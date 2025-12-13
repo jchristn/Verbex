@@ -2,6 +2,23 @@
 
 A React-based web dashboard for managing Verbex inverted indices.
 
+## Screenshots
+
+<div align="center">
+  <img src="../assets/screenshot1.png" alt="Dashboard Overview" width="800">
+  <p><em>Dashboard Overview</em></p>
+</div>
+
+<div align="center">
+  <img src="../assets/screenshot2.png" alt="Index Management" width="800">
+  <p><em>Index Management</em></p>
+</div>
+
+<div align="center">
+  <img src="../assets/screenshot3.png" alt="Search Interface" width="800">
+  <p><em>Search Interface</em></p>
+</div>
+
 ## Features
 
 - **Index Management**: Create, view, and delete indices with configurable storage modes and text processing options

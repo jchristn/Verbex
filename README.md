@@ -13,10 +13,28 @@
   **Verbex is in ALPHA** - we welcome your feedback, improvements, bugfixes, and deliciously harsh criticisms
 </div>
 
-Verbex provides a production-ready inverted index implementation that scales from simple in-memory operations to enterprise-grade persistent storage with hybrid caching strategies. Built with performance, reliability, and ease of use in mind.
+Verbex provides a production-ready inverted index implementation that scales from simple in-memory operations to enterprise-grade persistent storage. Built with performance, reliability, and ease of use in mind.
+
+## Screenshots
+
+<div align="center">
+  <img src="assets/screenshot1.png" alt="Dashboard Overview" width="800">
+  <p><em>Dashboard Overview</em></p>
+</div>
+
+<div align="center">
+  <img src="assets/screenshot2.png" alt="Index Management" width="800">
+  <p><em>Index Management</em></p>
+</div>
+
+<div align="center">
+  <img src="assets/screenshot3.png" alt="Search Interface" width="800">
+  <p><em>Search Interface</em></p>
+</div>
 
 ## Table of Contents
 
+- [Screenshots](#screenshots)
 - [What is Verbex?](#what-is-verbex)
 - [Who Should Use Verbex?](#who-should-use-verbex)
 - [Key Features](#key-features)
