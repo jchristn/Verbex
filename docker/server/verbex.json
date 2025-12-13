@@ -1,0 +1,26 @@
+{
+  "Logging": {
+    "SyslogServers": [],
+    "ConsoleLogging": true,
+    "EnableColors": false,
+    "LogDirectory": "./logs",
+    "LogFilename": "verbex.log",
+    "FileLogging": true,
+    "IncludeDateInFilename": true
+  },
+  "Rest": {
+    "Hostname": "*",
+    "Port": 8080,
+    "Ssl": false,
+    "SslCertificateFile": null,
+    "SslCertificatePassword": null
+  },
+  "DataDirectory": "./data",
+  "AdminBearerToken": "verbexadmin",
+  "Debug": {
+    "Authentication": false,
+    "Exceptions": true,
+    "Requests": false,
+    "DatabaseQueries": false
+  }
+}

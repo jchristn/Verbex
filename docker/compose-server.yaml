@@ -1,0 +1,13 @@
+services:
+  verbex-server:
+    image: jchristn/verbex-server:v0.1.0
+    container_name: verbex-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./server/verbex.json:/app/verbex.json
+      - ./server/data:/app/data
+      - ./server/logs:/app/logs
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production

@@ -1,8 +1,25 @@
-node_modules
-dist
-.git
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/
 .gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Development
+*.log
+*.local
+.env*.local
+
+# Misc
 *.md
-.env*
-.vscode
-.idea
