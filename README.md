@@ -18,18 +18,15 @@ Verbex provides a production-ready inverted index implementation that scales fro
 ## Screenshots
 
 <div align="center">
-  <img src="assets/screenshot1.png" alt="Dashboard Overview" width="800">
-  <p><em>Dashboard Overview</em></p>
+  <img src="assets/screenshot1.png" alt="Screenshot 1" width="800">
 </div>
 
 <div align="center">
-  <img src="assets/screenshot2.png" alt="Index Management" width="800">
-  <p><em>Index Management</em></p>
+  <img src="assets/screenshot2.png" alt="Screenshot 2" width="800">
 </div>
 
 <div align="center">
-  <img src="assets/screenshot3.png" alt="Search Interface" width="800">
-  <p><em>Search Interface</em></p>
+  <img src="assets/screenshot3.png" alt="Screenshot 3" width="800">
 </div>
 
 ## Table of Contents
