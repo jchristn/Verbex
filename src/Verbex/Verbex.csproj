@@ -24,6 +24,7 @@
         <PackageTags>search;fulltext;full-text-search;text-search;inverted-index;index;indexing;tf-idf;lucene;elasticsearch;solr;sqlite;tokenization;lemmatization;document-search;search-engine;information-retrieval;stopwords</PackageTags>
         <IncludeSymbols>True</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     </PropertyGroup>
 
     <ItemGroup>

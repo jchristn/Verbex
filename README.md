@@ -6,7 +6,6 @@
   [![NuGet](https://img.shields.io/nuget/v/Verbex.svg)](https://nuget.org/packages/Verbex)
   ![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg)
   ![License](https://img.shields.io/badge/license-MIT-green.svg)
-  ![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)
 
   **A high-performance, feature-rich inverted index library for .NET 8.0 with multiple storage modes, advanced caching, and comprehensive search capabilities.**
 
