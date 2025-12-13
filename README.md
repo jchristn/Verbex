@@ -3,7 +3,7 @@
 
   # Verbex
 
-  ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+  [![NuGet](https://img.shields.io/nuget/v/Verbex.svg)](https://nuget.org/packages/Verbex)
   ![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg)
   ![License](https://img.shields.io/badge/license-MIT-green.svg)
   ![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)

@@ -1,0 +1,3797 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Verbex</name>
+    </assembly>
+    <members>
+        <member name="T:Verbex.BasicLemmatizer">
+            <summary>
+            Basic lemmatizer implementation using simple suffix rules for common English word forms.
+            This is a simplified lemmatizer suitable for basic text processing needs.
+            Thread-safe for concurrent access.
+            </summary>
+        </member>
+        <member name="M:Verbex.BasicLemmatizer.Lemmatize(System.String)">
+            <summary>
+            Reduces a word to its base form using simple suffix rules and irregular word mappings.
+            </summary>
+            <param name="word">The word to lemmatize. Cannot be null or empty.</param>
+            <returns>The lemmatized form of the word.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when word is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when word is empty or whitespace.</exception>
+        </member>
+        <member name="T:Verbex.BasicStopWordRemover">
+            <summary>
+            Basic stop word remover implementation using a predefined list of common English stop words.
+            This implementation focuses on the most frequently used stop words that typically don't contribute
+            meaningful content to search operations.
+            Thread-safe for concurrent access.
+            </summary>
+        </member>
+        <member name="M:Verbex.BasicStopWordRemover.IsStopWord(System.String)">
+            <summary>
+            Determines whether a word should be removed as a stop word.
+            </summary>
+            <param name="word">The word to evaluate. Cannot be null or empty.</param>
+            <returns>True if the word is a stop word and should be removed; otherwise false.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when word is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when word is empty or whitespace.</exception>
+        </member>
+        <member name="T:Verbex.Constants">
+            <summary>
+            Constants.
+            </summary>
+        </member>
+        <member name="P:Verbex.Constants.Logo">
+            <summary>
+            Logo.
+            </summary>
+        </member>
+        <member name="T:Verbex.DefaultTokenizer">
+            <summary>
+            Default implementation of ITokenizer that provides basic word tokenization
+            Splits text on whitespace and common punctuation marks
+            </summary>
+        </member>
+        <member name="F:Verbex.DefaultTokenizer.DefaultSeparators">
+            <summary>
+            Characters used to split text into tokens
+            </summary>
+        </member>
+        <member name="M:Verbex.DefaultTokenizer.#ctor">
+            <summary>
+            Initializes a new instance of the DefaultTokenizer class with default separators
+            </summary>
+        </member>
+        <member name="M:Verbex.DefaultTokenizer.#ctor(System.Char[])">
+            <summary>
+            Initializes a new instance of the DefaultTokenizer class with custom separators
+            </summary>
+            <param name="separators">Custom separator characters to use for tokenization</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when separators is null</exception>
+        </member>
+        <member name="M:Verbex.DefaultTokenizer.Tokenize(System.String)">
+            <summary>
+            Tokenizes the given content into an array of tokens
+            Converts content to lowercase and splits on configured separator characters
+            </summary>
+            <param name="content">The content to tokenize</param>
+            <returns>Array of lowercase tokens extracted from the content</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when content is null</exception>
+        </member>
+        <member name="T:Verbex.DocumentMetadata">
+            <summary>
+            Metadata for a document stored in the inverted index
+            </summary>
+        </member>
+        <member name="M:Verbex.DocumentMetadata.#ctor(System.String,System.String)">
+            <summary>
+            Initializes a new instance of the DocumentMetadata class with minimal parameters.
+            Used primarily by the repository layer.
+            </summary>
+            <param name="documentId">The unique document identifier</param>
+            <param name="documentPath">The path or location of the document</param>
+            <exception cref="T:System.ArgumentException">Thrown when documentId is empty</exception>
+            <exception cref="T:System.ArgumentNullException">Thrown when documentPath is null</exception>
+        </member>
+        <member name="M:Verbex.DocumentMetadata.#ctor(System.String,System.String,System.Int64,System.String,System.String)">
+            <summary>
+            Initializes a new instance of the DocumentMetadata class
+            </summary>
+            <param name="documentId">The unique document identifier</param>
+            <param name="documentPath">The path or location of the document</param>
+            <param name="documentLength">The length of the document in characters</param>
+            <param name="contentSha256">SHA-256 hash of the document content for duplicate detection</param>
+            <param name="originalFileName">The original file name (optional, used for retrieval by name)</param>
+            <exception cref="T:System.ArgumentException">Thrown when documentId is empty</exception>
+            <exception cref="T:System.ArgumentNullException">Thrown when documentPath or contentSha256 is null</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when documentLength is negative</exception>
+        </member>
+        <member name="P:Verbex.DocumentMetadata.DocumentId">
+            <summary>
+            Gets the unique document identifier
+            </summary>
+        </member>
+        <member name="P:Verbex.DocumentMetadata.DocumentPath">
+            <summary>
+            Gets or sets the path or location of the document
+            </summary>
+            <exception cref="T:System.ArgumentNullException">Thrown when value is null</exception>
+        </member>
+        <member name="P:Verbex.DocumentMetadata.OriginalFileName">
+            <summary>
+            Gets or sets the original file name of the document.
+            This is used for retrieval by file name and is separate from the GUID-based storage path.
+            Can be null if no original file name was provided.
+            </summary>
+        </member>
+        <member name="P:Verbex.DocumentMetadata.DocumentLength">
+            <summary>
+            Gets or sets the length of the document in characters
+            Minimum value: 0
+            </summary>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when value is negative</exception>
+        </member>
+        <member name="P:Verbex.DocumentMetadata.IndexedDate">
+            <summary>
+            Gets or sets the date when the document was first indexed
+            </summary>
+        </member>
+        <member name="P:Verbex.DocumentMetadata.LastModified">
+            <summary>
+            Gets or sets the date when the document metadata was last modified
+            </summary>
+        </member>
+        <member name="P:Verbex.DocumentMetadata.ContentSha256">
+            <summary>
+            Gets or sets the SHA-256 hash of the document content for duplicate detection
+            </summary>
+            <exception cref="T:System.ArgumentNullException">Thrown when value is null</exception>
+        </member>
+        <member name="P:Verbex.DocumentMetadata.Terms">
+            <summary>
+            Gets a read-only collection of terms contained in this document
+            </summary>
+        </member>
+        <member name="P:Verbex.DocumentMetadata.IsDeleted">
+            <summary>
+            Gets or sets whether this document has been marked for deletion
+            Default value: false
+            When true, the document will be excluded from search results and eligible for garbage collection
+            </summary>
+        </member>
+        <member name="P:Verbex.DocumentMetadata.CustomMetadata">
+            <summary>
+            Gets a read-only dictionary of custom metadata properties
+            </summary>
+        </member>
+        <member name="P:Verbex.DocumentMetadata.Tags">
+            <summary>
+            Gets a read-only dictionary of tags (key-value pairs) associated with this document.
+            This is an alias for CustomMetadata for API consistency.
+            </summary>
+        </member>
+        <member name="P:Verbex.DocumentMetadata.Labels">
+            <summary>
+            Gets a read-only list of labels associated with this document.
+            Labels are case-insensitive strings used for categorization.
+            </summary>
+        </member>
+        <member name="M:Verbex.DocumentMetadata.AddTerm(System.String)">
+            <summary>
+            Adds a term to the document's term collection
+            </summary>
+            <param name="term">The term to add</param>
+            <returns>True if the term was added, false if it already existed</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when term is null</exception>
+            <exception cref="T:System.ArgumentException">Thrown when term is empty or whitespace</exception>
+        </member>
+        <member name="M:Verbex.DocumentMetadata.RemoveTerm(System.String)">
+            <summary>
+            Removes a term from the document's term collection
+            </summary>
+            <param name="term">The term to remove</param>
+            <returns>True if the term was removed, false if it didn't exist</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when term is null</exception>
+        </member>
+        <member name="M:Verbex.DocumentMetadata.SetCustomMetadata(System.String,System.Object)">
+            <summary>
+            Sets custom metadata for the document
+            </summary>
+            <param name="key">The metadata key</param>
+            <param name="value">The metadata value</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when key is null</exception>
+            <exception cref="T:System.ArgumentException">Thrown when key is empty or whitespace</exception>
+        </member>
+        <member name="M:Verbex.DocumentMetadata.RemoveCustomMetadata(System.String)">
+            <summary>
+            Removes custom metadata for the specified key
+            </summary>
+            <param name="key">The metadata key to remove</param>
+            <returns>True if the metadata was removed, false if key didn't exist</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when key is null</exception>
+        </member>
+        <member name="M:Verbex.DocumentMetadata.ClearTerms">
+            <summary>
+            Clears all terms from the document
+            </summary>
+        </member>
+        <member name="M:Verbex.DocumentMetadata.AddLabel(System.String)">
+            <summary>
+            Adds a label to the document's label collection.
+            Labels are stored in lowercase for case-insensitive matching.
+            </summary>
+            <param name="label">The label to add</param>
+            <returns>True if the label was added, false if it already existed</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when label is null</exception>
+            <exception cref="T:System.ArgumentException">Thrown when label is empty or whitespace</exception>
+        </member>
+        <member name="M:Verbex.DocumentMetadata.RemoveLabel(System.String)">
+            <summary>
+            Removes a label from the document's label collection
+            </summary>
+            <param name="label">The label to remove</param>
+            <returns>True if the label was removed, false if it didn't exist</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when label is null</exception>
+        </member>
+        <member name="M:Verbex.DocumentMetadata.HasLabel(System.String)">
+            <summary>
+            Checks if the document has a specific label
+            </summary>
+            <param name="label">The label to check</param>
+            <returns>True if the label exists, false otherwise</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when label is null</exception>
+        </member>
+        <member name="M:Verbex.DocumentMetadata.ClearLabels">
+            <summary>
+            Clears all labels from the document
+            </summary>
+        </member>
+        <member name="M:Verbex.DocumentMetadata.SetTag(System.String,System.Object)">
+            <summary>
+            Sets a tag (key-value pair) for the document.
+            This is an alias for SetCustomMetadata for API consistency.
+            </summary>
+            <param name="key">The tag key</param>
+            <param name="value">The tag value</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when key is null</exception>
+            <exception cref="T:System.ArgumentException">Thrown when key is empty or whitespace</exception>
+        </member>
+        <member name="M:Verbex.DocumentMetadata.RemoveTag(System.String)">
+            <summary>
+            Removes a tag for the specified key.
+            This is an alias for RemoveCustomMetadata for API consistency.
+            </summary>
+            <param name="key">The tag key to remove</param>
+            <returns>True if the tag was removed, false if key didn't exist</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when key is null</exception>
+        </member>
+        <member name="T:Verbex.ILemmatizer">
+            <summary>
+            Interface for text lemmatization, reducing words to their base or dictionary form.
+            </summary>
+        </member>
+        <member name="M:Verbex.ILemmatizer.Lemmatize(System.String)">
+            <summary>
+            Reduces a word to its base form.
+            </summary>
+            <param name="word">The word to lemmatize. Cannot be null or empty.</param>
+            <returns>The lemmatized form of the word.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when word is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when word is empty or whitespace.</exception>
+        </member>
+        <member name="T:Verbex.IndexStatistics">
+            <summary>
+            Comprehensive statistics for the inverted index
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.DocumentCount">
+            <summary>
+            Gets or sets the total number of documents in the index
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.TermCount">
+            <summary>
+            Gets or sets the total number of unique terms in the index
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.PostingCount">
+            <summary>
+            Gets or sets the total number of postings (term-document pairs) in the index
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.AverageDocumentLength">
+            <summary>
+            Gets or sets the average document length in terms
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.TotalDocumentSize">
+            <summary>
+            Gets or sets the total size of all documents in characters
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.TotalTermOccurrences">
+            <summary>
+            Gets or sets the total number of term occurrences across all documents
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.AverageTermsPerDocument">
+            <summary>
+            Gets or sets the average terms per document
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.AverageDocumentFrequency">
+            <summary>
+            Gets or sets the average document frequency across all terms
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.MaxDocumentFrequency">
+            <summary>
+            Gets or sets the maximum document frequency (most common term)
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.MinDocumentLength">
+            <summary>
+            Gets or sets the minimum document length
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.MaxDocumentLength">
+            <summary>
+            Gets or sets the maximum document length
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.HotCacheSize">
+            <summary>
+            Gets or sets the number of terms currently in the hot cache (deprecated, always 0)
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.DocumentCacheSize">
+            <summary>
+            Gets or sets the number of documents currently in the recent documents cache (deprecated, always 0)
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.WriteBufferSize">
+            <summary>
+            Gets or sets the current write buffer size (deprecated, always 0)
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.GeneratedAt">
+            <summary>
+            Gets or sets the timestamp when these statistics were generated
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.Memory">
+            <summary>
+            Gets or sets memory usage statistics
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.TopTerms">
+            <summary>
+            Gets or sets the top N most frequent terms
+            </summary>
+        </member>
+        <member name="M:Verbex.IndexStatistics.#ctor">
+            <summary>
+            Initializes a new instance of the IndexStatistics class
+            </summary>
+        </member>
+        <member name="M:Verbex.IndexStatistics.#ctor(System.Int64,System.Int64,System.Int64,System.Double,System.Int64,System.Int32,System.Int32,System.Int32,Verbex.MemoryStatistics,System.Collections.Generic.IReadOnlyList{Verbex.TermFrequencyInfo})">
+            <summary>
+            Initializes a new instance of the IndexStatistics class
+            </summary>
+            <param name="documentCount">Total number of documents</param>
+            <param name="termCount">Total number of unique terms</param>
+            <param name="postingCount">Total number of postings</param>
+            <param name="averageDocumentLength">Average document length</param>
+            <param name="totalDocumentSize">Total document size in characters</param>
+            <param name="hotCacheSize">Hot cache size</param>
+            <param name="documentCacheSize">Document cache size</param>
+            <param name="writeBufferSize">Write buffer size</param>
+            <param name="memory">Memory statistics</param>
+            <param name="topTerms">Top frequent terms</param>
+        </member>
+        <member name="T:Verbex.InvertedIndex">
+            <summary>
+            Main inverted index implementation using SQLite storage.
+            Thread-safe for concurrent operations.
+            </summary>
+        </member>
+        <member name="P:Verbex.InvertedIndex.Configuration">
+            <summary>
+            Gets the configuration used by this index.
+            </summary>
+        </member>
+        <member name="P:Verbex.InvertedIndex.IndexName">
+            <summary>
+            Gets the name of the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.InvertedIndex.IsOpen">
+            <summary>
+            Gets whether the index is open and ready for operations.
+            </summary>
+        </member>
+        <member name="M:Verbex.InvertedIndex.#ctor(System.String,Verbex.VerbexConfiguration)">
+            <summary>
+            Initializes a new instance of the InvertedIndex class with configuration object.
+            </summary>
+            <param name="indexName">Name of the index.</param>
+            <param name="configuration">Configuration settings for the index.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when indexName or configuration is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when indexName is empty or whitespace.</exception>
+        </member>
+        <member name="M:Verbex.InvertedIndex.#ctor(System.String,Verbex.Repositories.IIndexRepository,Verbex.VerbexConfiguration)">
+            <summary>
+            Initializes a new instance of the InvertedIndex class with a custom repository.
+            </summary>
+            <param name="indexName">Name of the index.</param>
+            <param name="repository">Repository to use for storage.</param>
+            <param name="configuration">Configuration settings for the index.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when indexName or repository is null.</exception>
+        </member>
+        <member name="M:Verbex.InvertedIndex.OpenAsync(System.Threading.CancellationToken)">
+            <summary>
+            Opens the index. Must be called before any operations.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.CloseAsync(System.Threading.CancellationToken)">
+            <summary>
+            Closes the index.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetDocumentCountAsync(System.Threading.CancellationToken)">
+            <summary>
+            Gets the total number of documents in the index.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Document count.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.AddDocumentAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Adds a document to the index.
+            </summary>
+            <param name="documentName">Name/path of the document.</param>
+            <param name="content">Document content to index.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>The document ID.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when documentName or content is null.</exception>
+        </member>
+        <member name="M:Verbex.InvertedIndex.AddDocumentAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Adds a document to the index with a specific ID.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="documentName">Name/path of the document.</param>
+            <param name="content">Document content to index.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when documentName or content is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when documentId is empty.</exception>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetDocumentAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets a document by ID.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Document metadata or null if not found.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetDocumentWithMetadataAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets a document by ID with all metadata (labels, tags, terms) populated in a single query.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Document metadata with labels, tags, and terms populated, or null if not found.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetDocumentByNameAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets a document by name.
+            </summary>
+            <param name="documentName">Document name.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Document metadata or null if not found.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetDocumentsAsync(System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Gets all documents with pagination.
+            </summary>
+            <param name="limit">Maximum number of documents.</param>
+            <param name="offset">Number of documents to skip.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of documents.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.DocumentExistsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Checks if a document exists by ID.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>True if document exists.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.DocumentExistsByNameAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Checks if a document exists by name.
+            </summary>
+            <param name="documentName">Document name.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>True if document exists.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.RemoveDocumentAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Removes a document from the index.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>True if document was removed.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.ClearAsync(System.Threading.CancellationToken)">
+            <summary>
+            Removes all documents from the index.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of documents removed.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.SearchAsync(System.String,System.Nullable{System.Int32},System.Boolean,System.Threading.CancellationToken)">
+            <summary>
+            Searches the index for documents matching the query.
+            </summary>
+            <param name="query">Search query string.</param>
+            <param name="maxResults">Maximum number of results.</param>
+            <param name="useAndLogic">If true, documents must contain all terms. If false, any term.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Search results.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.SearchAsync(System.String,System.Nullable{System.Int32},System.Boolean,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Searches the index for documents matching the query with optional label and tag filtering.
+            </summary>
+            <param name="query">Search query string.</param>
+            <param name="maxResults">Maximum number of results.</param>
+            <param name="useAndLogic">If true, documents must contain all terms. If false, any term.</param>
+            <param name="labels">Optional list of labels to filter by (documents must have ALL labels).</param>
+            <param name="tags">Optional dictionary of tags to filter by (documents must have ALL tags).</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Search results.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.TermExistsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Checks if a term exists in the index.
+            </summary>
+            <param name="term">Term to check.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>True if term exists.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetPostingsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets the posting list for a term (documents containing the term).
+            </summary>
+            <param name="term">Term to look up.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of document-term records.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetTermsByPrefixAsync(System.String,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Gets terms matching a prefix.
+            </summary>
+            <param name="prefix">Prefix to match.</param>
+            <param name="limit">Maximum number of terms.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of matching terms.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetDocumentTermsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets all terms indexed for a specific document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of document-term records containing term information.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.AddLabelAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Adds a label to a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="label">Label text.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.AddLabelsBatchAsync(System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Batch adds labels to a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="labels">List of labels to add.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.ReplaceLabelsAsync(System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Replaces all labels on a document with the provided list (deletes all existing, then adds new).
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="labels">List of labels to set.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.AddIndexLabelAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Adds an index-level label.
+            </summary>
+            <param name="label">Label text.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetLabelsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets labels for a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of labels.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetIndexLabelsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Gets index-level labels.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>List of labels.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetDocumentsByLabelAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets documents with a specific label.
+            </summary>
+            <param name="label">Label to filter by.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of documents.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.RemoveLabelAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Removes a label from a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="label">Label to remove.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>True if label was removed.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.RemoveIndexLabelAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Removes an index-level label.
+            </summary>
+            <param name="label">Label to remove.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>True if label was removed.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.SetTagAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Sets a tag on a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="key">Tag key.</param>
+            <param name="value">Tag value.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.AddTagsBatchAsync(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Adds multiple tags to a document in a single batch operation.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="tags">Dictionary of tag keys and values.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.ReplaceTagsAsync(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Replaces all tags on a document with the provided dictionary (deletes all existing, then adds new).
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="tags">Dictionary of tags to set.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.SetIndexTagAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Sets an index-level tag.
+            </summary>
+            <param name="key">Tag key.</param>
+            <param name="value">Tag value.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetTagAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets a tag value from a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="key">Tag key.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Tag value or null.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetTagsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets all tags for a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Dictionary of tags.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetIndexTagsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Gets index-level tags.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Dictionary of tags.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetDocumentsByTagAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets documents with a specific tag.
+            </summary>
+            <param name="key">Tag key.</param>
+            <param name="value">Tag value to match.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of documents.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.RemoveTagAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Removes a tag from a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="key">Tag key.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>True if tag was removed.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.RemoveIndexTagAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Removes an index-level tag.
+            </summary>
+            <param name="key">Tag key.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>True if tag was removed.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetStatisticsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Gets comprehensive index statistics.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Index statistics.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetTermStatisticsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets statistics for a specific term.
+            </summary>
+            <param name="term">Term to get statistics for.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Term statistics or null if term not found.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetTermCountAsync(System.Threading.CancellationToken)">
+            <summary>
+            Gets the unique term count in the index.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Term count.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetTopTermsAsync(System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Gets the top terms by document frequency.
+            </summary>
+            <param name="limit">Maximum number of terms.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of top terms.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.FlushAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Flushes any pending changes. For in-memory mode, saves to the specified path.
+            </summary>
+            <param name="targetPath">Path to save to (for in-memory mode only).</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.Dispose">
+            <summary>
+            Disposes the index.
+            </summary>
+        </member>
+        <member name="M:Verbex.InvertedIndex.DisposeAsync">
+            <summary>
+            Disposes the index asynchronously.
+            </summary>
+        </member>
+        <member name="M:Verbex.InvertedIndex.Dispose(System.Boolean)">
+            <summary>
+            Disposes managed resources.
+            </summary>
+            <param name="disposing">True if called from Dispose.</param>
+        </member>
+        <member name="M:Verbex.InvertedIndex.DisposeAsyncCore">
+            <summary>
+            Disposes managed resources asynchronously.
+            </summary>
+        </member>
+        <member name="T:Verbex.IStopWordRemover">
+            <summary>
+            Interface for removing common stop words from text processing.
+            Stop words are frequently used words that typically don't contribute significant meaning to search queries.
+            </summary>
+        </member>
+        <member name="M:Verbex.IStopWordRemover.IsStopWord(System.String)">
+            <summary>
+            Determines whether a word should be removed as a stop word.
+            </summary>
+            <param name="word">The word to evaluate. Cannot be null or empty.</param>
+            <returns>True if the word is a stop word and should be removed; otherwise false.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when word is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when word is empty or whitespace.</exception>
+        </member>
+        <member name="T:Verbex.ITokenizer">
+            <summary>
+            Interface for tokenizing text content into individual terms
+            </summary>
+        </member>
+        <member name="M:Verbex.ITokenizer.Tokenize(System.String)">
+            <summary>
+            Tokenizes the given content into an array of tokens
+            </summary>
+            <param name="content">The content to tokenize</param>
+            <returns>Array of tokens extracted from the content</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when content is null</exception>
+        </member>
+        <member name="T:Verbex.MemoryStatistics">
+            <summary>
+            Memory usage statistics
+            </summary>
+        </member>
+        <member name="P:Verbex.MemoryStatistics.IndexMemoryBytes">
+            <summary>
+            Gets the estimated memory usage of the main index in bytes
+            </summary>
+        </member>
+        <member name="P:Verbex.MemoryStatistics.DocumentStoreMemoryBytes">
+            <summary>
+            Gets the estimated memory usage of the document store in bytes
+            </summary>
+        </member>
+        <member name="P:Verbex.MemoryStatistics.CacheMemoryBytes">
+            <summary>
+            Gets the estimated memory usage of caches in bytes
+            </summary>
+        </member>
+        <member name="P:Verbex.MemoryStatistics.TotalMemoryBytes">
+            <summary>
+            Gets the estimated total memory usage in bytes
+            </summary>
+        </member>
+        <member name="M:Verbex.MemoryStatistics.#ctor(System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Initializes a new instance of the MemoryStatistics class
+            </summary>
+            <param name="indexMemoryBytes">Index memory usage</param>
+            <param name="documentStoreMemoryBytes">Document store memory usage</param>
+            <param name="cacheMemoryBytes">Cache memory usage</param>
+        </member>
+        <member name="T:Verbex.MetadataFilter">
+            <summary>
+            Represents a filter for searching documents by their custom metadata properties and labels.
+            Multiple filters are combined with AND logic (all filters must match).
+            Label matching is case-insensitive. Tag (custom metadata) matching is exact.
+            </summary>
+        </member>
+        <member name="M:Verbex.MetadataFilter.#ctor">
+            <summary>
+            Initializes a new instance of the MetadataFilter class with no filters.
+            </summary>
+        </member>
+        <member name="M:Verbex.MetadataFilter.#ctor(System.String,System.Object)">
+            <summary>
+            Initializes a new instance of the MetadataFilter class with a single key-value filter.
+            </summary>
+            <param name="key">The metadata key to filter on</param>
+            <param name="value">The value to match</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when key is null</exception>
+            <exception cref="T:System.ArgumentException">Thrown when key is empty or whitespace</exception>
+        </member>
+        <member name="M:Verbex.MetadataFilter.#ctor(System.Collections.Generic.Dictionary{System.String,System.Object})">
+            <summary>
+            Initializes a new instance of the MetadataFilter class with multiple filters.
+            </summary>
+            <param name="filters">Dictionary of metadata key-value pairs to filter on</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when filters is null</exception>
+        </member>
+        <member name="M:Verbex.MetadataFilter.#ctor(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Initializes a new instance of the MetadataFilter class with labels only.
+            </summary>
+            <param name="labels">Collection of labels to filter on (case-insensitive)</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when labels is null</exception>
+        </member>
+        <member name="M:Verbex.MetadataFilter.#ctor(System.Collections.Generic.Dictionary{System.String,System.Object},System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Initializes a new instance of the MetadataFilter class with both tags and labels.
+            </summary>
+            <param name="filters">Dictionary of metadata key-value pairs to filter on</param>
+            <param name="labels">Collection of labels to filter on (case-insensitive)</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when filters or labels is null</exception>
+        </member>
+        <member name="P:Verbex.MetadataFilter.Count">
+            <summary>
+            Gets the count of tag filters in this MetadataFilter.
+            </summary>
+        </member>
+        <member name="P:Verbex.MetadataFilter.LabelCount">
+            <summary>
+            Gets the count of label filters in this MetadataFilter.
+            </summary>
+        </member>
+        <member name="P:Verbex.MetadataFilter.TotalCount">
+            <summary>
+            Gets the total count of all filters (tags + labels) in this MetadataFilter.
+            </summary>
+        </member>
+        <member name="P:Verbex.MetadataFilter.IsEmpty">
+            <summary>
+            Gets whether this MetadataFilter has no filters (will match all documents).
+            Returns true only if both tag filters and label filters are empty.
+            </summary>
+        </member>
+        <member name="P:Verbex.MetadataFilter.Filters">
+            <summary>
+            Gets a read-only dictionary of the tag filter key-value pairs.
+            </summary>
+        </member>
+        <member name="P:Verbex.MetadataFilter.Labels">
+            <summary>
+            Gets a read-only collection of the label filters.
+            Label matching is case-insensitive.
+            </summary>
+        </member>
+        <member name="M:Verbex.MetadataFilter.Add(System.String,System.Object)">
+            <summary>
+            Adds a filter for the specified key and value.
+            If a filter for the key already exists, it will be replaced.
+            </summary>
+            <param name="key">The metadata key to filter on</param>
+            <param name="value">The value to match</param>
+            <returns>This MetadataFilter instance for method chaining</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when key is null</exception>
+            <exception cref="T:System.ArgumentException">Thrown when key is empty or whitespace</exception>
+        </member>
+        <member name="M:Verbex.MetadataFilter.Remove(System.String)">
+            <summary>
+            Removes the filter for the specified key.
+            </summary>
+            <param name="key">The metadata key to remove</param>
+            <returns>True if the filter was removed, false if the key was not found</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when key is null</exception>
+        </member>
+        <member name="M:Verbex.MetadataFilter.Clear">
+            <summary>
+            Clears all tag filters from this MetadataFilter.
+            Does not affect label filters.
+            </summary>
+        </member>
+        <member name="M:Verbex.MetadataFilter.ClearAll">
+            <summary>
+            Clears all filters (both tags and labels) from this MetadataFilter.
+            </summary>
+        </member>
+        <member name="M:Verbex.MetadataFilter.AddLabel(System.String)">
+            <summary>
+            Adds a label to the filter. Label matching is case-insensitive.
+            </summary>
+            <param name="label">The label to filter on</param>
+            <returns>This MetadataFilter instance for method chaining</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when label is null</exception>
+            <exception cref="T:System.ArgumentException">Thrown when label is empty or whitespace</exception>
+        </member>
+        <member name="M:Verbex.MetadataFilter.AddLabels(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Adds multiple labels to the filter. Label matching is case-insensitive.
+            Empty or whitespace labels are ignored.
+            </summary>
+            <param name="labels">The labels to filter on</param>
+            <returns>This MetadataFilter instance for method chaining</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when labels is null</exception>
+        </member>
+        <member name="M:Verbex.MetadataFilter.RemoveLabel(System.String)">
+            <summary>
+            Removes a label from the filter.
+            </summary>
+            <param name="label">The label to remove</param>
+            <returns>True if the label was removed, false if not found</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when label is null</exception>
+        </member>
+        <member name="M:Verbex.MetadataFilter.ClearLabels">
+            <summary>
+            Clears all label filters from this MetadataFilter.
+            Does not affect tag filters.
+            </summary>
+        </member>
+        <member name="M:Verbex.MetadataFilter.HasLabel(System.String)">
+            <summary>
+            Checks whether this filter contains the specified label.
+            Comparison is case-insensitive.
+            </summary>
+            <param name="label">The label to check for</param>
+            <returns>True if the filter contains the label, false otherwise</returns>
+        </member>
+        <member name="M:Verbex.MetadataFilter.Matches(Verbex.DocumentMetadata)">
+            <summary>
+            Checks whether the specified document metadata matches all filters.
+            All filter conditions must be satisfied (AND logic).
+            Both tag filters and label filters must match.
+            </summary>
+            <param name="metadata">The document metadata to check</param>
+            <returns>True if all filters match or if there are no filters, false otherwise</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when metadata is null</exception>
+        </member>
+        <member name="M:Verbex.MetadataFilter.ValuesMatch(System.Object,System.Object)">
+            <summary>
+            Compares two values for equality, handling JsonElement values from JSON deserialization.
+            </summary>
+        </member>
+        <member name="M:Verbex.MetadataFilter.GetValueFromJsonElement(System.Text.Json.JsonElement)">
+            <summary>
+            Extracts the actual value from a JsonElement.
+            </summary>
+        </member>
+        <member name="M:Verbex.MetadataFilter.Create(System.String,System.Object)">
+            <summary>
+            Creates a new MetadataFilter with the specified key-value pair.
+            Convenience factory method for creating single-filter instances.
+            </summary>
+            <param name="key">The metadata key to filter on</param>
+            <param name="value">The value to match</param>
+            <returns>A new MetadataFilter instance</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when key is null</exception>
+            <exception cref="T:System.ArgumentException">Thrown when key is empty or whitespace</exception>
+        </member>
+        <member name="M:Verbex.MetadataFilter.Create(System.Collections.Generic.Dictionary{System.String,System.Object})">
+            <summary>
+            Creates a new MetadataFilter from the specified dictionary.
+            Convenience factory method for creating multi-filter instances.
+            </summary>
+            <param name="filters">Dictionary of metadata key-value pairs to filter on</param>
+            <returns>A new MetadataFilter instance</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when filters is null</exception>
+        </member>
+        <member name="M:Verbex.MetadataFilter.CreateWithLabels(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Creates a new MetadataFilter with the specified labels.
+            Convenience factory method for creating label-only filter instances.
+            </summary>
+            <param name="labels">Collection of labels to filter on (case-insensitive)</param>
+            <returns>A new MetadataFilter instance</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when labels is null</exception>
+        </member>
+        <member name="M:Verbex.MetadataFilter.Create(System.Collections.Generic.Dictionary{System.String,System.Object},System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Creates a new MetadataFilter with both tags and labels.
+            Convenience factory method for creating combined filter instances.
+            </summary>
+            <param name="filters">Dictionary of metadata key-value pairs to filter on, or null</param>
+            <param name="labels">Collection of labels to filter on (case-insensitive), or null</param>
+            <returns>A new MetadataFilter instance</returns>
+        </member>
+        <member name="T:Verbex.Repositories.Converters">
+            <summary>
+            Provides conversion utilities between database rows and domain objects.
+            </summary>
+        </member>
+        <member name="F:Verbex.Repositories.Converters.TimestampFormat">
+            <summary>
+            ISO 8601 timestamp format used for database storage.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.FormatTimestamp(System.DateTime)">
+            <summary>
+            Formats a DateTime as an ISO 8601 UTC string.
+            </summary>
+            <param name="dateTime">The DateTime to format.</param>
+            <returns>ISO 8601 formatted string.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.ParseTimestamp(System.String)">
+            <summary>
+            Parses an ISO 8601 UTC string to DateTime.
+            </summary>
+            <param name="timestamp">The timestamp string to parse.</param>
+            <returns>Parsed DateTime in UTC.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.GetString(System.Data.DataRow,System.String)">
+            <summary>
+            Gets a string value from a DataRow, handling DBNull.
+            </summary>
+            <param name="row">The DataRow.</param>
+            <param name="column">The column name.</param>
+            <returns>String value or null.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.GetRequiredString(System.Data.DataRow,System.String)">
+            <summary>
+            Gets a required string value from a DataRow.
+            </summary>
+            <param name="row">The DataRow.</param>
+            <param name="column">The column name.</param>
+            <returns>String value.</returns>
+            <exception cref="T:System.InvalidOperationException">If value is null.</exception>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.GetInt(System.Data.DataRow,System.String,System.Int32)">
+            <summary>
+            Gets an integer value from a DataRow, handling DBNull.
+            </summary>
+            <param name="row">The DataRow.</param>
+            <param name="column">The column name.</param>
+            <param name="defaultValue">Default value if null.</param>
+            <returns>Integer value.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.GetLong(System.Data.DataRow,System.String,System.Int64)">
+            <summary>
+            Gets a long value from a DataRow, handling DBNull.
+            </summary>
+            <param name="row">The DataRow.</param>
+            <param name="column">The column name.</param>
+            <param name="defaultValue">Default value if null.</param>
+            <returns>Long value.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.GetDouble(System.Data.DataRow,System.String,System.Double)">
+            <summary>
+            Gets a double value from a DataRow, handling DBNull.
+            </summary>
+            <param name="row">The DataRow.</param>
+            <param name="column">The column name.</param>
+            <param name="defaultValue">Default value if null.</param>
+            <returns>Double value.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.GetGuid(System.Data.DataRow,System.String)">
+            <summary>
+            Gets a GUID value from a DataRow.
+            </summary>
+            <param name="row">The DataRow.</param>
+            <param name="column">The column name.</param>
+            <returns>GUID value or Guid.Empty.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.GetNullableGuid(System.Data.DataRow,System.String)">
+            <summary>
+            Gets a nullable GUID value from a DataRow.
+            </summary>
+            <param name="row">The DataRow.</param>
+            <param name="column">The column name.</param>
+            <returns>GUID value or null.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.GetDateTime(System.Data.DataRow,System.String)">
+            <summary>
+            Gets a DateTime value from a DataRow.
+            </summary>
+            <param name="row">The DataRow.</param>
+            <param name="column">The column name.</param>
+            <returns>DateTime value.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.GetNullableDateTime(System.Data.DataRow,System.String)">
+            <summary>
+            Gets a nullable DateTime value from a DataRow.
+            </summary>
+            <param name="row">The DataRow.</param>
+            <param name="column">The column name.</param>
+            <returns>DateTime value or null.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.SerializeIntList(System.Collections.Generic.List{System.Int32})">
+            <summary>
+            Serializes a list of integers to a JSON array string.
+            </summary>
+            <param name="positions">The integer list to serialize.</param>
+            <returns>JSON array string (e.g., "[1,5,9]").</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.DeserializeIntList(System.String)">
+            <summary>
+            Deserializes a JSON array string to a list of integers.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <returns>List of integers.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.DocumentFromRow(System.Data.DataRow)">
+            <summary>
+            Converts a DataRow to a DocumentRecord.
+            </summary>
+            <param name="row">The DataRow.</param>
+            <returns>DocumentRecord instance.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.TermFromRow(System.Data.DataRow)">
+            <summary>
+            Converts a DataRow to a TermRecord.
+            </summary>
+            <param name="row">The DataRow.</param>
+            <returns>TermRecord instance.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.DocumentTermFromRow(System.Data.DataRow)">
+            <summary>
+            Converts a DataRow to a DocumentTermRecord.
+            </summary>
+            <param name="row">The DataRow.</param>
+            <returns>DocumentTermRecord instance.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.LabelFromRow(System.Data.DataRow)">
+            <summary>
+            Converts a DataRow to a LabelRecord.
+            </summary>
+            <param name="row">The DataRow.</param>
+            <returns>LabelRecord instance.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.TagFromRow(System.Data.DataRow)">
+            <summary>
+            Converts a DataRow to a TagRecord.
+            </summary>
+            <param name="row">The DataRow.</param>
+            <returns>TagRecord instance.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Converters.IndexMetadataFromRow(System.Data.DataRow)">
+            <summary>
+            Converts a DataRow to an IndexMetadataRecord.
+            </summary>
+            <param name="row">The DataRow.</param>
+            <returns>IndexMetadataRecord instance.</returns>
+        </member>
+        <member name="T:Verbex.Repositories.DiskIndexRepository">
+            <summary>
+            Disk-based SQLite index repository.
+            Data is persisted immediately to the specified database file.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.DiskIndexRepository.#ctor(System.String)">
+            <summary>
+            Creates a new disk-based index repository.
+            </summary>
+            <param name="databasePath">Path to the SQLite database file.</param>
+            <exception cref="T:System.ArgumentNullException">If databasePath is null or empty.</exception>
+        </member>
+        <member name="M:Verbex.Repositories.DiskIndexRepository.Create(System.String,System.String)">
+            <summary>
+            Creates a new disk-based index repository with automatic directory creation.
+            </summary>
+            <param name="directory">Directory to store the database.</param>
+            <param name="databaseFilename">Database filename (default: index.db).</param>
+            <returns>New DiskIndexRepository instance.</returns>
+            <exception cref="T:System.ArgumentNullException">If directory is null or empty.</exception>
+        </member>
+        <member name="M:Verbex.Repositories.DiskIndexRepository.GetDefaultStorageDirectory(System.String)">
+            <summary>
+            Gets the default storage directory for indices.
+            </summary>
+            <param name="indexName">Name of the index.</param>
+            <returns>Default directory path.</returns>
+        </member>
+        <member name="T:Verbex.Repositories.DocumentRecord">
+            <summary>
+            Record type for document table rows.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentRecord.Id">
+            <summary>Document ID (k-sortable unique identifier).</summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentRecord.Name">
+            <summary>Document name.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentRecord.ContentSha256">
+            <summary>SHA-256 hash of the document content.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentRecord.DocumentLength">
+            <summary>Document length in characters.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentRecord.TermCount">
+            <summary>Number of unique terms in the document.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentRecord.IndexedUtc">
+            <summary>Timestamp when the document was indexed.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentRecord.LastModifiedUtc">
+            <summary>Timestamp when the document was last modified.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentRecord.CreatedUtc">
+            <summary>Timestamp when the record was created.</summary>
+        </member>
+        <member name="T:Verbex.Repositories.DocumentTermRecord">
+            <summary>
+            Record type for document_terms table rows.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentTermRecord.Id">
+            <summary>Record ID (k-sortable unique identifier).</summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentTermRecord.DocumentId">
+            <summary>Document ID (k-sortable unique identifier).</summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentTermRecord.TermId">
+            <summary>Term ID (k-sortable unique identifier).</summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentTermRecord.TermFrequency">
+            <summary>Number of times the term appears in the document.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentTermRecord.CharacterPositions">
+            <summary>Character positions (absolute offsets) where the term appears.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentTermRecord.TermPositions">
+            <summary>Term positions (word indices) where the term appears.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentTermRecord.LastModifiedUtc">
+            <summary>Timestamp when the record was last modified.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentTermRecord.CreatedUtc">
+            <summary>Timestamp when the record was created.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentTermRecord.Term">
+            <summary>Term text (joined from terms table).</summary>
+        </member>
+        <member name="P:Verbex.Repositories.DocumentTermRecord.DocumentName">
+            <summary>Document name (joined from documents table).</summary>
+        </member>
+        <member name="T:Verbex.Repositories.IIndexRepository">
+            <summary>
+            Interface for inverted index persistence operations.
+            Implementations provide storage for documents, terms, and their relationships.
+            This interface exposes segregated method interfaces for better organization and flexibility.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.IIndexRepository.IsOpen">
+            <summary>
+            Gets whether the repository is currently open.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.IIndexRepository.IndexName">
+            <summary>
+            Gets the name of the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.IIndexRepository.Document">
+            <summary>
+            Gets the document operations interface.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.IIndexRepository.Term">
+            <summary>
+            Gets the term operations interface.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.IIndexRepository.DocumentTerm">
+            <summary>
+            Gets the document-term operations interface.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.IIndexRepository.Label">
+            <summary>
+            Gets the label operations interface.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.IIndexRepository.Tag">
+            <summary>
+            Gets the tag operations interface.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.IIndexRepository.Statistics">
+            <summary>
+            Gets the statistics operations interface.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.IIndexRepository.OpenAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Opens the repository connection and initializes the schema if needed.
+            </summary>
+            <param name="indexName">Name of the index.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.IIndexRepository.CloseAsync(System.Threading.CancellationToken)">
+            <summary>
+            Closes the repository connection.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.IIndexRepository.FlushAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Flushes any pending changes to persistent storage.
+            For in-memory databases, this saves to the specified file.
+            </summary>
+            <param name="targetPath">Optional path to save to (for in-memory mode).</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="T:Verbex.Repositories.IndexMetadataRecord">
+            <summary>
+            Record type for index_metadata table rows.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.IndexMetadataRecord.Id">
+            <summary>Record ID (k-sortable unique identifier).</summary>
+        </member>
+        <member name="P:Verbex.Repositories.IndexMetadataRecord.Name">
+            <summary>Index name.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.IndexMetadataRecord.LastModifiedUtc">
+            <summary>Timestamp when the index was last modified.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.IndexMetadataRecord.CreatedUtc">
+            <summary>Timestamp when the record was created.</summary>
+        </member>
+        <member name="T:Verbex.Repositories.Interfaces.IDocumentMethods">
+            <summary>
+            Interface for document-related repository operations.
+            Provides CRUD operations for documents in the index.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentMethods.AddAsync(System.String,System.String,System.String,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Adds a new document to the index.
+            </summary>
+            <param name="id">Document ID (k-sortable unique identifier).</param>
+            <param name="name">Document name.</param>
+            <param name="contentSha256">SHA-256 hash for duplicate detection.</param>
+            <param name="documentLength">Character count of document.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentMethods.GetAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets a document by ID.
+            </summary>
+            <param name="id">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Document metadata or null if not found.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentMethods.GetByNameAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets a document by name.
+            </summary>
+            <param name="name">Document name.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Document metadata or null if not found.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentMethods.GetWithMetadataAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets a document by ID with all metadata (labels, tags, terms) in a single query.
+            </summary>
+            <param name="id">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Document metadata with populated labels, tags, and terms, or null if not found.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentMethods.GetByContentSha256Async(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets documents by content SHA-256 hash.
+            </summary>
+            <param name="contentSha256">SHA-256 content hash.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of matching documents.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentMethods.GetAllAsync(System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Gets all documents with pagination.
+            </summary>
+            <param name="limit">Maximum number of documents to return.</param>
+            <param name="offset">Number of documents to skip.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of documents.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentMethods.GetByIdsAsync(System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Gets multiple documents by IDs.
+            </summary>
+            <param name="ids">Document IDs.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of documents.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentMethods.GetCountAsync(System.Threading.CancellationToken)">
+            <summary>
+            Gets the total number of documents.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Document count.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentMethods.ExistsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Checks if a document exists by ID.
+            </summary>
+            <param name="id">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>True if document exists.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentMethods.ExistsByNameAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Checks if a document exists by name.
+            </summary>
+            <param name="name">Document name.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>True if document exists.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentMethods.UpdateAsync(System.String,System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Updates a document's metadata.
+            </summary>
+            <param name="id">Document ID.</param>
+            <param name="name">New document name.</param>
+            <param name="contentSha256">New SHA-256 content hash.</param>
+            <param name="documentLength">New document length.</param>
+            <param name="termCount">New term count.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentMethods.DeleteAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Deletes a document and all associated data.
+            </summary>
+            <param name="id">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>True if document was deleted.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentMethods.DeleteAllAsync(System.Threading.CancellationToken)">
+            <summary>
+            Deletes all documents and associated data.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of documents deleted.</returns>
+        </member>
+        <member name="T:Verbex.Repositories.Interfaces.IDocumentTermMethods">
+            <summary>
+            Interface for document-term relationship operations.
+            Provides operations for managing the inverted index mappings between documents and terms.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentTermMethods.AddAsync(System.String,System.String,System.Int32,System.Collections.Generic.List{System.Int32},System.Collections.Generic.List{System.Int32},System.Threading.CancellationToken)">
+            <summary>
+            Adds a document-term mapping.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="termId">Term ID.</param>
+            <param name="termFrequency">Term frequency in document.</param>
+            <param name="characterPositions">Character positions (absolute offsets) where the term appears.</param>
+            <param name="termPositions">Term positions (word indices) where the term appears.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentTermMethods.AddBatchAsync(System.String,System.Collections.Generic.List{System.ValueTuple{System.String,System.Int32,System.Collections.Generic.List{System.Int32},System.Collections.Generic.List{System.Int32}}},System.Threading.CancellationToken)">
+            <summary>
+            Batch adds document-term mappings.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="termMappings">List of (termId, termFrequency, characterPositions, termPositions) tuples.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentTermMethods.GetByDocumentAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets all terms for a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of document-term records.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentTermMethods.GetPostingsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets all documents containing a term.
+            </summary>
+            <param name="termId">Term ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of document-term records.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentTermMethods.GetPostingsByTermAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets all documents containing a term by term text.
+            </summary>
+            <param name="term">Term text.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of document-term records.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentTermMethods.SearchAsync(System.Collections.Generic.IEnumerable{System.String},System.Boolean,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Searches for documents containing specified terms.
+            </summary>
+            <param name="termIds">Term IDs to search for.</param>
+            <param name="requireAll">If true, documents must contain all terms (AND). If false, any term (OR).</param>
+            <param name="limit">Maximum results.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of document IDs with match information.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentTermMethods.SearchAsync(System.Collections.Generic.IEnumerable{System.String},System.Boolean,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Searches for documents containing specified terms with optional label and tag filtering.
+            </summary>
+            <param name="termIds">Term IDs to search for.</param>
+            <param name="requireAll">If true, documents must contain all terms (AND). If false, any term (OR).</param>
+            <param name="labels">Optional list of labels to filter by (documents must have ALL labels).</param>
+            <param name="tags">Optional dictionary of tags to filter by (documents must have ALL tags).</param>
+            <param name="limit">Maximum results.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of document IDs with match information.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentTermMethods.DeleteByDocumentAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Deletes all document-term mappings for a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of mappings deleted.</returns>
+        </member>
+        <member name="T:Verbex.Repositories.Interfaces.ILabelMethods">
+            <summary>
+            Interface for label-related repository operations.
+            Provides operations for managing labels on documents and the index.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ILabelMethods.AddAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Adds a label to a document or the index.
+            </summary>
+            <param name="documentId">Document ID, or null for index-level label.</param>
+            <param name="label">Label text.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ILabelMethods.GetByDocumentAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets labels for a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of labels.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ILabelMethods.GetIndexLabelsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Gets index-level labels.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>List of labels.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ILabelMethods.GetAllDistinctAsync(System.Threading.CancellationToken)">
+            <summary>
+            Gets all distinct labels.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>List of unique labels.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ILabelMethods.GetDocumentsByLabelAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets documents with a specific label.
+            </summary>
+            <param name="label">Label to filter by.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of documents.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ILabelMethods.ExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Checks if a label exists for a document.
+            </summary>
+            <param name="documentId">Document ID, or null for index-level.</param>
+            <param name="label">Label text.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>True if label exists.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ILabelMethods.RemoveAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Removes a label from a document or the index.
+            </summary>
+            <param name="documentId">Document ID, or null for index-level.</param>
+            <param name="label">Label text.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>True if label was removed.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ILabelMethods.RemoveAllAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Removes all labels from a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of labels removed.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ILabelMethods.AddBatchAsync(System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Batch adds labels to a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="labels">List of labels to add.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ILabelMethods.ReplaceAsync(System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Replaces all labels for a document with new labels.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="labels">List of new labels.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="T:Verbex.Repositories.Interfaces.IStatisticsMethods">
+            <summary>
+            Interface for statistics-related repository operations.
+            Provides operations for retrieving index and term statistics.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IStatisticsMethods.GetIndexStatisticsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Gets comprehensive index statistics.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Index statistics.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.IStatisticsMethods.GetTermStatisticsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets statistics for a specific term.
+            </summary>
+            <param name="term">Term text.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Term statistics or null if term not found.</returns>
+        </member>
+        <member name="T:Verbex.Repositories.Interfaces.ITagMethods">
+            <summary>
+            Interface for tag-related repository operations.
+            Provides operations for managing key-value tags on documents and the index.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITagMethods.SetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Sets a tag on a document or the index.
+            </summary>
+            <param name="documentId">Document ID, or null for index-level tag.</param>
+            <param name="key">Tag key.</param>
+            <param name="value">Tag value.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITagMethods.GetAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets a tag value.
+            </summary>
+            <param name="documentId">Document ID, or null for index-level.</param>
+            <param name="key">Tag key.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Tag value or null.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITagMethods.GetByDocumentAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets all tags for a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Dictionary of key-value pairs.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITagMethods.GetIndexTagsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Gets index-level tags.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Dictionary of key-value pairs.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITagMethods.GetAllDistinctKeysAsync(System.Threading.CancellationToken)">
+            <summary>
+            Gets all distinct tag keys.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>List of unique keys.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITagMethods.GetDocumentsByKeyAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets documents with a specific tag key.
+            </summary>
+            <param name="key">Tag key.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of documents.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITagMethods.GetDocumentsByTagAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets documents with a specific tag key-value pair.
+            </summary>
+            <param name="key">Tag key.</param>
+            <param name="value">Tag value.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of documents.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITagMethods.ExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Checks if a tag exists.
+            </summary>
+            <param name="documentId">Document ID, or null for index-level.</param>
+            <param name="key">Tag key.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>True if tag exists.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITagMethods.RemoveAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Removes a tag.
+            </summary>
+            <param name="documentId">Document ID, or null for index-level.</param>
+            <param name="key">Tag key.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>True if tag was removed.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITagMethods.RemoveAllAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Removes all tags from a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of tags removed.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITagMethods.AddBatchAsync(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Batch adds tags to a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="tags">Dictionary of tag key-value pairs.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITagMethods.ReplaceAsync(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Replaces all tags for a document with new tags.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="tags">Dictionary of new tag key-value pairs.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="T:Verbex.Repositories.Interfaces.ITermMethods">
+            <summary>
+            Interface for term-related repository operations.
+            Provides operations for managing terms in the index vocabulary.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITermMethods.AddOrGetAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Adds or gets a term, returning its ID.
+            </summary>
+            <param name="term">The term text.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Term ID (k-sortable unique identifier).</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITermMethods.GetAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets a term by its text.
+            </summary>
+            <param name="term">The term text.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Term record or null.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITermMethods.GetByIdAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets a term by ID.
+            </summary>
+            <param name="id">Term ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Term record or null.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITermMethods.GetMultipleAsync(System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Gets multiple terms by their text.
+            </summary>
+            <param name="terms">Term texts.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Dictionary mapping term text to term record.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITermMethods.GetByPrefixAsync(System.String,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Gets terms matching a prefix.
+            </summary>
+            <param name="prefix">Prefix to match.</param>
+            <param name="limit">Maximum number of terms.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of matching terms.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITermMethods.GetCountAsync(System.Threading.CancellationToken)">
+            <summary>
+            Gets the total number of unique terms.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Term count.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITermMethods.ExistsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Checks if a term exists.
+            </summary>
+            <param name="term">Term text.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>True if term exists.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITermMethods.UpdateFrequenciesAsync(System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Updates term frequencies.
+            </summary>
+            <param name="termId">Term ID.</param>
+            <param name="documentFrequency">New document frequency.</param>
+            <param name="totalFrequency">New total frequency.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITermMethods.IncrementFrequenciesAsync(System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Increments term frequencies.
+            </summary>
+            <param name="termId">Term ID.</param>
+            <param name="documentFrequencyDelta">Document frequency delta.</param>
+            <param name="totalFrequencyDelta">Total frequency delta.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITermMethods.AddOrGetBatchAsync(System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Batch inserts terms that don't exist and returns all term IDs (existing or new).
+            </summary>
+            <param name="terms">List of term strings to add or get.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Dictionary mapping term string to term ID.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITermMethods.IncrementFrequenciesBatchAsync(System.Collections.Generic.Dictionary{System.String,System.ValueTuple{System.Int32,System.Int32}},System.Threading.CancellationToken)">
+            <summary>
+            Batch increments term frequencies.
+            </summary>
+            <param name="updates">Dictionary mapping term ID to (documentFrequencyDelta, totalFrequencyDelta).</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITermMethods.DecrementFrequenciesBatchAsync(System.Collections.Generic.Dictionary{System.String,System.ValueTuple{System.Int32,System.Int32}},System.Threading.CancellationToken)">
+            <summary>
+            Batch decrements term frequencies.
+            </summary>
+            <param name="updates">Dictionary mapping term ID to (documentFrequencyDelta, totalFrequencyDelta).</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITermMethods.GetTopAsync(System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Gets top terms by document frequency.
+            </summary>
+            <param name="limit">Maximum number of terms.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of top terms.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITermMethods.DeleteOrphanedAsync(System.Threading.CancellationToken)">
+            <summary>
+            Deletes terms with zero document frequency.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of terms deleted.</returns>
+        </member>
+        <member name="T:Verbex.Repositories.LabelRecord">
+            <summary>
+            Record type for labels table rows.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.LabelRecord.Id">
+            <summary>Record ID (k-sortable unique identifier).</summary>
+        </member>
+        <member name="P:Verbex.Repositories.LabelRecord.DocumentId">
+            <summary>Document ID (null for index-level labels).</summary>
+        </member>
+        <member name="P:Verbex.Repositories.LabelRecord.Label">
+            <summary>Label text.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.LabelRecord.LastModifiedUtc">
+            <summary>Timestamp when the record was last modified.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.LabelRecord.CreatedUtc">
+            <summary>Timestamp when the record was created.</summary>
+        </member>
+        <member name="T:Verbex.Repositories.MemoryIndexRepository">
+            <summary>
+            In-memory SQLite index repository.
+            Data is stored in memory and lost when the repository is closed unless explicitly flushed to disk.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.MemoryIndexRepository.#ctor">
+            <summary>
+            Creates a new in-memory index repository.
+            </summary>
+        </member>
+        <member name="T:Verbex.Repositories.Queries.DocumentQueries">
+            <summary>
+            Contains SQL queries for document operations.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentQueries.Insert">
+            <summary>
+            Insert a new document.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentQueries.SelectById">
+            <summary>
+            Select a document by ID.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentQueries.SelectByName">
+            <summary>
+            Select a document by name.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentQueries.SelectByContentSha256">
+            <summary>
+            Select a document by content SHA-256 hash.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentQueries.SelectAll">
+            <summary>
+            Select all documents with pagination.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentQueries.SelectByIds(System.Int32)">
+            <summary>
+            Select documents by IDs.
+            </summary>
+            <param name="count">Number of IDs to select.</param>
+            <returns>SQL string with parameterized IN clause.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentQueries.Count">
+            <summary>
+            Count total documents.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentQueries.ExistsById">
+            <summary>
+            Check if document exists by ID.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentQueries.ExistsByName">
+            <summary>
+            Check if document exists by name.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentQueries.Update">
+            <summary>
+            Update a document.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentQueries.UpdateTermCount">
+            <summary>
+            Update document term count.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentQueries.DeleteById">
+            <summary>
+            Delete a document by ID.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentQueries.DeleteByName">
+            <summary>
+            Delete a document by name.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentQueries.DeleteAll">
+            <summary>
+            Delete all documents.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentQueries.SearchByName">
+            <summary>
+            Search documents by name pattern.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentQueries.SelectByIdWithMetadata">
+            <summary>
+            Select a document with all metadata (labels, tags, terms) in a single query.
+            Uses GROUP_CONCAT to aggregate related data.
+            </summary>
+        </member>
+        <member name="T:Verbex.Repositories.Queries.DocumentTermQueries">
+            <summary>
+            Contains SQL queries for document-term mapping operations.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.Insert">
+            <summary>
+            Insert a document-term mapping.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.InsertOrReplace">
+            <summary>
+            Insert or replace a document-term mapping.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.SelectByDocumentId">
+            <summary>
+            Select mappings by document ID.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.SelectByTermId">
+            <summary>
+            Select mappings by term ID.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.SelectByTerm">
+            <summary>
+            Select mappings by term text.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.SelectByTermIds(System.Int32)">
+            <summary>
+            Select mappings by multiple term IDs.
+            </summary>
+            <param name="count">Number of term IDs.</param>
+            <returns>SQL string with parameterized IN clause.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.SelectByDocumentAndTerm">
+            <summary>
+            Select a specific document-term mapping.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.Exists">
+            <summary>
+            Check if a document-term mapping exists.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.CountByDocument">
+            <summary>
+            Count mappings for a document.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.CountByTerm">
+            <summary>
+            Count mappings for a term (document frequency).
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.SumFrequencyByTerm">
+            <summary>
+            Sum term frequency for a term (total frequency).
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.Update">
+            <summary>
+            Update a document-term mapping.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.DeleteByDocumentId">
+            <summary>
+            Delete mappings by document ID.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.DeleteByTermId">
+            <summary>
+            Delete mappings by term ID.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.DeleteByDocumentAndTerm">
+            <summary>
+            Delete a specific mapping.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.DeleteAll">
+            <summary>
+            Delete all mappings.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.SelectDocumentsWithAllTerms(System.Int32)">
+            <summary>
+            Get documents containing all specified terms (AND search).
+            </summary>
+            <param name="termCount">Number of terms to match.</param>
+            <returns>SQL string.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.SelectDocumentsWithAnyTerms(System.Int32)">
+            <summary>
+            Get documents containing any of the specified terms (OR search).
+            </summary>
+            <param name="termCount">Number of terms to match.</param>
+            <returns>SQL string.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.SelectDocumentsWithAllTermsFiltered(System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Get documents containing all specified terms (AND search) with label filtering.
+            </summary>
+            <param name="termCount">Number of terms to match.</param>
+            <param name="labelCount">Number of labels to filter by.</param>
+            <param name="tagCount">Number of tags to filter by.</param>
+            <returns>SQL string.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.InsertBatch(System.Int32)">
+            <summary>
+            Batch insert document-term mappings.
+            </summary>
+            <param name="count">Number of mappings to insert.</param>
+            <returns>SQL string.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.SelectDocumentsWithAnyTermsFiltered(System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Get documents containing any of the specified terms (OR search) with label/tag filtering.
+            </summary>
+            <param name="termCount">Number of terms to match.</param>
+            <param name="labelCount">Number of labels to filter by.</param>
+            <param name="tagCount">Number of tags to filter by.</param>
+            <returns>SQL string.</returns>
+        </member>
+        <member name="T:Verbex.Repositories.Queries.LabelQueries">
+            <summary>
+            Contains SQL queries for label operations.
+            Labels can be associated with documents (document_id not null) or with the index itself (document_id is null).
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.Insert">
+            <summary>
+            Insert a label.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.InsertIfNotExists">
+            <summary>
+            Insert a label if it doesn't exist.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.SelectByDocumentId">
+            <summary>
+            Select labels by document ID.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.SelectIndexLabels">
+            <summary>
+            Select index-level labels (document_id is null).
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.SelectAll">
+            <summary>
+            Select all labels with pagination.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.SelectDistinct">
+            <summary>
+            Select distinct labels.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.SelectDocumentsByLabel">
+            <summary>
+            Select documents with a specific label.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.SelectDocumentsWithAllLabels(System.Int32)">
+            <summary>
+            Select documents with all specified labels (AND).
+            </summary>
+            <param name="labelCount">Number of labels.</param>
+            <returns>SQL string.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.Exists">
+            <summary>
+            Check if a label exists for a document.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.ExistsIndexLabel">
+            <summary>
+            Check if an index-level label exists.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.CountByDocument">
+            <summary>
+            Count labels for a document.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.CountIndexLabels">
+            <summary>
+            Count index-level labels.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.CountDocumentsByLabel">
+            <summary>
+            Count documents with a specific label.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.DeleteByDocumentAndLabel">
+            <summary>
+            Delete a specific label from a document.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.DeleteByDocumentId">
+            <summary>
+            Delete all labels from a document.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.DeleteIndexLabel">
+            <summary>
+            Delete an index-level label.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.DeleteAllIndexLabels">
+            <summary>
+            Delete all index-level labels.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.DeleteAll">
+            <summary>
+            Delete all labels.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.LabelQueries.InsertBatch(System.Int32)">
+            <summary>
+            Batch insert labels for a document.
+            </summary>
+            <param name="count">Number of labels to insert.</param>
+            <returns>SQL string.</returns>
+        </member>
+        <member name="T:Verbex.Repositories.Queries.SchemaQueries">
+            <summary>
+            Contains SQL queries for schema creation and management.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.SchemaQueries.CreateSchema">
+            <summary>
+            Returns the complete schema creation SQL.
+            </summary>
+            <returns>SQL string to create all tables and indices.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.SchemaQueries.ApplyPragmaSettings">
+            <summary>
+            Returns SQL to apply performance-related PRAGMA settings.
+            </summary>
+            <returns>SQL string with PRAGMA statements.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.SchemaQueries.CheckSchemaExists">
+            <summary>
+            Returns SQL to check if schema exists.
+            </summary>
+            <returns>SQL string.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.SchemaQueries.DropAllTables">
+            <summary>
+            Returns SQL to drop all tables (for testing/reset).
+            </summary>
+            <returns>SQL string.</returns>
+        </member>
+        <member name="T:Verbex.Repositories.Queries.StatisticsQueries">
+            <summary>
+            Contains SQL queries for statistics and analytics operations.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.StatisticsQueries.GetIndexStatistics">
+            <summary>
+            Get overall index statistics.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.StatisticsQueries.GetTermStatistics">
+            <summary>
+            Get statistics for a specific term.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.StatisticsQueries.GetTermStatisticsById">
+            <summary>
+            Get term statistics by ID.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.StatisticsQueries.GetTopTermsByDocumentFrequency">
+            <summary>
+            Get top N terms by document frequency.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.StatisticsQueries.GetTopTermsByTotalFrequency">
+            <summary>
+            Get top N terms by total frequency.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.StatisticsQueries.GetDocumentStatistics">
+            <summary>
+            Get document statistics.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.StatisticsQueries.GetTermFrequencyDistribution">
+            <summary>
+            Get term frequency distribution (histogram data).
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.StatisticsQueries.GetDocumentLengthDistribution">
+            <summary>
+            Get document length distribution (histogram data).
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.StatisticsQueries.GetLabelStatistics">
+            <summary>
+            Get label statistics.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.StatisticsQueries.GetTagKeyStatistics">
+            <summary>
+            Get tag key statistics.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.StatisticsQueries.GetIndexMetadata">
+            <summary>
+            Get index metadata.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.StatisticsQueries.UpsertIndexMetadata">
+            <summary>
+            Insert or update index metadata.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.StatisticsQueries.UpdateLastModified">
+            <summary>
+            Update last modified timestamp.
+            </summary>
+        </member>
+        <member name="T:Verbex.Repositories.Queries.TagQueries">
+            <summary>
+            Contains SQL queries for tag (key-value) operations.
+            Tags can be associated with documents (document_id not null) or with the index itself (document_id is null).
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.Insert">
+            <summary>
+            Insert a tag.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.InsertOrReplace">
+            <summary>
+            Insert or replace a tag (upsert by document_id + key).
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.SelectByDocumentId">
+            <summary>
+            Select tags by document ID.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.SelectIndexTags">
+            <summary>
+            Select index-level tags (document_id is null).
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.SelectByDocumentAndKey">
+            <summary>
+            Select a specific tag by document and key.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.SelectIndexTagByKey">
+            <summary>
+            Select an index-level tag by key.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.SelectAll">
+            <summary>
+            Select all tags with pagination.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.SelectDistinctKeys">
+            <summary>
+            Select distinct tag keys.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.SelectDocumentsByTagKey">
+            <summary>
+            Select documents with a specific tag key.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.SelectDocumentsByTagKeyValue">
+            <summary>
+            Select documents with a specific tag key-value pair.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.SelectDocumentsWithAllTags(System.Int32)">
+            <summary>
+            Select documents matching multiple tag filters (AND).
+            </summary>
+            <param name="filterCount">Number of key-value filters.</param>
+            <returns>SQL string.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.Exists">
+            <summary>
+            Check if a tag exists.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.ExistsIndexTag">
+            <summary>
+            Check if an index-level tag exists.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.CountByDocument">
+            <summary>
+            Count tags for a document.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.CountIndexTags">
+            <summary>
+            Count index-level tags.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.Update">
+            <summary>
+            Update a tag value.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.DeleteByDocumentAndKey">
+            <summary>
+            Delete a specific tag.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.DeleteByDocumentId">
+            <summary>
+            Delete all tags from a document.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.DeleteIndexTag">
+            <summary>
+            Delete an index-level tag.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.DeleteAllIndexTags">
+            <summary>
+            Delete all index-level tags.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.DeleteAll">
+            <summary>
+            Delete all tags.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TagQueries.InsertOrReplaceBatch(System.Int32)">
+            <summary>
+            Batch insert or replace tags for a document.
+            </summary>
+            <param name="count">Number of tags to insert.</param>
+            <returns>SQL string.</returns>
+        </member>
+        <member name="T:Verbex.Repositories.Queries.TermQueries">
+            <summary>
+            Contains SQL queries for term operations.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.Insert">
+            <summary>
+            Insert a new term.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.InsertOrIgnore">
+            <summary>
+            Insert a term or ignore if exists, returning the ID.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.SelectById">
+            <summary>
+            Select a term by ID.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.SelectByTerm">
+            <summary>
+            Select a term by term text.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.SelectByTerms(System.Int32)">
+            <summary>
+            Select terms by term texts.
+            </summary>
+            <param name="count">Number of terms to select.</param>
+            <returns>SQL string with parameterized IN clause.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.SelectAll">
+            <summary>
+            Select all terms with pagination.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.SelectByPrefix">
+            <summary>
+            Select terms matching a prefix pattern.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.Count">
+            <summary>
+            Count total terms.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.Exists">
+            <summary>
+            Check if term exists.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.UpdateFrequencies">
+            <summary>
+            Update term frequencies.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.IncrementFrequencies">
+            <summary>
+            Increment term frequencies.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.DecrementFrequencies">
+            <summary>
+            Decrement term frequencies.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.DeleteById">
+            <summary>
+            Delete a term by ID.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.DeleteByTerm">
+            <summary>
+            Delete a term by term text.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.DeleteOrphaned">
+            <summary>
+            Delete terms with zero document frequency (cleanup).
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.DeleteAll">
+            <summary>
+            Delete all terms.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.GetTotalFrequencySum">
+            <summary>
+            Get total term frequency sum (for statistics).
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.GetTopTerms">
+            <summary>
+            Get top N terms by document frequency.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.InsertBatchIgnore(System.Int32)">
+            <summary>
+            Batch insert terms, ignoring duplicates.
+            </summary>
+            <param name="count">Number of terms to insert.</param>
+            <returns>SQL string.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.IncrementFrequenciesBatch(System.Int32)">
+            <summary>
+            Batch increment term frequencies using CASE expressions.
+            </summary>
+            <param name="count">Number of terms to update.</param>
+            <returns>SQL string.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Queries.TermQueries.DecrementFrequenciesBatch(System.Int32)">
+            <summary>
+            Batch decrement term frequencies using CASE expressions.
+            </summary>
+            <param name="count">Number of terms to update.</param>
+            <returns>SQL string.</returns>
+        </member>
+        <member name="T:Verbex.Repositories.Sanitizer">
+            <summary>
+            Provides input sanitization utilities for database operations.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Sanitizer.Sanitize(System.String)">
+            <summary>
+            Sanitizes a string value for safe use in SQL operations.
+            Removes control characters and SQL comments, escapes single quotes.
+            </summary>
+            <param name="value">The value to sanitize.</param>
+            <returns>Sanitized string, or empty string if input is null.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Sanitizer.SanitizeGuid(System.Guid)">
+            <summary>
+            Sanitizes a GUID value, returning its string representation.
+            </summary>
+            <param name="guid">The GUID to sanitize.</param>
+            <returns>String representation of the GUID.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Sanitizer.SanitizeGuid(System.Nullable{System.Guid})">
+            <summary>
+            Sanitizes a nullable GUID value.
+            </summary>
+            <param name="guid">The nullable GUID to sanitize.</param>
+            <returns>String representation of the GUID, or null if input is null.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Sanitizer.IsValidGuid(System.String)">
+            <summary>
+            Validates that a string is a valid GUID format.
+            </summary>
+            <param name="value">The string to validate.</param>
+            <returns>True if valid GUID format.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Sanitizer.SanitizeForLike(System.String)">
+            <summary>
+            Sanitizes a string for use in LIKE patterns.
+            Escapes %, _, and [ characters.
+            </summary>
+            <param name="value">The value to sanitize.</param>
+            <returns>Sanitized pattern string.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Sanitizer.CreatePrefixPattern(System.String)">
+            <summary>
+            Creates a prefix search pattern for LIKE queries.
+            </summary>
+            <param name="prefix">The prefix to search for.</param>
+            <returns>Pattern string for LIKE query.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Sanitizer.CreateContainsPattern(System.String)">
+            <summary>
+            Creates a contains search pattern for LIKE queries.
+            </summary>
+            <param name="substring">The substring to search for.</param>
+            <returns>Pattern string for LIKE query.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Sanitizer.ValidateInt(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Validates and sanitizes an integer value within bounds.
+            </summary>
+            <param name="value">The value to validate.</param>
+            <param name="min">Minimum allowed value.</param>
+            <param name="max">Maximum allowed value.</param>
+            <param name="defaultValue">Default value if out of bounds.</param>
+            <returns>Validated integer value.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.Sanitizer.ValidatePagination(System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Validates pagination parameters.
+            </summary>
+            <param name="limit">The limit value.</param>
+            <param name="offset">The offset value.</param>
+            <param name="maxLimit">Maximum allowed limit.</param>
+            <returns>Tuple of validated (limit, offset).</returns>
+        </member>
+        <member name="T:Verbex.Repositories.SearchMatch">
+            <summary>
+            Represents a search match result from the repository.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.SearchMatch.DocumentId">
+            <summary>
+            The document ID.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.SearchMatch.TotalFrequency">
+            <summary>
+            Total term frequency across matched terms.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.SearchMatch.MatchedTermCount">
+            <summary>
+            Number of search terms matched.
+            </summary>
+        </member>
+        <member name="T:Verbex.Repositories.SqliteIndexRepository">
+            <summary>
+            SQLite-based implementation of the index repository.
+            Provides the base implementation for both in-memory and on-disk modes.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.SqliteIndexRepository.IsOpen">
+            <summary>
+            Gets whether the repository is currently open.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.SqliteIndexRepository.IndexName">
+            <summary>
+            Gets the name of the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.SqliteIndexRepository.Document">
+            <summary>
+            Gets the document operations interface.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.SqliteIndexRepository.Term">
+            <summary>
+            Gets the term operations interface.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.SqliteIndexRepository.DocumentTerm">
+            <summary>
+            Gets the document-term operations interface.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.SqliteIndexRepository.Label">
+            <summary>
+            Gets the label operations interface.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.SqliteIndexRepository.Tag">
+            <summary>
+            Gets the tag operations interface.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.SqliteIndexRepository.Statistics">
+            <summary>
+            Gets the statistics operations interface.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.SqliteIndexRepository.#ctor(System.String)">
+            <summary>
+            Creates a new SQLite index repository.
+            </summary>
+            <param name="databasePath">Path to the database file. If null, uses in-memory database.</param>
+        </member>
+        <member name="M:Verbex.Repositories.SqliteIndexRepository.OpenAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Opens the repository connection and initializes the schema if needed.
+            </summary>
+            <param name="indexName">Name of the index.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.SqliteIndexRepository.CloseAsync(System.Threading.CancellationToken)">
+            <summary>
+            Closes the repository connection.
+            For on-disk databases, performs a WAL checkpoint before closing to ensure all data is persisted.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.SqliteIndexRepository.FlushAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Flushes any pending changes to persistent storage.
+            For in-memory databases, this saves to the specified file.
+            For on-disk databases, this performs a WAL checkpoint to move data from the WAL file to the main database.
+            </summary>
+            <param name="targetPath">Path to save to (required for in-memory mode, ignored for on-disk mode).</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.SqliteIndexRepository.CheckpointAsync(System.Threading.CancellationToken)">
+            <summary>
+            Performs a WAL checkpoint to move data from the WAL file to the main database file.
+            This is only applicable for on-disk databases using WAL mode.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.SqliteIndexRepository.ThrowIfDisposed">
+            <summary>
+            Throws if disposed. Internal method for use by method implementations.
+            </summary>
+            <exception cref="T:System.ObjectDisposedException">Thrown if repository is disposed.</exception>
+        </member>
+        <member name="M:Verbex.Repositories.SqliteIndexRepository.ThrowIfNotOpen">
+            <summary>
+            Throws if not open. Internal method for use by method implementations.
+            </summary>
+            <exception cref="T:System.InvalidOperationException">Thrown if repository is not open.</exception>
+        </member>
+        <member name="M:Verbex.Repositories.SqliteIndexRepository.ExecuteReadAsync``1(System.Func{Microsoft.Data.Sqlite.SqliteConnection,System.Threading.Tasks.Task{``0}},System.Threading.CancellationToken)">
+            <summary>
+            Executes a read operation with proper locking.
+            </summary>
+            <typeparam name="T">Return type.</typeparam>
+            <param name="operation">The read operation to execute.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Result of the operation.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.SqliteIndexRepository.ExecuteWriteAsync``1(System.Func{Microsoft.Data.Sqlite.SqliteConnection,System.Threading.Tasks.Task{``0}},System.Threading.CancellationToken)">
+            <summary>
+            Executes a write operation with proper locking.
+            </summary>
+            <typeparam name="T">Return type.</typeparam>
+            <param name="operation">The write operation to execute.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Result of the operation.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.SqliteIndexRepository.ExecuteWriteAsync(System.Func{Microsoft.Data.Sqlite.SqliteConnection,System.Threading.Tasks.Task},System.Threading.CancellationToken)">
+            <summary>
+            Executes a write operation with proper locking.
+            </summary>
+            <param name="operation">The write operation to execute.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.SqliteIndexRepository.UpdateLastModifiedAsync(System.Threading.CancellationToken)">
+            <summary>
+            Updates the last modified timestamp in the index metadata.
+            Must be called within a write lock.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Repositories.SqliteIndexRepository.Dispose">
+            <summary>
+            Disposes the repository.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.SqliteIndexRepository.DisposeAsync">
+            <summary>
+            Disposes the repository asynchronously.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.SqliteIndexRepository.Dispose(System.Boolean)">
+            <summary>
+            Disposes managed resources.
+            For on-disk databases, performs a WAL checkpoint before closing to ensure all data is persisted.
+            </summary>
+            <param name="disposing">True if called from Dispose.</param>
+        </member>
+        <member name="M:Verbex.Repositories.SqliteIndexRepository.DisposeAsyncCore">
+            <summary>
+            Disposes managed resources asynchronously.
+            For on-disk databases, performs a WAL checkpoint before closing to ensure all data is persisted.
+            </summary>
+        </member>
+        <member name="T:Verbex.Repositories.Sqlite.SqliteDocumentMethods">
+            <summary>
+            SQLite implementation of document operations.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentMethods.#ctor(Verbex.Repositories.SqliteIndexRepository)">
+            <summary>
+            Creates a new instance of SqliteDocumentMethods.
+            </summary>
+            <param name="repository">Parent repository instance.</param>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentMethods.AddAsync(System.String,System.String,System.String,System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentMethods.GetAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentMethods.GetByNameAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentMethods.GetWithMetadataAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentMethods.GetByContentSha256Async(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentMethods.GetAllAsync(System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentMethods.GetByIdsAsync(System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentMethods.GetCountAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentMethods.ExistsAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentMethods.ExistsByNameAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentMethods.UpdateAsync(System.String,System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentMethods.DeleteAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentMethods.DeleteAllAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Verbex.Repositories.Sqlite.SqliteDocumentTermMethods">
+            <summary>
+            SQLite implementation of document-term operations.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentTermMethods.#ctor(Verbex.Repositories.SqliteIndexRepository)">
+            <summary>
+            Creates a new instance of SqliteDocumentTermMethods.
+            </summary>
+            <param name="repository">Parent repository instance.</param>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentTermMethods.AddAsync(System.String,System.String,System.Int32,System.Collections.Generic.List{System.Int32},System.Collections.Generic.List{System.Int32},System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentTermMethods.AddBatchAsync(System.String,System.Collections.Generic.List{System.ValueTuple{System.String,System.Int32,System.Collections.Generic.List{System.Int32},System.Collections.Generic.List{System.Int32}}},System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentTermMethods.GetByDocumentAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentTermMethods.GetPostingsAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentTermMethods.GetPostingsByTermAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentTermMethods.SearchAsync(System.Collections.Generic.IEnumerable{System.String},System.Boolean,System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentTermMethods.SearchAsync(System.Collections.Generic.IEnumerable{System.String},System.Boolean,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentTermMethods.DeleteByDocumentAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Verbex.Repositories.Sqlite.SqliteLabelMethods">
+            <summary>
+            SQLite implementation of label operations.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteLabelMethods.#ctor(Verbex.Repositories.SqliteIndexRepository)">
+            <summary>
+            Creates a new instance of SqliteLabelMethods.
+            </summary>
+            <param name="repository">Parent repository instance.</param>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteLabelMethods.AddAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteLabelMethods.GetByDocumentAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteLabelMethods.GetIndexLabelsAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteLabelMethods.GetAllDistinctAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteLabelMethods.GetDocumentsByLabelAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteLabelMethods.ExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteLabelMethods.RemoveAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteLabelMethods.RemoveAllAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteLabelMethods.AddBatchAsync(System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteLabelMethods.ReplaceAsync(System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Verbex.Repositories.Sqlite.SqliteStatisticsMethods">
+            <summary>
+            SQLite implementation of statistics operations.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteStatisticsMethods.#ctor(Verbex.Repositories.SqliteIndexRepository)">
+            <summary>
+            Creates a new instance of SqliteStatisticsMethods.
+            </summary>
+            <param name="repository">Parent repository instance.</param>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteStatisticsMethods.GetIndexStatisticsAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteStatisticsMethods.GetTermStatisticsAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Verbex.Repositories.Sqlite.SqliteTagMethods">
+            <summary>
+            SQLite implementation of tag operations.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTagMethods.#ctor(Verbex.Repositories.SqliteIndexRepository)">
+            <summary>
+            Creates a new instance of SqliteTagMethods.
+            </summary>
+            <param name="repository">Parent repository instance.</param>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTagMethods.SetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTagMethods.GetAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTagMethods.GetByDocumentAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTagMethods.GetIndexTagsAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTagMethods.GetAllDistinctKeysAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTagMethods.GetDocumentsByKeyAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTagMethods.GetDocumentsByTagAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTagMethods.ExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTagMethods.RemoveAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTagMethods.RemoveAllAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTagMethods.AddBatchAsync(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTagMethods.ReplaceAsync(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Verbex.Repositories.Sqlite.SqliteTermMethods">
+            <summary>
+            SQLite implementation of term operations.
+            </summary>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.#ctor(Verbex.Repositories.SqliteIndexRepository)">
+            <summary>
+            Creates a new instance of SqliteTermMethods.
+            </summary>
+            <param name="repository">Parent repository instance.</param>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.AddOrGetAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.GetAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.GetByIdAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.GetMultipleAsync(System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.GetByPrefixAsync(System.String,System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.GetCountAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.ExistsAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.UpdateFrequenciesAsync(System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.IncrementFrequenciesAsync(System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.AddOrGetBatchAsync(System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.IncrementFrequenciesBatchAsync(System.Collections.Generic.Dictionary{System.String,System.ValueTuple{System.Int32,System.Int32}},System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.DecrementFrequenciesBatchAsync(System.Collections.Generic.Dictionary{System.String,System.ValueTuple{System.Int32,System.Int32}},System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.GetTopAsync(System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.DeleteOrphanedAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Verbex.Repositories.TagRecord">
+            <summary>
+            Record type for tags table rows.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.TagRecord.Id">
+            <summary>Record ID (k-sortable unique identifier).</summary>
+        </member>
+        <member name="P:Verbex.Repositories.TagRecord.DocumentId">
+            <summary>Document ID (null for index-level tags).</summary>
+        </member>
+        <member name="P:Verbex.Repositories.TagRecord.Key">
+            <summary>Tag key.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.TagRecord.Value">
+            <summary>Tag value.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.TagRecord.LastModifiedUtc">
+            <summary>Timestamp when the record was last modified.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.TagRecord.CreatedUtc">
+            <summary>Timestamp when the record was created.</summary>
+        </member>
+        <member name="T:Verbex.Repositories.TermRecord">
+            <summary>
+            Record type for term table rows.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.TermRecord.Id">
+            <summary>Term ID (k-sortable unique identifier).</summary>
+        </member>
+        <member name="P:Verbex.Repositories.TermRecord.Term">
+            <summary>Term text.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.TermRecord.DocumentFrequency">
+            <summary>Number of documents containing this term.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.TermRecord.TotalFrequency">
+            <summary>Total occurrences of this term across all documents.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.TermRecord.LastUpdatedUtc">
+            <summary>Timestamp when the term was last updated.</summary>
+        </member>
+        <member name="P:Verbex.Repositories.TermRecord.CreatedUtc">
+            <summary>Timestamp when the record was created.</summary>
+        </member>
+        <member name="T:Verbex.Repositories.TermStatisticsResult">
+            <summary>
+            Statistics for a single term returned by the repository.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.TermStatisticsResult.Term">
+            <summary>
+            The term.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.TermStatisticsResult.DocumentFrequency">
+            <summary>
+            Number of documents containing this term.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.TermStatisticsResult.TotalFrequency">
+            <summary>
+            Total occurrences across all documents.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.TermStatisticsResult.InverseDocumentFrequency">
+            <summary>
+            Inverse Document Frequency (log(N/df)).
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.TermStatisticsResult.AverageFrequencyPerDocument">
+            <summary>
+            Average term frequency per document containing the term.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.TermStatisticsResult.MaxFrequencyInDocument">
+            <summary>
+            Maximum frequency in any single document.
+            </summary>
+        </member>
+        <member name="P:Verbex.Repositories.TermStatisticsResult.MinFrequencyInDocument">
+            <summary>
+            Minimum frequency in any document containing the term.
+            </summary>
+        </member>
+        <member name="T:Verbex.SearchResult">
+            <summary>
+            Represents a search result with relevance scoring.
+            </summary>
+        </member>
+        <member name="M:Verbex.SearchResult.#ctor(System.String,System.Double)">
+            <summary>
+            Initializes a new instance of the SearchResult class.
+            </summary>
+            <param name="documentId">The document identifier.</param>
+            <param name="score">The relevance score.</param>
+            <exception cref="T:System.ArgumentException">Thrown when documentId is empty.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when score is negative.</exception>
+        </member>
+        <member name="M:Verbex.SearchResult.#ctor(Verbex.DocumentMetadata,System.Double,System.Int32)">
+            <summary>
+            Initializes a new instance of the SearchResult class with document metadata.
+            </summary>
+            <param name="document">The document metadata.</param>
+            <param name="score">The relevance score.</param>
+            <param name="matchedTermCount">Number of query terms matched.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when document is null.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when score is negative or matchedTermCount is negative.</exception>
+        </member>
+        <member name="P:Verbex.SearchResult.DocumentId">
+            <summary>
+            Gets the document identifier.
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchResult.Document">
+            <summary>
+            Gets the document metadata, if available.
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchResult.MatchedTermCount">
+            <summary>
+            Gets the number of query terms that matched this document.
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchResult.Score">
+            <summary>
+            Gets or sets the overall relevance score for this result.
+            Minimum value: 0.0
+            Higher scores indicate greater relevance
+            </summary>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when value is negative</exception>
+        </member>
+        <member name="P:Verbex.SearchResult.TermScores">
+            <summary>
+            Gets a read-only dictionary of term-specific scores
+            Maps each query term to its contribution to the overall score
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchResult.TermFrequencies">
+            <summary>
+            Gets a read-only dictionary of term frequencies in the document
+            Maps each query term to its frequency in the matched document
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchResult.TotalTermMatches">
+            <summary>
+            Gets the total number of term matches across all query terms
+            Minimum value: 0
+            </summary>
+        </member>
+        <member name="M:Verbex.SearchResult.AddTermScore(System.String,System.Double,System.Int32)">
+            <summary>
+            Adds or updates the score for a specific term
+            </summary>
+            <param name="term">The term</param>
+            <param name="score">The term's contribution to the overall score</param>
+            <param name="frequency">The frequency of the term in the document</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when term is null</exception>
+            <exception cref="T:System.ArgumentException">Thrown when term is empty or whitespace</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when score is negative or frequency is negative</exception>
+        </member>
+        <member name="M:Verbex.SearchResult.GetTermScore(System.String)">
+            <summary>
+            Gets the score for a specific term
+            </summary>
+            <param name="term">The term to get the score for</param>
+            <returns>The term score, or 0.0 if term not found</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when term is null</exception>
+        </member>
+        <member name="M:Verbex.SearchResult.GetTermFrequency(System.String)">
+            <summary>
+            Gets the frequency for a specific term
+            </summary>
+            <param name="term">The term to get the frequency for</param>
+            <returns>The term frequency, or 0 if term not found</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when term is null</exception>
+        </member>
+        <member name="M:Verbex.SearchResult.ContainsTerm(System.String)">
+            <summary>
+            Checks if this result contains a specific term
+            </summary>
+            <param name="term">The term to check for</param>
+            <returns>True if the term is present, false otherwise</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when term is null</exception>
+        </member>
+        <member name="M:Verbex.SearchResult.GetMatchedTerms">
+            <summary>
+            Gets all query terms that matched in this document
+            </summary>
+            <returns>Collection of matched terms</returns>
+        </member>
+        <member name="M:Verbex.SearchResult.CalculateTermMatchPercentage(System.Int32)">
+            <summary>
+            Calculates the percentage of query terms that matched in this document
+            </summary>
+            <param name="totalQueryTerms">Total number of terms in the original query</param>
+            <returns>Match percentage between 0.0 and 1.0</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when totalQueryTerms is less than 1</exception>
+        </member>
+        <member name="T:Verbex.SearchResults">
+            <summary>
+            Container for search results with metadata.
+            </summary>
+        </member>
+        <member name="M:Verbex.SearchResults.#ctor(System.Collections.Generic.IEnumerable{Verbex.SearchResult},System.Int32,System.TimeSpan)">
+            <summary>
+            Initializes a new instance of the SearchResults class.
+            </summary>
+            <param name="results">The search results.</param>
+            <param name="totalCount">Total number of matching documents.</param>
+            <param name="searchTime">Time taken to perform the search.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when results is null.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when totalCount is negative.</exception>
+        </member>
+        <member name="P:Verbex.SearchResults.Results">
+            <summary>
+            Gets the search results.
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchResults.TotalCount">
+            <summary>
+            Gets the total number of matching documents.
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchResults.SearchTime">
+            <summary>
+            Gets the time taken to perform the search.
+            </summary>
+        </member>
+        <member name="T:Verbex.StorageMode">
+            <summary>
+            Defines the storage mode for the inverted index.
+            </summary>
+        </member>
+        <member name="F:Verbex.StorageMode.InMemory">
+            <summary>
+            Index is stored in an in-memory SQLite database.
+            Fast performance but data is lost when application terminates unless explicitly flushed.
+            </summary>
+        </member>
+        <member name="F:Verbex.StorageMode.OnDisk">
+            <summary>
+            Index is stored in a file-based SQLite database.
+            Data is persisted immediately to disk for maximum durability.
+            </summary>
+        </member>
+        <member name="T:Verbex.TermFrequencyInfo">
+            <summary>
+            Information about term frequency
+            </summary>
+        </member>
+        <member name="P:Verbex.TermFrequencyInfo.Term">
+            <summary>
+            Gets the term
+            </summary>
+        </member>
+        <member name="P:Verbex.TermFrequencyInfo.DocumentFrequency">
+            <summary>
+            Gets the document frequency (number of documents containing this term)
+            </summary>
+        </member>
+        <member name="P:Verbex.TermFrequencyInfo.CollectionFrequency">
+            <summary>
+            Gets the collection frequency (total occurrences across all documents)
+            </summary>
+        </member>
+        <member name="M:Verbex.TermFrequencyInfo.#ctor(System.String,System.Int64,System.Int64)">
+            <summary>
+            Initializes a new instance of the TermFrequencyInfo class
+            </summary>
+            <param name="term">The term</param>
+            <param name="documentFrequency">Document frequency</param>
+            <param name="collectionFrequency">Collection frequency</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when term is null</exception>
+        </member>
+        <member name="T:Verbex.TermPosition">
+            <summary>
+            Represents the position of a term occurrence within a document.
+            </summary>
+            <remarks>
+            This class is used for in-memory representation during document processing.
+            Positions are stored in the database as separate integer arrays for
+            character positions and term positions.
+            </remarks>
+        </member>
+        <member name="P:Verbex.TermPosition.CharacterPosition">
+            <summary>
+            The character position (absolute offset from the start of the document).
+            </summary>
+        </member>
+        <member name="P:Verbex.TermPosition.TermIndex">
+            <summary>
+            The term position (0-based index of the word in the document).
+            </summary>
+        </member>
+        <member name="M:Verbex.TermPosition.#ctor">
+            <summary>
+            Creates a new instance of TermPosition.
+            </summary>
+        </member>
+        <member name="M:Verbex.TermPosition.#ctor(System.Int32,System.Int32)">
+            <summary>
+            Creates a new instance of TermPosition with specified positions.
+            </summary>
+            <param name="characterPosition">The character position (absolute offset).</param>
+            <param name="termIndex">The term position (word index).</param>
+        </member>
+        <member name="M:Verbex.TermPosition.ToString">
+            <summary>
+            Returns a string representation of the position.
+            </summary>
+            <returns>String in format "characterPosition:termIndex".</returns>
+        </member>
+        <member name="M:Verbex.TermPosition.Equals(System.Object)">
+            <summary>
+            Determines equality based on both position values.
+            </summary>
+            <param name="obj">Object to compare.</param>
+            <returns>True if equal.</returns>
+        </member>
+        <member name="M:Verbex.TermPosition.GetHashCode">
+            <summary>
+            Returns hash code based on both position values.
+            </summary>
+            <returns>Hash code.</returns>
+        </member>
+        <member name="T:Verbex.TermStatistics">
+            <summary>
+            Thread-safe global term statistics for ranking algorithms such as TF-IDF and BM25
+            </summary>
+        </member>
+        <member name="M:Verbex.TermStatistics.#ctor">
+            <summary>
+            Initializes a new instance of the TermStatistics class
+            </summary>
+        </member>
+        <member name="P:Verbex.TermStatistics.TotalDocuments">
+            <summary>
+            Gets the total number of documents in the collection
+            Minimum value: 0
+            </summary>
+        </member>
+        <member name="P:Verbex.TermStatistics.AverageDocumentLength">
+            <summary>
+            Gets the average document length in terms across all documents
+            Minimum value: 0.0
+            Used in BM25 scoring algorithm
+            </summary>
+        </member>
+        <member name="P:Verbex.TermStatistics.TotalTermOccurrences">
+            <summary>
+            Gets the total number of term occurrences across all documents
+            Minimum value: 0
+            </summary>
+        </member>
+        <member name="M:Verbex.TermStatistics.GetDocumentFrequency(System.String)">
+            <summary>
+            Gets the document frequency for a specific term (number of documents containing the term)
+            </summary>
+            <param name="term">The term to query</param>
+            <returns>The document frequency, or 0 if term doesn't exist</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when term is null</exception>
+        </member>
+        <member name="M:Verbex.TermStatistics.GetCollectionTermFrequency(System.String)">
+            <summary>
+            Gets the collection term frequency for a specific term (total occurrences across all documents)
+            </summary>
+            <param name="term">The term to query</param>
+            <returns>The collection term frequency, or 0 if term doesn't exist</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when term is null</exception>
+        </member>
+        <member name="M:Verbex.TermStatistics.CalculateIdf(System.String)">
+            <summary>
+            Calculates the Inverse Document Frequency (IDF) for a term
+            IDF = log(Total Documents / Document Frequency)
+            </summary>
+            <param name="term">The term to calculate IDF for</param>
+            <returns>The IDF value, or 0.0 if term doesn't exist</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when term is null</exception>
+        </member>
+        <member name="M:Verbex.TermStatistics.AddDocument(System.Int64,System.Collections.Generic.Dictionary{System.String,System.Int32})">
+            <summary>
+            Updates statistics when a document is added to the index
+            </summary>
+            <param name="documentLength">The length of the document in terms</param>
+            <param name="termFrequencies">Dictionary of term frequencies in the document</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when termFrequencies is null</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when documentLength is negative</exception>
+        </member>
+        <member name="M:Verbex.TermStatistics.RemoveDocument(System.Int64,System.Collections.Generic.Dictionary{System.String,System.Int32})">
+            <summary>
+            Updates statistics when a document is removed from the index
+            </summary>
+            <param name="documentLength">The length of the removed document in terms</param>
+            <param name="termFrequencies">Dictionary of term frequencies in the removed document</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when termFrequencies is null</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when documentLength is negative</exception>
+            <exception cref="T:System.InvalidOperationException">Thrown when trying to remove from empty collection</exception>
+        </member>
+        <member name="M:Verbex.TermStatistics.GetAllTerms">
+            <summary>
+            Gets all terms currently tracked in the statistics
+            </summary>
+            <returns>Collection of all terms</returns>
+        </member>
+        <member name="M:Verbex.TermStatistics.Clear">
+            <summary>
+            Clears all statistics
+            </summary>
+        </member>
+        <member name="M:Verbex.TermStatistics.Dispose">
+            <summary>
+            Releases all resources used by this TermStatistics instance
+            </summary>
+        </member>
+        <member name="M:Verbex.TermStatistics.Dispose(System.Boolean)">
+            <summary>
+            Releases resources used by this TermStatistics instance
+            </summary>
+            <param name="disposing">True if disposing managed resources</param>
+        </member>
+        <member name="T:Verbex.Utilities.IdGenerator">
+            <summary>
+            Provides centralized generation of k-sortable unique identifiers for all database entities.
+            Uses PrettyId library to generate IDs that are both unique and chronologically sortable.
+            </summary>
+            <remarks>
+            All generated IDs are exactly 32 characters in length including their entity-specific prefix.
+            IDs include a timestamp component ensuring chronological sorting when queried.
+            </remarks>
+        </member>
+        <member name="F:Verbex.Utilities.IdGenerator.TotalIdLength">
+            <summary>
+            Total length for all generated IDs including prefix.
+            </summary>
+        </member>
+        <member name="F:Verbex.Utilities.IdGenerator.DocumentPrefix">
+            <summary>
+            Prefix for document IDs.
+            </summary>
+        </member>
+        <member name="F:Verbex.Utilities.IdGenerator.TermPrefix">
+            <summary>
+            Prefix for term IDs.
+            </summary>
+        </member>
+        <member name="F:Verbex.Utilities.IdGenerator.DocumentTermPrefix">
+            <summary>
+            Prefix for document-term mapping IDs.
+            </summary>
+        </member>
+        <member name="F:Verbex.Utilities.IdGenerator.LabelPrefix">
+            <summary>
+            Prefix for label IDs.
+            </summary>
+        </member>
+        <member name="F:Verbex.Utilities.IdGenerator.TagPrefix">
+            <summary>
+            Prefix for tag IDs.
+            </summary>
+        </member>
+        <member name="F:Verbex.Utilities.IdGenerator.IndexMetadataPrefix">
+            <summary>
+            Prefix for index metadata IDs.
+            </summary>
+        </member>
+        <member name="F:Verbex.Utilities.IdGenerator.Generator">
+            <summary>
+            The PrettyId generator instance used for all ID generation.
+            </summary>
+        </member>
+        <member name="M:Verbex.Utilities.IdGenerator.GenerateDocumentId">
+            <summary>
+            Generates a new k-sortable unique identifier for a document.
+            </summary>
+            <returns>A 32-character k-sortable unique identifier with "doc_" prefix.</returns>
+        </member>
+        <member name="M:Verbex.Utilities.IdGenerator.GenerateTermId">
+            <summary>
+            Generates a new k-sortable unique identifier for a term.
+            </summary>
+            <returns>A 32-character k-sortable unique identifier with "term_" prefix.</returns>
+        </member>
+        <member name="M:Verbex.Utilities.IdGenerator.GenerateDocumentTermId">
+            <summary>
+            Generates a new k-sortable unique identifier for a document-term mapping.
+            </summary>
+            <returns>A 32-character k-sortable unique identifier with "docterm_" prefix.</returns>
+        </member>
+        <member name="M:Verbex.Utilities.IdGenerator.GenerateLabelId">
+            <summary>
+            Generates a new k-sortable unique identifier for a label.
+            </summary>
+            <returns>A 32-character k-sortable unique identifier with "label_" prefix.</returns>
+        </member>
+        <member name="M:Verbex.Utilities.IdGenerator.GenerateTagId">
+            <summary>
+            Generates a new k-sortable unique identifier for a tag.
+            </summary>
+            <returns>A 32-character k-sortable unique identifier with "tag_" prefix.</returns>
+        </member>
+        <member name="M:Verbex.Utilities.IdGenerator.GenerateIndexMetadataId">
+            <summary>
+            Generates a new k-sortable unique identifier for index metadata.
+            </summary>
+            <returns>A 32-character k-sortable unique identifier with "idx_" prefix.</returns>
+        </member>
+        <member name="M:Verbex.Utilities.IdGenerator.Generate">
+            <summary>
+            Generates a new k-sortable unique identifier without a prefix.
+            </summary>
+            <returns>A 32-character k-sortable unique identifier.</returns>
+            <remarks>
+            Prefer using the entity-specific methods (GenerateDocumentId, GenerateTermId, etc.)
+            for better traceability. This method is provided for backward compatibility.
+            </remarks>
+        </member>
+        <member name="M:Verbex.Utilities.IdGenerator.Generate(System.String)">
+            <summary>
+            Generates a new k-sortable unique identifier with a custom prefix.
+            </summary>
+            <param name="prefix">The prefix to prepend to the generated ID.</param>
+            <returns>A 32-character k-sortable unique identifier string with the specified prefix.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when prefix is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when prefix is 24 characters or longer.</exception>
+            <remarks>
+            Prefer using the entity-specific methods (GenerateDocumentId, GenerateTermId, etc.)
+            for standard entity types. This method is provided for custom entity types.
+            </remarks>
+        </member>
+        <member name="T:Verbex.VerbexConfiguration">
+            <summary>
+            Configuration settings for the Verbex inverted index.
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexConfiguration.StorageMode">
+            <summary>
+            Gets or sets the storage mode for the index.
+            Default: InMemory
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexConfiguration.StorageDirectory">
+            <summary>
+            Gets or sets the storage directory for disk-based storage mode.
+            Only used when StorageMode is OnDisk.
+            If null, the database will be created in the default location.
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexConfiguration.DatabaseFilename">
+            <summary>
+            Gets or sets the SQLite database filename.
+            Default: "index.db"
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexConfiguration.MinTokenLength">
+            <summary>
+            Gets or sets the minimum token length. Tokens shorter than this will be excluded.
+            Valid range: 0 to Int32.MaxValue. Set to 0 to disable minimum length filtering.
+            Default: 0 (disabled)
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexConfiguration.MaxTokenLength">
+            <summary>
+            Gets or sets the maximum token length. Tokens longer than this will be excluded.
+            Valid range: 0 to Int32.MaxValue. Set to 0 to disable maximum length filtering.
+            Default: 0 (disabled)
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexConfiguration.Lemmatizer">
+            <summary>
+            Gets or sets the lemmatizer instance for reducing words to their base forms.
+            If null, no lemmatization will be performed.
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexConfiguration.StopWordRemover">
+            <summary>
+            Gets or sets the stop word remover instance for filtering common words.
+            If null, no stop word filtering will be performed.
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexConfiguration.Tokenizer">
+            <summary>
+            Gets or sets the tokenizer instance for splitting text into tokens.
+            If null, the default tokenizer will be used.
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexConfiguration.DefaultMaxSearchResults">
+            <summary>
+            Gets or sets the default maximum search results.
+            Default: 100
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexConfiguration.PhraseSearchBonus">
+            <summary>
+            Gets or sets the phrase search scoring bonus multiplier.
+            Default: 2.0
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexConfiguration.SigmoidNormalizationDivisor">
+            <summary>
+            Gets or sets the sigmoid normalization divisor for score calculation.
+            Default: 10.0
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexConfiguration.TokenizationDelimiters">
+            <summary>
+            Gets or sets the tokenization delimiters.
+            Default: space, tab, newline, carriage return, period, comma, semicolon, colon, exclamation, question mark.
+            </summary>
+        </member>
+        <member name="M:Verbex.VerbexConfiguration.GetDatabasePath">
+            <summary>
+            Gets the full database path for disk-based storage.
+            </summary>
+            <returns>Full path to the database file.</returns>
+        </member>
+        <member name="M:Verbex.VerbexConfiguration.GetDefaultStorageDirectory(System.String)">
+            <summary>
+            Gets the default storage directory for the Verbex index.
+            Returns the path to .vbx/indices/{indexName}/ in the user's profile directory.
+            </summary>
+            <param name="indexName">Name of the index.</param>
+            <returns>Full path to the default storage directory.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when indexName is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when indexName is empty or whitespace.</exception>
+        </member>
+        <member name="M:Verbex.VerbexConfiguration.CreateInMemory">
+            <summary>
+            Creates a configuration with default settings for in-memory storage.
+            </summary>
+            <returns>Configuration for in-memory index.</returns>
+        </member>
+        <member name="M:Verbex.VerbexConfiguration.CreateOnDisk(System.String)">
+            <summary>
+            Creates a configuration with default settings for disk-based storage.
+            </summary>
+            <param name="indexName">Name of the index (used to create storage directory).</param>
+            <returns>Configuration for disk-based index.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when indexName is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when indexName is empty or whitespace.</exception>
+        </member>
+        <member name="M:Verbex.VerbexConfiguration.CreateOnDisk(System.String,System.String)">
+            <summary>
+            Creates a configuration with default settings for disk-based storage at a custom path.
+            </summary>
+            <param name="storageDirectory">Directory to store the database.</param>
+            <param name="databaseFilename">Database filename (default: "index.db").</param>
+            <returns>Configuration for disk-based index.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when storageDirectory is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when storageDirectory is empty or whitespace.</exception>
+        </member>
+        <member name="M:Verbex.VerbexConfiguration.Validate">
+            <summary>
+            Validates the configuration settings.
+            </summary>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when configuration values are invalid.</exception>
+        </member>
+        <member name="M:Verbex.VerbexConfiguration.Clone">
+            <summary>
+            Creates a copy of this configuration.
+            </summary>
+            <returns>A new configuration instance with the same values.</returns>
+        </member>
+    </members>
+</doc>

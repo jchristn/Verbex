@@ -7,11 +7,53 @@
         <Version>0.1.0</Version>
         <AssemblyVersion>0.1.0.0</AssemblyVersion>
         <FileVersion>0.1.0.0</FileVersion>
+        <ApplicationIcon>logo.ico</ApplicationIcon>
+        <GenerateDocumentationFile>True</GenerateDocumentationFile>
+        <DocumentationFile>Verbex.xml</DocumentationFile>
+        <Title>Verbex</Title>
+        <Authors>jchristn</Authors>
+        <Description>Verbex is a comprehensive inverted index library that enables fast, scalable full-text search capabilities.</Description>
+        <Copyright>(c)2025 Joel Christner</Copyright>
+        <PackageProjectUrl>https://github.com/jchristn/verbex</PackageProjectUrl>
+        <PackageIcon>logo.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <RepositoryUrl>https://github.com/jchristn/verbex</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageReleaseNotes>Verbex is in ALPHA.</PackageReleaseNotes>
+        <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+        <PackageTags>search;fulltext;full-text-search;text-search;inverted-index;index;indexing;tf-idf;lucene;elasticsearch;solr;sqlite;tokenization;lemmatization;document-search;search-engine;information-retrieval;stopwords</PackageTags>
+        <IncludeSymbols>True</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     </PropertyGroup>
+
+    <ItemGroup>
+      <Content Include="logo.ico" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Include="..\..\assets\logo.png">
+        <Pack>True</Pack>
+        <PackagePath>\</PackagePath>
+      </None>
+      <None Include="..\..\LICENSE.md">
+        <Pack>True</Pack>
+        <PackagePath>\</PackagePath>
+      </None>
+      <None Include="..\..\README.md">
+        <Pack>True</Pack>
+        <PackagePath>\</PackagePath>
+      </None>
+    </ItemGroup>
 
     <ItemGroup>
       <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.1" />
       <PackageReference Include="PrettyId" Version="2.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Update="Verbex.xml">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
 </Project>
