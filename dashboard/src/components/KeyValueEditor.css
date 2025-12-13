@@ -1,0 +1,110 @@
+.kv-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kv-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.kv-key {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.kv-separator {
+  color: var(--text-muted);
+}
+
+.kv-value {
+  flex: 1;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.kv-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  border-radius: 4px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.kv-remove:hover {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.kv-add-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+}
+
+.kv-input {
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.kv-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-alpha);
+}
+
+.kv-input::placeholder {
+  color: var(--text-muted);
+}
+
+.kv-add-btn {
+  padding: 8px 16px;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.kv-add-btn:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.kv-add-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.kv-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}

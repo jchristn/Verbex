@@ -1,0 +1,27 @@
+{
+  "CreatedUtc": "2024-01-15T10:30:00.0000000Z",
+  "Logging": {
+    "SyslogServers": [],
+    "ConsoleLogging": true,
+    "EnableColors": true,
+    "LogDirectory": "logs",
+    "LogFilename": "verbex.log",
+    "FileLogging": true,
+    "IncludeDateInFilename": true
+  },
+  "Rest": {
+    "Hostname": "localhost",
+    "Port": 8080,
+    "Ssl": false,
+    "SslCertificateFile": null,
+    "SslCertificatePassword": null
+  },
+  "DataDirectory": "./data",
+  "AdminBearerToken": "verbexadmin",
+  "Debug": {
+    "Authentication": false,
+    "Exceptions": true,
+    "Requests": false,
+    "DatabaseQueries": false
+  }
+}

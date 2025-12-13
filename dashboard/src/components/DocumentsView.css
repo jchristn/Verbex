@@ -1,0 +1,344 @@
+.documents-view {
+  width: 100%;
+}
+
+.documents-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.documents-table th,
+.documents-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.documents-table th {
+  background: var(--bg-secondary);
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.documents-table tbody tr:hover {
+  background: var(--bg-hover);
+}
+
+.documents-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.doc-id {
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.error-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--color-error);
+}
+
+.error-state p {
+  margin: 0 0 16px 0;
+}
+
+/* Add Document Form */
+.add-document-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.add-document-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.add-document-form label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.add-document-form input,
+.add-document-form textarea {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.add-document-form input:focus,
+.add-document-form textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-alpha);
+}
+
+.add-document-form textarea {
+  resize: vertical;
+  min-height: 200px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  line-height: 1.5;
+}
+
+.add-document-form .form-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.add-document-form .form-error {
+  font-size: 0.8rem;
+  color: var(--color-error);
+  display: block;
+  margin-top: 4px;
+}
+
+.add-document-form .input-error {
+  border-color: var(--color-error);
+}
+
+.add-document-form .input-error:focus {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.15);
+}
+
+.input-with-action {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.input-with-action input {
+  flex: 1;
+}
+
+.add-document-form .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Document Details */
+.document-details {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.document-details .details-section h4 {
+  margin: 0 0 16px 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.document-details .details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.document-details .detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.document-details .detail-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.document-details .detail-value {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.doc-id-value {
+  font-family: 'Consolas', 'Monaco', monospace;
+  word-break: break-all;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copy-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 4px 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+
+.copy-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.copy-btn:active {
+  background: var(--color-primary-alpha);
+  color: var(--color-primary);
+}
+
+.document-content {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 16px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.document-terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.term-badge {
+  background: var(--color-primary-alpha);
+  color: var(--color-primary);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.content-notice {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.no-content-notice {
+  margin: 0;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
+/* Section header with edit button */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.section-header h4 {
+  margin: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* Edit section */
+.edit-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Small button variant */
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}
+
+.document-details .details-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Labels Display */
+.document-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.label-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: var(--color-primary-alpha);
+  color: var(--color-primary);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+/* Tags Display */
+.document-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tag-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.tag-key {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.tag-separator {
+  color: var(--text-muted);
+}
+
+.tag-value {
+  color: var(--text-primary);
+  word-break: break-word;
+}

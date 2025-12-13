@@ -1,0 +1,651 @@
+{
+	"info": {
+		"_postman_id": "verbex-api-collection",
+		"name": "Verbex",
+		"description": "Postman collection for the Verbex REST API Server - a comprehensive inverted index implementation with REST endpoints for index management, document operations, and search functionality.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "protocol",
+			"value": "http",
+			"type": "string",
+			"description": "Protocol to use (http or https)"
+		},
+		{
+			"key": "hostname",
+			"value": "localhost",
+			"type": "string",
+			"description": "Server hostname"
+		},
+		{
+			"key": "port",
+			"value": "8080",
+			"type": "string",
+			"description": "Server port"
+		},
+		{
+			"key": "access_key",
+			"value": "verbexadmin",
+			"type": "string",
+			"description": "Admin bearer token for authentication"
+		}
+	],
+	"item": [
+		{
+			"name": "Health",
+			"description": "Health check endpoints (no authentication required)",
+			"item": [
+				{
+					"name": "Root Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								""
+							]
+						},
+						"description": "Basic health check at root endpoint. Returns server health status, version, and timestamp."
+					},
+					"response": []
+				},
+				{
+					"name": "Health Check (v1.0)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/health",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"health"
+							]
+						},
+						"description": "Versioned health check endpoint. Returns server health status, version, and timestamp."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Authentication",
+			"description": "Authentication endpoints for login and token validation",
+			"item": [
+				{
+					"name": "Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Username\": \"admin\",\n    \"Password\": \"password\"\n}"
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/auth/login",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"auth",
+								"login"
+							]
+						},
+						"description": "Authenticate with username and password. Returns a token on successful authentication. Default credentials: admin/password"
+					},
+					"response": []
+				},
+				{
+					"name": "Validate Token",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/auth/validate",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"auth",
+								"validate"
+							]
+						},
+						"description": "Validate the current bearer token. Returns whether the token is valid."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Indices",
+			"description": "Index management endpoints for creating, listing, and deleting indices",
+			"item": [
+				{
+					"name": "List All Indices",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices"
+							]
+						},
+						"description": "Get a list of all available indices with their configurations."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Index",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Id\": \"test-index\",\n    \"Name\": \"Test Index\",\n    \"Description\": \"A test index for demonstration\",\n    \"InMemory\": true,\n    \"StorageMode\": \"MemoryOnly\",\n    \"EnableLemmatizer\": false,\n    \"EnableStopWordRemover\": false,\n    \"MinTokenLength\": 0,\n    \"MaxTokenLength\": 0,\n    \"Labels\": [\"demo\", \"test\"],\n    \"Tags\": {\n        \"environment\": \"development\",\n        \"owner\": \"api-team\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices"
+							]
+						},
+						"description": "Create a new index with the specified configuration.\n\nRequired fields:\n- Id: Unique identifier for the index\n- Name: Display name for the index\n\nOptional fields:\n- Description: Description of the index\n- RepositoryFilename: Filename for persistence (default: {Id}.db)\n- InMemory: Whether to keep index in memory (default: false)\n- StorageMode: Storage mode - MemoryOnly, DiskOnly, or Hybrid (default: MemoryOnly)\n- EnableLemmatizer: Enable lemmatization (default: false)\n- EnableStopWordRemover: Enable stop word removal (default: false)\n- MinTokenLength: Minimum token length (default: 0)\n- MaxTokenLength: Maximum token length (default: 0)\n- Labels: Array of string labels for categorization (optional)\n- Tags: Key-value pairs for custom metadata (optional)"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Index (with Advanced Options)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Id\": \"advanced-index\",\n    \"Name\": \"Advanced Index\",\n    \"Description\": \"An index with advanced text processing options\",\n    \"RepositoryFilename\": \"advanced-index.db\",\n    \"InMemory\": false,\n    \"StorageMode\": \"Hybrid\",\n    \"EnableLemmatizer\": true,\n    \"EnableStopWordRemover\": true,\n    \"MinTokenLength\": 2,\n    \"MaxTokenLength\": 50,\n    \"Labels\": [\"production\", \"searchable\", \"nlp-enabled\"],\n    \"Tags\": {\n        \"owner\": \"search-team\",\n        \"version\": \"2.0\",\n        \"tier\": \"premium\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices"
+							]
+						},
+						"description": "Create a new index with advanced text processing options including lemmatization, stop word removal, token length constraints, labels, and tags."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Index Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index"
+							]
+						},
+						"description": "Get detailed statistics and information about a specific index."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Index",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index"
+							]
+						},
+						"description": "Delete an existing index and all its documents."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Documents",
+			"description": "Document management endpoints for adding, retrieving, and deleting documents within indices",
+			"item": [
+				{
+					"name": "List Documents",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/documents",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"documents"
+							]
+						},
+						"description": "Get a list of all documents in the specified index."
+					},
+					"response": []
+				},
+				{
+					"name": "Add Document",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Content\": \"This is a sample document with some searchable content. It contains words like technology, innovation, and software development.\",\n    \"Labels\": [\"technical\", \"blog\"],\n    \"Tags\": {\n        \"author\": \"John Doe\",\n        \"category\": \"technology\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/documents",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"documents"
+							]
+						},
+						"description": "Add a new document to the specified index. The document ID will be auto-generated if not provided.\n\nRequired fields:\n- Content: The document content to be indexed\n\nOptional fields:\n- Id: Custom document ID (GUID format)\n- Labels: Array of string labels for categorization\n- Tags: Key-value pairs for custom metadata"
+					},
+					"response": []
+				},
+				{
+					"name": "Add Document (with Custom ID)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"Content\": \"This is another document with a custom ID. It discusses topics like machine learning, artificial intelligence, and data science.\",\n    \"Labels\": [\"ai\", \"research\", \"important\"],\n    \"Tags\": {\n        \"author\": \"Jane Smith\",\n        \"department\": \"R&D\",\n        \"priority\": \"high\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/documents",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"documents"
+							]
+						},
+						"description": "Add a new document with a custom document ID (GUID format), labels, and tags."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Document",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/documents/550e8400-e29b-41d4-a716-446655440000",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"documents",
+								"550e8400-e29b-41d4-a716-446655440000"
+							]
+						},
+						"description": "Retrieve a specific document by its ID from the specified index."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Document",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/documents/550e8400-e29b-41d4-a716-446655440000",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"documents",
+								"550e8400-e29b-41d4-a716-446655440000"
+							]
+						},
+						"description": "Delete a specific document from the specified index."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Search",
+			"description": "Search endpoints for querying indexed documents",
+			"item": [
+				{
+					"name": "Search Index",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Query\": \"technology software\"\n}"
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/search",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"search"
+							]
+						},
+						"description": "Search for documents in the specified index using the provided query.\n\nRequired fields:\n- Query: The search query string\n\nOptional fields:\n- MaxResults: Maximum number of results to return (default: 100)"
+					},
+					"response": []
+				},
+				{
+					"name": "Search Index (with Max Results)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Query\": \"machine learning artificial intelligence\",\n    \"MaxResults\": 10\n}"
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/search",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"search"
+							]
+						},
+						"description": "Search for documents with a limited number of results returned."
+					},
+					"response": []
+				},
+				{
+					"name": "Search Index (with Label Filter)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Query\": \"technology software\",\n    \"MaxResults\": 100,\n    \"Labels\": [\"important\", \"reviewed\"]\n}"
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/search",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"search"
+							]
+						},
+						"description": "Search for documents filtered by labels. Documents must have ALL specified labels (AND logic). Label matching is case-insensitive."
+					},
+					"response": []
+				},
+				{
+					"name": "Search Index (with Tag Filter)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Query\": \"technology software\",\n    \"MaxResults\": 100,\n    \"Tags\": {\n        \"category\": \"tech\",\n        \"status\": \"published\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/search",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"search"
+							]
+						},
+						"description": "Search for documents filtered by tags (key-value pairs). Documents must have ALL specified tags with matching values (AND logic). Tag matching is exact (case-sensitive)."
+					},
+					"response": []
+				},
+				{
+					"name": "Search Index (with Labels and Tags)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Query\": \"technology software\",\n    \"MaxResults\": 100,\n    \"Labels\": [\"important\"],\n    \"Tags\": {\n        \"category\": \"tech\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/search",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"search"
+							]
+						},
+						"description": "Search for documents filtered by both labels and tags. Documents must match the search query AND have all specified labels AND have all specified tags."
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
