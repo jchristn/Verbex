@@ -160,20 +160,11 @@ curl -X POST http://localhost:8080/v1.0/indices/myindex/search \
 | `Lemmatizer` | `null` | Word lemmatization processor |
 | `StopWordRemover` | `null` | Stop word filter |
 
-## Performance
-
-| Operation | InMemory | OnDisk |
-|-----------|----------|--------|
-| Document Addition | 2,500/sec | 1,800/sec |
-| Simple Search | 0.8ms | 2.1ms |
-| Complex Search | 2.1ms | 5.7ms |
-
 ## Support
 
 - [File a Bug](https://github.com/jchristn/verbex/issues/new?template=bug_report.md)
 - [Request a Feature](https://github.com/jchristn/verbex/issues/new?template=feature_request.md)
 - [Discussions](https://github.com/jchristn/verbex/discussions)
-- Email: [joel@watson.fi](mailto:joel@watson.fi)
 
 ## Contributing
 
@@ -187,10 +178,6 @@ dotnet run --project src/Test  # Run test suite
 ## License
 
 [MIT License](LICENSE) - free for commercial and personal use.
-
----
-
-**Built by [Joel Christner](https://github.com/jchristn)**
 
 ## Attribution
 
