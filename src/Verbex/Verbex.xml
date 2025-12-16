@@ -532,6 +532,7 @@
         <member name="M:Verbex.InvertedIndex.ClearAsync(System.Threading.CancellationToken)">
             <summary>
             Removes all documents from the index.
+            Also clears all terms, labels, and tags via cascade delete.
             </summary>
             <param name="token">Cancellation token.</param>
             <returns>Number of documents removed.</returns>
@@ -1949,6 +1950,13 @@
             <param name="token">Cancellation token.</param>
             <returns>Number of terms deleted.</returns>
         </member>
+        <member name="M:Verbex.Repositories.Interfaces.ITermMethods.DeleteAllAsync(System.Threading.CancellationToken)">
+            <summary>
+            Deletes all terms from the index.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of terms deleted.</returns>
+        </member>
         <member name="T:Verbex.Repositories.LabelRecord">
             <summary>
             Record type for labels table rows.
@@ -3127,6 +3135,9 @@
             <inheritdoc/>
         </member>
         <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.DeleteOrphanedAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteTermMethods.DeleteAllAsync(System.Threading.CancellationToken)">
             <inheritdoc/>
         </member>
         <member name="T:Verbex.Repositories.TagRecord">

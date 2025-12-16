@@ -322,6 +322,7 @@ namespace Verbex
 
         /// <summary>
         /// Removes all documents from the index.
+        /// Also clears all terms, labels, and tags via cascade delete.
         /// </summary>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Number of documents removed.</returns>
@@ -330,7 +331,11 @@ namespace Verbex
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            return await _Repository.Document.DeleteAllAsync(token).ConfigureAwait(false);
+            long documentCount = await _Repository.Document.DeleteAllAsync(token).ConfigureAwait(false);
+
+            await _Repository.Term.DeleteAllAsync(token).ConfigureAwait(false);
+
+            return documentCount;
         }
 
         #endregion

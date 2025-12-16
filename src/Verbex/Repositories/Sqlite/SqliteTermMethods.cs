@@ -439,5 +439,31 @@ namespace Verbex.Repositories.Sqlite
                 return (long)affected;
             }, token).ConfigureAwait(false);
         }
+
+        /// <inheritdoc/>
+        public async Task<long> DeleteAllAsync(CancellationToken token = default)
+        {
+            _Repository.ThrowIfDisposed();
+            _Repository.ThrowIfNotOpen();
+
+            return await _Repository.ExecuteWriteAsync(async (connection) =>
+            {
+                long count = await GetCountInternalAsync(connection, token).ConfigureAwait(false);
+
+                using SqliteCommand cmd = connection.CreateCommand();
+                cmd.CommandText = TermQueries.DeleteAll();
+                await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+
+                return count;
+            }, token).ConfigureAwait(false);
+        }
+
+        private static async Task<long> GetCountInternalAsync(SqliteConnection connection, CancellationToken token)
+        {
+            using SqliteCommand cmd = connection.CreateCommand();
+            cmd.CommandText = TermQueries.Count();
+            object? result = await cmd.ExecuteScalarAsync(token).ConfigureAwait(false);
+            return Convert.ToInt64(result);
+        }
     }
 }

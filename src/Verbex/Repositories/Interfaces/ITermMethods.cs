@@ -124,5 +124,12 @@ namespace Verbex.Repositories.Interfaces
         /// <param name="token">Cancellation token.</param>
         /// <returns>Number of terms deleted.</returns>
         Task<long> DeleteOrphanedAsync(CancellationToken token = default);
+
+        /// <summary>
+        /// Deletes all terms from the index.
+        /// </summary>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Number of terms deleted.</returns>
+        Task<long> DeleteAllAsync(CancellationToken token = default);
     }
 }
