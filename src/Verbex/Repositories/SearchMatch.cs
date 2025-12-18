@@ -1,5 +1,7 @@
 namespace Verbex.Repositories
 {
+    using System.Collections.Generic;
+
     /// <summary>
     /// Represents a search match result from the repository.
     /// </summary>
@@ -19,5 +21,10 @@ namespace Verbex.Repositories
         /// Number of search terms matched.
         /// </summary>
         public int MatchedTermCount { get; set; }
+
+        /// <summary>
+        /// Per-term frequencies mapping term ID to frequency in this document.
+        /// </summary>
+        public Dictionary<string, int> TermFrequencies { get; set; } = new Dictionary<string, int>();
     }
 }

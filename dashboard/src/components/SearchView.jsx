@@ -72,7 +72,8 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
         if (Object.keys(tags).length === 0) tags = null;
       }
 
-      const response = await apiClient.search(selectedIndex, searchQuery, maxResults, labels, tags);
+      const useAndLogic = searchMode === 'all';
+      const response = await apiClient.search(selectedIndex, searchQuery, maxResults, labels, tags, useAndLogic);
 
       // Filter results by minimum score if specified
       let filteredResults = response.data;

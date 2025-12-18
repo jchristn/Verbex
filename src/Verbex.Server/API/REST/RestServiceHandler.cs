@@ -997,7 +997,7 @@ namespace Verbex.Server.API.REST
                     SearchResults searchResults = await index.SearchAsync(
                         searchRequest.Query,
                         searchRequest.MaxResults,
-                        false, // useAndLogic
+                        searchRequest.UseAndLogic,
                         searchRequest.Labels,
                         tagFilters).ConfigureAwait(false);
 

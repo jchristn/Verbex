@@ -220,10 +220,11 @@ class ApiClient {
   }
 
   // Search endpoints
-  async search(indexId, query, maxResults = 100, labels = null, tags = null) {
+  async search(indexId, query, maxResults = 100, labels = null, tags = null, useAndLogic = false) {
     const body = {
       Query: query,
-      MaxResults: maxResults
+      MaxResults: maxResults,
+      UseAndLogic: useAndLogic
     };
     if (labels && labels.length > 0) {
       body.Labels = labels;

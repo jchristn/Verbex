@@ -288,5 +288,51 @@ namespace Verbex.Repositories.Sqlite
                 return (long)affected;
             }, token).ConfigureAwait(false);
         }
+
+        /// <inheritdoc/>
+        public async Task<List<DocumentTermRecord>> GetByDocumentsAndTermsAsync(IEnumerable<string> documentIds, IEnumerable<string> termIds, CancellationToken token = default)
+        {
+            _Repository.ThrowIfDisposed();
+            _Repository.ThrowIfNotOpen();
+            ArgumentNullException.ThrowIfNull(documentIds, nameof(documentIds));
+            ArgumentNullException.ThrowIfNull(termIds, nameof(termIds));
+
+            List<string> docIdList = new List<string>(documentIds);
+            List<string> termIdList = new List<string>(termIds);
+
+            if (docIdList.Count == 0 || termIdList.Count == 0)
+            {
+                return new List<DocumentTermRecord>();
+            }
+
+            return await _Repository.ExecuteReadAsync(async (connection) =>
+            {
+                using SqliteCommand cmd = connection.CreateCommand();
+                cmd.CommandText = DocumentTermQueries.SelectByDocumentsAndTerms(docIdList.Count, termIdList.Count);
+
+                for (int i = 0; i < docIdList.Count; i++)
+                {
+                    cmd.Parameters.AddWithValue($"@docId{i}", docIdList[i]);
+                }
+
+                for (int i = 0; i < termIdList.Count; i++)
+                {
+                    cmd.Parameters.AddWithValue($"@termId{i}", termIdList[i]);
+                }
+
+                List<DocumentTermRecord> results = new List<DocumentTermRecord>();
+                using SqliteDataReader reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
+                while (await reader.ReadAsync(token).ConfigureAwait(false))
+                {
+                    results.Add(new DocumentTermRecord
+                    {
+                        DocumentId = reader.GetString(0),
+                        TermId = reader.GetString(1),
+                        TermFrequency = reader.GetInt32(2)
+                    });
+                }
+                return results;
+            }, token).ConfigureAwait(false);
+        }
     }
 }

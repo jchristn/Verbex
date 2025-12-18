@@ -390,12 +390,49 @@ namespace Verbex
                 return new SearchResults(new List<SearchResult>(), 0, DateTime.UtcNow - startTime);
             }
 
+            // When using AND logic, ALL query terms must exist in the index
+            // If any term doesn't exist, no document can match all terms
+            if (useAndLogic && termRecords.Count < queryTerms.Count)
+            {
+                return new SearchResults(new List<SearchResult>(), 0, DateTime.UtcNow - startTime);
+            }
+
             List<string> termIds = termRecords.Values.Select(t => t.Id).ToList();
 
             int limit = maxResults ?? _Configuration.DefaultMaxSearchResults;
             List<SearchMatch> matches = await _Repository.DocumentTerm.SearchAsync(termIds, useAndLogic, labels, tags, limit, token).ConfigureAwait(false);
 
+            if (matches.Count == 0)
+            {
+                return new SearchResults(new List<SearchResult>(), 0, DateTime.UtcNow - startTime);
+            }
+
             List<string> docIds = matches.Select(m => m.DocumentId).ToList();
+
+            // Fetch per-term frequencies for all matched documents
+            List<DocumentTermRecord> documentTermRecords = await _Repository.DocumentTerm.GetByDocumentsAndTermsAsync(docIds, termIds, token).ConfigureAwait(false);
+
+            // Build lookup: documentId -> (termId -> frequency)
+            Dictionary<string, Dictionary<string, int>> perDocTermFrequencies = new Dictionary<string, Dictionary<string, int>>();
+            foreach (DocumentTermRecord dtr in documentTermRecords)
+            {
+                if (!perDocTermFrequencies.TryGetValue(dtr.DocumentId, out Dictionary<string, int>? termFreqs))
+                {
+                    termFreqs = new Dictionary<string, int>();
+                    perDocTermFrequencies[dtr.DocumentId] = termFreqs;
+                }
+                termFreqs[dtr.TermId] = dtr.TermFrequency;
+            }
+
+            // Populate TermFrequencies in each SearchMatch
+            foreach (SearchMatch match in matches)
+            {
+                if (perDocTermFrequencies.TryGetValue(match.DocumentId, out Dictionary<string, int>? termFreqs))
+                {
+                    match.TermFrequencies = termFreqs;
+                }
+            }
+
             List<DocumentMetadata> documents = await _Repository.Document.GetByIdsAsync(docIds, token).ConfigureAwait(false);
 
             Dictionary<string, DocumentMetadata> docLookup = documents.ToDictionary(d => d.DocumentId);
@@ -1112,19 +1149,33 @@ namespace Verbex
 
         private double CalculateScore(SearchMatch match, Dictionary<string, TermRecord> termRecords, long totalDocs)
         {
-            double score = 0;
+            double score = 0.0;
 
+            // Calculate TF-IDF for each term that this document actually contains
+            // Formula: score = Σ log(1 + TF) × log((N + 1) / (df + 1))
             foreach (TermRecord term in termRecords.Values)
             {
-                if (term.DocumentFrequency > 0 && totalDocs > 0)
+                // Only include terms that this document actually matches
+                if (!match.TermFrequencies.TryGetValue(term.Id, out int termFrequency))
                 {
-                    double idf = Math.Log((double)totalDocs / term.DocumentFrequency);
-                    score += idf;
+                    continue;
+                }
+
+                if (termFrequency > 0 && totalDocs > 0)
+                {
+                    // TF component: logarithmic term frequency
+                    double tf = Math.Log(1.0 + termFrequency);
+
+                    // IDF component: inverse document frequency with smoothing
+                    // Smoothing prevents division by zero and ensures non-zero IDF
+                    double idf = Math.Log((totalDocs + 1.0) / (term.DocumentFrequency + 1.0));
+
+                    // Accumulate TF-IDF for this term
+                    score += tf * idf;
                 }
             }
 
-            score *= match.TotalFrequency;
-
+            // Apply sigmoid normalization to map score to 0-1 range
             score = 1.0 / (1.0 + Math.Exp(-score / _Configuration.SigmoidNormalizationDivisor));
 
             return score;

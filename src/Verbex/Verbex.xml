@@ -1611,6 +1611,16 @@
             <param name="token">Cancellation token.</param>
             <returns>Number of mappings deleted.</returns>
         </member>
+        <member name="M:Verbex.Repositories.Interfaces.IDocumentTermMethods.GetByDocumentsAndTermsAsync(System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Gets document-term mappings for specific documents and terms.
+            Used to retrieve per-term frequencies for scoring.
+            </summary>
+            <param name="documentIds">List of document IDs.</param>
+            <param name="termIds">List of term IDs.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of document-term records.</returns>
+        </member>
         <member name="T:Verbex.Repositories.Interfaces.ILabelMethods">
             <summary>
             Interface for label-related repository operations.
@@ -2202,6 +2212,14 @@
             <param name="tagCount">Number of tags to filter by.</param>
             <returns>SQL string.</returns>
         </member>
+        <member name="M:Verbex.Repositories.Queries.DocumentTermQueries.SelectByDocumentsAndTerms(System.Int32,System.Int32)">
+            <summary>
+            Select document-term records for specific documents and terms.
+            </summary>
+            <param name="documentCount">Number of document IDs.</param>
+            <param name="termCount">Number of term IDs.</param>
+            <returns>SQL string.</returns>
+        </member>
         <member name="T:Verbex.Repositories.Queries.LabelQueries">
             <summary>
             Contains SQL queries for label operations.
@@ -2739,6 +2757,11 @@
             Number of search terms matched.
             </summary>
         </member>
+        <member name="P:Verbex.Repositories.SearchMatch.TermFrequencies">
+            <summary>
+            Per-term frequencies mapping term ID to frequency in this document.
+            </summary>
+        </member>
         <member name="T:Verbex.Repositories.SqliteIndexRepository">
             <summary>
             SQLite-based implementation of the index repository.
@@ -2977,6 +3000,9 @@
             <inheritdoc/>
         </member>
         <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentTermMethods.DeleteByDocumentAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Verbex.Repositories.Sqlite.SqliteDocumentTermMethods.GetByDocumentsAndTermsAsync(System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc/>
         </member>
         <member name="T:Verbex.Repositories.Sqlite.SqliteLabelMethods">

@@ -358,5 +358,33 @@ namespace Verbex.Repositories.Queries
                 LIMIT @limit;
             ";
         }
+
+        /// <summary>
+        /// Select document-term records for specific documents and terms.
+        /// </summary>
+        /// <param name="documentCount">Number of document IDs.</param>
+        /// <param name="termCount">Number of term IDs.</param>
+        /// <returns>SQL string.</returns>
+        internal static string SelectByDocumentsAndTerms(int documentCount, int termCount)
+        {
+            string[] docParams = new string[documentCount];
+            for (int i = 0; i < documentCount; i++)
+            {
+                docParams[i] = $"@docId{i}";
+            }
+
+            string[] termParams = new string[termCount];
+            for (int i = 0; i < termCount; i++)
+            {
+                termParams[i] = $"@termId{i}";
+            }
+
+            return $@"
+                SELECT document_id, term_id, term_frequency
+                FROM document_terms
+                WHERE document_id IN ({string.Join(", ", docParams)})
+                  AND term_id IN ({string.Join(", ", termParams)});
+            ";
+        }
     }
 }

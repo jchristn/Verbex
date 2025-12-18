@@ -84,5 +84,15 @@ namespace Verbex.Repositories.Interfaces
         /// <param name="token">Cancellation token.</param>
         /// <returns>Number of mappings deleted.</returns>
         Task<long> DeleteByDocumentAsync(string documentId, CancellationToken token = default);
+
+        /// <summary>
+        /// Gets document-term mappings for specific documents and terms.
+        /// Used to retrieve per-term frequencies for scoring.
+        /// </summary>
+        /// <param name="documentIds">List of document IDs.</param>
+        /// <param name="termIds">List of term IDs.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>List of document-term records.</returns>
+        Task<List<DocumentTermRecord>> GetByDocumentsAndTermsAsync(IEnumerable<string> documentIds, IEnumerable<string> termIds, CancellationToken token = default);
     }
 }

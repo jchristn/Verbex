@@ -42,6 +42,23 @@ namespace Verbex.Server.Classes
         }
 
         /// <summary>
+        /// If true, documents must contain ALL search terms (AND logic).
+        /// If false, documents can contain ANY search term (OR logic).
+        /// Default value is false (OR logic).
+        /// </summary>
+        public bool UseAndLogic
+        {
+            get
+            {
+                return _UseAndLogic;
+            }
+            set
+            {
+                _UseAndLogic = value;
+            }
+        }
+
+        /// <summary>
         /// Optional list of labels to filter by.
         /// Documents must have ALL specified labels to match (AND logic).
         /// Label matching is case-insensitive.
@@ -83,6 +100,7 @@ namespace Verbex.Server.Classes
 
         private string _Query = "";
         private int _MaxResults = 100;
+        private bool _UseAndLogic = false;
         private List<string>? _Labels = null;
         private Dictionary<string, object>? _Tags = null;
 
