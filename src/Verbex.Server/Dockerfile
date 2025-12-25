@@ -1,17 +1,19 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# Build stage runs on host architecture to avoid QEMU emulation issues
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+ARG TARGETARCH
 WORKDIR /src
 
 # Copy csproj files and restore dependencies
 COPY Verbex/Verbex.csproj Verbex/
 COPY Verbex.Server/Verbex.Server.csproj Verbex.Server/
-RUN dotnet restore Verbex.Server/Verbex.Server.csproj
+RUN dotnet restore Verbex.Server/Verbex.Server.csproj -a $TARGETARCH
 
 # Copy source code and build
 COPY Verbex/ Verbex/
 COPY Verbex.Server/ Verbex.Server/
-RUN dotnet publish Verbex.Server/Verbex.Server.csproj -c Release -o /app/publish -f net10.0 /p:GeneratePackageOnBuild=false /p:ErrorOnDuplicatePublishOutputFiles=false
+RUN dotnet publish Verbex.Server/Verbex.Server.csproj -c Release -o /app/publish -f net10.0 -a $TARGETARCH /p:GeneratePackageOnBuild=false /p:ErrorOnDuplicatePublishOutputFiles=false
 
-# Runtime image
+# Runtime image uses target architecture
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish .
