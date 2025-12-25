@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy csproj files and restore dependencies
@@ -9,10 +9,10 @@ RUN dotnet restore Verbex.Server/Verbex.Server.csproj
 # Copy source code and build
 COPY Verbex/ Verbex/
 COPY Verbex.Server/ Verbex.Server/
-RUN dotnet publish Verbex.Server/Verbex.Server.csproj -c Release -o /app/publish /p:GeneratePackageOnBuild=false /p:ErrorOnDuplicatePublishOutputFiles=false
+RUN dotnet publish Verbex.Server/Verbex.Server.csproj -c Release -o /app/publish -f net10.0 /p:GeneratePackageOnBuild=false /p:ErrorOnDuplicatePublishOutputFiles=false
 
 # Runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish .
 
