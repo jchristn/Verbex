@@ -17,6 +17,7 @@ namespace Verbex.Server.API.REST
     using Verbex.Utilities;
     using WatsonWebserver;
     using WatsonWebserver.Core;
+    using WatsonWebserver.Core.OpenApi;
 
     /// <summary>
     /// REST service handler.
@@ -74,7 +75,8 @@ namespace Verbex.Server.API.REST
         public void Start()
         {
             _Webserver?.Start();
-            _Logging?.Info(_Header + "started on http://" + _Settings!.Rest.Hostname + ":" + _Settings.Rest.Port);
+            string protocol = _Settings!.Rest.Ssl ? "https" : "http";
+            _Logging?.Info(_Header + "started on " + protocol + "://" + _Settings.Rest.Hostname + ":" + _Settings.Rest.Port);
         }
 
         /// <summary>
@@ -101,8 +103,59 @@ namespace Verbex.Server.API.REST
                 Port = _Settings.Rest.Port
             };
 
+            // Configure SSL settings
+            webserverSettings.Ssl.Enable = _Settings.Rest.Ssl;
+            if (_Settings.Rest.Ssl)
+            {
+                if (!String.IsNullOrEmpty(_Settings.Rest.SslCertificateFile))
+                {
+                    webserverSettings.Ssl.PfxCertificateFile = _Settings.Rest.SslCertificateFile;
+                }
+                if (!String.IsNullOrEmpty(_Settings.Rest.SslCertificatePassword))
+                {
+                    webserverSettings.Ssl.PfxCertificatePassword = _Settings.Rest.SslCertificatePassword;
+                }
+            }
+
             _Webserver = new Webserver(webserverSettings, DefaultRoute);
+
+            if (_Settings.Rest.EnableOpenApi)
+            {
+                ConfigureOpenApi();
+            }
+
             InitializeRoutes();
+        }
+
+        /// <summary>
+        /// Configure OpenAPI/Swagger documentation.
+        /// </summary>
+        private void ConfigureOpenApi()
+        {
+            _Webserver!.UseOpenApi(settings =>
+            {
+                settings.Info.Title = "Verbex API";
+                settings.Info.Version = "1.0.0";
+                settings.Info.Description = "REST API for Verbex inverted index service. Provides endpoints for managing indices, documents, and performing full-text search operations.";
+
+                settings.Tags.Add(new OpenApiTag { Name = "Health", Description = "Health check endpoints" });
+                settings.Tags.Add(new OpenApiTag { Name = "Authentication", Description = "Authentication and token management" });
+                settings.Tags.Add(new OpenApiTag { Name = "Indices", Description = "Index management operations" });
+                settings.Tags.Add(new OpenApiTag { Name = "Documents", Description = "Document management within indices" });
+                settings.Tags.Add(new OpenApiTag { Name = "Search", Description = "Full-text search operations" });
+
+                settings.SecuritySchemes.Add("BearerAuth", new OpenApiSecurityScheme
+                {
+                    Type = "http",
+                    Scheme = "bearer",
+                    BearerFormat = "Token",
+                    Description = "Bearer token authentication. Use the /v1.0/auth/login endpoint to obtain a token."
+                });
+
+                settings.EnableSwaggerUi = _Settings!.Rest.EnableSwaggerUi;
+                settings.DocumentPath = "/openapi.json";
+                settings.SwaggerUiPath = "/swagger";
+            });
         }
 
         /// <summary>
@@ -115,35 +168,228 @@ namespace Verbex.Server.API.REST
             _Webserver.Routes.PostRouting = PostRoutingRoute;
 
             // Health check routes
-            _Webserver.Routes.PreAuthentication.Static.Add(HttpMethod.GET, "/", GetHealthRoute, ExceptionRoute);
-            _Webserver.Routes.PreAuthentication.Static.Add(HttpMethod.GET, "/v1.0/health", GetHealthRoute, ExceptionRoute);
+            _Webserver.Routes.PreAuthentication.Static.Add(
+                HttpMethod.GET, "/", GetHealthRoute,
+                metadata => metadata
+                    .WithTag("Health")
+                    .WithDescription("Root health check endpoint. Returns service status, version, and timestamp."),
+                ExceptionRoute);
+
+            _Webserver.Routes.PreAuthentication.Static.Add(
+                HttpMethod.GET, "/v1.0/health", GetHealthRoute,
+                metadata => metadata
+                    .WithTag("Health")
+                    .WithDescription("Versioned health check endpoint. Returns service status, version, and timestamp.")
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Service is healthy", CreateResponseSchema())),
+                ExceptionRoute);
 
             // Authentication routes
-            _Webserver.Routes.PreAuthentication.Static.Add(HttpMethod.POST, "/v1.0/auth/login", PostAuthLoginRoute, ExceptionRoute);
-            _Webserver.Routes.PreAuthentication.Static.Add(HttpMethod.GET, "/v1.0/auth/validate", GetAuthValidateRoute, ExceptionRoute);
+            _Webserver.Routes.PreAuthentication.Static.Add(
+                HttpMethod.POST, "/v1.0/auth/login", PostAuthLoginRoute,
+                metadata => metadata
+                    .WithTag("Authentication")
+                    .WithDescription("Authenticate with username and password to obtain a bearer token.")
+                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
+                        CreateLoginRequestSchema(),
+                        "Login credentials",
+                        required: true))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Login successful", CreateLoginResponseSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PreAuthentication.Static.Add(
+                HttpMethod.GET, "/v1.0/auth/validate", GetAuthValidateRoute,
+                metadata => metadata
+                    .WithTag("Authentication")
+                    .WithDescription("Validate a bearer token. Returns whether the token is valid.")
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Token validation result", CreateValidateResponseSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized()),
+                ExceptionRoute);
 
             // Index management routes
-            _Webserver.Routes.PostAuthentication.Static.Add(HttpMethod.GET, "/v1.0/indices", GetIndicesRoute, ExceptionRoute);
-            _Webserver.Routes.PostAuthentication.Static.Add(HttpMethod.POST, "/v1.0/indices", PostIndicesRoute, ExceptionRoute);
-            _Webserver.Routes.PostAuthentication.Parameter.Add(HttpMethod.GET, "/v1.0/indices/{id}", GetIndexRoute, ExceptionRoute);
-            _Webserver.Routes.PostAuthentication.Parameter.Add(HttpMethod.DELETE, "/v1.0/indices/{id}", DeleteIndexRoute, ExceptionRoute);
+            _Webserver.Routes.PostAuthentication.Static.Add(
+                HttpMethod.GET, "/v1.0/indices", GetIndicesRoute,
+                metadata => metadata
+                    .WithTag("Indices")
+                    .WithDescription("List all available indices with their configuration and metadata.")
+                    .WithResponse(200, OpenApiResponseMetadata.Json("List of indices", CreateIndicesListSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Static.Add(
+                HttpMethod.POST, "/v1.0/indices", PostIndicesRoute,
+                metadata => metadata
+                    .WithTag("Indices")
+                    .WithDescription("Create a new index with the specified configuration. The index ID must be unique.")
+                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
+                        CreateIndexRequestSchema(),
+                        "Index configuration",
+                        required: true))
+                    .WithResponse(201, OpenApiResponseMetadata.Created(CreateIndexCreatedSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(409, OpenApiResponseMetadata.Create("Index with this ID already exists")),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.GET, "/v1.0/indices/{id}", GetIndexRoute,
+                metadata => metadata
+                    .WithTag("Indices")
+                    .WithDescription("Get detailed information about a specific index including configuration and statistics.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Index details with statistics", CreateIndexDetailsSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.DELETE, "/v1.0/indices/{id}", DeleteIndexRoute,
+                metadata => metadata
+                    .WithTag("Indices")
+                    .WithDescription("Delete an index and all its documents permanently.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index to delete"))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Index deleted successfully", CreateMessageSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
 
             // Index labels and tags update routes
-            _Webserver.Routes.PostAuthentication.Parameter.Add(HttpMethod.PUT, "/v1.0/indices/{id}/labels", PutIndexLabelsRoute, ExceptionRoute);
-            _Webserver.Routes.PostAuthentication.Parameter.Add(HttpMethod.PUT, "/v1.0/indices/{id}/tags", PutIndexTagsRoute, ExceptionRoute);
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.PUT, "/v1.0/indices/{id}/labels", PutIndexLabelsRoute,
+                metadata => metadata
+                    .WithTag("Indices")
+                    .WithDescription("Replace all labels on an index. This is a full replacement, not an additive operation.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
+                        CreateUpdateLabelsRequestSchema(),
+                        "New labels for the index",
+                        required: true))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Labels updated successfully", CreateIndexUpdateSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.PUT, "/v1.0/indices/{id}/tags", PutIndexTagsRoute,
+                metadata => metadata
+                    .WithTag("Indices")
+                    .WithDescription("Replace all tags on an index. This is a full replacement, not an additive operation.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
+                        CreateUpdateTagsRequestSchema(),
+                        "New tags for the index",
+                        required: true))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Tags updated successfully", CreateIndexUpdateSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
 
             // Index-specific document routes
-            _Webserver.Routes.PostAuthentication.Parameter.Add(HttpMethod.GET, "/v1.0/indices/{id}/documents", GetIndexDocumentsRoute, ExceptionRoute);
-            _Webserver.Routes.PostAuthentication.Parameter.Add(HttpMethod.POST, "/v1.0/indices/{id}/documents", PostIndexDocumentsRoute, ExceptionRoute);
-            _Webserver.Routes.PostAuthentication.Parameter.Add(HttpMethod.GET, "/v1.0/indices/{id}/documents/{docId}", GetIndexDocumentRoute, ExceptionRoute);
-            _Webserver.Routes.PostAuthentication.Parameter.Add(HttpMethod.DELETE, "/v1.0/indices/{id}/documents/{docId}", DeleteIndexDocumentRoute, ExceptionRoute);
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.GET, "/v1.0/indices/{id}/documents", GetIndexDocumentsRoute,
+                metadata => metadata
+                    .WithTag("Documents")
+                    .WithDescription("List all documents in an index. Limited to 1000 documents maximum.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("List of documents", CreateDocumentsListSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.POST, "/v1.0/indices/{id}/documents", PostIndexDocumentsRoute,
+                metadata => metadata
+                    .WithTag("Documents")
+                    .WithDescription("Add a new document to an index. If no ID is provided, one will be auto-generated.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
+                        CreateAddDocumentRequestSchema(),
+                        "Document to add",
+                        required: true))
+                    .WithResponse(201, OpenApiResponseMetadata.Created(CreateDocumentCreatedSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.GET, "/v1.0/indices/{id}/documents/{docId}", GetIndexDocumentRoute,
+                metadata => metadata
+                    .WithTag("Documents")
+                    .WithDescription("Get a specific document by ID including its metadata (labels and tags).")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithParameter(OpenApiParameterMetadata.Path("docId", "The unique identifier of the document"))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Document details", CreateDocumentDetailsSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.DELETE, "/v1.0/indices/{id}/documents/{docId}", DeleteIndexDocumentRoute,
+                metadata => metadata
+                    .WithTag("Documents")
+                    .WithDescription("Delete a document from an index permanently.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithParameter(OpenApiParameterMetadata.Path("docId", "The unique identifier of the document to delete"))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Document deleted successfully", CreateMessageSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
 
             // Document labels and tags update routes
-            _Webserver.Routes.PostAuthentication.Parameter.Add(HttpMethod.PUT, "/v1.0/indices/{id}/documents/{docId}/labels", PutDocumentLabelsRoute, ExceptionRoute);
-            _Webserver.Routes.PostAuthentication.Parameter.Add(HttpMethod.PUT, "/v1.0/indices/{id}/documents/{docId}/tags", PutDocumentTagsRoute, ExceptionRoute);
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.PUT, "/v1.0/indices/{id}/documents/{docId}/labels", PutDocumentLabelsRoute,
+                metadata => metadata
+                    .WithTag("Documents")
+                    .WithDescription("Replace all labels on a document. This is a full replacement, not an additive operation.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithParameter(OpenApiParameterMetadata.Path("docId", "The unique identifier of the document"))
+                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
+                        CreateUpdateLabelsRequestSchema(),
+                        "New labels for the document",
+                        required: true))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Labels updated successfully", CreateDocumentUpdateSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.PUT, "/v1.0/indices/{id}/documents/{docId}/tags", PutDocumentTagsRoute,
+                metadata => metadata
+                    .WithTag("Documents")
+                    .WithDescription("Replace all tags on a document. This is a full replacement, not an additive operation.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithParameter(OpenApiParameterMetadata.Path("docId", "The unique identifier of the document"))
+                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
+                        CreateUpdateTagsRequestSchema(),
+                        "New tags for the document",
+                        required: true))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Tags updated successfully", CreateDocumentUpdateSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
 
             // Index-specific search routes
-            _Webserver.Routes.PostAuthentication.Parameter.Add(HttpMethod.POST, "/v1.0/indices/{id}/search", PostIndexSearchRoute, ExceptionRoute);
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.POST, "/v1.0/indices/{id}/search", PostIndexSearchRoute,
+                metadata => metadata
+                    .WithTag("Search")
+                    .WithDescription("Perform a full-text search within an index. Supports AND/OR logic and label/tag filtering.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index to search"))
+                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
+                        CreateSearchRequestSchema(),
+                        "Search query and options",
+                        required: true))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Search results", CreateSearchResultsSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
         }
 
         /// <summary>
@@ -1126,6 +1372,463 @@ namespace Verbex.Server.API.REST
 
             await ctx.Response.Send(json);
         }
+
+        #region OpenAPI-Schema-Helpers
+
+        /// <summary>
+        /// Create base response schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateResponseSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Guid"] = OpenApiSchemaMetadata.String(),
+                    ["Success"] = OpenApiSchemaMetadata.Boolean(),
+                    ["TimestampUtc"] = OpenApiSchemaMetadata.String("date-time"),
+                    ["StatusCode"] = OpenApiSchemaMetadata.Integer(),
+                    ["ErrorMessage"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true },
+                    ["Data"] = new OpenApiSchemaMetadata { Type = "object" },
+                    ["ProcessingTimeMs"] = OpenApiSchemaMetadata.Number("double")
+                }
+            };
+        }
+
+        /// <summary>
+        /// Create error response schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateErrorSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Guid"] = OpenApiSchemaMetadata.String(),
+                    ["Success"] = OpenApiSchemaMetadata.Boolean(),
+                    ["TimestampUtc"] = OpenApiSchemaMetadata.String("date-time"),
+                    ["StatusCode"] = OpenApiSchemaMetadata.Integer(),
+                    ["ErrorMessage"] = OpenApiSchemaMetadata.String(),
+                    ["ProcessingTimeMs"] = OpenApiSchemaMetadata.Number("double")
+                }
+            };
+        }
+
+        /// <summary>
+        /// Create login request schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateLoginRequestSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Username"] = new OpenApiSchemaMetadata { Type = "string", Description = "Username for authentication" },
+                    ["Password"] = new OpenApiSchemaMetadata { Type = "string", Description = "Password for authentication" }
+                },
+                Required = new List<string> { "Username", "Password" }
+            };
+        }
+
+        /// <summary>
+        /// Create login response schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateLoginResponseSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Token"] = new OpenApiSchemaMetadata { Type = "string", Description = "Bearer token for authentication" },
+                    ["Username"] = new OpenApiSchemaMetadata { Type = "string", Description = "Authenticated username" }
+                }
+            };
+            return response;
+        }
+
+        /// <summary>
+        /// Create validate response schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateValidateResponseSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Valid"] = new OpenApiSchemaMetadata { Type = "boolean", Description = "Whether the token is valid" }
+                }
+            };
+            return response;
+        }
+
+        /// <summary>
+        /// Create message response schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateMessageSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Message"] = OpenApiSchemaMetadata.String()
+                }
+            };
+            return response;
+        }
+
+        /// <summary>
+        /// Create indices list schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateIndicesListSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Indices"] = OpenApiSchemaMetadata.CreateArray(CreateIndexSummarySchema()),
+                    ["Count"] = OpenApiSchemaMetadata.Integer()
+                }
+            };
+            return response;
+        }
+
+        /// <summary>
+        /// Create index summary schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateIndexSummarySchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Id"] = new OpenApiSchemaMetadata { Type = "string", Description = "Unique identifier of the index" },
+                    ["Name"] = new OpenApiSchemaMetadata { Type = "string", Description = "Display name of the index" },
+                    ["Description"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true },
+                    ["Enabled"] = OpenApiSchemaMetadata.Boolean(),
+                    ["InMemory"] = OpenApiSchemaMetadata.Boolean(),
+                    ["CreatedUtc"] = OpenApiSchemaMetadata.String("date-time"),
+                    ["Labels"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String()),
+                    ["Tags"] = new OpenApiSchemaMetadata { Type = "object", Description = "Key-value pairs" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Create index request schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateIndexRequestSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Id"] = new OpenApiSchemaMetadata { Type = "string", Description = "Unique identifier for the index" },
+                    ["Name"] = new OpenApiSchemaMetadata { Type = "string", Description = "Display name of the index" },
+                    ["Description"] = new OpenApiSchemaMetadata { Type = "string", Description = "Optional description" },
+                    ["RepositoryFilename"] = new OpenApiSchemaMetadata { Type = "string", Description = "Filename for persistent storage" },
+                    ["InMemory"] = new OpenApiSchemaMetadata { Type = "boolean", Description = "Whether to store in memory only" },
+                    ["StorageMode"] = new OpenApiSchemaMetadata { Type = "string", Description = "Storage mode (MemoryOnly, OnDisk)" },
+                    ["EnableLemmatizer"] = new OpenApiSchemaMetadata { Type = "boolean", Description = "Enable lemmatization" },
+                    ["EnableStopWordRemover"] = new OpenApiSchemaMetadata { Type = "boolean", Description = "Enable stop word removal" },
+                    ["MinTokenLength"] = new OpenApiSchemaMetadata { Type = "integer", Description = "Minimum token length" },
+                    ["MaxTokenLength"] = new OpenApiSchemaMetadata { Type = "integer", Description = "Maximum token length" },
+                    ["Labels"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String()),
+                    ["Tags"] = new OpenApiSchemaMetadata { Type = "object", Description = "Key-value pairs" }
+                },
+                Required = new List<string> { "Id", "Name" }
+            };
+        }
+
+        /// <summary>
+        /// Create index created response schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateIndexCreatedSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Message"] = OpenApiSchemaMetadata.String(),
+                    ["Index"] = CreateIndexSummarySchema()
+                }
+            };
+            return response;
+        }
+
+        /// <summary>
+        /// Create index details schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateIndexDetailsSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Configuration"] = CreateIndexSummarySchema(),
+                    ["Statistics"] = new OpenApiSchemaMetadata
+                    {
+                        Type = "object",
+                        Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                        {
+                            ["DocumentCount"] = OpenApiSchemaMetadata.Integer(),
+                            ["TermCount"] = OpenApiSchemaMetadata.Integer(),
+                            ["TotalTermOccurrences"] = OpenApiSchemaMetadata.Integer("int64")
+                        }
+                    }
+                }
+            };
+            return response;
+        }
+
+        /// <summary>
+        /// Create index update response schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateIndexUpdateSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Message"] = OpenApiSchemaMetadata.String(),
+                    ["Index"] = new OpenApiSchemaMetadata
+                    {
+                        Type = "object",
+                        Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                        {
+                            ["Id"] = OpenApiSchemaMetadata.String(),
+                            ["Name"] = OpenApiSchemaMetadata.String(),
+                            ["Labels"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String()),
+                            ["Tags"] = new OpenApiSchemaMetadata { Type = "object" }
+                        }
+                    }
+                }
+            };
+            return response;
+        }
+
+        /// <summary>
+        /// Create update labels request schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateUpdateLabelsRequestSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Labels"] = new OpenApiSchemaMetadata
+                    {
+                        Type = "array",
+                        Items = OpenApiSchemaMetadata.String(),
+                        Description = "List of labels to replace existing labels"
+                    }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Create update tags request schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateUpdateTagsRequestSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Tags"] = new OpenApiSchemaMetadata
+                    {
+                        Type = "object",
+                        Description = "Key-value pairs to replace existing tags"
+                    }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Create documents list schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateDocumentsListSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Documents"] = OpenApiSchemaMetadata.CreateArray(CreateDocumentSchema()),
+                    ["Count"] = OpenApiSchemaMetadata.Integer()
+                }
+            };
+            return response;
+        }
+
+        /// <summary>
+        /// Create document schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateDocumentSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Id"] = new OpenApiSchemaMetadata { Type = "string", Description = "Unique identifier of the document" },
+                    ["Name"] = new OpenApiSchemaMetadata { Type = "string", Description = "Name of the document" },
+                    ["ContentLength"] = OpenApiSchemaMetadata.Integer(),
+                    ["TermCount"] = OpenApiSchemaMetadata.Integer(),
+                    ["CreatedUtc"] = OpenApiSchemaMetadata.String("date-time"),
+                    ["Labels"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String()),
+                    ["Tags"] = new OpenApiSchemaMetadata { Type = "object" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Create add document request schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateAddDocumentRequestSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Id"] = new OpenApiSchemaMetadata { Type = "string", Description = "Optional document ID. Auto-generated if not provided." },
+                    ["Content"] = new OpenApiSchemaMetadata { Type = "string", Description = "Document content to index" },
+                    ["Labels"] = new OpenApiSchemaMetadata { Type = "array", Items = OpenApiSchemaMetadata.String(), Description = "Optional labels" },
+                    ["Tags"] = new OpenApiSchemaMetadata { Type = "object", Description = "Optional key-value tags" }
+                },
+                Required = new List<string> { "Content" }
+            };
+        }
+
+        /// <summary>
+        /// Create document created response schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateDocumentCreatedSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["DocumentId"] = new OpenApiSchemaMetadata { Type = "string", Description = "ID of the created document" },
+                    ["Message"] = OpenApiSchemaMetadata.String()
+                }
+            };
+            return response;
+        }
+
+        /// <summary>
+        /// Create document details schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateDocumentDetailsSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = CreateDocumentSchema();
+            return response;
+        }
+
+        /// <summary>
+        /// Create document update response schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateDocumentUpdateSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Message"] = OpenApiSchemaMetadata.String(),
+                    ["Document"] = CreateDocumentSchema()
+                }
+            };
+            return response;
+        }
+
+        /// <summary>
+        /// Create search request schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateSearchRequestSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Query"] = new OpenApiSchemaMetadata { Type = "string", Description = "Search query string" },
+                    ["MaxResults"] = new OpenApiSchemaMetadata { Type = "integer", Description = "Maximum number of results (default: 100)", Default = 100 },
+                    ["UseAndLogic"] = new OpenApiSchemaMetadata { Type = "boolean", Description = "Use AND logic instead of OR (default: false)", Default = false },
+                    ["Labels"] = new OpenApiSchemaMetadata { Type = "array", Items = OpenApiSchemaMetadata.String(), Description = "Filter by labels (AND logic)" },
+                    ["Tags"] = new OpenApiSchemaMetadata { Type = "object", Description = "Filter by tags (AND logic, exact match)" }
+                },
+                Required = new List<string> { "Query" }
+            };
+        }
+
+        /// <summary>
+        /// Create search results schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateSearchResultsSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Query"] = OpenApiSchemaMetadata.String(),
+                    ["Results"] = OpenApiSchemaMetadata.CreateArray(CreateSearchResultItemSchema()),
+                    ["TotalCount"] = OpenApiSchemaMetadata.Integer(),
+                    ["SearchTime"] = new OpenApiSchemaMetadata { Type = "number", Format = "double", Description = "Search time in milliseconds" }
+                }
+            };
+            return response;
+        }
+
+        /// <summary>
+        /// Create search result item schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateSearchResultItemSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["DocumentId"] = OpenApiSchemaMetadata.String(),
+                    ["DocumentName"] = OpenApiSchemaMetadata.String(),
+                    ["Score"] = OpenApiSchemaMetadata.Number("double"),
+                    ["MatchedTerms"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String()),
+                    ["Labels"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String()),
+                    ["Tags"] = new OpenApiSchemaMetadata { Type = "object" }
+                }
+            };
+        }
+
+        #endregion
 
         #endregion
     }

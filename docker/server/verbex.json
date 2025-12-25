@@ -13,7 +13,9 @@
     "Port": 8080,
     "Ssl": false,
     "SslCertificateFile": null,
-    "SslCertificatePassword": null
+    "SslCertificatePassword": null,
+    "EnableOpenApi": true,
+    "EnableSwaggerUi": true
   },
   "DataDirectory": "./data",
   "AdminBearerToken": "verbexadmin",

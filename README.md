@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/logo.png" alt="Verbex Logo" width="128" height="128">
+  <img src="https://raw.githubusercontent.com/jchristn/verbex/main/assets/logo.png" alt="Verbex Logo" width="128" height="128">
 
   # Verbex
 
@@ -15,15 +15,15 @@
 ## Screenshots
 
 <div align="center">
-  <img src="assets/screenshot1.png" alt="Screenshot 1" width="800">
+  <img src="https://raw.githubusercontent.com/jchristn/verbex/main/assets/screenshot1.png" alt="Screenshot 1" width="800">
 </div>
 
 <div align="center">
-  <img src="assets/screenshot2.png" alt="Screenshot 2" width="800">
+  <img src="https://raw.githubusercontent.com/jchristn/verbex/main/assets/screenshot2.png" alt="Screenshot 2" width="800">
 </div>
 
 <div align="center">
-  <img src="assets/screenshot3.png" alt="Screenshot 3" width="800">
+  <img src="https://raw.githubusercontent.com/jchristn/verbex/main/assets/screenshot3.png" alt="Screenshot 3" width="800">
 </div>
 
 ## Quick Start

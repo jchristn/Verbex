@@ -86,6 +86,41 @@ namespace Verbex.Server.Classes
             }
         }
 
+        /// <summary>
+        /// Enable OpenAPI documentation endpoint.
+        /// When enabled, the OpenAPI specification document will be available at the configured path (typically /openapi.json).
+        /// Default value is true.
+        /// </summary>
+        public bool EnableOpenApi
+        {
+            get
+            {
+                return _EnableOpenApi;
+            }
+            set
+            {
+                _EnableOpenApi = value;
+            }
+        }
+
+        /// <summary>
+        /// Enable Swagger UI endpoint.
+        /// When enabled, the interactive Swagger UI will be available at the configured path (typically /swagger).
+        /// Requires EnableOpenApi to be true for Swagger UI to function.
+        /// Default value is true.
+        /// </summary>
+        public bool EnableSwaggerUi
+        {
+            get
+            {
+                return _EnableSwaggerUi;
+            }
+            set
+            {
+                _EnableSwaggerUi = value;
+            }
+        }
+
         #endregion
 
         #region Private-Members
@@ -95,6 +130,8 @@ namespace Verbex.Server.Classes
         private bool _Ssl = false;
         private string? _SslCertificateFile = null;
         private string? _SslCertificatePassword = null;
+        private bool _EnableOpenApi = true;
+        private bool _EnableSwaggerUi = true;
 
         #endregion
 
