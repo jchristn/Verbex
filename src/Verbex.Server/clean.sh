@@ -1,6 +1,6 @@
 #!/bin/bash
 # Clean script for Verbex.Server
-# Removes logs directory, verbex.json, and data directory
+# Removes logs directory, verbex.json, data directory, and verbex.db
 
 echo "Cleaning Verbex.Server..."
 
@@ -17,6 +17,11 @@ fi
 if [ -d "data" ]; then
     echo "Deleting data directory..."
     rm -rf "data"
+fi
+
+if [ -f "verbex.db" ]; then
+    echo "Deleting verbex.db..."
+    rm -f "verbex.db"
 fi
 
 echo "Clean complete."

@@ -1,12 +1,14 @@
 namespace Verbex.Server
 {
     using System;
+    using System.Collections.Generic;
     using System.IO;
     using System.Reflection;
     using System.Threading;
     using SyslogLogging;
     using Verbex.Database;
     using Verbex.Database.Interfaces;
+    using Verbex.Models;
     using Verbex.Server.Classes;
     using Verbex.Server.Services;
     using Verbex.Server.API.REST;
@@ -63,7 +65,8 @@ namespace Verbex.Server
         /// Main entry point.
         /// </summary>
         /// <param name="args">Arguments.</param>
-        public static void Main(string[] args)
+        /// <returns>Exit code (0 for success, 1 for failure).</returns>
+        public static async Task<int> Main(string[] args)
         {
             try
             {
@@ -71,8 +74,9 @@ namespace Verbex.Server
                 ParseArguments(args);
                 InitializeSettings();
                 InitializeLogging();
-                InitializeGlobals();
-                CreateDefaultRecords();
+                await InitializeGlobalsAsync().ConfigureAwait(false);
+                await CreateDefaultRecordsAsync().ConfigureAwait(false);
+                await DiscoverAllIndicesAsync().ConfigureAwait(false);
 
                 RestService?.Start();
                 Logging?.Info(_Header + "started at " + DateTime.UtcNow + " using process ID " + _ProcessId);
@@ -98,14 +102,18 @@ namespace Verbex.Server
                 RestService?.Stop();
 
                 Logging?.Info(_Header + "disposing indices...");
-                IndexManager?.DisposeAllAsync().GetAwaiter().GetResult();
+                if (IndexManager != null)
+                {
+                    await IndexManager.DisposeAllAsync().ConfigureAwait(false);
+                }
 
                 Logging?.Info(_Header + "stopped at " + DateTime.UtcNow);
+                return 0;
             }
             catch (Exception e)
             {
                 ExceptionConsole("Main", "Fatal startup exception", e);
-                Environment.Exit(1);
+                return 1;
             }
         }
 
@@ -193,27 +201,133 @@ namespace Verbex.Server
         /// <summary>
         /// Initialize globals.
         /// </summary>
-        private static void InitializeGlobals()
+        /// <returns>Task.</returns>
+        private static async Task InitializeGlobalsAsync()
         {
             if (Settings == null) throw new InvalidOperationException("Settings must be initialized before globals");
 
             // Initialize database driver
-            Logging?.Info(_Header + "initializing database driver...");
-            Database = DatabaseDriverFactory.CreateAndInitializeAsync(Settings.Database).GetAwaiter().GetResult();
+            Database = await DatabaseDriverFactory.CreateAndInitializeAsync(Settings.Database).ConfigureAwait(false);
             Logging?.Info(_Header + "database driver initialized (" + Settings.Database.Type + ")");
 
             Authentication = new AuthenticationService(Settings.AdminBearerToken, Database);
-            IndexManager = new IndexManager(Logging);
-            IndexManager.DiscoverIndicesAsync(Settings.DataDirectory).GetAwaiter().GetResult();
+            IndexManager = new IndexManager(Database, Logging);
             RestService = new RestServiceHandler(Settings, Authentication, IndexManager, Database, Logging!);
         }
 
         /// <summary>
-        /// Create default records.
+        /// Discover and load indices for all tenants from the database.
         /// </summary>
-        private static void CreateDefaultRecords()
+        /// <returns>Task.</returns>
+        private static async Task DiscoverAllIndicesAsync()
         {
-            // Add default record creation logic here
+            if (Database == null || Settings == null || IndexManager == null)
+            {
+                throw new InvalidOperationException("Database, Settings, and IndexManager must be initialized before discovering indices");
+            }
+
+            try
+            {
+                List<TenantMetadata> tenants = await Database.Tenants.ReadManyAsync().ConfigureAwait(false);
+                Logging?.Info(_Header + "discovering indices for " + tenants.Count + " tenant(s)");
+
+                foreach (TenantMetadata tenant in tenants)
+                {
+                    if (!tenant.Active)
+                    {
+                        Logging?.Info(_Header + "skipping inactive tenant '" + tenant.Identifier + "'");
+                        continue;
+                    }
+
+                    await IndexManager.DiscoverIndicesAsync(tenant.Identifier, Settings.DataDirectory).ConfigureAwait(false);
+                }
+
+                Logging?.Info(_Header + "index discovery complete");
+            }
+            catch (Exception e)
+            {
+                Logging?.Warn(_Header + "failed to discover indices: " + e.Message);
+            }
+        }
+
+        /// <summary>
+        /// Create default records if the database is empty.
+        /// Creates a default tenant, user, credential, and index on first startup.
+        /// </summary>
+        /// <returns>Task.</returns>
+        private static async Task CreateDefaultRecordsAsync()
+        {
+            if (Database == null || Settings == null || IndexManager == null)
+            {
+                throw new InvalidOperationException("Database, Settings, and IndexManager must be initialized before creating default records");
+            }
+
+            try
+            {
+                // Check if any tenants exist
+                List<TenantMetadata> existingTenants = await Database.Tenants.ReadManyAsync().ConfigureAwait(false);
+                if (existingTenants.Count > 0)
+                {
+                    Logging?.Info(_Header + "database already has records, skipping default record creation");
+                    return;
+                }
+
+                Logging?.Info(_Header + "creating default records for initial setup");
+
+                // Create default tenant
+                TenantMetadata defaultTenant = new TenantMetadata("Default Tenant")
+                {
+                    Identifier = "default",
+                    Description = "Default tenant created during initial setup",
+                    Active = true
+                };
+                await Database.Tenants.CreateAsync(defaultTenant).ConfigureAwait(false);
+                Logging?.Info(_Header + "created default tenant: " + defaultTenant.Identifier);
+
+                // Create default user
+                UserMaster defaultUser = new UserMaster("default", "default@user.com")
+                {
+                    Identifier = "default",
+                    TenantId = defaultTenant.Identifier,
+                    FirstName = "Default",
+                    LastName = "User",
+                    IsAdmin = true,
+                    Active = true
+                };
+                defaultUser.SetPassword("password");
+                await Database.Users.CreateAsync(defaultUser).ConfigureAwait(false);
+                Logging?.Info(_Header + "created default user: " + defaultUser.Email);
+
+                // Create default credential with bearer token "default"
+                Credential defaultCredential = new Credential("default", "default", "Default API Key")
+                {
+                    Identifier = "default",
+                    TenantId = defaultTenant.Identifier,
+                    BearerToken = "default",
+                    Active = true
+                };
+                await Database.Credentials.CreateAsync(defaultCredential).ConfigureAwait(false);
+                Logging?.Info(_Header + "created default credential with bearer token: default");
+
+                // Create default index
+                IndexMetadata defaultIndex = new IndexMetadata(
+                    defaultTenant.Identifier, 
+                    "Default Index", 
+                    "Default index created during initial setup")
+                {
+                    Enabled = true,
+                    InMemory = false
+                };
+                IndexMetadata createdIndex = await IndexManager.CreateIndexAsync(defaultIndex).ConfigureAwait(false);
+                Logging?.Info(_Header + "created default index: " + createdIndex.Identifier);
+
+                Logging?.Info(_Header + "default records created successfully");
+            }
+            catch (Exception e)
+            {
+                Logging?.Warn(_Header + "failed to create default records: " + e.Message);
+                // Don't throw - allow server to continue even if default record creation fails
+            }
         }
 
         /// <summary>

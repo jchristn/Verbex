@@ -1,15 +1,17 @@
 namespace Verbex.Models
 {
     using System;
+    using System.Collections.Generic;
     using System.Text.Json.Serialization;
     using PrettyId;
 
     /// <summary>
-    /// Represents metadata for a search index within a tenant.
+    /// Represents metadata and configuration for a search index within a tenant.
     /// </summary>
     /// <remarks>
     /// An index is a container for documents, terms, and their relationships.
     /// Each index belongs to a specific tenant and provides document search functionality.
+    /// This class combines both identity/metadata and runtime configuration settings.
     /// </remarks>
     public class IndexMetadata
     {
@@ -24,6 +26,17 @@ namespace Verbex.Models
         private string _SchemaVersion = "3.0";
         private DateTime _CreatedUtc = DateTime.UtcNow;
         private DateTime _LastUpdateUtc = DateTime.UtcNow;
+        private bool _InMemory = false;
+        private bool _Enabled = true;
+        private bool _EnableLemmatizer = false;
+        private bool _EnableStopWordRemover = false;
+        private int _MinTokenLength = 0;
+        private int _MaxTokenLength = 0;
+        private int _HotCacheSize = 10000;
+        private int _DocumentCacheSize = 1000;
+        private int _ExpectedTerms = 1000000;
+        private List<string> _Labels = new List<string>();
+        private Dictionary<string, string> _Tags = new Dictionary<string, string>();
 
         /// <summary>
         /// Gets or sets the unique identifier for the index.
@@ -103,6 +116,128 @@ namespace Verbex.Models
         {
             get => _LastUpdateUtc;
             set => _LastUpdateUtc = value;
+        }
+
+        /// <summary>
+        /// Gets or sets whether this index should be stored in memory only (SQLite).
+        /// </summary>
+        /// <value>True for in-memory storage, false for disk-based storage. Default is false.</value>
+        /// <remarks>When true, index data is not persisted and will be lost on restart.</remarks>
+        [JsonPropertyName("inMemory")]
+        public bool InMemory
+        {
+            get => _InMemory;
+            set => _InMemory = value;
+        }
+
+        /// <summary>
+        /// Gets or sets whether this index is enabled.
+        /// </summary>
+        /// <value>True if the index is enabled and can be used. Default is true.</value>
+        [JsonPropertyName("enabled")]
+        public bool Enabled
+        {
+            get => _Enabled;
+            set => _Enabled = value;
+        }
+
+        /// <summary>
+        /// Gets or sets whether to enable lemmatization for this index.
+        /// </summary>
+        /// <value>True to enable lemmatization during indexing. Default is false.</value>
+        [JsonPropertyName("enableLemmatizer")]
+        public bool EnableLemmatizer
+        {
+            get => _EnableLemmatizer;
+            set => _EnableLemmatizer = value;
+        }
+
+        /// <summary>
+        /// Gets or sets whether to enable stop word removal for this index.
+        /// </summary>
+        /// <value>True to enable stop word removal during indexing. Default is false.</value>
+        [JsonPropertyName("enableStopWordRemover")]
+        public bool EnableStopWordRemover
+        {
+            get => _EnableStopWordRemover;
+            set => _EnableStopWordRemover = value;
+        }
+
+        /// <summary>
+        /// Gets or sets the minimum token length for indexing.
+        /// </summary>
+        /// <value>Minimum token length. Tokens shorter than this are ignored. 0 means disabled. Default is 0.</value>
+        [JsonPropertyName("minTokenLength")]
+        public int MinTokenLength
+        {
+            get => _MinTokenLength;
+            set => _MinTokenLength = value < 0 ? 0 : value;
+        }
+
+        /// <summary>
+        /// Gets or sets the maximum token length for indexing.
+        /// </summary>
+        /// <value>Maximum token length. Tokens longer than this are ignored. 0 means disabled. Default is 0.</value>
+        [JsonPropertyName("maxTokenLength")]
+        public int MaxTokenLength
+        {
+            get => _MaxTokenLength;
+            set => _MaxTokenLength = value < 0 ? 0 : value;
+        }
+
+        /// <summary>
+        /// Gets or sets the hot cache size for frequently accessed terms.
+        /// </summary>
+        /// <value>Number of terms to keep in hot cache. Default is 10000.</value>
+        [JsonPropertyName("hotCacheSize")]
+        public int HotCacheSize
+        {
+            get => _HotCacheSize;
+            set => _HotCacheSize = value < 0 ? 0 : value;
+        }
+
+        /// <summary>
+        /// Gets or sets the document cache size.
+        /// </summary>
+        /// <value>Number of documents to keep in cache. Default is 1000.</value>
+        [JsonPropertyName("documentCacheSize")]
+        public int DocumentCacheSize
+        {
+            get => _DocumentCacheSize;
+            set => _DocumentCacheSize = value < 0 ? 0 : value;
+        }
+
+        /// <summary>
+        /// Gets or sets the expected number of terms for bloom filter sizing.
+        /// </summary>
+        /// <value>Expected number of unique terms. Default is 1000000.</value>
+        [JsonPropertyName("expectedTerms")]
+        public int ExpectedTerms
+        {
+            get => _ExpectedTerms;
+            set => _ExpectedTerms = value < 0 ? 0 : value;
+        }
+
+        /// <summary>
+        /// Gets or sets labels for categorizing the index.
+        /// </summary>
+        /// <value>List of string labels. Default is empty list.</value>
+        [JsonPropertyName("labels")]
+        public List<string> Labels
+        {
+            get => _Labels;
+            set => _Labels = value ?? new List<string>();
+        }
+
+        /// <summary>
+        /// Gets or sets custom tags (key-value pairs) for the index.
+        /// </summary>
+        /// <value>Dictionary of string key-value pairs. Default is empty dictionary.</value>
+        [JsonPropertyName("tags")]
+        public Dictionary<string, string> Tags
+        {
+            get => _Tags;
+            set => _Tags = value ?? new Dictionary<string, string>();
         }
 
         /// <summary>

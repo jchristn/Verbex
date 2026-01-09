@@ -428,6 +428,13 @@ namespace Verbex.Server.API.REST
                     .WithDescription("Delete a tenant and all its data. Requires global admin access."),
                 ExceptionRoute);
 
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.PUT, "/v1.0/tenants/{id}", PutTenantRoute,
+                metadata => metadata
+                    .WithTag("Tenants")
+                    .WithDescription("Update a tenant. Requires global admin access."),
+                ExceptionRoute);
+
             // User management routes (admin only)
             _Webserver.Routes.PostAuthentication.Parameter.Add(
                 HttpMethod.GET, "/v1.0/tenants/{id}/users", GetTenantUsersRoute,
@@ -457,6 +464,13 @@ namespace Verbex.Server.API.REST
                     .WithDescription("Delete a user."),
                 ExceptionRoute);
 
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.PUT, "/v1.0/tenants/{id}/users/{userId}", PutTenantUserRoute,
+                metadata => metadata
+                    .WithTag("Users")
+                    .WithDescription("Update a user."),
+                ExceptionRoute);
+
             // Credential management routes (admin only)
             _Webserver.Routes.PostAuthentication.Parameter.Add(
                 HttpMethod.GET, "/v1.0/tenants/{id}/credentials", GetTenantCredentialsRoute,
@@ -477,6 +491,13 @@ namespace Verbex.Server.API.REST
                 metadata => metadata
                     .WithTag("Credentials")
                     .WithDescription("Revoke an API credential."),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.PUT, "/v1.0/tenants/{id}/credentials/{credId}", PutTenantCredentialRoute,
+                metadata => metadata
+                    .WithTag("Credentials")
+                    .WithDescription("Update an API credential (activate/deactivate)."),
                 ExceptionRoute);
         }
 
@@ -686,17 +707,45 @@ namespace Verbex.Server.API.REST
         /// <returns>Task.</returns>
         private async Task GetAuthValidateRoute(HttpContextBase ctx)
         {
-            await WrappedRequestHandler(ctx, RequestTypeEnum.Authentication, (reqCtx) =>
+            await WrappedRequestHandler(ctx, RequestTypeEnum.Authentication, async (reqCtx) =>
             {
                 string? token = GetAuthToken(ctx);
-                bool isValid = !string.IsNullOrEmpty(token) && _Auth!.AuthenticateBearer(token);
-
-                return Task.FromResult(new ResponseContext
+                if (String.IsNullOrEmpty(token))
                 {
-                    Success = isValid,
-                    StatusCode = isValid ? 200 : 401,
-                    Data = new { Valid = isValid }
-                });
+                    return new ResponseContext
+                    {
+                        Success = false,
+                        StatusCode = 401,
+                        Data = new { Valid = false }
+                    };
+                }
+
+                AuthContext? authContext = await _Auth!.AuthenticateBearerAsync(token).ConfigureAwait(false);
+                if (authContext == null || !authContext.IsAuthenticated)
+                {
+                    return new ResponseContext
+                    {
+                        Success = false,
+                        StatusCode = 401,
+                        Data = new { Valid = false }
+                    };
+                }
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new
+                    {
+                        Valid = true,
+                        IsGlobalAdmin = authContext.IsGlobalAdmin,
+                        IsTenantAdmin = authContext.IsTenantAdmin,
+                        TenantId = authContext.TenantId,
+                        UserId = authContext.UserId,
+                        CredentialId = authContext.CredentialId,
+                        Email = authContext.Email
+                    }
+                };
             });
         }
 
@@ -707,26 +756,32 @@ namespace Verbex.Server.API.REST
         /// <returns>Task.</returns>
         private async Task GetIndicesRoute(HttpContextBase ctx)
         {
-            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, (reqCtx) =>
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
             {
-                var indices = _IndexManager!.GetAllConfigurations().Select(config => new
+                // Get tenant from auth context
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                string tenantId = !String.IsNullOrEmpty(auth?.TenantId) ? auth.TenantId : "default";
+
+                List<IndexMetadata> indices = _IndexManager!.GetAllMetadata(tenantId);
+                var response = indices.Select(m => new
                 {
-                    Id = config.Id,
-                    Name = config.Name,
-                    Description = config.Description,
-                    Enabled = config.Enabled,
-                    InMemory = config.InMemory,
-                    CreatedUtc = config.CreatedUtc,
-                    Labels = config.Labels,
-                    Tags = config.Tags
+                    Identifier = m.Identifier,
+                    TenantId = m.TenantId,
+                    Name = m.Name,
+                    Description = m.Description,
+                    Enabled = m.Enabled,
+                    InMemory = m.InMemory,
+                    CreatedUtc = m.CreatedUtc,
+                    Labels = m.Labels,
+                    Tags = m.Tags
                 }).ToList();
 
-                return Task.FromResult(new ResponseContext
+                return new ResponseContext
                 {
                     Success = true,
                     StatusCode = 200,
-                    Data = new { Indices = indices, Count = indices.Count }
-                });
+                    Data = new { Indices = response, Count = response.Count }
+                };
             });
         }
 
@@ -739,6 +794,9 @@ namespace Verbex.Server.API.REST
         {
             await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
             {
+                // Get tenant from auth context
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+
                 string body = await GetRequestBody(ctx);
                 if (String.IsNullOrEmpty(body))
                 {
@@ -756,16 +814,37 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 400, errorMessage);
                 }
 
-                if (_IndexManager!.IndexExists(createRequest.Id))
+                // Determine tenant ID: for global admins use request, for tenant users use auth context
+                string tenantId;
+                if (auth != null && auth.IsGlobalAdmin)
                 {
-                    return new ResponseContext(false, 409, "Index with this ID already exists");
+                    // Global admins must specify tenant ID in request
+                    if (String.IsNullOrEmpty(createRequest.TenantId))
+                    {
+                        return new ResponseContext(false, 400, "Tenant ID is required for global admin");
+                    }
+                    tenantId = createRequest.TenantId;
+                }
+                else
+                {
+                    // Tenant users use their auth context tenant ID
+                    tenantId = auth?.TenantId ?? "";
+                    if (String.IsNullOrEmpty(tenantId))
+                    {
+                        return new ResponseContext(false, 400, "Unable to determine tenant ID");
+                    }
                 }
 
-                IndexConfiguration config = createRequest.ToIndexConfiguration();
-
-                bool created = await _IndexManager!.CreateIndexAsync(config).ConfigureAwait(false);
-                if (created)
+                if (_IndexManager!.IndexExistsByName(tenantId, createRequest.Name))
                 {
+                    return new ResponseContext(false, 409, "Index with this name already exists in the tenant");
+                }
+
+                IndexMetadata metadata = createRequest.ToIndexMetadata(tenantId);
+
+                try
+                {
+                    IndexMetadata created = await _IndexManager!.CreateIndexAsync(metadata).ConfigureAwait(false);
                     return new ResponseContext
                     {
                         Success = true,
@@ -773,20 +852,21 @@ namespace Verbex.Server.API.REST
                         Data = new {
                             Message = "Index created successfully",
                             Index = new {
-                                Id = config.Id,
-                                Name = config.Name,
-                                Description = config.Description,
-                                InMemory = config.InMemory,
-                                CreatedUtc = config.CreatedUtc,
-                                Labels = config.Labels,
-                                Tags = config.Tags
+                                Identifier = created.Identifier,
+                                TenantId = created.TenantId,
+                                Name = created.Name,
+                                Description = created.Description,
+                                InMemory = created.InMemory,
+                                CreatedUtc = created.CreatedUtc,
+                                Labels = created.Labels,
+                                Tags = created.Tags
                             }
                         }
                     };
                 }
-                else
+                catch (InvalidOperationException ex)
                 {
-                    return new ResponseContext(false, 500, "Failed to create index");
+                    return new ResponseContext(false, 409, ex.Message);
                 }
             });
         }
@@ -830,6 +910,10 @@ namespace Verbex.Server.API.REST
         {
             await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
             {
+                // Get tenant from auth context
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                string tenantId = !String.IsNullOrEmpty(auth?.TenantId) ? auth.TenantId : "default";
+
                 string? indexId = ctx.Request.Url.Parameters["id"];
                 if (String.IsNullOrEmpty(indexId))
                 {
@@ -841,7 +925,7 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 404, "Index not found");
                 }
 
-                bool deleted = await _IndexManager!.DeleteIndexAsync(indexId).ConfigureAwait(false);
+                bool deleted = await _IndexManager!.DeleteIndexAsync(tenantId, indexId).ConfigureAwait(false);
                 if (deleted)
                 {
                     return new ResponseContext
@@ -867,6 +951,10 @@ namespace Verbex.Server.API.REST
         {
             await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
             {
+                // Get tenant from auth context
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                string tenantId = !String.IsNullOrEmpty(auth?.TenantId) ? auth.TenantId : "default";
+
                 string? indexId = ctx.Request.Url.Parameters["id"];
                 if (String.IsNullOrEmpty(indexId))
                 {
@@ -890,10 +978,9 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 400, "Invalid JSON in request body");
                 }
 
-                bool updated = _IndexManager.UpdateIndexLabels(indexId, request.Labels);
-                if (updated)
+                IndexMetadata? updated = await _IndexManager.UpdateIndexLabelsAsync(tenantId, indexId, request.Labels).ConfigureAwait(false);
+                if (updated != null)
                 {
-                    IndexConfiguration? config = _IndexManager.GetConfiguration(indexId);
                     return new ResponseContext
                     {
                         Success = true,
@@ -903,10 +990,10 @@ namespace Verbex.Server.API.REST
                             Message = "Labels updated successfully",
                             Index = new
                             {
-                                Id = config?.Id,
-                                Name = config?.Name,
-                                Labels = config?.Labels,
-                                Tags = config?.Tags
+                                Identifier = updated.Identifier,
+                                Name = updated.Name,
+                                Labels = updated.Labels,
+                                Tags = updated.Tags
                             }
                         }
                     };
@@ -927,6 +1014,10 @@ namespace Verbex.Server.API.REST
         {
             await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
             {
+                // Get tenant from auth context
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                string tenantId = !String.IsNullOrEmpty(auth?.TenantId) ? auth.TenantId : "default";
+
                 string? indexId = ctx.Request.Url.Parameters["id"];
                 if (String.IsNullOrEmpty(indexId))
                 {
@@ -950,10 +1041,9 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 400, "Invalid JSON in request body");
                 }
 
-                bool updated = _IndexManager.UpdateIndexTags(indexId, request.Tags);
-                if (updated)
+                IndexMetadata? updated = await _IndexManager.UpdateIndexTagsAsync(tenantId, indexId, request.Tags).ConfigureAwait(false);
+                if (updated != null)
                 {
-                    IndexConfiguration? config = _IndexManager.GetConfiguration(indexId);
                     return new ResponseContext
                     {
                         Success = true,
@@ -963,10 +1053,10 @@ namespace Verbex.Server.API.REST
                             Message = "Tags updated successfully",
                             Index = new
                             {
-                                Id = config?.Id,
-                                Name = config?.Name,
-                                Labels = config?.Labels,
-                                Tags = config?.Tags
+                                Identifier = updated.Identifier,
+                                Name = updated.Name,
+                                Labels = updated.Labels,
+                                Tags = updated.Tags
                             }
                         }
                     };
@@ -1407,12 +1497,24 @@ namespace Verbex.Server.API.REST
             await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
             {
                 AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
-                if (auth == null || !auth.IsGlobalAdmin)
+                if (auth == null || !auth.HasAdminAccess)
                 {
-                    return new ResponseContext(false, 403, "Global admin access required");
+                    return new ResponseContext(false, 403, "Admin access required");
                 }
 
-                List<TenantMetadata> tenants = await _Database!.Tenants.ReadManyAsync().ConfigureAwait(false);
+                List<TenantMetadata> tenants;
+                if (auth.IsGlobalAdmin)
+                {
+                    // Global admins can see all tenants
+                    tenants = await _Database!.Tenants.ReadManyAsync().ConfigureAwait(false);
+                }
+                else
+                {
+                    // Tenant admins can only see their own tenant
+                    TenantMetadata? tenant = await _Database!.Tenants.ReadByIdentifierAsync(auth.TenantId).ConfigureAwait(false);
+                    tenants = tenant != null ? new List<TenantMetadata> { tenant } : new List<TenantMetadata>();
+                }
+
                 return new ResponseContext
                 {
                     Success = true,
@@ -1533,6 +1635,60 @@ namespace Verbex.Server.API.REST
         }
 
         /// <summary>
+        /// Update tenant route.
+        /// </summary>
+        private async Task PutTenantRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.IsGlobalAdmin)
+                {
+                    return new ResponseContext(false, 403, "Global admin access required");
+                }
+
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(tenantId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID is required");
+                }
+
+                TenantMetadata? tenant = await _Database!.Tenants.ReadByIdentifierAsync(tenantId).ConfigureAwait(false);
+                if (tenant == null)
+                {
+                    return new ResponseContext(false, 404, "Tenant not found");
+                }
+
+                string body = await GetRequestBody(ctx);
+                if (String.IsNullOrEmpty(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                UpdateTenantRequest? request = JsonSerializer.Deserialize<UpdateTenantRequest>(body, _JsonOptions);
+                if (request == null)
+                {
+                    return new ResponseContext(false, 400, "Invalid request");
+                }
+
+                // Apply updates
+                if (request.Name != null) tenant.Name = request.Name;
+                if (request.Description != null) tenant.Description = request.Description;
+                if (request.Active.HasValue) tenant.Active = request.Active.Value;
+                tenant.LastUpdateUtc = DateTime.UtcNow;
+
+                await _Database.Tenants.UpdateAsync(tenant).ConfigureAwait(false);
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { Message = "Tenant updated successfully", Tenant = tenant }
+                };
+            });
+        }
+
+        /// <summary>
         /// Get tenant users route.
         /// </summary>
         private async Task GetTenantUsersRoute(HttpContextBase ctx)
@@ -1557,7 +1713,7 @@ namespace Verbex.Server.API.REST
                 {
                     Success = true,
                     StatusCode = 200,
-                    Data = new { Users = users.Select(u => new { u.Identifier, u.Email, u.FirstName, u.LastName, u.IsAdmin, u.Active, u.CreatedUtc }), Count = users.Count }
+                    Data = new { Users = users.Select(u => new { u.Identifier, u.TenantId, u.Email, u.FirstName, u.LastName, u.IsAdmin, u.Active, u.CreatedUtc }), Count = users.Count }
                 };
             });
         }
@@ -1652,7 +1808,7 @@ namespace Verbex.Server.API.REST
                 {
                     Success = true,
                     StatusCode = 200,
-                    Data = new { user.Identifier, user.Email, user.FirstName, user.LastName, user.IsAdmin, user.Active, user.CreatedUtc }
+                    Data = new { user.Identifier, user.TenantId, user.Email, user.FirstName, user.LastName, user.IsAdmin, user.Active, user.CreatedUtc }
                 };
             });
         }
@@ -1695,6 +1851,66 @@ namespace Verbex.Server.API.REST
         }
 
         /// <summary>
+        /// Update tenant user route.
+        /// </summary>
+        private async Task PutTenantUserRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                string? userId = ctx.Request.Url.Parameters["userId"];
+
+                if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(userId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID and User ID are required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                // Require admin access and correct tenant for non-global admins
+                if (auth == null || !auth.HasAdminAccess || (!auth.IsGlobalAdmin && auth.TenantId != tenantId))
+                {
+                    return new ResponseContext(false, 403, "Admin access required");
+                }
+
+                UserMaster? user = await _Database!.Users.ReadByIdentifierAsync(tenantId, userId).ConfigureAwait(false);
+                if (user == null)
+                {
+                    return new ResponseContext(false, 404, "User not found");
+                }
+
+                string body = await GetRequestBody(ctx);
+                if (String.IsNullOrEmpty(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                UpdateUserRequest? request = JsonSerializer.Deserialize<UpdateUserRequest>(body, _JsonOptions);
+                if (request == null)
+                {
+                    return new ResponseContext(false, 400, "Invalid request");
+                }
+
+                // Apply updates
+                if (request.Email != null) user.Email = request.Email;
+                if (request.Password != null) user.SetPassword(request.Password);
+                if (request.FirstName != null) user.FirstName = request.FirstName;
+                if (request.LastName != null) user.LastName = request.LastName;
+                if (request.IsAdmin.HasValue) user.IsAdmin = request.IsAdmin.Value;
+                if (request.Active.HasValue) user.Active = request.Active.Value;
+                user.LastUpdateUtc = DateTime.UtcNow;
+
+                await _Database.Users.UpdateAsync(user).ConfigureAwait(false);
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { Message = "User updated successfully", User = new { user.Identifier, user.TenantId, user.Email, user.FirstName, user.LastName, user.IsAdmin, user.Active, user.CreatedUtc } }
+                };
+            });
+        }
+
+        /// <summary>
         /// Get tenant credentials route.
         /// </summary>
         private async Task GetTenantCredentialsRoute(HttpContextBase ctx)
@@ -1719,7 +1935,7 @@ namespace Verbex.Server.API.REST
                 {
                     Success = true,
                     StatusCode = 200,
-                    Data = new { Credentials = credentials.Select(c => new { c.Identifier, c.Name, c.Active, c.CreatedUtc, TokenPreview = c.BearerToken.Substring(0, Math.Min(8, c.BearerToken.Length)) + "..." }), Count = credentials.Count }
+                    Data = new { Credentials = credentials.Select(c => new { c.Identifier, c.TenantId, c.UserId, c.Name, c.Active, c.CreatedUtc, TokenPreview = c.BearerToken.Substring(0, Math.Min(8, c.BearerToken.Length)) + "..." }), Count = credentials.Count }
                 };
             });
         }
@@ -1806,6 +2022,65 @@ namespace Verbex.Server.API.REST
         }
 
         /// <summary>
+        /// Update tenant credential route.
+        /// </summary>
+        private async Task PutTenantCredentialRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                string? credId = ctx.Request.Url.Parameters["credId"];
+
+                if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(credId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID and Credential ID are required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.HasAdminAccess || (!auth.IsGlobalAdmin && auth.TenantId != tenantId))
+                {
+                    return new ResponseContext(false, 403, "Admin access required");
+                }
+
+                Credential? credential = await _Database!.Credentials.ReadByIdentifierAsync(tenantId, credId).ConfigureAwait(false);
+                if (credential == null)
+                {
+                    return new ResponseContext(false, 404, "Credential not found");
+                }
+
+                string body = await GetRequestBody(ctx);
+                if (String.IsNullOrEmpty(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                UpdateCredentialRequest? request = JsonSerializer.Deserialize<UpdateCredentialRequest>(body, _JsonOptions);
+                if (request == null)
+                {
+                    return new ResponseContext(false, 400, "Invalid request");
+                }
+
+                if (request.Name != null)
+                {
+                    credential.Name = request.Name;
+                }
+                if (request.Active.HasValue)
+                {
+                    credential.Active = request.Active.Value;
+                }
+
+                await _Database.Credentials.UpdateAsync(credential).ConfigureAwait(false);
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { Message = "Credential updated successfully", Credential = new { credential.Identifier, credential.TenantId, credential.Name, credential.Active } }
+                };
+            });
+        }
+
+        /// <summary>
         /// Wrapped request handler.
         /// </summary>
         /// <param name="ctx">HTTP context.</param>
@@ -1824,7 +2099,7 @@ namespace Verbex.Server.API.REST
             }
             catch (Exception e)
             {
-                _Logging?.Error(_Header + "Exception in " + requestType + ": " + e.Message);
+                _Logging?.Error(_Header + "exception in " + requestType + ": " + e.Message);
                 responseContext = new ResponseContext(false, 500, e.Message);
             }
 
@@ -2051,7 +2326,8 @@ namespace Verbex.Server.API.REST
                 Type = "object",
                 Properties = new Dictionary<string, OpenApiSchemaMetadata>
                 {
-                    ["Id"] = new OpenApiSchemaMetadata { Type = "string", Description = "Unique identifier of the index" },
+                    ["Identifier"] = new OpenApiSchemaMetadata { Type = "string", Description = "Unique identifier of the index" },
+                    ["TenantId"] = new OpenApiSchemaMetadata { Type = "string", Description = "Tenant the index belongs to" },
                     ["Name"] = new OpenApiSchemaMetadata { Type = "string", Description = "Display name of the index" },
                     ["Description"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true },
                     ["Enabled"] = OpenApiSchemaMetadata.Boolean(),
@@ -2073,12 +2349,9 @@ namespace Verbex.Server.API.REST
                 Type = "object",
                 Properties = new Dictionary<string, OpenApiSchemaMetadata>
                 {
-                    ["Id"] = new OpenApiSchemaMetadata { Type = "string", Description = "Unique identifier for the index" },
                     ["Name"] = new OpenApiSchemaMetadata { Type = "string", Description = "Display name of the index" },
                     ["Description"] = new OpenApiSchemaMetadata { Type = "string", Description = "Optional description" },
-                    ["RepositoryFilename"] = new OpenApiSchemaMetadata { Type = "string", Description = "Filename for persistent storage" },
-                    ["InMemory"] = new OpenApiSchemaMetadata { Type = "boolean", Description = "Whether to store in memory only" },
-                    ["StorageMode"] = new OpenApiSchemaMetadata { Type = "string", Description = "Storage mode (MemoryOnly, OnDisk)" },
+                    ["InMemory"] = new OpenApiSchemaMetadata { Type = "boolean", Description = "Whether to store in memory only (SQLite)" },
                     ["EnableLemmatizer"] = new OpenApiSchemaMetadata { Type = "boolean", Description = "Enable lemmatization" },
                     ["EnableStopWordRemover"] = new OpenApiSchemaMetadata { Type = "boolean", Description = "Enable stop word removal" },
                     ["MinTokenLength"] = new OpenApiSchemaMetadata { Type = "integer", Description = "Minimum token length" },
@@ -2086,7 +2359,7 @@ namespace Verbex.Server.API.REST
                     ["Labels"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String()),
                     ["Tags"] = new OpenApiSchemaMetadata { Type = "object", Description = "Key-value pairs" }
                 },
-                Required = new List<string> { "Id", "Name" }
+                Required = new List<string> { "Name" }
             };
         }
 

@@ -5421,11 +5421,12 @@
         </member>
         <member name="T:Verbex.Models.IndexMetadata">
             <summary>
-            Represents metadata for a search index within a tenant.
+            Represents metadata and configuration for a search index within a tenant.
             </summary>
             <remarks>
             An index is a container for documents, terms, and their relationships.
             Each index belongs to a specific tenant and provides document search functionality.
+            This class combines both identity/metadata and runtime configuration settings.
             </remarks>
         </member>
         <member name="P:Verbex.Models.IndexMetadata.Identifier">
@@ -5472,6 +5473,73 @@
             Gets or sets the UTC timestamp when the index was last updated.
             </summary>
             <value>The last update timestamp in UTC.</value>
+        </member>
+        <member name="P:Verbex.Models.IndexMetadata.InMemory">
+            <summary>
+            Gets or sets whether this index should be stored in memory only (SQLite).
+            </summary>
+            <value>True for in-memory storage, false for disk-based storage. Default is false.</value>
+            <remarks>When true, index data is not persisted and will be lost on restart.</remarks>
+        </member>
+        <member name="P:Verbex.Models.IndexMetadata.Enabled">
+            <summary>
+            Gets or sets whether this index is enabled.
+            </summary>
+            <value>True if the index is enabled and can be used. Default is true.</value>
+        </member>
+        <member name="P:Verbex.Models.IndexMetadata.EnableLemmatizer">
+            <summary>
+            Gets or sets whether to enable lemmatization for this index.
+            </summary>
+            <value>True to enable lemmatization during indexing. Default is false.</value>
+        </member>
+        <member name="P:Verbex.Models.IndexMetadata.EnableStopWordRemover">
+            <summary>
+            Gets or sets whether to enable stop word removal for this index.
+            </summary>
+            <value>True to enable stop word removal during indexing. Default is false.</value>
+        </member>
+        <member name="P:Verbex.Models.IndexMetadata.MinTokenLength">
+            <summary>
+            Gets or sets the minimum token length for indexing.
+            </summary>
+            <value>Minimum token length. Tokens shorter than this are ignored. 0 means disabled. Default is 0.</value>
+        </member>
+        <member name="P:Verbex.Models.IndexMetadata.MaxTokenLength">
+            <summary>
+            Gets or sets the maximum token length for indexing.
+            </summary>
+            <value>Maximum token length. Tokens longer than this are ignored. 0 means disabled. Default is 0.</value>
+        </member>
+        <member name="P:Verbex.Models.IndexMetadata.HotCacheSize">
+            <summary>
+            Gets or sets the hot cache size for frequently accessed terms.
+            </summary>
+            <value>Number of terms to keep in hot cache. Default is 10000.</value>
+        </member>
+        <member name="P:Verbex.Models.IndexMetadata.DocumentCacheSize">
+            <summary>
+            Gets or sets the document cache size.
+            </summary>
+            <value>Number of documents to keep in cache. Default is 1000.</value>
+        </member>
+        <member name="P:Verbex.Models.IndexMetadata.ExpectedTerms">
+            <summary>
+            Gets or sets the expected number of terms for bloom filter sizing.
+            </summary>
+            <value>Expected number of unique terms. Default is 1000000.</value>
+        </member>
+        <member name="P:Verbex.Models.IndexMetadata.Labels">
+            <summary>
+            Gets or sets labels for categorizing the index.
+            </summary>
+            <value>List of string labels. Default is empty list.</value>
+        </member>
+        <member name="P:Verbex.Models.IndexMetadata.Tags">
+            <summary>
+            Gets or sets custom tags (key-value pairs) for the index.
+            </summary>
+            <value>Dictionary of string key-value pairs. Default is empty dictionary.</value>
         </member>
         <member name="M:Verbex.Models.IndexMetadata.#ctor">
             <summary>

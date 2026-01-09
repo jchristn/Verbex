@@ -2,27 +2,22 @@ namespace Verbex.Server.Classes
 {
     using System;
     using System.Collections.Generic;
+    using Verbex.Models;
 
     /// <summary>
-    /// Create index request.
+    /// Request to create a new index.
     /// </summary>
     public class CreateIndexRequest
     {
         #region Public-Members
 
         /// <summary>
-        /// Unique identifier for the index.
+        /// Tenant ID for the index (required for global admins, ignored for tenant users).
         /// </summary>
-        public string Id
+        public string TenantId
         {
-            get
-            {
-                return _Id;
-            }
-            set
-            {
-                _Id = value ?? "";
-            }
+            get => _TenantId;
+            set => _TenantId = value ?? "";
         }
 
         /// <summary>
@@ -30,14 +25,8 @@ namespace Verbex.Server.Classes
         /// </summary>
         public string Name
         {
-            get
-            {
-                return _Name;
-            }
-            set
-            {
-                _Name = value ?? "";
-            }
+            get => _Name;
+            set => _Name = value ?? "";
         }
 
         /// <summary>
@@ -45,59 +34,18 @@ namespace Verbex.Server.Classes
         /// </summary>
         public string Description
         {
-            get
-            {
-                return _Description;
-            }
-            set
-            {
-                _Description = value ?? "";
-            }
+            get => _Description;
+            set => _Description = value ?? "";
         }
 
         /// <summary>
-        /// Repository filename for this index.
+        /// Whether this index should be in-memory only (SQLite).
         /// </summary>
-        public string RepositoryFilename
-        {
-            get
-            {
-                return _RepositoryFilename;
-            }
-            set
-            {
-                _RepositoryFilename = value ?? "";
-            }
-        }
-
-        /// <summary>
-        /// Whether this index should be in-memory only.
-        /// </summary>
+        /// <remarks>When true, index data is not persisted and will be lost on restart.</remarks>
         public bool InMemory
         {
-            get
-            {
-                return _InMemory;
-            }
-            set
-            {
-                _InMemory = value;
-            }
-        }
-
-        /// <summary>
-        /// Storage mode for the index.
-        /// </summary>
-        public string StorageMode
-        {
-            get
-            {
-                return _StorageMode;
-            }
-            set
-            {
-                _StorageMode = value ?? "MemoryOnly";
-            }
+            get => _InMemory;
+            set => _InMemory = value;
         }
 
         /// <summary>
@@ -115,14 +63,8 @@ namespace Verbex.Server.Classes
         /// </summary>
         public int MinTokenLength
         {
-            get
-            {
-                return _MinTokenLength;
-            }
-            set
-            {
-                _MinTokenLength = value < 0 ? 0 : value;
-            }
+            get => _MinTokenLength;
+            set => _MinTokenLength = value < 0 ? 0 : value;
         }
 
         /// <summary>
@@ -130,14 +72,8 @@ namespace Verbex.Server.Classes
         /// </summary>
         public int MaxTokenLength
         {
-            get
-            {
-                return _MaxTokenLength;
-            }
-            set
-            {
-                _MaxTokenLength = value < 0 ? 0 : value;
-            }
+            get => _MaxTokenLength;
+            set => _MaxTokenLength = value < 0 ? 0 : value;
         }
 
         /// <summary>
@@ -145,14 +81,8 @@ namespace Verbex.Server.Classes
         /// </summary>
         public List<string> Labels
         {
-            get
-            {
-                return _Labels;
-            }
-            set
-            {
-                _Labels = value ?? new List<string>();
-            }
+            get => _Labels;
+            set => _Labels = value ?? new List<string>();
         }
 
         /// <summary>
@@ -160,26 +90,18 @@ namespace Verbex.Server.Classes
         /// </summary>
         public Dictionary<string, string> Tags
         {
-            get
-            {
-                return _Tags;
-            }
-            set
-            {
-                _Tags = value ?? new Dictionary<string, string>();
-            }
+            get => _Tags;
+            set => _Tags = value ?? new Dictionary<string, string>();
         }
 
         #endregion
 
         #region Private-Members
 
-        private string _Id = "";
+        private string _TenantId = "";
         private string _Name = "";
         private string _Description = "";
-        private string _RepositoryFilename = "";
         private bool _InMemory = false;
-        private string _StorageMode = "MemoryOnly";
         private int _MinTokenLength = 0;
         private int _MaxTokenLength = 0;
         private List<string> _Labels = new List<string>();
@@ -194,7 +116,6 @@ namespace Verbex.Server.Classes
         /// </summary>
         public CreateIndexRequest()
         {
-
         }
 
         #endregion
@@ -208,12 +129,6 @@ namespace Verbex.Server.Classes
         /// <returns>True if valid, false otherwise.</returns>
         public bool Validate(out string errorMessage)
         {
-            if (String.IsNullOrEmpty(_Id))
-            {
-                errorMessage = "Id is required";
-                return false;
-            }
-
             if (String.IsNullOrEmpty(_Name))
             {
                 errorMessage = "Name is required";
@@ -225,17 +140,21 @@ namespace Verbex.Server.Classes
         }
 
         /// <summary>
-        /// Convert to IndexConfiguration.
+        /// Convert to IndexMetadata.
         /// </summary>
-        /// <returns>IndexConfiguration instance.</returns>
-        public IndexConfiguration ToIndexConfiguration()
+        /// <param name="tenantId">The tenant ID this index belongs to.</param>
+        /// <returns>IndexMetadata instance.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when tenantId is null or empty.</exception>
+        public IndexMetadata ToIndexMetadata(string tenantId)
         {
-            string repoFilename = String.IsNullOrEmpty(_RepositoryFilename) ? $"{_Id}.db" : _RepositoryFilename;
+            if (String.IsNullOrEmpty(tenantId))
+            {
+                throw new ArgumentNullException(nameof(tenantId), "Tenant ID is required");
+            }
 
-            return new IndexConfiguration(_Id, _Name, _Description, repoFilename)
+            return new IndexMetadata(tenantId, _Name, _Description)
             {
                 InMemory = _InMemory,
-                StorageMode = _StorageMode,
                 EnableLemmatizer = EnableLemmatizer,
                 EnableStopWordRemover = EnableStopWordRemover,
                 MinTokenLength = _MinTokenLength,

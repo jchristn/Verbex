@@ -222,6 +222,12 @@ namespace Verbex.Server.Services
     /// </summary>
     public class AuthContext
     {
+        private string _TenantId = string.Empty;
+        private string _UserId = string.Empty;
+        private string _CredentialId = string.Empty;
+        private string _Token = string.Empty;
+        private string _Email = string.Empty;
+
         /// <summary>
         /// Whether the authentication was successful.
         /// </summary>
@@ -235,22 +241,38 @@ namespace Verbex.Server.Services
         /// <summary>
         /// Tenant ID if tenant-scoped.
         /// </summary>
-        public string? TenantId { get; set; }
+        public string TenantId
+        {
+            get => _TenantId;
+            set => _TenantId = value ?? string.Empty;
+        }
 
         /// <summary>
         /// User ID if user-authenticated.
         /// </summary>
-        public string? UserId { get; set; }
+        public string UserId
+        {
+            get => _UserId;
+            set => _UserId = value ?? string.Empty;
+        }
 
         /// <summary>
         /// Credential ID if API key authenticated.
         /// </summary>
-        public string? CredentialId { get; set; }
+        public string CredentialId
+        {
+            get => _CredentialId;
+            set => _CredentialId = value ?? string.Empty;
+        }
 
         /// <summary>
         /// The token used for authentication.
         /// </summary>
-        public string? Token { get; set; }
+        public string Token
+        {
+            get => _Token;
+            set => _Token = value ?? string.Empty;
+        }
 
         /// <summary>
         /// Whether this user is a tenant administrator.
@@ -260,7 +282,11 @@ namespace Verbex.Server.Services
         /// <summary>
         /// The user's email address.
         /// </summary>
-        public string? Email { get; set; }
+        public string Email
+        {
+            get => _Email;
+            set => _Email = value ?? string.Empty;
+        }
 
         /// <summary>
         /// Whether this context has tenant access (either global admin or has tenant ID).

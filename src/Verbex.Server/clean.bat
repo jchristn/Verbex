@@ -1,6 +1,6 @@
 @echo off
 REM Clean script for Verbex.Server
-REM Removes logs directory, verbex.json, and data directory
+REM Removes logs directory, verbex.json, data directory, and verbex.db
 
 echo Cleaning Verbex.Server...
 
@@ -17,6 +17,11 @@ if exist "verbex.json" (
 if exist "data" (
     echo Deleting data directory...
     rmdir /s /q "data"
+)
+
+if exist "verbex.db" (
+    echo Deleting verbex.db...
+    del /f /q "verbex.db"
 )
 
 echo Clean complete.

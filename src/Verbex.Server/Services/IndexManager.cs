@@ -5,31 +5,25 @@ namespace Verbex.Server.Services
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Threading;
     using System.Threading.Tasks;
     using SyslogLogging;
     using Verbex;
-    using Verbex.Server.Classes;
+    using Verbex.Database;
+    using Verbex.Models;
 
     /// <summary>
-    /// Manages multiple inverted indices.
+    /// Manages multiple inverted indices with database-backed metadata storage.
     /// </summary>
     public class IndexManager
     {
-        #region Public-Members
-
-        /// <summary>
-        /// The name of the index metadata file stored in each index directory.
-        /// </summary>
-        public const string IndexMetadataFilename = "index.json";
-
-        #endregion
-
         #region Private-Members
 
         private readonly ConcurrentDictionary<string, InvertedIndex> _Indices;
-        private readonly ConcurrentDictionary<string, IndexConfiguration> _Configurations;
+        private readonly ConcurrentDictionary<string, IndexMetadata> _Metadata;
         private readonly string _Header = "[IndexManager] ";
-        private LoggingModule? _Logging = null;
+        private readonly LoggingModule? _Logging;
+        private readonly DatabaseDriverBase _Database;
         private string _DataDirectory = "./data";
 
         #endregion
@@ -39,12 +33,15 @@ namespace Verbex.Server.Services
         /// <summary>
         /// Instantiate.
         /// </summary>
+        /// <param name="database">Database driver for metadata storage.</param>
         /// <param name="logging">Logging module.</param>
-        public IndexManager(LoggingModule? logging = null)
+        /// <exception cref="ArgumentNullException">Thrown when database is null.</exception>
+        public IndexManager(DatabaseDriverBase database, LoggingModule? logging = null)
         {
+            _Database = database ?? throw new ArgumentNullException(nameof(database));
             _Logging = logging;
             _Indices = new ConcurrentDictionary<string, InvertedIndex>();
-            _Configurations = new ConcurrentDictionary<string, IndexConfiguration>();
+            _Metadata = new ConcurrentDictionary<string, IndexMetadata>();
         }
 
         #endregion
@@ -52,13 +49,15 @@ namespace Verbex.Server.Services
         #region Public-Methods
 
         /// <summary>
-        /// Discover and initialize indices from the data directory.
-        /// Scans for subdirectories containing index.json metadata files.
+        /// Discover and initialize indices from the database for a specific tenant.
         /// </summary>
-        /// <param name="dataDirectory">The root data directory to scan for indices.</param>
-        /// <exception cref="ArgumentNullException">Thrown when dataDirectory is null or empty.</exception>
-        public async Task DiscoverIndicesAsync(string dataDirectory)
+        /// <param name="tenantId">The tenant ID to load indices for.</param>
+        /// <param name="dataDirectory">The root data directory for index storage.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <exception cref="ArgumentNullException">Thrown when tenantId or dataDirectory is null or empty.</exception>
+        public async Task DiscoverIndicesAsync(string tenantId, string dataDirectory, CancellationToken token = default)
         {
+            if (String.IsNullOrEmpty(tenantId)) throw new ArgumentNullException(nameof(tenantId));
             if (String.IsNullOrEmpty(dataDirectory)) throw new ArgumentNullException(nameof(dataDirectory));
 
             _DataDirectory = dataDirectory;
@@ -67,118 +66,73 @@ namespace Verbex.Server.Services
             {
                 Directory.CreateDirectory(_DataDirectory);
                 _Logging?.Info(_Header + "created data directory: " + _DataDirectory);
-                return;
             }
 
-            string[] indexDirectories = Directory.GetDirectories(_DataDirectory);
-            _Logging?.Info(_Header + "scanning data directory '" + _DataDirectory + "', found " + indexDirectories.Length + " subdirectories");
+            List<IndexMetadata> indices = await _Database.Indexes.ReadManyAsync(tenantId, limit: 1000, token: token).ConfigureAwait(false);
+            _Logging?.Info(_Header + "found " + indices.Count + " indices for tenant '" + tenantId + "'");
 
-            foreach (string indexDir in indexDirectories)
+            foreach (IndexMetadata metadata in indices)
             {
-                string metadataPath = Path.Combine(indexDir, IndexMetadataFilename);
-
-                IndexConfiguration? config = IndexConfiguration.FromFile(metadataPath);
-                if (config == null)
+                if (!metadata.Enabled)
                 {
-                    _Logging?.Warn(_Header + "skipping directory '" + indexDir + "': no valid " + IndexMetadataFilename + " found");
+                    _Logging?.Info(_Header + "skipping disabled index '" + metadata.Identifier + "'");
                     continue;
                 }
 
-                if (!config.Enabled)
+                if (_Indices.ContainsKey(metadata.Identifier))
                 {
-                    _Logging?.Info(_Header + "skipping disabled index '" + config.Id + "'");
+                    _Logging?.Info(_Header + "index '" + metadata.Identifier + "' already loaded, skipping");
                     continue;
                 }
 
                 try
                 {
-                    await InitializeIndexAsync(config, indexDir).ConfigureAwait(false);
-                    _Logging?.Info(_Header + "discovered and initialized index '" + config.Id + "' (" + config.Name + ")");
+                    await InitializeIndexAsync(metadata, token).ConfigureAwait(false);
+                    _Logging?.Info(_Header + "initialized index '" + metadata.Identifier + "' (" + metadata.Name + ")");
                 }
                 catch (Exception ex)
                 {
-                    _Logging?.Error(_Header + "failed to initialize discovered index '" + config.Id + "': " + ex.Message);
+                    _Logging?.Error(_Header + "failed to initialize index '" + metadata.Identifier + "': " + ex.Message);
                 }
             }
 
-            _Logging?.Info(_Header + "index discovery complete, " + _Indices.Count + " indices loaded");
+            _Logging?.Info(_Header + "index discovery complete for tenant '" + tenantId + "', " + _Indices.Count + " indices loaded");
         }
 
         /// <summary>
-        /// Initialize a single index from its configuration.
+        /// Get all index metadata.
         /// </summary>
-        /// <param name="config">Index configuration.</param>
-        /// <param name="indexDirectory">Directory path for the index data.</param>
-        /// <exception cref="ArgumentNullException">Thrown when config is null.</exception>
-        private async Task InitializeIndexAsync(IndexConfiguration config, string indexDirectory)
+        /// <returns>List of index metadata.</returns>
+        public List<IndexMetadata> GetAllMetadata()
         {
-            if (config == null) throw new ArgumentNullException(nameof(config));
-
-            StorageMode storageMode = ParseStorageMode(config);
-
-            VerbexConfiguration verbexConfig = new VerbexConfiguration
-            {
-                StorageMode = storageMode,
-                MinTokenLength = config.MinTokenLength,
-                MaxTokenLength = config.MaxTokenLength,
-                Lemmatizer = config.EnableLemmatizer ? new BasicLemmatizer() : null,
-                StopWordRemover = config.EnableStopWordRemover ? new BasicStopWordRemover() : null
-            };
-
-            if (storageMode == StorageMode.OnDisk)
-            {
-                verbexConfig.StorageDirectory = indexDirectory;
-            }
-
-            InvertedIndex index = new InvertedIndex(config.Id, verbexConfig);
-            await index.OpenAsync().ConfigureAwait(false);
-
-            _Indices[config.Id] = index;
-            _Configurations[config.Id] = config;
+            return _Metadata.Values.ToList();
         }
 
         /// <summary>
-        /// Parse storage mode from configuration.
+        /// Get all index metadata for a specific tenant.
         /// </summary>
-        /// <param name="config">Index configuration.</param>
-        /// <returns>Storage mode.</returns>
-        private static StorageMode ParseStorageMode(IndexConfiguration config)
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <returns>List of index metadata for the tenant.</returns>
+        public List<IndexMetadata> GetAllMetadata(string tenantId)
         {
-            if (config.InMemory ||
-                config.StorageMode.Equals("MemoryOnly", StringComparison.OrdinalIgnoreCase) ||
-                config.StorageMode.Equals("Memory", StringComparison.OrdinalIgnoreCase) ||
-                config.StorageMode.Equals("InMemory", StringComparison.OrdinalIgnoreCase))
-            {
-                return StorageMode.InMemory;
-            }
-
-            // All other modes map to OnDisk (PersistenceOnly, Hybrid, Disk, etc.)
-            return StorageMode.OnDisk;
+            if (String.IsNullOrEmpty(tenantId)) return new List<IndexMetadata>();
+            return _Metadata.Values.Where(m => m.TenantId == tenantId).ToList();
         }
 
         /// <summary>
-        /// Get all index configurations.
-        /// </summary>
-        /// <returns>List of index configurations.</returns>
-        public List<IndexConfiguration> GetAllConfigurations()
-        {
-            return _Configurations.Values.ToList();
-        }
-
-        /// <summary>
-        /// Get index configuration by ID.
+        /// Get index metadata by identifier.
         /// </summary>
         /// <param name="indexId">Index identifier.</param>
-        /// <returns>Index configuration or null if not found.</returns>
-        public IndexConfiguration? GetConfiguration(string indexId)
+        /// <returns>Index metadata or null if not found.</returns>
+        public IndexMetadata? GetMetadata(string indexId)
         {
             if (String.IsNullOrEmpty(indexId)) return null;
-            _Configurations.TryGetValue(indexId, out IndexConfiguration? config);
-            return config;
+            _Metadata.TryGetValue(indexId, out IndexMetadata? metadata);
+            return metadata;
         }
 
         /// <summary>
-        /// Get inverted index by ID.
+        /// Get inverted index by identifier.
         /// </summary>
         /// <param name="indexId">Index identifier.</param>
         /// <returns>Inverted index or null if not found.</returns>
@@ -201,90 +155,79 @@ namespace Verbex.Server.Services
         }
 
         /// <summary>
+        /// Check if index exists by name within a tenant.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="name">Index name.</param>
+        /// <returns>True if index exists, false otherwise.</returns>
+        public bool IndexExistsByName(string tenantId, string name)
+        {
+            if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(name)) return false;
+            return _Metadata.Values.Any(m => m.TenantId == tenantId && m.Name == name);
+        }
+
+        /// <summary>
         /// Create a new index.
         /// </summary>
-        /// <param name="config">Index configuration.</param>
-        /// <returns>True if created successfully, false otherwise.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when config is null.</exception>
-        /// <exception cref="ArgumentException">Thrown when index ID is empty.</exception>
-        public async Task<bool> CreateIndexAsync(IndexConfiguration config)
+        /// <param name="metadata">Index metadata.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>The created index metadata.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when metadata is null.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when index already exists.</exception>
+        public async Task<IndexMetadata> CreateIndexAsync(IndexMetadata metadata, CancellationToken token = default)
         {
-            if (config == null) throw new ArgumentNullException(nameof(config));
-            if (String.IsNullOrEmpty(config.Id)) throw new ArgumentException("Index ID cannot be empty");
+            if (metadata == null) throw new ArgumentNullException(nameof(metadata));
 
-            if (_Indices.ContainsKey(config.Id))
+            if (_Indices.ContainsKey(metadata.Identifier))
             {
-                return false; // Index already exists
+                throw new InvalidOperationException("Index with identifier '" + metadata.Identifier + "' already exists");
             }
 
-            try
+            if (IndexExistsByName(metadata.TenantId, metadata.Name))
             {
-                StorageMode storageMode = ParseStorageMode(config);
-                string indexDirectory = Path.Combine(_DataDirectory, config.Id);
-
-                VerbexConfiguration verbexConfig = new VerbexConfiguration
-                {
-                    StorageMode = storageMode,
-                    MinTokenLength = config.MinTokenLength,
-                    MaxTokenLength = config.MaxTokenLength,
-                    Lemmatizer = config.EnableLemmatizer ? new BasicLemmatizer() : null,
-                    StopWordRemover = config.EnableStopWordRemover ? new BasicStopWordRemover() : null
-                };
-
-                if (storageMode == StorageMode.InMemory)
-                {
-                    // Memory-only indices do not persist to disk, so no directory or index.json is created.
-                    // These indices will not survive server restarts.
-                    _Logging?.Debug(_Header + "memory-only index '" + config.Id + "' will not be persisted to disk");
-                }
-                else
-                {
-                    // Persistent indices require a directory and index.json for discovery on restart
-                    verbexConfig.StorageDirectory = indexDirectory;
-
-                    // Save index metadata to index.json for discovery on restart
-                    Directory.CreateDirectory(indexDirectory);
-                    string metadataPath = Path.Combine(indexDirectory, IndexMetadataFilename);
-                    config.ToFile(metadataPath);
-                }
-
-                InvertedIndex index = new InvertedIndex(config.Id, verbexConfig);
-                await index.OpenAsync().ConfigureAwait(false);
-
-                _Indices[config.Id] = index;
-                _Configurations[config.Id] = config;
-
-                _Logging?.Info(_Header + "created index '" + config.Id + "' (" + config.Name + ")");
-                return true;
+                throw new InvalidOperationException("Index with name '" + metadata.Name + "' already exists in tenant '" + metadata.TenantId + "'");
             }
-            catch (Exception ex)
-            {
-                _Logging?.Error(_Header + "failed to create index '" + config.Id + "': " + ex.Message);
-                return false;
-            }
+
+            // Create in database first
+            IndexMetadata created = await _Database.Indexes.CreateAsync(metadata, token).ConfigureAwait(false);
+
+            // Initialize the runtime index
+            await InitializeIndexAsync(created, token).ConfigureAwait(false);
+
+            _Logging?.Info(_Header + "created index '" + created.Identifier + "' (" + created.Name + ") for tenant '" + created.TenantId + "'");
+
+            return created;
         }
 
         /// <summary>
         /// Delete an index.
         /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
         /// <param name="indexId">Index identifier.</param>
+        /// <param name="token">Cancellation token.</param>
         /// <returns>True if deleted successfully, false otherwise.</returns>
-        public async Task<bool> DeleteIndexAsync(string indexId)
+        public async Task<bool> DeleteIndexAsync(string tenantId, string indexId, CancellationToken token = default)
         {
-            if (String.IsNullOrEmpty(indexId)) return false;
+            if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(indexId)) return false;
 
-            bool removed = _Indices.TryRemove(indexId, out InvertedIndex? index);
-            if (removed)
+            // Delete from database
+            bool deleted = await _Database.Indexes.DeleteByIdentifierAsync(tenantId, indexId, token).ConfigureAwait(false);
+
+            if (deleted)
             {
-                _Configurations.TryRemove(indexId, out IndexConfiguration? config);
-                if (index != null)
+                // Remove from runtime
+                bool removedIndex = _Indices.TryRemove(indexId, out InvertedIndex? index);
+                _Metadata.TryRemove(indexId, out _);
+
+                if (removedIndex && index != null)
                 {
                     await index.DisposeAsync().ConfigureAwait(false);
                 }
+
                 _Logging?.Info(_Header + "deleted index '" + indexId + "'");
             }
 
-            return removed;
+            return deleted;
         }
 
         /// <summary>
@@ -295,20 +238,22 @@ namespace Verbex.Server.Services
         public async Task<object?> GetIndexStatisticsAsync(string indexId)
         {
             InvertedIndex? index = GetIndex(indexId);
-            IndexConfiguration? config = GetConfiguration(indexId);
+            IndexMetadata? metadata = GetMetadata(indexId);
 
-            if (index == null || config == null) return null;
+            if (index == null || metadata == null) return null;
 
             return new
             {
-                Id = config.Id,
-                Name = config.Name,
-                Description = config.Description,
-                Enabled = config.Enabled,
-                InMemory = config.InMemory,
-                CreatedUtc = config.CreatedUtc,
-                Labels = config.Labels,
-                Tags = config.Tags,
+                Identifier = metadata.Identifier,
+                TenantId = metadata.TenantId,
+                Name = metadata.Name,
+                Description = metadata.Description,
+                Enabled = metadata.Enabled,
+                InMemory = metadata.InMemory,
+                CreatedUtc = metadata.CreatedUtc,
+                LastUpdateUtc = metadata.LastUpdateUtc,
+                Labels = metadata.Labels,
+                Tags = metadata.Tags,
                 Statistics = await index.GetStatisticsAsync().ConfigureAwait(false)
             };
         }
@@ -316,71 +261,47 @@ namespace Verbex.Server.Services
         /// <summary>
         /// Update index labels (full replacement).
         /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
         /// <param name="indexId">Index identifier.</param>
         /// <param name="labels">New labels list.</param>
-        /// <returns>True if updated successfully, false if index not found.</returns>
-        public bool UpdateIndexLabels(string indexId, List<string> labels)
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Updated metadata if successful, null if index not found.</returns>
+        public async Task<IndexMetadata?> UpdateIndexLabelsAsync(string tenantId, string indexId, List<string> labels, CancellationToken token = default)
         {
-            if (String.IsNullOrEmpty(indexId)) return false;
-            if (!_Configurations.TryGetValue(indexId, out IndexConfiguration? config)) return false;
+            if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(indexId)) return null;
+            if (!_Metadata.TryGetValue(indexId, out IndexMetadata? metadata)) return null;
 
-            config.Labels = labels ?? new List<string>();
+            metadata.Labels = labels ?? new List<string>();
+            metadata.LastUpdateUtc = DateTime.UtcNow;
 
-            // Persist to index.json if not memory-only
-            if (!config.InMemory && !config.StorageMode.Equals("MemoryOnly", StringComparison.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    string indexDirectory = Path.Combine(_DataDirectory, indexId);
-                    string metadataPath = Path.Combine(indexDirectory, IndexMetadataFilename);
-                    if (Directory.Exists(indexDirectory))
-                    {
-                        config.ToFile(metadataPath);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _Logging?.Warn(_Header + "failed to persist labels update for index '" + indexId + "': " + ex.Message);
-                }
-            }
+            IndexMetadata updated = await _Database.Indexes.UpdateAsync(metadata, token).ConfigureAwait(false);
+            _Metadata[indexId] = updated;
 
             _Logging?.Info(_Header + "updated labels for index '" + indexId + "'");
-            return true;
+            return updated;
         }
 
         /// <summary>
         /// Update index tags (full replacement).
         /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
         /// <param name="indexId">Index identifier.</param>
         /// <param name="tags">New tags dictionary.</param>
-        /// <returns>True if updated successfully, false if index not found.</returns>
-        public bool UpdateIndexTags(string indexId, Dictionary<string, string> tags)
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Updated metadata if successful, null if index not found.</returns>
+        public async Task<IndexMetadata?> UpdateIndexTagsAsync(string tenantId, string indexId, Dictionary<string, string> tags, CancellationToken token = default)
         {
-            if (String.IsNullOrEmpty(indexId)) return false;
-            if (!_Configurations.TryGetValue(indexId, out IndexConfiguration? config)) return false;
+            if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(indexId)) return null;
+            if (!_Metadata.TryGetValue(indexId, out IndexMetadata? metadata)) return null;
 
-            config.Tags = tags ?? new Dictionary<string, string>();
+            metadata.Tags = tags ?? new Dictionary<string, string>();
+            metadata.LastUpdateUtc = DateTime.UtcNow;
 
-            // Persist to index.json if not memory-only
-            if (!config.InMemory && !config.StorageMode.Equals("MemoryOnly", StringComparison.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    string indexDirectory = Path.Combine(_DataDirectory, indexId);
-                    string metadataPath = Path.Combine(indexDirectory, IndexMetadataFilename);
-                    if (Directory.Exists(indexDirectory))
-                    {
-                        config.ToFile(metadataPath);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _Logging?.Warn(_Header + "failed to persist tags update for index '" + indexId + "': " + ex.Message);
-                }
-            }
+            IndexMetadata updated = await _Database.Indexes.UpdateAsync(metadata, token).ConfigureAwait(false);
+            _Metadata[indexId] = updated;
 
             _Logging?.Info(_Header + "updated tags for index '" + indexId + "'");
-            return true;
+            return updated;
         }
 
         /// <summary>
@@ -400,12 +321,47 @@ namespace Verbex.Server.Services
                 }
             }
             _Indices.Clear();
-            _Configurations.Clear();
+            _Metadata.Clear();
         }
 
         #endregion
 
         #region Private-Methods
+
+        /// <summary>
+        /// Initialize a single index from its metadata.
+        /// </summary>
+        /// <param name="metadata">Index metadata.</param>
+        /// <param name="token">Cancellation token.</param>
+        private async Task InitializeIndexAsync(IndexMetadata metadata, CancellationToken token = default)
+        {
+            StorageMode storageMode = metadata.InMemory ? StorageMode.InMemory : StorageMode.OnDisk;
+
+            VerbexConfiguration verbexConfig = new VerbexConfiguration
+            {
+                StorageMode = storageMode,
+                MinTokenLength = metadata.MinTokenLength,
+                MaxTokenLength = metadata.MaxTokenLength,
+                Lemmatizer = metadata.EnableLemmatizer ? new BasicLemmatizer() : null,
+                StopWordRemover = metadata.EnableStopWordRemover ? new BasicStopWordRemover() : null
+            };
+
+            if (storageMode == StorageMode.OnDisk)
+            {
+                string indexDirectory = Path.Combine(_DataDirectory, metadata.TenantId, metadata.Identifier);
+                if (!Directory.Exists(indexDirectory))
+                {
+                    Directory.CreateDirectory(indexDirectory);
+                }
+                verbexConfig.StorageDirectory = indexDirectory;
+            }
+
+            InvertedIndex index = new InvertedIndex(metadata.Identifier, verbexConfig);
+            await index.OpenAsync().ConfigureAwait(false);
+
+            _Indices[metadata.Identifier] = index;
+            _Metadata[metadata.Identifier] = metadata;
+        }
 
         #endregion
     }
