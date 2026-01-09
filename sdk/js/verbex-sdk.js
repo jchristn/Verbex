@@ -82,7 +82,8 @@ class IndexInfo {
      * @param {object} data - Index data (camelCase from toCamelCaseKeys)
      */
     constructor(data) {
-        this.id = data.id || '';
+        this.identifier = data.identifier || '';
+        this.tenantId = data.tenantId || null;
         this.name = data.name || null;
         this.description = data.description || null;
         this.enabled = data.enabled || null;
@@ -362,12 +363,9 @@ class VerbexClient {
     /**
      * Create a new index.
      * @param {object} options - Index creation options
-     * @param {string} options.id - Unique identifier for the index
-     * @param {string} [options.name] - Display name
+     * @param {string} options.name - Display name for the index (required)
      * @param {string} [options.description] - Description
-     * @param {string} [options.repositoryFilename] - Filename for persistence
-     * @param {boolean} [options.inMemory=false] - Use in-memory storage
-     * @param {string} [options.storageMode='MemoryOnly'] - Storage mode
+     * @param {boolean} [options.inMemory=false] - Use in-memory storage only
      * @param {boolean} [options.enableLemmatizer=false] - Enable lemmatization
      * @param {boolean} [options.enableStopWordRemover=false] - Enable stop word filtering
      * @param {number} [options.minTokenLength=0] - Minimum token length
@@ -378,17 +376,16 @@ class VerbexClient {
      */
     async createIndex(options) {
         const data = {
-            Id: options.id,
-            Name: options.name || options.id,
-            Description: options.description || '',
-            RepositoryFilename: options.repositoryFilename || `${options.id}.db`,
+            Name: options.name,
             InMemory: options.inMemory || false,
-            StorageMode: options.storageMode || 'MemoryOnly',
             EnableLemmatizer: options.enableLemmatizer || false,
             EnableStopWordRemover: options.enableStopWordRemover || false,
             MinTokenLength: options.minTokenLength || 0,
             MaxTokenLength: options.maxTokenLength || 0
         };
+        if (options.description) {
+            data.Description = options.description;
+        }
         if (options.labels) {
             data.Labels = options.labels;
         }

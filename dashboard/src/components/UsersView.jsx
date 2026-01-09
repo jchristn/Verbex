@@ -1,6 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Modal from './Modal';
+import ActionMenu from './ActionMenu';
+import MetadataModal from './MetadataModal';
+import CopyableId from './CopyableId';
+import Pagination from './Pagination';
+import SortableHeader from './SortableHeader';
 import './UsersView.css';
 
 function UsersView({ selectedTenant, tenants, onTenantSelect }) {
@@ -22,29 +27,121 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
 
-  const loadUsers = async () => {
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editUser, setEditUser] = useState(null);
+  const [editEmail, setEditEmail] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editIsAdmin, setEditIsAdmin] = useState(false);
+  const [editActive, setEditActive] = useState(true);
+  const [isEditingUser, setIsEditingUser] = useState(false);
+  const [editError, setEditError] = useState(null);
+
+  // Metadata modal
+  const [showMetadataModal, setShowMetadataModal] = useState(false);
+  const [metadataUser, setMetadataUser] = useState(null);
+
+  // Sorting
+  const [sortKey, setSortKey] = useState('email');
+  const [sortDirection, setSortDirection] = useState('asc');
+
+  // Filtering
+  const [filters, setFilters] = useState({});
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Auto-select tenant if only one exists
+  useEffect(() => {
+    if (!selectedTenant && tenants?.length === 1) {
+      onTenantSelect && onTenantSelect(tenants[0].identifier);
+    }
+  }, [tenants, selectedTenant, onTenantSelect]);
+
+  const loadUsers = useCallback(async (signal) => {
     if (!apiClient || !selectedTenant) return;
 
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiClient.getUsers(selectedTenant);
+      const response = await apiClient.getUsers(selectedTenant, { signal });
       setUsers(response.data?.users || []);
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.error('Failed to load users:', err);
       setError(err.message);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [apiClient, selectedTenant]);
 
   useEffect(() => {
     if (selectedTenant) {
-      loadUsers();
+      const abortController = new AbortController();
+      loadUsers(abortController.signal);
+      return () => abortController.abort();
     } else {
       setUsers([]);
     }
-  }, [apiClient, selectedTenant]);
+  }, [loadUsers]);
+
+  // Filter and sort users
+  const filteredAndSortedUsers = useMemo(() => {
+    let result = [...users];
+
+    // Apply filters
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) {
+        result = result.filter(user => {
+          const fieldValue = user[key];
+          if (fieldValue === null || fieldValue === undefined) return false;
+          return String(fieldValue).toLowerCase().includes(value.toLowerCase());
+        });
+      }
+    });
+
+    // Apply sorting
+    result.sort((a, b) => {
+      let aVal = a[sortKey];
+      let bVal = b[sortKey];
+
+      if (aVal === null || aVal === undefined) aVal = '';
+      if (bVal === null || bVal === undefined) bVal = '';
+
+      if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+      if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [users, filters, sortKey, sortDirection]);
+
+  // Paginate
+  const totalPages = Math.ceil(filteredAndSortedUsers.length / pageSize);
+  const paginatedUsers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredAndSortedUsers.slice(start, start + pageSize);
+  }, [filteredAndSortedUsers, currentPage, pageSize]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, pageSize]);
+
+  const handleSort = (key, direction) => {
+    setSortKey(key);
+    setSortDirection(direction);
+  };
+
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
 
   const handleViewDetails = (user) => {
     setSelectedUser(user);
@@ -121,6 +218,66 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
     resetCreateForm();
   };
 
+  const handleOpenEditModal = (user) => {
+    setEditUser(user);
+    setEditEmail(user.email || '');
+    setEditPassword('');
+    setEditFirstName(user.firstName || '');
+    setEditLastName(user.lastName || '');
+    setEditIsAdmin(user.isAdmin || false);
+    setEditActive(user.active);
+    setEditError(null);
+    setShowEditModal(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditUser(null);
+    setEditEmail('');
+    setEditPassword('');
+    setEditFirstName('');
+    setEditLastName('');
+    setEditIsAdmin(false);
+    setEditActive(true);
+    setEditError(null);
+  };
+
+  const handleEditUser = async (e) => {
+    e.preventDefault();
+    setEditError(null);
+
+    if (!editEmail.trim()) {
+      setEditError('Email is required');
+      return;
+    }
+
+    if (editPassword && editPassword.length < 6) {
+      setEditError('Password must be at least 6 characters');
+      return;
+    }
+
+    setIsEditingUser(true);
+    try {
+      const updates = {
+        email: editEmail.trim(),
+        firstName: editFirstName.trim() || null,
+        lastName: editLastName.trim() || null,
+        isAdmin: editIsAdmin,
+        active: editActive
+      };
+      if (editPassword) {
+        updates.password = editPassword;
+      }
+      await apiClient.updateUser(selectedTenant, editUser.identifier, updates);
+      handleCloseEditModal();
+      loadUsers();
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setIsEditingUser(false);
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleString();
@@ -133,7 +290,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
       <div className="workspace-header">
         <div className="workspace-title">
           <h2>Users</h2>
-          {selectedTenant && <span className="count-badge">{users.length}</span>}
+          {selectedTenant && <span className="count-badge">{filteredAndSortedUsers.length}</span>}
         </div>
         <div className="workspace-actions">
           {selectedTenant && (
@@ -200,26 +357,79 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
         </div>
       ) : (
         <div className="workspace-card">
-          <table className="users-table">
+          <table className="data-table">
             <thead>
               <tr>
-                <th>Status</th>
-                <th>Email</th>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Created</th>
-                <th>Actions</th>
+                <SortableHeader
+                  label="Status"
+                  sortKey="active"
+                  currentSort={sortKey}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  hasFilters
+                />
+                <SortableHeader
+                  label="ID"
+                  sortKey="identifier"
+                  currentSort={sortKey}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  filterable
+                  filterValue={filters.identifier || ''}
+                  onFilterChange={handleFilterChange}
+                  hasFilters
+                />
+                <SortableHeader
+                  label="Email"
+                  sortKey="email"
+                  currentSort={sortKey}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  filterable
+                  filterValue={filters.email || ''}
+                  onFilterChange={handleFilterChange}
+                  hasFilters
+                />
+                <SortableHeader
+                  label="Name"
+                  sortKey="firstName"
+                  currentSort={sortKey}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  filterable
+                  filterValue={filters.firstName || ''}
+                  onFilterChange={handleFilterChange}
+                  hasFilters
+                />
+                <SortableHeader
+                  label="Role"
+                  sortKey="isAdmin"
+                  currentSort={sortKey}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  hasFilters
+                />
+                <SortableHeader
+                  label="Created"
+                  sortKey="createdUtc"
+                  currentSort={sortKey}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  hasFilters
+                />
+                <th className="actions-column">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
+              {paginatedUsers.map((user) => (
                 <tr key={user.identifier}>
                   <td>
                     <span className={`status-badge ${user.active ? 'enabled' : 'disabled'}`}>
                       {user.active ? 'Active' : 'Disabled'}
                     </span>
                   </td>
-                  <td className="user-email">{user.email}</td>
+                  <td><CopyableId value={user.identifier} /></td>
+                  <td>{user.email}</td>
                   <td>{[user.firstName, user.lastName].filter(Boolean).join(' ') || '-'}</td>
                   <td>
                     <span className={`role-badge ${user.isAdmin ? 'admin' : 'user'}`}>
@@ -228,19 +438,38 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
                   </td>
                   <td>{formatDate(user.createdUtc)}</td>
                   <td>
-                    <div className="table-actions">
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        onClick={() => handleViewDetails(user)}
-                      >
-                        Details
-                      </button>
-                    </div>
+                    <ActionMenu
+                      actions={[
+                        {
+                          label: 'Details',
+                          onClick: () => handleViewDetails(user)
+                        },
+                        {
+                          label: 'Edit',
+                          onClick: () => handleOpenEditModal(user)
+                        },
+                        {
+                          label: 'View Metadata',
+                          onClick: () => {
+                            setMetadataUser(user);
+                            setShowMetadataModal(true);
+                          }
+                        }
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredAndSortedUsers.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 
@@ -348,7 +577,11 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
               <div className="details-grid">
                 <div className="detail-item">
                   <span className="detail-label">ID</span>
-                  <span className="detail-value">{selectedUser.identifier}</span>
+                  <span className="detail-value"><CopyableId value={selectedUser.identifier} /></span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Tenant ID</span>
+                  <span className="detail-value"><CopyableId value={selectedUser.tenantId} /></span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Email</span>
@@ -401,6 +634,123 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Metadata Modal */}
+      <MetadataModal
+        isOpen={showMetadataModal}
+        onClose={() => {
+          setShowMetadataModal(false);
+          setMetadataUser(null);
+        }}
+        title="User Metadata"
+        data={metadataUser}
+      />
+
+      {/* Edit User Modal */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={handleCloseEditModal}
+        title={`Edit User: ${editUser?.email || ''}`}
+      >
+        <form onSubmit={handleEditUser} className="user-form">
+          {editError && (
+            <div className="form-error">{editError}</div>
+          )}
+          <div className="form-group">
+            <label>ID</label>
+            <div className="form-static-value">
+              <CopyableId value={editUser?.identifier} />
+            </div>
+          </div>
+          <div className="form-group">
+            <label htmlFor="editUserEmail">Email *</label>
+            <input
+              type="email"
+              id="editUserEmail"
+              value={editEmail}
+              onChange={(e) => setEditEmail(e.target.value)}
+              placeholder="user@example.com"
+              disabled={isEditingUser}
+              autoFocus
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="editUserPassword">Password</label>
+            <input
+              type="password"
+              id="editUserPassword"
+              value={editPassword}
+              onChange={(e) => setEditPassword(e.target.value)}
+              placeholder="Leave blank to keep current password"
+              disabled={isEditingUser}
+            />
+            <span className="form-hint">Leave blank to keep current password</span>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="editUserFirstName">First Name</label>
+              <input
+                type="text"
+                id="editUserFirstName"
+                value={editFirstName}
+                onChange={(e) => setEditFirstName(e.target.value)}
+                placeholder="Optional"
+                disabled={isEditingUser}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="editUserLastName">Last Name</label>
+              <input
+                type="text"
+                id="editUserLastName"
+                value={editLastName}
+                onChange={(e) => setEditLastName(e.target.value)}
+                placeholder="Optional"
+                disabled={isEditingUser}
+              />
+            </div>
+          </div>
+          <div className="form-group checkbox-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={editIsAdmin}
+                onChange={(e) => setEditIsAdmin(e.target.checked)}
+                disabled={isEditingUser}
+              />
+              <span>Tenant Administrator</span>
+            </label>
+          </div>
+          <div className="form-group checkbox-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={editActive}
+                onChange={(e) => setEditActive(e.target.checked)}
+                disabled={isEditingUser}
+              />
+              <span>Active</span>
+            </label>
+          </div>
+          <div className="form-actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleCloseEditModal}
+              disabled={isEditingUser}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={isEditingUser}
+            >
+              {isEditingUser ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

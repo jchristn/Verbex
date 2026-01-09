@@ -11,21 +11,6 @@ namespace Verbex.Sdk
         #region Public-Members
 
         /// <summary>
-        /// Unique identifier for the index.
-        /// </summary>
-        public string Id
-        {
-            get
-            {
-                return _Id;
-            }
-            set
-            {
-                _Id = value ?? "";
-            }
-        }
-
-        /// <summary>
         /// Display name for the index.
         /// </summary>
         public string Name
@@ -43,7 +28,8 @@ namespace Verbex.Sdk
         /// <summary>
         /// Description of the index.
         /// </summary>
-        public string Description
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Description
         {
             get
             {
@@ -51,27 +37,13 @@ namespace Verbex.Sdk
             }
             set
             {
-                _Description = value ?? "";
-            }
-        }
-
-        /// <summary>
-        /// Repository filename for persistence.
-        /// </summary>
-        public string RepositoryFilename
-        {
-            get
-            {
-                return _RepositoryFilename;
-            }
-            set
-            {
-                _RepositoryFilename = value ?? "";
+                _Description = value;
             }
         }
 
         /// <summary>
         /// Whether this index should be in-memory only.
+        /// When true, index data is not persisted and will be lost on restart.
         /// </summary>
         public bool InMemory
         {
@@ -82,22 +54,6 @@ namespace Verbex.Sdk
             set
             {
                 _InMemory = value;
-            }
-        }
-
-        /// <summary>
-        /// Storage mode for the index (MemoryOnly, PersistenceOnly, Hybrid).
-        /// Default is MemoryOnly.
-        /// </summary>
-        public string StorageMode
-        {
-            get
-            {
-                return _StorageMode;
-            }
-            set
-            {
-                _StorageMode = value ?? "MemoryOnly";
             }
         }
 
@@ -177,12 +133,9 @@ namespace Verbex.Sdk
 
         #region Private-Members
 
-        private string _Id = "";
         private string _Name = "";
-        private string _Description = "";
-        private string _RepositoryFilename = "";
+        private string? _Description = null;
         private bool _InMemory = false;
-        private string _StorageMode = "MemoryOnly";
         private int _MinTokenLength = 0;
         private int _MaxTokenLength = 0;
         private List<string>? _Labels = null;
@@ -202,13 +155,21 @@ namespace Verbex.Sdk
         /// <summary>
         /// Instantiate a CreateIndexRequest with required parameters.
         /// </summary>
-        /// <param name="id">Unique identifier for the index.</param>
-        /// <param name="name">Display name for the index. Defaults to id if not specified.</param>
-        public CreateIndexRequest(string id, string? name = null)
+        /// <param name="name">Display name for the index.</param>
+        public CreateIndexRequest(string name)
         {
-            Id = id;
-            Name = name ?? id;
-            RepositoryFilename = $"{id}.db";
+            Name = name;
+        }
+
+        /// <summary>
+        /// Instantiate a CreateIndexRequest with name and description.
+        /// </summary>
+        /// <param name="name">Display name for the index.</param>
+        /// <param name="description">Description of the index.</param>
+        public CreateIndexRequest(string name, string description)
+        {
+            Name = name;
+            Description = description;
         }
 
         #endregion

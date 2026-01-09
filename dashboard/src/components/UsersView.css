@@ -18,7 +18,7 @@
 .tenant-select {
   flex: 1;
   max-width: 400px;
-  padding: 8px 12px;
+  padding: 8px 32px 8px 12px;
   border: 1px solid var(--border-color, #e0e0e0);
   border-radius: 4px;
   background-color: var(--input-bg, #fff);
@@ -98,6 +98,7 @@
 .checkbox-group {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
 }
 
 .checkbox-group label {

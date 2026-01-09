@@ -28,6 +28,7 @@ function Workspace({
             isLoading={isLoading}
             onRefresh={onRefresh}
             onIndexSelectAndNavigate={onIndexSelectAndNavigate}
+            tenants={tenants}
           />
         );
       case 'search':

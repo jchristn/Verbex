@@ -1,7 +1,6 @@
 namespace Verbex.Database
 {
     using System;
-    using System.Text.Json.Serialization;
 
     /// <summary>
     /// Configuration settings for database connectivity.
@@ -32,7 +31,6 @@ namespace Verbex.Database
         /// Gets or sets the database type.
         /// </summary>
         /// <value>The type of database to use. Default is <see cref="DatabaseTypeEnum.Sqlite"/>.</value>
-        [JsonPropertyName("type")]
         public DatabaseTypeEnum Type
         {
             get => _Type;
@@ -46,7 +44,6 @@ namespace Verbex.Database
         /// The path to the SQLite database file. Default is "./verbex.db".
         /// Ignored when <see cref="InMemory"/> is true or when using server-based databases.
         /// </value>
-        [JsonPropertyName("filename")]
         public string Filename
         {
             get => _Filename;
@@ -60,7 +57,6 @@ namespace Verbex.Database
         /// True to use in-memory storage; false to use file storage. Default is false.
         /// Only applicable when <see cref="Type"/> is <see cref="DatabaseTypeEnum.Sqlite"/>.
         /// </value>
-        [JsonPropertyName("inMemory")]
         public bool InMemory
         {
             get => _InMemory;
@@ -74,7 +70,6 @@ namespace Verbex.Database
         /// The hostname or IP address of the database server. Default is "localhost".
         /// Used for PostgreSQL, MySQL, and SQL Server connections.
         /// </value>
-        [JsonPropertyName("hostname")]
         public string Hostname
         {
             get => _Hostname;
@@ -88,7 +83,6 @@ namespace Verbex.Database
         /// The port number to connect to. A value of 0 uses the database-specific default port.
         /// Default ports: PostgreSQL=5432, MySQL=3306, SQL Server=1433.
         /// </value>
-        [JsonPropertyName("port")]
         public int Port
         {
             get => _Port;
@@ -102,7 +96,6 @@ namespace Verbex.Database
         /// The name of the database to connect to. Default is "verbex".
         /// Used for PostgreSQL, MySQL, and SQL Server connections.
         /// </value>
-        [JsonPropertyName("databaseName")]
         public string DatabaseName
         {
             get => _DatabaseName;
@@ -116,7 +109,6 @@ namespace Verbex.Database
         /// The username for database authentication. Empty string indicates no authentication.
         /// Used for PostgreSQL, MySQL, and SQL Server connections.
         /// </value>
-        [JsonPropertyName("username")]
         public string Username
         {
             get => _Username;
@@ -130,7 +122,6 @@ namespace Verbex.Database
         /// The password for database authentication. Empty string indicates no password.
         /// This value should be handled securely and not logged.
         /// </value>
-        [JsonPropertyName("password")]
         public string Password
         {
             get => _Password;
@@ -144,7 +135,6 @@ namespace Verbex.Database
         /// True to require SSL/TLS encryption; false to allow unencrypted connections.
         /// Default is false. Recommended true for production environments.
         /// </value>
-        [JsonPropertyName("requireEncryption")]
         public bool RequireEncryption
         {
             get => _RequireEncryption;
@@ -158,7 +148,6 @@ namespace Verbex.Database
         /// The schema name. Empty string uses the default schema.
         /// Applicable to PostgreSQL (default: "public") and SQL Server (default: "dbo").
         /// </value>
-        [JsonPropertyName("schema")]
         public string Schema
         {
             get => _Schema;
@@ -172,7 +161,6 @@ namespace Verbex.Database
         /// The minimum number of connections to maintain in the pool. Default is 1.
         /// Must be greater than 0 and less than or equal to <see cref="MaxPoolSize"/>.
         /// </value>
-        [JsonPropertyName("minPoolSize")]
         public int MinPoolSize
         {
             get => _MinPoolSize;
@@ -186,7 +174,6 @@ namespace Verbex.Database
         /// The maximum number of connections allowed in the pool. Default is 100.
         /// Must be greater than or equal to <see cref="MinPoolSize"/>.
         /// </value>
-        [JsonPropertyName("maxPoolSize")]
         public int MaxPoolSize
         {
             get => _MaxPoolSize;
@@ -200,7 +187,6 @@ namespace Verbex.Database
         /// The timeout for individual SQL commands in seconds. Default is 30.
         /// A value of 0 indicates no timeout.
         /// </value>
-        [JsonPropertyName("commandTimeout")]
         public int CommandTimeout
         {
             get => _CommandTimeout;
@@ -214,7 +200,6 @@ namespace Verbex.Database
         /// The timeout for establishing a connection in seconds. Default is 30.
         /// A value of 0 indicates no timeout.
         /// </value>
-        [JsonPropertyName("connectionTimeout")]
         public int ConnectionTimeout
         {
             get => _ConnectionTimeout;

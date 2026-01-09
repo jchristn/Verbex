@@ -6,6 +6,7 @@ services:
       - "8080:8080"
     volumes:
       - ./server/verbex.json:/app/verbex.json
+      - ./server/verbex.db:/app/verbex.db
       - ./server/data:/app/data
       - ./server/logs:/app/logs
     restart: unless-stopped

@@ -1,0 +1,90 @@
+.sortable-header {
+  padding: 12px 16px !important;
+  vertical-align: bottom;
+}
+
+.sortable-header.has-filters {
+  padding-bottom: 8px !important;
+}
+
+.sortable-header-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.sortable-header-btn:hover {
+  color: var(--text-primary);
+}
+
+.sortable-header-label {
+  white-space: nowrap;
+}
+
+.sortable-header-arrows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  opacity: 0.3;
+  transition: opacity 0.15s;
+}
+
+.sortable-header-arrows.active {
+  opacity: 1;
+}
+
+.sortable-header-btn:hover .sortable-header-arrows {
+  opacity: 0.6;
+}
+
+.sortable-header-arrows svg {
+  display: block;
+  color: var(--text-muted);
+}
+
+.sortable-header-arrows svg.active {
+  color: var(--color-primary);
+}
+
+.sortable-header-filter-container {
+  margin-top: 8px;
+  height: 28px;
+}
+
+.sortable-header-filter {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  height: 28px;
+  box-sizing: border-box;
+}
+
+.sortable-header-filter:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.sortable-header-filter::placeholder {
+  color: var(--text-muted);
+}
+
+.sortable-header-filter-spacer {
+  height: 28px;
+}

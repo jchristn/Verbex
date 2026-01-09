@@ -4,14 +4,19 @@ namespace Verbex.Sdk
 
     /// <summary>
     /// Index information model.
-    /// Matches the server's index statistics serialization format.
+    /// Matches the server's index metadata serialization format.
     /// </summary>
     public class IndexInfo
     {
         /// <summary>
-        /// Unique identifier for the index.
+        /// Unique identifier for the index (auto-generated).
         /// </summary>
-        public string Id { get; set; } = string.Empty;
+        public string Identifier { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Tenant identifier the index belongs to.
+        /// </summary>
+        public string? TenantId { get; set; }
 
         /// <summary>
         /// Display name for the index.

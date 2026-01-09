@@ -88,12 +88,20 @@
   color: var(--text-secondary);
 }
 
-.search-option select,
+.search-option select {
+  padding: 8px 32px 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
 .search-option input {
   padding: 8px 12px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  background: var(--bg-primary);
+  background-color: var(--bg-primary);
   color: var(--text-primary);
   font-size: 0.875rem;
 }

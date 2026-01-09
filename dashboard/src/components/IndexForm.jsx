@@ -1,29 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import TagInput from './TagInput';
 import KeyValueEditor from './KeyValueEditor';
+import CopyableId from './CopyableId';
 import './IndexForm.css';
 
-function IndexForm({ onSuccess, onCancel }) {
-  const { apiClient } = useAuth();
-  const [isAdvanced, setIsAdvanced] = useState(false);
+function IndexForm({ onSuccess, onCancel, tenants = [] }) {
+  const { apiClient, userInfo } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [labels, setLabels] = useState([]);
   const [tags, setTags] = useState({});
+  const [selectedTenantId, setSelectedTenantId] = useState('');
+
+  const isGlobalAdmin = userInfo?.isGlobalAdmin;
+
+  // Auto-select tenant if only one exists
+  useEffect(() => {
+    if (isGlobalAdmin && tenants.length === 1 && !selectedTenantId) {
+      setSelectedTenantId(tenants[0].identifier);
+    }
+  }, [isGlobalAdmin, tenants, selectedTenantId]);
 
   const [formData, setFormData] = useState({
-    id: '',
     name: '',
     description: '',
-    storageMode: 'OnDisk',
+    inMemory: false,
     enableLemmatizer: true,
     enableStopWordRemover: true,
     minTokenLength: 2,
-    maxTokenLength: 50,
-    hotCacheSize: 10000,
-    documentCacheSize: 1000,
-    expectedTerms: 1000000
+    maxTokenLength: 50
   });
 
   const handleChange = (e) => {
@@ -48,23 +54,24 @@ function IndexForm({ onSuccess, onCancel }) {
     setIsSubmitting(true);
 
     try {
-      const isInMemory = formData.storageMode === 'InMemory';
       const indexConfig = {
-        id: formData.id,
         name: formData.name,
         description: formData.description || undefined,
-        storageMode: formData.storageMode,
-        inMemory: isInMemory,
+        inMemory: formData.inMemory,
         enableLemmatizer: formData.enableLemmatizer,
         enableStopWordRemover: formData.enableStopWordRemover,
         minTokenLength: formData.minTokenLength,
         maxTokenLength: formData.maxTokenLength
       };
 
-      if (isAdvanced) {
-        indexConfig.hotCacheSize = formData.hotCacheSize;
-        indexConfig.documentCacheSize = formData.documentCacheSize;
-        indexConfig.expectedTerms = formData.expectedTerms;
+      // For global admins, include the selected tenant ID
+      if (isGlobalAdmin) {
+        if (!selectedTenantId) {
+          setError('Please select a tenant');
+          setIsSubmitting(false);
+          return;
+        }
+        indexConfig.tenantId = selectedTenantId;
       }
 
       if (labels.length > 0) {
@@ -88,21 +95,31 @@ function IndexForm({ onSuccess, onCancel }) {
       <div className="form-section">
         <h4>Basic Information</h4>
 
-        <div className="form-group">
-          <label htmlFor="id">Index ID *</label>
-          <input
-            type="text"
-            id="id"
-            name="id"
-            value={formData.id}
-            onChange={handleChange}
-            placeholder="my-index"
-            required
-            pattern="[a-zA-Z0-9_-]+"
-            title="Only alphanumeric characters, hyphens, and underscores"
-          />
-          <span className="form-hint">Unique identifier for the index</span>
-        </div>
+        {isGlobalAdmin ? (
+          <div className="form-group">
+            <label htmlFor="tenantSelect">Tenant *</label>
+            <select
+              id="tenantSelect"
+              value={selectedTenantId}
+              onChange={(e) => setSelectedTenantId(e.target.value)}
+              required
+            >
+              <option value="">-- Select a tenant --</option>
+              {tenants.map((tenant) => (
+                <option key={tenant.identifier} value={tenant.identifier}>
+                  {tenant.name || tenant.identifier}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : userInfo?.tenantId ? (
+          <div className="form-group">
+            <label>Tenant</label>
+            <div className="form-static-value">
+              <CopyableId value={userInfo.tenantId} />
+            </div>
+          </div>
+        ) : null}
 
         <div className="form-group">
           <label htmlFor="name">Display Name *</label>
@@ -115,6 +132,7 @@ function IndexForm({ onSuccess, onCancel }) {
             placeholder="My Index"
             required
           />
+          <span className="form-hint">A unique identifier will be generated automatically</span>
         </div>
 
         <div className="form-group">
@@ -150,18 +168,17 @@ function IndexForm({ onSuccess, onCancel }) {
       </div>
 
       <div className="form-section">
-        <div className="form-group">
-          <label htmlFor="storageMode">Storage Mode</label>
-          <select
-            id="storageMode"
-            name="storageMode"
-            value={formData.storageMode}
-            onChange={handleChange}
-          >
-            <option value="InMemory">In-Memory (Fastest, No Persistence)</option>
-            <option value="OnDisk">On-Disk (Persistent)</option>
-          </select>
-          <span className="form-hint">Determines how the index data is stored</span>
+        <div className="form-group form-group-checkbox">
+          <label>
+            <input
+              type="checkbox"
+              name="inMemory"
+              checked={formData.inMemory}
+              onChange={handleChange}
+            />
+            In-Memory Storage
+          </label>
+          <span className="form-hint">Fastest performance, but data is not persisted on restart</span>
         </div>
 
         <div className="form-row">
@@ -175,7 +192,7 @@ function IndexForm({ onSuccess, onCancel }) {
               />
               Enable Lemmatization
             </label>
-            <span className="form-hint">Reduces words to base forms (e.g., "running" → "run")</span>
+            <span className="form-hint">Reduces words to base forms (e.g., "running" to "run")</span>
           </div>
 
           <div className="form-group form-group-checkbox">
@@ -219,60 +236,6 @@ function IndexForm({ onSuccess, onCancel }) {
             />
           </div>
         </div>
-      </div>
-
-      <div className="form-section">
-        <button
-          type="button"
-          className="advanced-toggle"
-          onClick={() => setIsAdvanced(!isAdvanced)}
-        >
-          {isAdvanced ? '▼' : '▶'} Advanced Options
-        </button>
-
-        {isAdvanced && (
-          <div className="advanced-options">
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="hotCacheSize">Hot Cache Size</label>
-                <input
-                  type="number"
-                  id="hotCacheSize"
-                  name="hotCacheSize"
-                  value={formData.hotCacheSize}
-                  onChange={handleNumberChange}
-                  min={100}
-                />
-                <span className="form-hint">Frequently accessed terms cache</span>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="documentCacheSize">Document Cache Size</label>
-                <input
-                  type="number"
-                  id="documentCacheSize"
-                  name="documentCacheSize"
-                  value={formData.documentCacheSize}
-                  onChange={handleNumberChange}
-                  min={100}
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="expectedTerms">Expected Terms</label>
-              <input
-                type="number"
-                id="expectedTerms"
-                name="expectedTerms"
-                value={formData.expectedTerms}
-                onChange={handleNumberChange}
-                min={1000}
-              />
-              <span className="form-hint">Expected unique terms for bloom filter sizing</span>
-            </div>
-          </div>
-        )}
       </div>
 
       {error && <div className="form-error">{error}</div>}

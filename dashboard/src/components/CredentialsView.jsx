@@ -1,6 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Modal from './Modal';
+import ConfirmModal from './ConfirmModal';
+import ActionMenu from './ActionMenu';
+import MetadataModal from './MetadataModal';
+import CopyableId from './CopyableId';
+import Pagination from './Pagination';
+import SortableHeader from './SortableHeader';
 import './CredentialsView.css';
 
 function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
@@ -11,6 +17,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedCredential, setSelectedCredential] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
   const [error, setError] = useState(null);
 
   // Create form state
@@ -18,52 +25,181 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
 
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editCredential, setEditCredential] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editActive, setEditActive] = useState(true);
+  const [isEditingCredential, setIsEditingCredential] = useState(false);
+  const [editError, setEditError] = useState(null);
+
   // New credential token display
   const [newCredentialToken, setNewCredentialToken] = useState(null);
   const [tokenCopied, setTokenCopied] = useState(false);
 
-  const loadCredentials = async () => {
+  // Metadata modal
+  const [showMetadataModal, setShowMetadataModal] = useState(false);
+  const [metadataCredential, setMetadataCredential] = useState(null);
+
+  // Confirm modals
+  const [showToggleConfirm, setShowToggleConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [confirmCredential, setConfirmCredential] = useState(null);
+  const [actionError, setActionError] = useState(null);
+
+  // Sorting
+  const [sortKey, setSortKey] = useState('createdUtc');
+  const [sortDirection, setSortDirection] = useState('desc');
+
+  // Filtering
+  const [filters, setFilters] = useState({});
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Auto-select tenant if only one exists
+  useEffect(() => {
+    if (!selectedTenant && tenants?.length === 1) {
+      onTenantSelect && onTenantSelect(tenants[0].identifier);
+    }
+  }, [tenants, selectedTenant, onTenantSelect]);
+
+  const loadCredentials = useCallback(async (signal) => {
     if (!apiClient || !selectedTenant) return;
 
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiClient.getCredentials(selectedTenant);
+      const response = await apiClient.getCredentials(selectedTenant, { signal });
       setCredentials(response.data?.credentials || []);
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.error('Failed to load credentials:', err);
       setError(err.message);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [apiClient, selectedTenant]);
 
   useEffect(() => {
     if (selectedTenant) {
-      loadCredentials();
+      const abortController = new AbortController();
+      loadCredentials(abortController.signal);
+      return () => abortController.abort();
     } else {
       setCredentials([]);
     }
-  }, [apiClient, selectedTenant]);
+  }, [loadCredentials]);
+
+  // Filter and sort credentials
+  const filteredAndSortedCredentials = useMemo(() => {
+    let result = [...credentials];
+
+    // Apply filters
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) {
+        result = result.filter(cred => {
+          const fieldValue = cred[key];
+          if (fieldValue === null || fieldValue === undefined) return false;
+          return String(fieldValue).toLowerCase().includes(value.toLowerCase());
+        });
+      }
+    });
+
+    // Apply sorting
+    result.sort((a, b) => {
+      let aVal = a[sortKey];
+      let bVal = b[sortKey];
+
+      if (aVal === null || aVal === undefined) aVal = '';
+      if (bVal === null || bVal === undefined) bVal = '';
+
+      if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+      if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [credentials, filters, sortKey, sortDirection]);
+
+  // Paginate
+  const totalPages = Math.ceil(filteredAndSortedCredentials.length / pageSize);
+  const paginatedCredentials = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredAndSortedCredentials.slice(start, start + pageSize);
+  }, [filteredAndSortedCredentials, currentPage, pageSize]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, pageSize]);
+
+  const handleSort = (key, direction) => {
+    setSortKey(key);
+    setSortDirection(direction);
+  };
+
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
 
   const handleViewDetails = (credential) => {
     setSelectedCredential(credential);
     setShowDetailModal(true);
   };
 
-  const handleDelete = async (credentialId) => {
-    if (!confirm(`Are you sure you want to delete this credential? Any applications using this API key will no longer be able to authenticate. This action cannot be undone.`)) {
-      return;
+  const handleToggleActive = (credential) => {
+    setConfirmCredential(credential);
+    setActionError(null);
+    setShowToggleConfirm(true);
+  };
+
+  const confirmToggleActive = async () => {
+    if (!confirmCredential) return;
+
+    const newStatus = !confirmCredential.active;
+    setIsToggling(true);
+    setActionError(null);
+
+    try {
+      await apiClient.updateCredential(selectedTenant, confirmCredential.identifier, {
+        active: newStatus
+      });
+      setShowToggleConfirm(false);
+      setConfirmCredential(null);
+      loadCredentials();
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setIsToggling(false);
     }
+  };
+
+  const handleDelete = (credential) => {
+    setConfirmCredential(credential);
+    setActionError(null);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!confirmCredential) return;
 
     setIsDeleting(true);
+    setActionError(null);
+
     try {
-      await apiClient.deleteCredential(selectedTenant, credentialId);
+      await apiClient.deleteCredential(selectedTenant, confirmCredential.identifier);
+      setShowDeleteConfirm(false);
       setShowDetailModal(false);
+      setConfirmCredential(null);
       setSelectedCredential(null);
       loadCredentials();
     } catch (err) {
-      alert(`Failed to delete credential: ${err.message}`);
+      setActionError(err.message);
     } finally {
       setIsDeleting(false);
     }
@@ -98,6 +234,41 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
     setCreateError(null);
   };
 
+  const handleOpenEditModal = (credential) => {
+    setEditCredential(credential);
+    setEditName(credential.name || '');
+    setEditActive(credential.active);
+    setEditError(null);
+    setShowEditModal(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditCredential(null);
+    setEditName('');
+    setEditActive(true);
+    setEditError(null);
+  };
+
+  const handleEditCredential = async (e) => {
+    e.preventDefault();
+    setEditError(null);
+
+    setIsEditingCredential(true);
+    try {
+      await apiClient.updateCredential(selectedTenant, editCredential.identifier, {
+        name: editName.trim() || null,
+        active: editActive
+      });
+      handleCloseEditModal();
+      loadCredentials();
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setIsEditingCredential(false);
+    }
+  };
+
   const handleCopyToken = async () => {
     if (newCredentialToken) {
       try {
@@ -120,10 +291,9 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
     return new Date(dateString).toLocaleString();
   };
 
-  const maskToken = (token) => {
-    if (!token) return 'N/A';
-    if (token.length <= 8) return '********';
-    return token.substring(0, 4) + '...' + token.substring(token.length - 4);
+  const formatTokenPreview = (tokenPreview) => {
+    if (!tokenPreview) return 'N/A';
+    return tokenPreview;
   };
 
   const selectedTenantData = tenants?.find(t => t.identifier === selectedTenant);
@@ -133,7 +303,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
       <div className="workspace-header">
         <div className="workspace-title">
           <h2>Credentials</h2>
-          {selectedTenant && <span className="count-badge">{credentials.length}</span>}
+          {selectedTenant && <span className="count-badge">{filteredAndSortedCredentials.length}</span>}
         </div>
         <div className="workspace-actions">
           {selectedTenant && (
@@ -200,43 +370,108 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
         </div>
       ) : (
         <div className="workspace-card">
-          <table className="credentials-table">
+          <table className="data-table">
             <thead>
               <tr>
-                <th>Status</th>
-                <th>ID</th>
-                <th>Description</th>
-                <th>Token</th>
-                <th>Created</th>
-                <th>Actions</th>
+                <SortableHeader
+                  label="Status"
+                  sortKey="active"
+                  currentSort={sortKey}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  hasFilters
+                />
+                <SortableHeader
+                  label="ID"
+                  sortKey="identifier"
+                  currentSort={sortKey}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  filterable
+                  filterValue={filters.identifier || ''}
+                  onFilterChange={handleFilterChange}
+                  hasFilters
+                />
+                <SortableHeader
+                  label="Description"
+                  sortKey="name"
+                  currentSort={sortKey}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  filterable
+                  filterValue={filters.name || ''}
+                  onFilterChange={handleFilterChange}
+                  hasFilters
+                />
+                <SortableHeader
+                  label="Token"
+                  sortKey="tokenPreview"
+                  currentSort={sortKey}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  hasFilters
+                />
+                <SortableHeader
+                  label="Created"
+                  sortKey="createdUtc"
+                  currentSort={sortKey}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  hasFilters
+                />
+                <th className="actions-column">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {credentials.map((credential) => (
+              {paginatedCredentials.map((credential) => (
                 <tr key={credential.identifier}>
                   <td>
                     <span className={`status-badge ${credential.active ? 'enabled' : 'disabled'}`}>
                       {credential.active ? 'Active' : 'Disabled'}
                     </span>
                   </td>
-                  <td className="credential-id">{credential.identifier}</td>
+                  <td><CopyableId value={credential.identifier} /></td>
                   <td>{credential.name || '-'}</td>
-                  <td className="credential-token">{maskToken(credential.bearerToken)}</td>
+                  <td className="credential-token">{formatTokenPreview(credential.tokenPreview)}</td>
                   <td>{formatDate(credential.createdUtc)}</td>
                   <td>
-                    <div className="table-actions">
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        onClick={() => handleViewDetails(credential)}
-                      >
-                        Details
-                      </button>
-                    </div>
+                    <ActionMenu
+                      actions={[
+                        {
+                          label: 'Details',
+                          onClick: () => handleViewDetails(credential)
+                        },
+                        {
+                          label: 'Edit',
+                          onClick: () => handleOpenEditModal(credential)
+                        },
+                        {
+                          label: credential.active ? 'Deactivate' : 'Activate',
+                          onClick: () => handleToggleActive(credential),
+                          disabled: isToggling
+                        },
+                        {
+                          label: 'View Metadata',
+                          onClick: () => {
+                            setMetadataCredential(credential);
+                            setShowMetadataModal(true);
+                          }
+                        }
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredAndSortedCredentials.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 
@@ -331,7 +566,15 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
               <div className="details-grid">
                 <div className="detail-item">
                   <span className="detail-label">ID</span>
-                  <span className="detail-value">{selectedCredential.identifier}</span>
+                  <span className="detail-value"><CopyableId value={selectedCredential.identifier} /></span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Tenant ID</span>
+                  <span className="detail-value"><CopyableId value={selectedCredential.tenantId} /></span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">User ID</span>
+                  <span className="detail-value"><CopyableId value={selectedCredential.userId} /></span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Description</span>
@@ -345,7 +588,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Token</span>
-                  <span className="detail-value credential-token">{maskToken(selectedCredential.bearerToken)}</span>
+                  <span className="detail-value credential-token">{formatTokenPreview(selectedCredential.tokenPreview)}</span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Created</span>
@@ -357,10 +600,10 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
             <div className="details-actions">
               <button
                 className="btn btn-danger"
-                onClick={() => handleDelete(selectedCredential.identifier)}
+                onClick={() => handleDelete(selectedCredential)}
                 disabled={isDeleting}
               >
-                {isDeleting ? 'Deleting...' : 'Delete Credential'}
+                Delete Credential
               </button>
               <button
                 className="btn btn-secondary"
@@ -374,6 +617,115 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Metadata Modal */}
+      <MetadataModal
+        isOpen={showMetadataModal}
+        onClose={() => {
+          setShowMetadataModal(false);
+          setMetadataCredential(null);
+        }}
+        title="Credential Metadata"
+        data={metadataCredential}
+      />
+
+      {/* Toggle Active Confirm Modal */}
+      <ConfirmModal
+        isOpen={showToggleConfirm}
+        onClose={() => {
+          setShowToggleConfirm(false);
+          setConfirmCredential(null);
+          setActionError(null);
+        }}
+        onConfirm={confirmToggleActive}
+        title={confirmCredential?.active ? 'Deactivate Credential' : 'Activate Credential'}
+        message={confirmCredential?.active
+          ? 'Are you sure you want to deactivate this credential? Applications using this API key will no longer be able to authenticate.'
+          : 'Are you sure you want to activate this credential?'
+        }
+        entityName={confirmCredential?.identifier}
+        confirmLabel={confirmCredential?.active ? 'Deactivate' : 'Activate'}
+        variant={confirmCredential?.active ? 'warning' : 'info'}
+        warningMessage={actionError || (confirmCredential?.active ? 'The credential can be reactivated later.' : null)}
+        isLoading={isToggling}
+      />
+
+      {/* Delete Confirm Modal */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setConfirmCredential(null);
+          setActionError(null);
+        }}
+        onConfirm={confirmDelete}
+        title="Delete Credential"
+        message="Are you sure you want to delete this credential? Any applications using this API key will no longer be able to authenticate."
+        entityName={confirmCredential?.identifier}
+        confirmLabel="Delete"
+        variant="danger"
+        warningMessage={actionError || 'This action cannot be undone.'}
+        isLoading={isDeleting}
+      />
+
+      {/* Edit Credential Modal */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={handleCloseEditModal}
+        title={`Edit Credential: ${editCredential?.identifier || ''}`}
+      >
+        <form onSubmit={handleEditCredential} className="credential-form">
+          {editError && (
+            <div className="form-error">{editError}</div>
+          )}
+          <div className="form-group">
+            <label>ID</label>
+            <div className="form-static-value">
+              <CopyableId value={editCredential?.identifier} />
+            </div>
+          </div>
+          <div className="form-group">
+            <label htmlFor="editCredentialName">Name/Description</label>
+            <input
+              type="text"
+              id="editCredentialName"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="Optional description (e.g., 'Production API Key')"
+              disabled={isEditingCredential}
+              autoFocus
+            />
+          </div>
+          <div className="form-group checkbox-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={editActive}
+                onChange={(e) => setEditActive(e.target.checked)}
+                disabled={isEditingCredential}
+              />
+              <span>Active</span>
+            </label>
+          </div>
+          <div className="form-actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleCloseEditModal}
+              disabled={isEditingCredential}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={isEditingCredential}
+            >
+              {isEditingCredential ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

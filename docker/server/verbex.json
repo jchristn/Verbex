@@ -1,9 +1,10 @@
 {
+  "CreatedUtc": "2026-01-09T17:22:48.9590463Z",
   "Logging": {
     "SyslogServers": [],
     "ConsoleLogging": true,
-    "EnableColors": false,
-    "LogDirectory": "./logs",
+    "EnableColors": true,
+    "LogDirectory": "logs",
     "LogFilename": "verbex.log",
     "FileLogging": true,
     "IncludeDateInFilename": true
@@ -16,6 +17,22 @@
     "SslCertificatePassword": null,
     "EnableOpenApi": true,
     "EnableSwaggerUi": true
+  },
+  "Database": {
+    "Type": "Sqlite",
+    "Filename": "./verbex.db",
+    "InMemory": false,
+    "Hostname": "localhost",
+    "Port": 0,
+    "DatabaseName": "verbex",
+    "Username": "",
+    "Password": "",
+    "RequireEncryption": false,
+    "Schema": "",
+    "MinPoolSize": 1,
+    "MaxPoolSize": 100,
+    "CommandTimeout": 30,
+    "ConnectionTimeout": 30
   },
   "DataDirectory": "./data",
   "AdminBearerToken": "verbexadmin",

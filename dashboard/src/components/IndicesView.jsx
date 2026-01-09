@@ -1,12 +1,17 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import IndexForm from './IndexForm';
 import Modal from './Modal';
 import TagInput from './TagInput';
 import KeyValueEditor from './KeyValueEditor';
+import ActionMenu from './ActionMenu';
+import MetadataModal from './MetadataModal';
+import CopyableId from './CopyableId';
+import Pagination from './Pagination';
+import SortableHeader from './SortableHeader';
 import './IndicesView.css';
 
-function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate }) {
+function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, tenants = [] }) {
   const { apiClient } = useAuth();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -22,12 +27,78 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate }
   const [isSavingLabels, setIsSavingLabels] = useState(false);
   const [isSavingTags, setIsSavingTags] = useState(false);
 
+  // Metadata modal
+  const [showMetadataModal, setShowMetadataModal] = useState(false);
+  const [metadataIndex, setMetadataIndex] = useState(null);
+
+  // Sorting
+  const [sortKey, setSortKey] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
+
+  // Filtering
+  const [filters, setFilters] = useState({});
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Filter and sort indices
+  const filteredAndSortedIndices = useMemo(() => {
+    let result = [...indices];
+
+    // Apply filters
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) {
+        result = result.filter(index => {
+          const fieldValue = index[key];
+          if (fieldValue === null || fieldValue === undefined) return false;
+          return String(fieldValue).toLowerCase().includes(value.toLowerCase());
+        });
+      }
+    });
+
+    // Apply sorting
+    result.sort((a, b) => {
+      let aVal = a[sortKey];
+      let bVal = b[sortKey];
+
+      if (aVal === null || aVal === undefined) aVal = '';
+      if (bVal === null || bVal === undefined) bVal = '';
+
+      if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+      if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [indices, filters, sortKey, sortDirection]);
+
+  // Paginate
+  const totalPages = Math.ceil(filteredAndSortedIndices.length / pageSize);
+  const paginatedIndices = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredAndSortedIndices.slice(start, start + pageSize);
+  }, [filteredAndSortedIndices, currentPage, pageSize]);
+
+  const handleSort = (key, direction) => {
+    setSortKey(key);
+    setSortDirection(direction);
+  };
+
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+    setCurrentPage(1);
+  };
+
   const handleViewDetails = async (index) => {
     setSelectedIndex(index);
     setShowDetailModal(true);
 
     try {
-      const response = await apiClient.getIndex(index.id);
+      const response = await apiClient.getIndex(index.identifier);
       setIndexDetails(response.data);
     } catch (err) {
       console.error('Failed to load index details:', err);
@@ -70,9 +141,8 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate }
   const handleSaveLabels = async () => {
     setIsSavingLabels(true);
     try {
-      await apiClient.updateIndexLabels(indexDetails.id, editLabels);
-      // Refresh index details
-      const response = await apiClient.getIndex(indexDetails.id);
+      await apiClient.updateIndexLabels(indexDetails.identifier, editLabels);
+      const response = await apiClient.getIndex(indexDetails.identifier);
       setIndexDetails(response.data);
       setEditingLabels(false);
       onRefresh();
@@ -96,9 +166,8 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate }
   const handleSaveTags = async () => {
     setIsSavingTags(true);
     try {
-      await apiClient.updateIndexTags(indexDetails.id, editTags);
-      // Refresh index details
-      const response = await apiClient.getIndex(indexDetails.id);
+      await apiClient.updateIndexTags(indexDetails.identifier, editTags);
+      const response = await apiClient.getIndex(indexDetails.identifier);
       setIndexDetails(response.data);
       setEditingTags(false);
       onRefresh();
@@ -134,7 +203,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate }
       <div className="workspace-header">
         <div className="workspace-title">
           <h2>Indices</h2>
-          <span className="count-badge">{indices.length}</span>
+          <span className="count-badge">{filteredAndSortedIndices.length}</span>
         </div>
         <div className="workspace-actions">
           <button className="btn btn-secondary" onClick={onRefresh}>
@@ -161,51 +230,103 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate }
         </div>
       ) : (
         <div className="workspace-card">
-          <table className="indices-table">
+          <table className="data-table">
             <thead>
               <tr>
-                <th>Status</th>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Storage</th>
-                <th>Created</th>
-                <th>Actions</th>
+                <SortableHeader
+                  label="Status"
+                  sortKey="enabled"
+                  currentSort={sortKey}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  hasFilters
+                />
+                <SortableHeader
+                  label="ID"
+                  sortKey="identifier"
+                  currentSort={sortKey}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  filterable
+                  filterValue={filters.identifier || ''}
+                  onFilterChange={handleFilterChange}
+                  hasFilters
+                />
+                <SortableHeader
+                  label="Name"
+                  sortKey="name"
+                  currentSort={sortKey}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  filterable
+                  filterValue={filters.name || ''}
+                  onFilterChange={handleFilterChange}
+                  hasFilters
+                />
+                <SortableHeader
+                  label="Storage"
+                  sortKey="inMemory"
+                  currentSort={sortKey}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  hasFilters
+                />
+                <SortableHeader
+                  label="Created"
+                  sortKey="createdUtc"
+                  currentSort={sortKey}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  hasFilters
+                />
+                <th className="actions-column">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {indices.map((index) => (
-                <tr key={index.id}>
+              {paginatedIndices.map((index) => (
+                <tr key={index.identifier}>
                   <td>
                     <span className={`status-badge ${index.enabled ? 'enabled' : 'disabled'}`}>
                       {index.enabled ? 'Active' : 'Disabled'}
                     </span>
                   </td>
-                  <td className="index-id">{index.id}</td>
+                  <td><CopyableId value={index.identifier} /></td>
                   <td>{index.name || '-'}</td>
                   <td>{index.inMemory ? 'Memory' : 'Disk'}</td>
                   <td>{formatDate(index.createdUtc)}</td>
                   <td>
-                    <div className="table-actions">
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        onClick={() => handleViewDetails(index)}
-                      >
-                        Details
-                      </button>
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        onClick={() => {
-                          onIndexSelectAndNavigate(index.id);
-                        }}
-                      >
-                        Documents
-                      </button>
-                    </div>
+                    <ActionMenu
+                      actions={[
+                        {
+                          label: 'Details',
+                          onClick: () => handleViewDetails(index)
+                        },
+                        {
+                          label: 'Documents',
+                          onClick: () => onIndexSelectAndNavigate(index.identifier)
+                        },
+                        {
+                          label: 'View Metadata',
+                          onClick: () => {
+                            setMetadataIndex(index);
+                            setShowMetadataModal(true);
+                          }
+                        }
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredAndSortedIndices.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          />
         </div>
       )}
 
@@ -218,6 +339,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate }
         <IndexForm
           onSuccess={handleCreateSuccess}
           onCancel={() => setShowCreateModal(false)}
+          tenants={tenants}
         />
       </Modal>
 
@@ -237,8 +359,12 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate }
               <h4>General Information</h4>
               <div className="details-grid">
                 <div className="detail-item">
-                  <span className="detail-label">ID</span>
-                  <span className="detail-value">{indexDetails.id}</span>
+                  <span className="detail-label">Identifier</span>
+                  <span className="detail-value"><CopyableId value={indexDetails.identifier} /></span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Tenant ID</span>
+                  <span className="detail-value"><CopyableId value={indexDetails.tenantId} /></span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Name</span>
@@ -385,7 +511,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate }
             <div className="details-actions">
               <button
                 className="btn btn-danger"
-                onClick={() => handleDelete(indexDetails.id)}
+                onClick={() => handleDelete(indexDetails.identifier)}
                 disabled={isDeleting}
               >
                 {isDeleting ? 'Deleting...' : 'Delete Index'}
@@ -406,6 +532,17 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate }
           <div className="loading-spinner">Loading index details...</div>
         )}
       </Modal>
+
+      {/* Metadata Modal */}
+      <MetadataModal
+        isOpen={showMetadataModal}
+        onClose={() => {
+          setShowMetadataModal(false);
+          setMetadataIndex(null);
+        }}
+        title="Index Metadata"
+        data={metadataIndex}
+      />
     </div>
   );
 }

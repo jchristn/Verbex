@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Topbar from './Topbar';
 import Sidebar from './Sidebar';
@@ -19,11 +19,26 @@ function Dashboard() {
   // Load saved state
   useEffect(() => {
     const savedView = localStorage.getItem('verbex_active_view');
-    const savedIndex = localStorage.getItem('verbex_selected_index');
-
     if (savedView) setActiveView(savedView);
-    if (savedIndex) setSelectedIndex(savedIndex);
+    // Note: savedIndex is validated after indices load
   }, []);
+
+  // Validate and restore saved index after indices are loaded
+  useEffect(() => {
+    if (indices.length > 0 && !selectedIndex) {
+      const savedIndex = localStorage.getItem('verbex_selected_index');
+      if (savedIndex) {
+        // Only restore if it matches a valid index identifier
+        const validIndex = indices.find(i => i.identifier === savedIndex);
+        if (validIndex) {
+          setSelectedIndex(savedIndex);
+        } else {
+          // Clear invalid saved index
+          localStorage.removeItem('verbex_selected_index');
+        }
+      }
+    }
+  }, [indices, selectedIndex]);
 
   // Save state changes
   useEffect(() => {
@@ -39,36 +54,40 @@ function Dashboard() {
   }, [selectedIndex]);
 
   // Load indices
-  const loadIndices = async () => {
+  const loadIndices = useCallback(async (signal) => {
     if (!apiClient) return;
 
     setIsLoading(true);
     try {
-      const response = await apiClient.getIndices();
+      const response = await apiClient.getIndices({ signal });
       setIndices(response.data?.indices || []);
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.error('Failed to load indices:', err);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [apiClient]);
 
   // Load tenants
-  const loadTenants = async () => {
+  const loadTenants = useCallback(async (signal) => {
     if (!apiClient) return;
 
     try {
-      const response = await apiClient.getTenants();
+      const response = await apiClient.getTenants({ signal });
       setTenants(response.data?.tenants || []);
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.error('Failed to load tenants:', err);
     }
-  };
+  }, [apiClient]);
 
   useEffect(() => {
-    loadIndices();
-    loadTenants();
-  }, [apiClient]);
+    const abortController = new AbortController();
+    loadIndices(abortController.signal);
+    loadTenants(abortController.signal);
+    return () => abortController.abort();
+  }, [loadIndices, loadTenants]);
 
   const handleViewChange = (view) => {
     setActiveView(view);

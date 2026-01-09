@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import CopyableId from './CopyableId';
 import './SearchView.css';
 
 function SearchView({ selectedIndex, indices, onIndexSelect }) {
@@ -29,7 +30,7 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
   // Auto-select if only one index available
   useEffect(() => {
     if (indices.length === 1 && !selectedIndex) {
-      onIndexSelect(indices[0].id);
+      onIndexSelect(indices[0].identifier);
     }
   }, [indices, selectedIndex, onIndexSelect]);
 
@@ -108,7 +109,7 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
     }
   };
 
-  const selectedIndexInfo = indices.find((i) => i.id === selectedIndex);
+  const selectedIndexInfo = indices.find((i) => i.identifier === selectedIndex);
 
   return (
     <div className="search-view">
@@ -126,8 +127,8 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
             >
               <option value="">Select an index...</option>
               {indices.map((index) => (
-                <option key={index.id} value={index.id}>
-                  {index.name || index.id}
+                <option key={index.identifier} value={index.identifier}>
+                  {index.name || index.identifier}
                 </option>
               ))}
             </select>
@@ -299,7 +300,7 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
                       </div>
                     </div>
                     <div className="result-doc-id">
-                      <code>{result.documentId}</code>
+                      <CopyableId value={result.documentId} />
                     </div>
                     {result.matchedTerms && result.matchedTerms.length > 0 && (
                       <div className="result-matches">

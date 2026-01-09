@@ -1,0 +1,36 @@
+.copyable-id {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.copyable-id-value {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.85em;
+}
+
+.copyable-id-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.copyable-id-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.copyable-id-btn.copied {
+  color: var(--color-success, #22c55e);
+}
+
+.copyable-id-btn svg {
+  display: block;
+}

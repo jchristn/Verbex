@@ -63,10 +63,10 @@
 }
 
 .index-selector-inline select {
-  padding: 8px 12px;
+  padding: 8px 32px 8px 12px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  background: var(--bg-primary);
+  background-color: var(--bg-primary);
   color: var(--text-primary);
   font-size: 0.875rem;
   min-width: 200px;

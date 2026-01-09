@@ -1,0 +1,76 @@
+.action-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.action-menu-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  min-width: auto;
+}
+
+.action-menu-trigger svg {
+  display: block;
+}
+
+.action-menu-dropdown {
+  position: fixed;
+  min-width: 160px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px var(--shadow-color);
+  z-index: 10000;
+  overflow: hidden;
+}
+
+.action-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.action-menu-item:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.action-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-menu-item.danger {
+  color: var(--color-error);
+}
+
+.action-menu-item.danger:hover:not(:disabled) {
+  background: var(--color-error-bg);
+}
+
+.action-menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+.action-menu-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.action-menu-label {
+  flex: 1;
+}

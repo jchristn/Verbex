@@ -25,12 +25,25 @@ export function AuthProvider({ children }) {
     if (savedUrl && savedToken) {
       const client = new ApiClient(savedUrl, savedToken);
       client.validateToken()
-        .then(() => {
+        .then((response) => {
           setServerUrl(savedUrl);
           setToken(savedToken);
           setApiClient(client);
           setIsAuthenticated(true);
-          if (savedUserInfo) {
+
+          // Use auth context from validate response, fall back to saved userInfo
+          if (response.data) {
+            const authContext = {
+              email: response.data.email,
+              tenantId: response.data.tenantId,
+              userId: response.data.userId,
+              isGlobalAdmin: response.data.isGlobalAdmin || false,
+              isAdmin: response.data.isGlobalAdmin || response.data.isTenantAdmin || false,
+              isTenantAdmin: response.data.isTenantAdmin || false
+            };
+            setUserInfo(authContext);
+            localStorage.setItem('verbex_user_info', JSON.stringify(authContext));
+          } else if (savedUserInfo) {
             try {
               setUserInfo(JSON.parse(savedUserInfo));
             } catch (e) {
@@ -76,7 +89,19 @@ export function AuthProvider({ children }) {
     }
 
     const client = new ApiClient(url, finalToken);
-    await client.validateToken();
+    const validateResponse = await client.validateToken();
+
+    // If no loginUserInfo from credentials login, build it from validate response
+    if (!loginUserInfo && validateResponse.data) {
+      loginUserInfo = {
+        email: validateResponse.data.email,
+        tenantId: validateResponse.data.tenantId,
+        userId: validateResponse.data.userId,
+        isGlobalAdmin: validateResponse.data.isGlobalAdmin || false,
+        isAdmin: validateResponse.data.isGlobalAdmin || validateResponse.data.isTenantAdmin || false,
+        isTenantAdmin: validateResponse.data.isTenantAdmin || false
+      };
+    }
 
     localStorage.setItem('verbex_server_url', url);
     localStorage.setItem('verbex_token', finalToken);

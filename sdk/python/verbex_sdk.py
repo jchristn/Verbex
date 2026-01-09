@@ -70,7 +70,8 @@ class ApiResponse:
 @dataclass
 class IndexInfo:
     """Index information model."""
-    id: str
+    identifier: str
+    tenant_id: Optional[str]
     name: Optional[str]
     description: Optional[str]
     enabled: Optional[bool]
@@ -84,7 +85,8 @@ class IndexInfo:
     def from_dict(d: Dict[str, Any]) -> 'IndexInfo':
         """Create IndexInfo from dictionary."""
         return IndexInfo(
-            id=d.get('id', ''),
+            identifier=d.get('identifier', ''),
+            tenant_id=d.get('tenantId'),
             name=d.get('name'),
             description=d.get('description'),
             enabled=d.get('enabled'),
@@ -393,12 +395,9 @@ class VerbexClient:
 
     def create_index(
         self,
-        id: str,
-        name: Optional[str] = None,
+        name: str,
         description: Optional[str] = None,
-        repository_filename: Optional[str] = None,
         in_memory: bool = False,
-        storage_mode: str = "MemoryOnly",
         enable_lemmatizer: bool = False,
         enable_stop_word_remover: bool = False,
         min_token_length: int = 0,
@@ -410,12 +409,9 @@ class VerbexClient:
         Create a new index.
 
         Args:
-            id: Unique identifier for the index
-            name: Display name for the index
+            name: Display name for the index (required)
             description: Description of the index
-            repository_filename: Filename for persistence
             in_memory: Whether to use in-memory storage only
-            storage_mode: Storage mode (MemoryOnly, PersistenceOnly, Hybrid)
             enable_lemmatizer: Enable word lemmatization
             enable_stop_word_remover: Enable stop word filtering
             min_token_length: Minimum token length (0 to disable)
@@ -426,18 +422,16 @@ class VerbexClient:
         Returns:
             ApiResponse containing the created index information
         """
-        data = {
-            'Id': id,
-            'Name': name or id,
-            'Description': description or '',
-            'RepositoryFilename': repository_filename or f'{id}.db',
+        data: Dict[str, Any] = {
+            'Name': name,
             'InMemory': in_memory,
-            'StorageMode': storage_mode,
             'EnableLemmatizer': enable_lemmatizer,
             'EnableStopWordRemover': enable_stop_word_remover,
             'MinTokenLength': min_token_length,
             'MaxTokenLength': max_token_length
         }
+        if description:
+            data['Description'] = description
         if labels:
             data['Labels'] = labels
         if tags:

@@ -1,8 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Modal from './Modal';
 import TagInput from './TagInput';
 import KeyValueEditor from './KeyValueEditor';
+import ActionMenu from './ActionMenu';
+import MetadataModal from './MetadataModal';
+import CopyableId from './CopyableId';
+import Pagination from './Pagination';
+import SortableHeader from './SortableHeader';
 import './DocumentsView.css';
 
 function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
@@ -33,44 +38,134 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
   const [isSavingDocLabels, setIsSavingDocLabels] = useState(false);
   const [isSavingDocTags, setIsSavingDocTags] = useState(false);
 
-  const selectedIndexInfo = indices.find((i) => i.id === selectedIndex);
+  // Metadata modal
+  const [showMetadataModal, setShowMetadataModal] = useState(false);
+  const [metadataDoc, setMetadataDoc] = useState(null);
+
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState('indexedDate');
+  const [sortDirection, setSortDirection] = useState('desc');
+
+  // Filtering state
+  const [filterDocId, setFilterDocId] = useState('');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const selectedIndexInfo = indices.find((i) => i.identifier === selectedIndex);
 
   const handleIndexChange = (e) => {
     const newIndex = e.target.value;
     onIndexSelect(newIndex || null);
   };
 
+  // Sorting handler
+  const handleSort = (column, direction) => {
+    setSortColumn(column);
+    setSortDirection(direction);
+    setCurrentPage(1);
+  };
+
+  // Filter handler
+  const handleFilterChange = (column, value) => {
+    if (column === 'documentId') {
+      setFilterDocId(value);
+    }
+  };
+
+  // Filter and sort documents
+  const filteredAndSortedDocuments = useMemo(() => {
+    let result = [...documents];
+
+    // Apply filter
+    if (filterDocId) {
+      const lowerFilter = filterDocId.toLowerCase();
+      result = result.filter((doc) =>
+        doc.documentId?.toLowerCase().includes(lowerFilter)
+      );
+    }
+
+    // Apply sorting
+    result.sort((a, b) => {
+      let aVal, bVal;
+
+      switch (sortColumn) {
+        case 'documentId':
+          aVal = a.documentId || '';
+          bVal = b.documentId || '';
+          break;
+        case 'documentLength':
+          aVal = a.documentLength || 0;
+          bVal = b.documentLength || 0;
+          break;
+        case 'indexedDate':
+          aVal = new Date(a.indexedDate || 0).getTime();
+          bVal = new Date(b.indexedDate || 0).getTime();
+          break;
+        default:
+          aVal = '';
+          bVal = '';
+      }
+
+      if (typeof aVal === 'string') {
+        const comparison = aVal.localeCompare(bVal);
+        return sortDirection === 'asc' ? comparison : -comparison;
+      } else {
+        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+    });
+
+    return result;
+  }, [documents, filterDocId, sortColumn, sortDirection]);
+
+  // Pagination calculations
+  const totalItems = filteredAndSortedDocuments.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const paginatedDocuments = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredAndSortedDocuments.slice(startIndex, startIndex + pageSize);
+  }, [filteredAndSortedDocuments, currentPage, pageSize]);
+
+  // Reset page when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterDocId]);
+
   // Auto-select if only one index available
   useEffect(() => {
     if (indices.length === 1 && !selectedIndex) {
-      onIndexSelect(indices[0].id);
+      onIndexSelect(indices[0].identifier);
     }
   }, [indices, selectedIndex, onIndexSelect]);
 
-  // Load documents when index changes
-  useEffect(() => {
-    if (selectedIndex) {
-      loadDocuments();
-    } else {
-      setDocuments([]);
-    }
-  }, [selectedIndex]);
-
-  const loadDocuments = async () => {
-    if (!selectedIndex) return;
+  const loadDocuments = useCallback(async (signal) => {
+    if (!selectedIndex || !apiClient) return;
 
     setIsLoading(true);
     setError('');
 
     try {
-      const response = await apiClient.getDocuments(selectedIndex);
+      const response = await apiClient.getDocuments(selectedIndex, { signal });
       setDocuments(response.data?.documents || []);
     } catch (err) {
+      if (err.name === 'AbortError') return;
       setError(err.message || 'Failed to load documents');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [apiClient, selectedIndex]);
+
+  // Load documents when index changes
+  useEffect(() => {
+    if (selectedIndex) {
+      const abortController = new AbortController();
+      loadDocuments(abortController.signal);
+      return () => abortController.abort();
+    } else {
+      setDocuments([]);
+    }
+  }, [loadDocuments]);
 
   const handleAddDocument = async (e) => {
     e.preventDefault();
@@ -156,14 +251,6 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
     setDocIdError('');
   };
 
-  const copyToClipboard = async (text) => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (err) {
-      console.error('Failed to copy to clipboard:', err);
-    }
-  };
-
   // Document labels edit handlers
   const handleStartEditDocLabels = () => {
     setEditDocLabels(viewDocument.labels || []);
@@ -243,8 +330,8 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
             >
               <option value="">Select an index...</option>
               {indices.map((index) => (
-                <option key={index.id} value={index.id}>
-                  {index.name || index.id}
+                <option key={index.identifier} value={index.identifier}>
+                  {index.name || index.identifier}
                 </option>
               ))}
             </select>
@@ -300,41 +387,90 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
         </div>
       ) : (
         <div className="workspace-card">
-          <table className="documents-table">
+          <table className="data-table documents-table">
             <thead>
               <tr>
-                <th>Document ID</th>
-                <th>Length</th>
-                <th>Indexed</th>
-                <th>Actions</th>
+                <SortableHeader
+                  label="Document ID"
+                  sortKey="documentId"
+                  currentSort={sortColumn}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  hasFilters={true}
+                  filterable={true}
+                  filterValue={filterDocId}
+                  onFilterChange={handleFilterChange}
+                  filterPlaceholder="Filter by ID..."
+                />
+                <SortableHeader
+                  label="Length"
+                  sortKey="documentLength"
+                  currentSort={sortColumn}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  hasFilters={true}
+                />
+                <SortableHeader
+                  label="Indexed"
+                  sortKey="indexedDate"
+                  currentSort={sortColumn}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  hasFilters={true}
+                />
+                <th className="sortable-header has-filters actions-column">
+                  <button className="sortable-header-btn" disabled>
+                    <span className="sortable-header-label">Actions</span>
+                  </button>
+                  <div className="sortable-header-filter-container">
+                    <div className="sortable-header-filter-spacer" />
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {documents.map((doc) => (
+              {paginatedDocuments.map((doc) => (
                 <tr key={doc.documentId}>
-                  <td className="doc-id">{doc.documentId}</td>
+                  <td><CopyableId value={doc.documentId} /></td>
                   <td>{doc.documentLength?.toLocaleString() || 'N/A'}</td>
                   <td>{formatDate(doc.indexedDate)}</td>
                   <td>
-                    <div className="table-actions">
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        onClick={() => handleViewDocument(doc.documentId)}
-                      >
-                        View
-                      </button>
-                      <button
-                        className="btn btn-sm btn-danger"
-                        onClick={() => handleDeleteDocument(doc.documentId)}
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <ActionMenu
+                      actions={[
+                        {
+                          label: 'View',
+                          onClick: () => handleViewDocument(doc.documentId)
+                        },
+                        {
+                          label: 'View Metadata',
+                          onClick: () => {
+                            setMetadataDoc(doc);
+                            setShowMetadataModal(true);
+                          }
+                        },
+                        {
+                          label: 'Delete',
+                          variant: 'danger',
+                          onClick: () => handleDeleteDocument(doc.documentId)
+                        }
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setCurrentPage(1);
+            }}
+          />
         </div>
       )}
 
@@ -447,20 +583,15 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
               <h4>Metadata</h4>
               <div className="details-grid">
                 <div className="detail-item">
+                  <span className="detail-label">Index ID</span>
+                  <span className="detail-value">
+                    <CopyableId value={selectedIndex} />
+                  </span>
+                </div>
+                <div className="detail-item">
                   <span className="detail-label">Document ID</span>
-                  <span className="detail-value doc-id-value">
-                    {viewDocument.documentId}
-                    <button
-                      type="button"
-                      className="copy-btn"
-                      onClick={() => copyToClipboard(viewDocument.documentId)}
-                      title="Copy to clipboard"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                      </svg>
-                    </button>
+                  <span className="detail-value">
+                    <CopyableId value={viewDocument.documentId} />
                   </span>
                 </div>
                 <div className="detail-item">
@@ -621,6 +752,17 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
           </div>
         ) : null}
       </Modal>
+
+      {/* Metadata Modal */}
+      <MetadataModal
+        isOpen={showMetadataModal}
+        onClose={() => {
+          setShowMetadataModal(false);
+          setMetadataDoc(null);
+        }}
+        title="Document Metadata"
+        data={metadataDoc}
+      />
     </div>
   );
 }

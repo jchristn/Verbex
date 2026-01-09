@@ -37,6 +37,8 @@ class ApiClient {
 
   /**
    * Make an HTTP request to the API
+   * @param {string} endpoint - API endpoint
+   * @param {Object} options - Fetch options including optional signal for AbortController
    */
   async request(endpoint, options = {}) {
     const url = `${this.baseUrl}${endpoint}`;
@@ -51,7 +53,8 @@ class ApiClient {
 
     const response = await fetch(url, {
       ...options,
-      headers
+      headers,
+      signal: options.signal
     });
 
     const rawData = await response.json();
@@ -122,32 +125,28 @@ class ApiClient {
   }
 
   // Index endpoints
-  async getIndices() {
-    return this.get('/v1.0/indices');
+  async getIndices(options = {}) {
+    return this.get('/v1.0/indices', options);
   }
 
-  async getIndex(id) {
-    return this.get(`/v1.0/indices/${encodeURIComponent(id)}`);
+  async getIndex(id, options = {}) {
+    return this.get(`/v1.0/indices/${encodeURIComponent(id)}`, options);
   }
 
   async createIndex(indexConfig) {
     // Convert to PascalCase for the API
     const apiConfig = {
-      Id: indexConfig.id,
       Name: indexConfig.name
     };
 
+    if (indexConfig.tenantId) {
+      apiConfig.TenantId = indexConfig.tenantId;
+    }
     if (indexConfig.description) {
       apiConfig.Description = indexConfig.description;
     }
-    if (indexConfig.repositoryFilename) {
-      apiConfig.RepositoryFilename = indexConfig.repositoryFilename;
-    }
     if (indexConfig.inMemory !== undefined) {
       apiConfig.InMemory = indexConfig.inMemory;
-    }
-    if (indexConfig.storageMode) {
-      apiConfig.StorageMode = indexConfig.storageMode;
     }
     if (indexConfig.enableLemmatizer !== undefined) {
       apiConfig.EnableLemmatizer = indexConfig.enableLemmatizer;
@@ -184,12 +183,12 @@ class ApiClient {
   }
 
   // Document endpoints
-  async getDocuments(indexId) {
-    return this.get(`/v1.0/indices/${encodeURIComponent(indexId)}/documents`);
+  async getDocuments(indexId, options = {}) {
+    return this.get(`/v1.0/indices/${encodeURIComponent(indexId)}/documents`, options);
   }
 
-  async getDocument(indexId, docId) {
-    return this.get(`/v1.0/indices/${encodeURIComponent(indexId)}/documents/${encodeURIComponent(docId)}`);
+  async getDocument(indexId, docId, options = {}) {
+    return this.get(`/v1.0/indices/${encodeURIComponent(indexId)}/documents/${encodeURIComponent(docId)}`, options);
   }
 
   async addDocument(indexId, document) {
@@ -240,12 +239,12 @@ class ApiClient {
   }
 
   // Admin - Tenant endpoints
-  async getTenants() {
-    return this.get('/v1.0/tenants');
+  async getTenants(options = {}) {
+    return this.get('/v1.0/tenants', options);
   }
 
-  async getTenant(tenantId) {
-    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}`);
+  async getTenant(tenantId, options = {}) {
+    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}`, options);
   }
 
   async createTenant(tenant) {
@@ -262,13 +261,17 @@ class ApiClient {
     return this.delete(`/v1.0/tenants/${encodeURIComponent(tenantId)}`);
   }
 
-  // Admin - User endpoints
-  async getUsers(tenantId) {
-    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/users`);
+  async updateTenant(tenantId, updates) {
+    return this.put(`/v1.0/tenants/${encodeURIComponent(tenantId)}`, updates);
   }
 
-  async getUser(tenantId, userId) {
-    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}`);
+  // Admin - User endpoints
+  async getUsers(tenantId, options = {}) {
+    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/users`, options);
+  }
+
+  async getUser(tenantId, userId, options = {}) {
+    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}`, options);
   }
 
   async createUser(tenantId, user) {
@@ -292,13 +295,17 @@ class ApiClient {
     return this.delete(`/v1.0/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}`);
   }
 
-  // Admin - Credential endpoints
-  async getCredentials(tenantId) {
-    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials`);
+  async updateUser(tenantId, userId, updates) {
+    return this.put(`/v1.0/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}`, updates);
   }
 
-  async getCredential(tenantId, credentialId) {
-    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials/${encodeURIComponent(credentialId)}`);
+  // Admin - Credential endpoints
+  async getCredentials(tenantId, options = {}) {
+    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials`, options);
+  }
+
+  async getCredential(tenantId, credentialId, options = {}) {
+    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials/${encodeURIComponent(credentialId)}`, options);
   }
 
   async createCredential(tenantId, credential) {
@@ -307,6 +314,10 @@ class ApiClient {
       apiCredential.description = credential.description;
     }
     return this.post(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials`, apiCredential);
+  }
+
+  async updateCredential(tenantId, credentialId, updates) {
+    return this.put(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials/${encodeURIComponent(credentialId)}`, updates);
   }
 
   async deleteCredential(tenantId, credentialId) {
