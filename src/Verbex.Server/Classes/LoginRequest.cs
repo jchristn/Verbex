@@ -39,12 +39,28 @@ namespace Verbex.Server.Classes
             }
         }
 
+        /// <summary>
+        /// Tenant ID for tenant-scoped authentication.
+        /// </summary>
+        public string? TenantId
+        {
+            get
+            {
+                return _TenantId;
+            }
+            set
+            {
+                _TenantId = value;
+            }
+        }
+
         #endregion
 
         #region Private-Members
 
         private string _Username = "";
         private string _Password = "";
+        private string? _TenantId = null;
 
         #endregion
 

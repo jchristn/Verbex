@@ -591,5 +591,219 @@ namespace Verbex.Sdk
             ApiResponse<SearchData> response = await SearchAsync(indexId, query, maxResults, labels, tags, cancellationToken).ConfigureAwait(false);
             return response.Data;
         }
+
+        // ==================== Admin - Tenant Management Endpoints ====================
+
+        /// <summary>
+        /// Lists all tenants.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>List of tenants.</returns>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<ApiResponse<TenantsListData>> ListTenantsAsync(CancellationToken cancellationToken = default)
+        {
+            return await MakeRequestAsync<TenantsListData>(HttpMethod.Get, "/v1.0/admin/tenants", null, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Gets all tenants as a list.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>List of TenantInfo objects.</returns>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<List<TenantInfo>> GetTenantsAsync(CancellationToken cancellationToken = default)
+        {
+            ApiResponse<TenantsListData> response = await ListTenantsAsync(cancellationToken).ConfigureAwait(false);
+            return response.Data?.Tenants ?? new List<TenantInfo>();
+        }
+
+        /// <summary>
+        /// Gets a specific tenant.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Tenant details.</returns>
+        /// <exception cref="VerbexException">Thrown when the tenant is not found.</exception>
+        public async Task<ApiResponse<TenantInfo>> GetTenantAsync(string tenantId, CancellationToken cancellationToken = default)
+        {
+            return await MakeRequestAsync<TenantInfo>(HttpMethod.Get, $"/v1.0/admin/tenants/{tenantId}", null, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Creates a new tenant.
+        /// </summary>
+        /// <param name="name">Tenant name.</param>
+        /// <param name="description">Optional description.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Created tenant response.</returns>
+        /// <exception cref="VerbexException">Thrown when creation fails.</exception>
+        public async Task<ApiResponse<CreateTenantData>> CreateTenantAsync(
+            string name,
+            string? description = null,
+            CancellationToken cancellationToken = default)
+        {
+            CreateTenantRequest request = new CreateTenantRequest(name, description);
+            return await MakeRequestAsync<CreateTenantData>(HttpMethod.Post, "/v1.0/admin/tenants", request, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Deletes a tenant.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Deletion confirmation.</returns>
+        /// <exception cref="VerbexException">Thrown when the tenant is not found.</exception>
+        public async Task<ApiResponse<DeleteData>> DeleteTenantAsync(string tenantId, CancellationToken cancellationToken = default)
+        {
+            return await MakeRequestAsync<DeleteData>(HttpMethod.Delete, $"/v1.0/admin/tenants/{tenantId}", null, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        // ==================== Admin - User Management Endpoints ====================
+
+        /// <summary>
+        /// Lists all users in a tenant.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>List of users.</returns>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<ApiResponse<UsersListData>> ListUsersAsync(string tenantId, CancellationToken cancellationToken = default)
+        {
+            return await MakeRequestAsync<UsersListData>(HttpMethod.Get, $"/v1.0/admin/tenants/{tenantId}/users", null, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Gets all users in a tenant as a list.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>List of UserInfo objects.</returns>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<List<UserInfo>> GetUsersAsync(string tenantId, CancellationToken cancellationToken = default)
+        {
+            ApiResponse<UsersListData> response = await ListUsersAsync(tenantId, cancellationToken).ConfigureAwait(false);
+            return response.Data?.Users ?? new List<UserInfo>();
+        }
+
+        /// <summary>
+        /// Gets a specific user.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="userId">The user identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>User details.</returns>
+        /// <exception cref="VerbexException">Thrown when the user is not found.</exception>
+        public async Task<ApiResponse<UserInfo>> GetUserAsync(string tenantId, string userId, CancellationToken cancellationToken = default)
+        {
+            return await MakeRequestAsync<UserInfo>(HttpMethod.Get, $"/v1.0/admin/tenants/{tenantId}/users/{userId}", null, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Creates a new user in a tenant.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="email">User email.</param>
+        /// <param name="password">User password.</param>
+        /// <param name="firstName">Optional first name.</param>
+        /// <param name="lastName">Optional last name.</param>
+        /// <param name="isAdmin">Whether user is tenant admin.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Created user response.</returns>
+        /// <exception cref="VerbexException">Thrown when creation fails.</exception>
+        public async Task<ApiResponse<CreateUserData>> CreateUserAsync(
+            string tenantId,
+            string email,
+            string password,
+            string? firstName = null,
+            string? lastName = null,
+            bool isAdmin = false,
+            CancellationToken cancellationToken = default)
+        {
+            CreateUserRequest request = new CreateUserRequest(email, password, firstName, lastName, isAdmin);
+            return await MakeRequestAsync<CreateUserData>(HttpMethod.Post, $"/v1.0/admin/tenants/{tenantId}/users", request, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Deletes a user.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="userId">The user identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Deletion confirmation.</returns>
+        /// <exception cref="VerbexException">Thrown when the user is not found.</exception>
+        public async Task<ApiResponse<DeleteData>> DeleteUserAsync(string tenantId, string userId, CancellationToken cancellationToken = default)
+        {
+            return await MakeRequestAsync<DeleteData>(HttpMethod.Delete, $"/v1.0/admin/tenants/{tenantId}/users/{userId}", null, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        // ==================== Admin - Credential Management Endpoints ====================
+
+        /// <summary>
+        /// Lists all credentials in a tenant.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>List of credentials.</returns>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<ApiResponse<CredentialsListData>> ListCredentialsAsync(string tenantId, CancellationToken cancellationToken = default)
+        {
+            return await MakeRequestAsync<CredentialsListData>(HttpMethod.Get, $"/v1.0/admin/tenants/{tenantId}/credentials", null, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Gets all credentials in a tenant as a list.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>List of CredentialInfo objects.</returns>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<List<CredentialInfo>> GetCredentialsAsync(string tenantId, CancellationToken cancellationToken = default)
+        {
+            ApiResponse<CredentialsListData> response = await ListCredentialsAsync(tenantId, cancellationToken).ConfigureAwait(false);
+            return response.Data?.Credentials ?? new List<CredentialInfo>();
+        }
+
+        /// <summary>
+        /// Gets a specific credential.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="credentialId">The credential identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Credential details.</returns>
+        /// <exception cref="VerbexException">Thrown when the credential is not found.</exception>
+        public async Task<ApiResponse<CredentialInfo>> GetCredentialAsync(string tenantId, string credentialId, CancellationToken cancellationToken = default)
+        {
+            return await MakeRequestAsync<CredentialInfo>(HttpMethod.Get, $"/v1.0/admin/tenants/{tenantId}/credentials/{credentialId}", null, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Creates a new credential (API key) in a tenant.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="description">Optional description.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Created credential response (includes bearer token).</returns>
+        /// <exception cref="VerbexException">Thrown when creation fails.</exception>
+        public async Task<ApiResponse<CreateCredentialData>> CreateCredentialAsync(
+            string tenantId,
+            string? description = null,
+            CancellationToken cancellationToken = default)
+        {
+            CreateCredentialRequest request = new CreateCredentialRequest(description);
+            return await MakeRequestAsync<CreateCredentialData>(HttpMethod.Post, $"/v1.0/admin/tenants/{tenantId}/credentials", request, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Deletes a credential.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="credentialId">The credential identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Deletion confirmation.</returns>
+        /// <exception cref="VerbexException">Thrown when the credential is not found.</exception>
+        public async Task<ApiResponse<DeleteData>> DeleteCredentialAsync(string tenantId, string credentialId, CancellationToken cancellationToken = default)
+        {
+            return await MakeRequestAsync<DeleteData>(HttpMethod.Delete, $"/v1.0/admin/tenants/{tenantId}/credentials/{credentialId}", null, true, cancellationToken).ConfigureAwait(false);
+        }
     }
 }

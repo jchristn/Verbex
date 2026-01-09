@@ -154,6 +154,60 @@ class SearchResponse {
 }
 
 /**
+ * Tenant information model.
+ */
+class TenantInfo {
+    /**
+     * Create a TenantInfo.
+     * @param {object} data - Tenant data (camelCase from toCamelCaseKeys)
+     */
+    constructor(data) {
+        this.identifier = data.identifier || '';
+        this.name = data.name || null;
+        this.active = data.active || false;
+        this.createdUtc = data.createdUtc || null;
+    }
+}
+
+/**
+ * User information model.
+ */
+class UserInfo {
+    /**
+     * Create a UserInfo.
+     * @param {object} data - User data (camelCase from toCamelCaseKeys)
+     */
+    constructor(data) {
+        this.identifier = data.identifier || '';
+        this.tenantId = data.tenantId || '';
+        this.email = data.email || '';
+        this.firstName = data.firstName || null;
+        this.lastName = data.lastName || null;
+        this.isAdmin = data.isAdmin || false;
+        this.active = data.active || false;
+        this.createdUtc = data.createdUtc || null;
+    }
+}
+
+/**
+ * Credential information model.
+ */
+class CredentialInfo {
+    /**
+     * Create a CredentialInfo.
+     * @param {object} data - Credential data (camelCase from toCamelCaseKeys)
+     */
+    constructor(data) {
+        this.identifier = data.identifier || '';
+        this.tenantId = data.tenantId || '';
+        this.name = data.name || null;
+        this.bearerToken = data.bearerToken || null;
+        this.active = data.active || false;
+        this.createdUtc = data.createdUtc || null;
+    }
+}
+
+/**
  * Verbex SDK Client for JavaScript.
  * Provides methods to interact with all Verbex REST API endpoints.
  */
@@ -527,6 +581,192 @@ class VerbexClient {
         const response = await this.search(indexId, query, maxResults, labels, tags);
         return response.data ? new SearchResponse(response.data) : null;
     }
+
+    // ==================== Admin - Tenant Management Endpoints ====================
+
+    /**
+     * List all tenants.
+     * @returns {Promise<ApiResponse>} List of tenants
+     */
+    async listTenants() {
+        return this._makeRequest('GET', '/v1.0/admin/tenants');
+    }
+
+    /**
+     * Get all tenants as TenantInfo objects.
+     * @returns {Promise<TenantInfo[]>} Array of TenantInfo objects
+     */
+    async getTenants() {
+        const response = await this.listTenants();
+        if (response.data?.tenants) {
+            return response.data.tenants.map(t => new TenantInfo(t));
+        }
+        return [];
+    }
+
+    /**
+     * Get a specific tenant.
+     * @param {string} tenantId - The tenant identifier
+     * @returns {Promise<ApiResponse>} Tenant details
+     */
+    async getTenant(tenantId) {
+        return this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}`);
+    }
+
+    /**
+     * Create a new tenant.
+     * @param {object} options - Tenant creation options
+     * @param {string} options.name - Tenant name
+     * @param {string} [options.description] - Optional description
+     * @returns {Promise<ApiResponse>} Created tenant response
+     */
+    async createTenant(options) {
+        const data = { name: options.name };
+        if (options.description) {
+            data.description = options.description;
+        }
+        return this._makeRequest('POST', '/v1.0/admin/tenants', data);
+    }
+
+    /**
+     * Delete a tenant.
+     * @param {string} tenantId - The tenant identifier
+     * @returns {Promise<ApiResponse>} Deletion confirmation
+     */
+    async deleteTenant(tenantId) {
+        return this._makeRequest('DELETE', `/v1.0/admin/tenants/${tenantId}`);
+    }
+
+    // ==================== Admin - User Management Endpoints ====================
+
+    /**
+     * List all users in a tenant.
+     * @param {string} tenantId - The tenant identifier
+     * @returns {Promise<ApiResponse>} List of users
+     */
+    async listUsers(tenantId) {
+        return this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}/users`);
+    }
+
+    /**
+     * Get all users in a tenant as UserInfo objects.
+     * @param {string} tenantId - The tenant identifier
+     * @returns {Promise<UserInfo[]>} Array of UserInfo objects
+     */
+    async getUsers(tenantId) {
+        const response = await this.listUsers(tenantId);
+        if (response.data?.users) {
+            return response.data.users.map(u => new UserInfo(u));
+        }
+        return [];
+    }
+
+    /**
+     * Get a specific user.
+     * @param {string} tenantId - The tenant identifier
+     * @param {string} userId - The user identifier
+     * @returns {Promise<ApiResponse>} User details
+     */
+    async getUser(tenantId, userId) {
+        return this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}/users/${userId}`);
+    }
+
+    /**
+     * Create a new user in a tenant.
+     * @param {string} tenantId - The tenant identifier
+     * @param {object} options - User creation options
+     * @param {string} options.email - User email
+     * @param {string} options.password - User password
+     * @param {string} [options.firstName] - Optional first name
+     * @param {string} [options.lastName] - Optional last name
+     * @param {boolean} [options.isAdmin=false] - Whether user is tenant admin
+     * @returns {Promise<ApiResponse>} Created user response
+     */
+    async createUser(tenantId, options) {
+        const data = {
+            email: options.email,
+            password: options.password
+        };
+        if (options.firstName) {
+            data.firstName = options.firstName;
+        }
+        if (options.lastName) {
+            data.lastName = options.lastName;
+        }
+        if (options.isAdmin !== undefined) {
+            data.isAdmin = options.isAdmin;
+        }
+        return this._makeRequest('POST', `/v1.0/admin/tenants/${tenantId}/users`, data);
+    }
+
+    /**
+     * Delete a user.
+     * @param {string} tenantId - The tenant identifier
+     * @param {string} userId - The user identifier
+     * @returns {Promise<ApiResponse>} Deletion confirmation
+     */
+    async deleteUser(tenantId, userId) {
+        return this._makeRequest('DELETE', `/v1.0/admin/tenants/${tenantId}/users/${userId}`);
+    }
+
+    // ==================== Admin - Credential Management Endpoints ====================
+
+    /**
+     * List all credentials in a tenant.
+     * @param {string} tenantId - The tenant identifier
+     * @returns {Promise<ApiResponse>} List of credentials
+     */
+    async listCredentials(tenantId) {
+        return this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}/credentials`);
+    }
+
+    /**
+     * Get all credentials in a tenant as CredentialInfo objects.
+     * @param {string} tenantId - The tenant identifier
+     * @returns {Promise<CredentialInfo[]>} Array of CredentialInfo objects
+     */
+    async getCredentials(tenantId) {
+        const response = await this.listCredentials(tenantId);
+        if (response.data?.credentials) {
+            return response.data.credentials.map(c => new CredentialInfo(c));
+        }
+        return [];
+    }
+
+    /**
+     * Get a specific credential.
+     * @param {string} tenantId - The tenant identifier
+     * @param {string} credentialId - The credential identifier
+     * @returns {Promise<ApiResponse>} Credential details
+     */
+    async getCredential(tenantId, credentialId) {
+        return this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}/credentials/${credentialId}`);
+    }
+
+    /**
+     * Create a new credential (API key) in a tenant.
+     * @param {string} tenantId - The tenant identifier
+     * @param {object} [options] - Credential creation options
+     * @param {string} [options.description] - Optional description
+     * @returns {Promise<ApiResponse>} Created credential response (includes bearer token)
+     */
+    async createCredential(tenantId, options = {}) {
+        const data = {};
+        if (options.description) {
+            data.description = options.description;
+        }
+        return this._makeRequest('POST', `/v1.0/admin/tenants/${tenantId}/credentials`, data);
+    }
+
+    /**
+     * Delete a credential.
+     * @param {string} tenantId - The tenant identifier
+     * @param {string} credentialId - The credential identifier
+     * @returns {Promise<ApiResponse>} Deletion confirmation
+     */
+    async deleteCredential(tenantId, credentialId) {
+        return this._makeRequest('DELETE', `/v1.0/admin/tenants/${tenantId}/credentials/${credentialId}`);
+    }
 }
 
 // Export for Node.js
@@ -538,7 +778,10 @@ if (typeof module !== 'undefined' && module.exports) {
         IndexInfo,
         DocumentInfo,
         SearchResult,
-        SearchResponse
+        SearchResponse,
+        TenantInfo,
+        UserInfo,
+        CredentialInfo
     };
 }
 
@@ -551,4 +794,7 @@ if (typeof exports !== 'undefined') {
     exports.DocumentInfo = DocumentInfo;
     exports.SearchResult = SearchResult;
     exports.SearchResponse = SearchResponse;
+    exports.TenantInfo = TenantInfo;
+    exports.UserInfo = UserInfo;
+    exports.CredentialInfo = CredentialInfo;
 }

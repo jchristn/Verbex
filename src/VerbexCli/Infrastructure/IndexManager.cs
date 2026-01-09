@@ -225,7 +225,7 @@ namespace VerbexCli.Infrastructure
             {
                 if (_LoadedIndices[name].Configuration?.StorageMode == StorageMode.OnDisk)
                 {
-                    await _LoadedIndices[name].FlushAsync(null, cancellationToken).ConfigureAwait(false);
+                    await _LoadedIndices[name].FlushAsync(cancellationToken).ConfigureAwait(false);
                 }
                 await _LoadedIndices[name].DisposeAsync().ConfigureAwait(false);
                 _LoadedIndices.Remove(name);
@@ -348,7 +348,7 @@ namespace VerbexCli.Infrastructure
             // Flush on-disk indices
             if (index.Configuration?.StorageMode == StorageMode.OnDisk)
             {
-                await index.FlushAsync(null, cancellationToken).ConfigureAwait(false);
+                await index.FlushAsync(cancellationToken).ConfigureAwait(false);
             }
 
             await SaveDocumentContentAsync(indexName, documentName, content, cancellationToken).ConfigureAwait(false);
@@ -388,7 +388,7 @@ namespace VerbexCli.Infrastructure
 
                 if (index.Configuration?.StorageMode == StorageMode.OnDisk)
                 {
-                    await index.FlushAsync(null, cancellationToken).ConfigureAwait(false);
+                    await index.FlushAsync(cancellationToken).ConfigureAwait(false);
                 }
 
                 await SaveDocumentMapAsync(indexName, cancellationToken).ConfigureAwait(false);
@@ -489,7 +489,7 @@ namespace VerbexCli.Infrastructure
 
             if (index.Configuration?.StorageMode == StorageMode.OnDisk)
             {
-                await index.FlushAsync(null, cancellationToken).ConfigureAwait(false);
+                await index.FlushAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -504,7 +504,7 @@ namespace VerbexCli.Infrastructure
                 {
                     if (index.Configuration?.StorageMode == StorageMode.OnDisk)
                     {
-                        index.FlushAsync(null, CancellationToken.None).Wait(TimeSpan.FromSeconds(5));
+                        index.FlushAsync(CancellationToken.None).Wait(TimeSpan.FromSeconds(5));
                     }
                     index.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(5));
                 }

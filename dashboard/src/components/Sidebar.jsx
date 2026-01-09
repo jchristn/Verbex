@@ -1,10 +1,16 @@
 import './Sidebar.css';
 
-function Sidebar({ activeView, onViewChange, indices }) {
+function Sidebar({ activeView, onViewChange, indices, isAdmin }) {
   const navItems = [
     { id: 'indices', label: 'Indices', icon: '📚' },
     { id: 'documents', label: 'Documents', icon: '📄' },
     { id: 'search', label: 'Search', icon: '🔍' }
+  ];
+
+  const adminItems = [
+    { id: 'tenants', label: 'Tenants', icon: '🏢' },
+    { id: 'users', label: 'Users', icon: '👤' },
+    { id: 'credentials', label: 'Credentials', icon: '🔑' }
   ];
 
   return (
@@ -23,6 +29,21 @@ function Sidebar({ activeView, onViewChange, indices }) {
             </button>
           ))}
         </div>
+        {isAdmin && (
+          <div className="nav-section">
+            <div className="nav-section-title">Administration</div>
+            {adminItems.map((item) => (
+              <button
+                key={item.id}
+                className={`nav-item ${activeView === item.id ? 'active' : ''}`}
+                onClick={() => onViewChange(item.id)}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-label">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </nav>
 
       <div className="sidebar-footer">

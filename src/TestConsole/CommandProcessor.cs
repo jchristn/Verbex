@@ -7,7 +7,7 @@ namespace TestConsole
     using System.Threading;
     using System.Threading.Tasks;
     using Verbex;
-    using Verbex.Repositories;
+    using Verbex.Models;
 
     /// <summary>
     /// Processes all user commands and delegates to appropriate handlers.
@@ -665,7 +665,7 @@ namespace TestConsole
                 // Flush only for on-disk indices
                 if (_IndexManager.CurrentIndex.Configuration?.StorageMode == StorageMode.OnDisk)
                 {
-                    await _IndexManager.CurrentIndex.FlushAsync(null, CancellationToken.None).ConfigureAwait(false);
+                    await _IndexManager.CurrentIndex.FlushAsync(CancellationToken.None).ConfigureAwait(false);
                 }
                 Console.WriteLine($"Cleared {count} documents.");
             }
@@ -853,7 +853,7 @@ namespace TestConsole
 
             try
             {
-                await _IndexManager.CurrentIndex.FlushAsync(null, CancellationToken.None).ConfigureAwait(false);
+                await _IndexManager.CurrentIndex.FlushAsync(CancellationToken.None).ConfigureAwait(false);
                 Console.WriteLine("Flushed pending operations.");
             }
             catch (Exception ex)

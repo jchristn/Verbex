@@ -16,8 +16,35 @@ namespace Test
         /// <returns>Task representing the asynchronous operation.</returns>
         public static async Task Main(string[] args)
         {
+            // Parse command-line arguments
+            CommandLineOptions options = CommandLineOptions.Parse(args);
+
+            // Show help if requested
+            if (options.ShowHelp)
+            {
+                Console.WriteLine(CommandLineOptions.GetUsageText());
+                return;
+            }
+
+            // Show usage if invalid arguments
+            if (!options.IsValid)
+            {
+                Console.WriteLine($"Error: {options.ErrorMessage}");
+                Console.WriteLine();
+                Console.WriteLine(CommandLineOptions.GetUsageText());
+                Environment.Exit(1);
+                return;
+            }
+
+            // Initialize test context with options
+            TestContext.Initialize(options);
+
             Console.WriteLine("Verbex Comprehensive Test Suite");
             Console.WriteLine("===============================");
+            Console.WriteLine();
+            Console.WriteLine($"Database: {TestContext.GetDatabaseDescription()}");
+            Console.WriteLine($"Cleanup:  {(TestContext.ShouldCleanup ? "Enabled" : "Disabled (--no-cleanup)")}");
+            Console.WriteLine();
 
             try
             {
@@ -50,6 +77,11 @@ namespace Test
             Console.WriteLine();
             Console.WriteLine("=== STORAGE MODE SPECIFIC TESTS ===");
             await StorageModeTests.RunAllAsync(runner).ConfigureAwait(false);
+
+            Console.WriteLine();
+            Console.WriteLine("=== MULTI-TENANCY DATABASE TESTS ===");
+            Console.WriteLine($"Using: {TestContext.GetDatabaseDescription()}");
+            await DatabaseDriverTests.RunAllAsync(runner).ConfigureAwait(false);
 
             // Print summary
             runner.PrintSummary();

@@ -8,19 +8,29 @@ namespace Verbex
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
-    using Verbex.Repositories;
+    using Verbex.Database;
+    using Verbex.Database.Interfaces;
+    using Verbex.Database.Sqlite;
+    using Verbex.Models;
     using Verbex.Utilities;
 
     /// <summary>
-    /// Main inverted index implementation using SQLite storage.
+    /// Main inverted index implementation using DatabaseDriverBase for storage.
+    /// Supports SQLite (in-memory and on-disk), PostgreSQL, MySQL, and SQL Server.
     /// Thread-safe for concurrent operations.
     /// </summary>
     public class InvertedIndex : IDisposable, IAsyncDisposable
     {
+        private const string LocalTenantName = "local";
+        private const string LocalTenantDescription = "Local tenant for standalone index usage";
+
         private readonly VerbexConfiguration _Configuration;
-        private readonly IIndexRepository _Repository;
+        private readonly DatabaseDriverBase _Driver;
         private readonly ITokenizer _Tokenizer;
         private readonly string _IndexName;
+        private readonly bool _OwnsDriver;
+        private string _TenantId = string.Empty;
+        private string _IndexId = string.Empty;
         private bool _IsDisposed;
 
         /// <summary>
@@ -36,14 +46,20 @@ namespace Verbex
         /// <summary>
         /// Gets whether the index is open and ready for operations.
         /// </summary>
-        public bool IsOpen => _Repository.IsOpen;
+        public bool IsOpen => _Driver.IsOpen && !string.IsNullOrEmpty(_IndexId);
+
+        /// <summary>
+        /// Gets the underlying database driver.
+        /// </summary>
+        public DatabaseDriverBase Driver => _Driver;
 
         /// <summary>
         /// Initializes a new instance of the InvertedIndex class with configuration object.
+        /// Creates an SQLite database driver based on the storage mode configuration.
         /// </summary>
         /// <param name="indexName">Name of the index.</param>
         /// <param name="configuration">Configuration settings for the index.</param>
-        /// <exception cref="ArgumentNullException">Thrown when indexName or configuration is null.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when indexName is null.</exception>
         /// <exception cref="ArgumentException">Thrown when indexName is empty or whitespace.</exception>
         public InvertedIndex(string indexName, VerbexConfiguration? configuration = null)
         {
@@ -57,10 +73,12 @@ namespace Verbex
             _IndexName = indexName;
             _Configuration = configuration?.Clone() ?? new VerbexConfiguration();
             _Tokenizer = _Configuration.Tokenizer ?? new DefaultTokenizer();
+            _OwnsDriver = true;
 
+            DatabaseSettings settings;
             if (_Configuration.StorageMode == StorageMode.InMemory)
             {
-                _Repository = new MemoryIndexRepository();
+                settings = DatabaseSettings.CreateInMemory();
             }
             else
             {
@@ -69,21 +87,25 @@ namespace Verbex
                 {
                     Directory.CreateDirectory(directory);
                 }
-                _Repository = DiskIndexRepository.Create(directory, _Configuration.DatabaseFilename);
+                string databasePath = Path.Combine(directory, _Configuration.DatabaseFilename);
+                settings = DatabaseSettings.CreateSqliteFile(databasePath);
             }
+
+            _Driver = new SqliteDatabaseDriver(settings);
         }
 
         /// <summary>
-        /// Initializes a new instance of the InvertedIndex class with a custom repository.
+        /// Initializes a new instance of the InvertedIndex class with a custom database driver.
         /// </summary>
         /// <param name="indexName">Name of the index.</param>
-        /// <param name="repository">Repository to use for storage.</param>
+        /// <param name="driver">Database driver to use for storage.</param>
         /// <param name="configuration">Configuration settings for the index.</param>
-        /// <exception cref="ArgumentNullException">Thrown when indexName or repository is null.</exception>
-        public InvertedIndex(string indexName, IIndexRepository repository, VerbexConfiguration? configuration = null)
+        /// <exception cref="ArgumentNullException">Thrown when indexName or driver is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when indexName is empty or whitespace.</exception>
+        public InvertedIndex(string indexName, DatabaseDriverBase driver, VerbexConfiguration? configuration = null)
         {
             ArgumentNullException.ThrowIfNull(indexName);
-            ArgumentNullException.ThrowIfNull(repository);
+            ArgumentNullException.ThrowIfNull(driver);
 
             if (string.IsNullOrWhiteSpace(indexName))
             {
@@ -91,13 +113,15 @@ namespace Verbex
             }
 
             _IndexName = indexName;
-            _Repository = repository;
+            _Driver = driver;
             _Configuration = configuration?.Clone() ?? new VerbexConfiguration();
             _Tokenizer = _Configuration.Tokenizer ?? new DefaultTokenizer();
+            _OwnsDriver = false;
         }
 
         /// <summary>
         /// Opens the index. Must be called before any operations.
+        /// Initializes the database driver, creates/gets the local tenant, and creates/gets the index.
         /// </summary>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Task.</returns>
@@ -105,10 +129,36 @@ namespace Verbex
         {
             ThrowIfDisposed();
 
-            if (!_Repository.IsOpen)
+            if (!_Driver.IsOpen)
             {
-                await _Repository.OpenAsync(_IndexName, token).ConfigureAwait(false);
+                await _Driver.InitializeAsync(token).ConfigureAwait(false);
             }
+
+            // Get or create the local tenant
+            TenantMetadata? tenant = await _Driver.Tenants.ReadByNameAsync(LocalTenantName, token).ConfigureAwait(false);
+            if (tenant == null)
+            {
+                tenant = new TenantMetadata(LocalTenantName)
+                {
+                    Description = LocalTenantDescription
+                };
+                tenant = await _Driver.Tenants.CreateAsync(tenant, token).ConfigureAwait(false);
+            }
+            _TenantId = tenant.Identifier;
+
+            // Get or create the index
+            IndexMetadata? index = await _Driver.Indexes.ReadByNameAsync(_TenantId, _IndexName, token).ConfigureAwait(false);
+            if (index == null)
+            {
+                index = new IndexMetadata
+                {
+                    TenantId = _TenantId,
+                    Name = _IndexName,
+                    Description = $"Index: {_IndexName}"
+                };
+                index = await _Driver.Indexes.CreateAsync(index, token).ConfigureAwait(false);
+            }
+            _IndexId = index.Identifier;
         }
 
         /// <summary>
@@ -118,10 +168,12 @@ namespace Verbex
         /// <returns>Task.</returns>
         public async Task CloseAsync(CancellationToken token = default)
         {
-            if (_Repository.IsOpen)
+            if (_Driver.IsOpen && _OwnsDriver)
             {
-                await _Repository.CloseAsync(token).ConfigureAwait(false);
+                await _Driver.CloseAsync(token).ConfigureAwait(false);
             }
+            _TenantId = string.Empty;
+            _IndexId = string.Empty;
         }
 
         #region Document Operations
@@ -136,7 +188,7 @@ namespace Verbex
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            return await _Repository.Document.GetCountAsync(token).ConfigureAwait(false);
+            return await _Driver.Documents.GetCountAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -157,7 +209,7 @@ namespace Verbex
             string documentId = IdGenerator.GenerateDocumentId();
             string contentSha256 = ComputeContentHash(content);
 
-            await _Repository.Document.AddAsync(documentId, documentName, contentSha256, content.Length, token).ConfigureAwait(false);
+            await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, token).ConfigureAwait(false);
 
             await IndexDocumentContentAsync(documentId, documentName, content, token).ConfigureAwait(false);
 
@@ -190,7 +242,7 @@ namespace Verbex
 
             string contentSha256 = ComputeContentHash(content);
 
-            await _Repository.Document.AddAsync(documentId, documentName, contentSha256, content.Length, token).ConfigureAwait(false);
+            await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, token).ConfigureAwait(false);
 
             await IndexDocumentContentAsync(documentId, documentName, content, token).ConfigureAwait(false);
         }
@@ -207,7 +259,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentId);
 
-            return await _Repository.Document.GetAsync(documentId, token).ConfigureAwait(false);
+            return await _Driver.Documents.GetAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -222,7 +274,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentId);
 
-            return await _Repository.Document.GetWithMetadataAsync(documentId, token).ConfigureAwait(false);
+            return await _Driver.Documents.GetWithMetadataAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -237,7 +289,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentName);
 
-            return await _Repository.Document.GetByNameAsync(documentName, token).ConfigureAwait(false);
+            return await _Driver.Documents.GetByNameAsync(_TenantId, _IndexId, documentName, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -252,7 +304,7 @@ namespace Verbex
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            return await _Repository.Document.GetAllAsync(limit, offset, token).ConfigureAwait(false);
+            return await _Driver.Documents.GetAllAsync(_TenantId, _IndexId, limit, offset, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -267,7 +319,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentId);
 
-            return await _Repository.Document.ExistsAsync(documentId, token).ConfigureAwait(false);
+            return await _Driver.Documents.ExistsAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -282,7 +334,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentName);
 
-            return await _Repository.Document.ExistsByNameAsync(documentName, token).ConfigureAwait(false);
+            return await _Driver.Documents.ExistsByNameAsync(_TenantId, _IndexId, documentName, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -297,7 +349,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentId);
 
-            List<DocumentTermRecord> docTerms = await _Repository.DocumentTerm.GetByDocumentAsync(documentId, token).ConfigureAwait(false);
+            List<DocumentTermRecord> docTerms = await _Driver.DocumentTerms.GetByDocumentAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
 
             // Batch decrement term frequencies (single UPDATE instead of N)
             if (docTerms.Count > 0)
@@ -308,14 +360,14 @@ namespace Verbex
                 {
                     decrements[docTerm.TermId] = (1, docTerm.TermFrequency);
                 }
-                await _Repository.Term.DecrementFrequenciesBatchAsync(decrements, token).ConfigureAwait(false);
+                await _Driver.Terms.DecrementFrequenciesBatchAsync(_TenantId, _IndexId, decrements, token).ConfigureAwait(false);
             }
 
-            await _Repository.DocumentTerm.DeleteByDocumentAsync(documentId, token).ConfigureAwait(false);
+            await _Driver.DocumentTerms.DeleteByDocumentAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
 
-            bool deleted = await _Repository.Document.DeleteAsync(documentId, token).ConfigureAwait(false);
+            bool deleted = await _Driver.Documents.DeleteAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
 
-            await _Repository.Term.DeleteOrphanedAsync(token).ConfigureAwait(false);
+            await _Driver.Terms.DeleteOrphanedAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
 
             return deleted;
         }
@@ -331,9 +383,9 @@ namespace Verbex
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            long documentCount = await _Repository.Document.DeleteAllAsync(token).ConfigureAwait(false);
+            long documentCount = await _Driver.Documents.DeleteAllAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
 
-            await _Repository.Term.DeleteAllAsync(token).ConfigureAwait(false);
+            await _Driver.Terms.DeleteAllAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
 
             return documentCount;
         }
@@ -383,7 +435,7 @@ namespace Verbex
                 return new SearchResults(new List<SearchResult>(), 0, TimeSpan.Zero);
             }
 
-            Dictionary<string, TermRecord> termRecords = await _Repository.Term.GetMultipleAsync(queryTerms, token).ConfigureAwait(false);
+            Dictionary<string, TermRecord> termRecords = await _Driver.Terms.GetMultipleAsync(_TenantId, _IndexId, queryTerms, token).ConfigureAwait(false);
 
             if (termRecords.Count == 0)
             {
@@ -400,7 +452,7 @@ namespace Verbex
             List<string> termIds = termRecords.Values.Select(t => t.Id).ToList();
 
             int limit = maxResults ?? _Configuration.DefaultMaxSearchResults;
-            List<SearchMatch> matches = await _Repository.DocumentTerm.SearchAsync(termIds, useAndLogic, labels, tags, limit, token).ConfigureAwait(false);
+            List<SearchMatch> matches = await _Driver.DocumentTerms.SearchAsync(_TenantId, _IndexId, termIds, useAndLogic, limit, labels, tags, token).ConfigureAwait(false);
 
             if (matches.Count == 0)
             {
@@ -410,7 +462,7 @@ namespace Verbex
             List<string> docIds = matches.Select(m => m.DocumentId).ToList();
 
             // Fetch per-term frequencies for all matched documents
-            List<DocumentTermRecord> documentTermRecords = await _Repository.DocumentTerm.GetByDocumentsAndTermsAsync(docIds, termIds, token).ConfigureAwait(false);
+            List<DocumentTermRecord> documentTermRecords = await _Driver.DocumentTerms.GetByDocumentsAndTermsAsync(_TenantId, _IndexId, docIds, termIds, token).ConfigureAwait(false);
 
             // Build lookup: documentId -> (termId -> frequency)
             Dictionary<string, Dictionary<string, int>> perDocTermFrequencies = new Dictionary<string, Dictionary<string, int>>();
@@ -433,11 +485,11 @@ namespace Verbex
                 }
             }
 
-            List<DocumentMetadata> documents = await _Repository.Document.GetByIdsAsync(docIds, token).ConfigureAwait(false);
+            List<DocumentMetadata> documents = await _Driver.Documents.GetByIdsAsync(_TenantId, _IndexId, docIds, token).ConfigureAwait(false);
 
             Dictionary<string, DocumentMetadata> docLookup = documents.ToDictionary(d => d.DocumentId);
 
-            long totalDocs = await _Repository.Document.GetCountAsync(token).ConfigureAwait(false);
+            long totalDocs = await _Driver.Documents.GetCountAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
 
             List<SearchResult> results = new List<SearchResult>();
             foreach (SearchMatch match in matches)
@@ -476,7 +528,7 @@ namespace Verbex
                 return false;
             }
 
-            return await _Repository.Term.ExistsAsync(normalizedTerm, token).ConfigureAwait(false);
+            return await _Driver.Terms.ExistsAsync(_TenantId, _IndexId, normalizedTerm, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -497,7 +549,13 @@ namespace Verbex
                 return new List<DocumentTermRecord>();
             }
 
-            return await _Repository.DocumentTerm.GetPostingsByTermAsync(normalizedTerm, token).ConfigureAwait(false);
+            TermRecord? termRecord = await _Driver.Terms.GetAsync(_TenantId, _IndexId, normalizedTerm, token).ConfigureAwait(false);
+            if (termRecord == null)
+            {
+                return new List<DocumentTermRecord>();
+            }
+
+            return await _Driver.DocumentTerms.GetPostingsByTermAsync(_TenantId, _IndexId, termRecord.Id, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -513,7 +571,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(prefix);
 
-            return await _Repository.Term.GetByPrefixAsync(prefix.ToLowerInvariant(), limit, token).ConfigureAwait(false);
+            return await _Driver.Terms.GetByPrefixAsync(_TenantId, _IndexId, prefix.ToLowerInvariant(), limit, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -528,7 +586,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentId);
 
-            return await _Repository.DocumentTerm.GetByDocumentAsync(documentId, token).ConfigureAwait(false);
+            return await _Driver.DocumentTerms.GetByDocumentAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
         }
 
         #endregion
@@ -549,7 +607,8 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(documentId);
             ArgumentNullException.ThrowIfNull(label);
 
-            await _Repository.Label.AddAsync(documentId, label.ToLowerInvariant(), token).ConfigureAwait(false);
+            string labelId = IdGenerator.GenerateLabelId();
+            await _Driver.Labels.AddAsync(_TenantId, _IndexId, labelId, documentId, label.ToLowerInvariant(), token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -571,8 +630,14 @@ namespace Verbex
                 return;
             }
 
-            List<string> normalizedLabels = labels.Select(l => l.ToLowerInvariant()).ToList();
-            await _Repository.Label.AddBatchAsync(documentId, normalizedLabels, token).ConfigureAwait(false);
+            List<LabelRecord> records = labels.Select(l => new LabelRecord
+            {
+                Id = IdGenerator.GenerateLabelId(),
+                DocumentId = documentId,
+                Label = l.ToLowerInvariant()
+            }).ToList();
+
+            await _Driver.Labels.AddBatchAsync(_TenantId, _IndexId, records, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -590,7 +655,7 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(labels);
 
             List<string> normalizedLabels = labels.Select(l => l.ToLowerInvariant()).ToList();
-            await _Repository.Label.ReplaceAsync(documentId, normalizedLabels, token).ConfigureAwait(false);
+            await _Driver.Labels.ReplaceAsync(_TenantId, _IndexId, documentId, normalizedLabels, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -605,7 +670,8 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(label);
 
-            await _Repository.Label.AddAsync(null, label.ToLowerInvariant(), token).ConfigureAwait(false);
+            string labelId = IdGenerator.GenerateLabelId();
+            await _Driver.Labels.AddAsync(_TenantId, _IndexId, labelId, null, label.ToLowerInvariant(), token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -620,7 +686,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentId);
 
-            return await _Repository.Label.GetByDocumentAsync(documentId, token).ConfigureAwait(false);
+            return await _Driver.Labels.GetByDocumentAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -633,7 +699,7 @@ namespace Verbex
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            return await _Repository.Label.GetIndexLabelsAsync(token).ConfigureAwait(false);
+            return await _Driver.Labels.GetIndexLabelsAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -641,14 +707,14 @@ namespace Verbex
         /// </summary>
         /// <param name="label">Label to filter by.</param>
         /// <param name="token">Cancellation token.</param>
-        /// <returns>List of documents.</returns>
-        public async Task<List<DocumentMetadata>> GetDocumentsByLabelAsync(string label, CancellationToken token = default)
+        /// <returns>List of document IDs.</returns>
+        public async Task<List<string>> GetDocumentIdsByLabelAsync(string label, CancellationToken token = default)
         {
             ThrowIfDisposed();
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(label);
 
-            return await _Repository.Label.GetDocumentsByLabelAsync(label.ToLowerInvariant(), token).ConfigureAwait(false);
+            return await _Driver.Labels.GetDocumentsByLabelAsync(_TenantId, _IndexId, label.ToLowerInvariant(), token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -665,7 +731,7 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(documentId);
             ArgumentNullException.ThrowIfNull(label);
 
-            return await _Repository.Label.RemoveAsync(documentId, label.ToLowerInvariant(), token).ConfigureAwait(false);
+            return await _Driver.Labels.RemoveAsync(_TenantId, _IndexId, documentId, label.ToLowerInvariant(), token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -680,7 +746,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(label);
 
-            return await _Repository.Label.RemoveAsync(null, label.ToLowerInvariant(), token).ConfigureAwait(false);
+            return await _Driver.Labels.RemoveIndexLabelAsync(_TenantId, _IndexId, label.ToLowerInvariant(), token).ConfigureAwait(false);
         }
 
         #endregion
@@ -702,7 +768,8 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(documentId);
             ArgumentNullException.ThrowIfNull(key);
 
-            await _Repository.Tag.SetAsync(documentId, key, value, token).ConfigureAwait(false);
+            string tagId = IdGenerator.GenerateTagId();
+            await _Driver.Tags.SetAsync(_TenantId, _IndexId, tagId, documentId, key, value, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -724,7 +791,15 @@ namespace Verbex
                 return;
             }
 
-            await _Repository.Tag.AddBatchAsync(documentId, tags, token).ConfigureAwait(false);
+            List<TagRecord> records = tags.Select(kvp => new TagRecord
+            {
+                Id = IdGenerator.GenerateTagId(),
+                DocumentId = documentId,
+                Key = kvp.Key,
+                Value = kvp.Value
+            }).ToList();
+
+            await _Driver.Tags.AddBatchAsync(_TenantId, _IndexId, records, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -741,7 +816,7 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(documentId);
             ArgumentNullException.ThrowIfNull(tags);
 
-            await _Repository.Tag.ReplaceAsync(documentId, tags, token).ConfigureAwait(false);
+            await _Driver.Tags.ReplaceAsync(_TenantId, _IndexId, documentId, tags, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -757,7 +832,8 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(key);
 
-            await _Repository.Tag.SetAsync(null, key, value, token).ConfigureAwait(false);
+            string tagId = IdGenerator.GenerateTagId();
+            await _Driver.Tags.SetAsync(_TenantId, _IndexId, tagId, null, key, value, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -774,7 +850,7 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(documentId);
             ArgumentNullException.ThrowIfNull(key);
 
-            return await _Repository.Tag.GetAsync(documentId, key, token).ConfigureAwait(false);
+            return await _Driver.Tags.GetAsync(_TenantId, _IndexId, documentId, key, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -783,13 +859,13 @@ namespace Verbex
         /// <param name="documentId">Document ID.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Dictionary of tags.</returns>
-        public async Task<Dictionary<string, string?>> GetTagsAsync(string documentId, CancellationToken token = default)
+        public async Task<Dictionary<string, string>> GetTagsAsync(string documentId, CancellationToken token = default)
         {
             ThrowIfDisposed();
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentId);
 
-            return await _Repository.Tag.GetByDocumentAsync(documentId, token).ConfigureAwait(false);
+            return await _Driver.Tags.GetByDocumentAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -797,29 +873,29 @@ namespace Verbex
         /// </summary>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Dictionary of tags.</returns>
-        public async Task<Dictionary<string, string?>> GetIndexTagsAsync(CancellationToken token = default)
+        public async Task<Dictionary<string, string>> GetIndexTagsAsync(CancellationToken token = default)
         {
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            return await _Repository.Tag.GetIndexTagsAsync(token).ConfigureAwait(false);
+            return await _Driver.Tags.GetIndexTagsAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
         }
 
         /// <summary>
-        /// Gets documents with a specific tag.
+        /// Gets document IDs with a specific tag.
         /// </summary>
         /// <param name="key">Tag key.</param>
         /// <param name="value">Tag value to match.</param>
         /// <param name="token">Cancellation token.</param>
-        /// <returns>List of documents.</returns>
-        public async Task<List<DocumentMetadata>> GetDocumentsByTagAsync(string key, string value, CancellationToken token = default)
+        /// <returns>List of document IDs.</returns>
+        public async Task<List<string>> GetDocumentIdsByTagAsync(string key, string value, CancellationToken token = default)
         {
             ThrowIfDisposed();
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(key);
             ArgumentNullException.ThrowIfNull(value);
 
-            return await _Repository.Tag.GetDocumentsByTagAsync(key, value, token).ConfigureAwait(false);
+            return await _Driver.Tags.GetDocumentsByTagAsync(_TenantId, _IndexId, key, value, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -836,7 +912,7 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(documentId);
             ArgumentNullException.ThrowIfNull(key);
 
-            return await _Repository.Tag.RemoveAsync(documentId, key, token).ConfigureAwait(false);
+            return await _Driver.Tags.RemoveAsync(_TenantId, _IndexId, documentId, key, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -851,7 +927,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(key);
 
-            return await _Repository.Tag.RemoveAsync(null, key, token).ConfigureAwait(false);
+            return await _Driver.Tags.RemoveIndexTagAsync(_TenantId, _IndexId, key, token).ConfigureAwait(false);
         }
 
         #endregion
@@ -868,7 +944,7 @@ namespace Verbex
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            return await _Repository.Statistics.GetIndexStatisticsAsync(token).ConfigureAwait(false);
+            return await _Driver.Statistics.GetIndexStatisticsAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -889,7 +965,7 @@ namespace Verbex
                 return null;
             }
 
-            return await _Repository.Statistics.GetTermStatisticsAsync(normalizedTerm, token).ConfigureAwait(false);
+            return await _Driver.Statistics.GetTermStatisticsAsync(_TenantId, _IndexId, normalizedTerm, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -902,7 +978,7 @@ namespace Verbex
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            return await _Repository.Term.GetCountAsync(token).ConfigureAwait(false);
+            return await _Driver.Terms.GetCountAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -916,7 +992,7 @@ namespace Verbex
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            return await _Repository.Term.GetTopAsync(limit, token).ConfigureAwait(false);
+            return await _Driver.Terms.GetTopAsync(_TenantId, _IndexId, limit, token).ConfigureAwait(false);
         }
 
         #endregion
@@ -924,17 +1000,16 @@ namespace Verbex
         #region Flush Operations
 
         /// <summary>
-        /// Flushes any pending changes. For in-memory mode, saves to the specified path.
+        /// Flushes any pending changes to persistent storage.
         /// </summary>
-        /// <param name="targetPath">Path to save to (for in-memory mode only).</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Task.</returns>
-        public async Task FlushAsync(string? targetPath = null, CancellationToken token = default)
+        public async Task FlushAsync(CancellationToken token = default)
         {
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            await _Repository.FlushAsync(targetPath, token).ConfigureAwait(false);
+            await _Driver.FlushAsync(token).ConfigureAwait(false);
         }
 
         #endregion
@@ -971,9 +1046,9 @@ namespace Verbex
                 return;
             }
 
-            if (disposing)
+            if (disposing && _OwnsDriver)
             {
-                _Repository.Dispose();
+                _Driver.Dispose();
             }
 
             _IsDisposed = true;
@@ -984,7 +1059,10 @@ namespace Verbex
         /// </summary>
         protected virtual async ValueTask DisposeAsyncCore()
         {
-            await _Repository.DisposeAsync().ConfigureAwait(false);
+            if (_OwnsDriver)
+            {
+                await _Driver.DisposeAsync().ConfigureAwait(false);
+            }
         }
 
         #endregion
@@ -1001,7 +1079,7 @@ namespace Verbex
 
         private void ThrowIfNotOpen()
         {
-            if (!_Repository.IsOpen)
+            if (!IsOpen)
             {
                 throw new InvalidOperationException("Index is not open. Call OpenAsync first.");
             }
@@ -1052,11 +1130,15 @@ namespace Verbex
 
             // Step 1: Batch add/get all terms (single INSERT + single SELECT)
             List<string> termList = new List<string>(termPositions.Keys);
-            Dictionary<string, string> termIds = await _Repository.Term.AddOrGetBatchAsync(termList, token).ConfigureAwait(false);
+            Dictionary<string, string> termIdsToGenerate = new Dictionary<string, string>();
+            foreach (string term in termList)
+            {
+                termIdsToGenerate[IdGenerator.GenerateTermId()] = term;
+            }
+            Dictionary<string, string> termIds = await _Driver.Terms.AddOrGetBatchAsync(_TenantId, _IndexId, termIdsToGenerate, token).ConfigureAwait(false);
 
             // Step 2: Prepare document-term mappings for batch insert
-            List<(string TermId, int TermFrequency, List<int> CharacterPositions, List<int> TermPositions)> docTermMappings =
-                new List<(string, int, List<int>, List<int>)>();
+            List<DocumentTermRecord> docTermRecords = new List<DocumentTermRecord>();
             Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> frequencyUpdates =
                 new Dictionary<string, (int, int)>();
 
@@ -1069,19 +1151,29 @@ namespace Verbex
 
                 if (termIds.TryGetValue(term, out string? termId))
                 {
-                    docTermMappings.Add((termId, termFrequency, characterPositions, termPositionsList));
+                    docTermRecords.Add(new DocumentTermRecord
+                    {
+                        Id = IdGenerator.GenerateDocumentTermId(),
+                        DocumentId = documentId,
+                        TermId = termId,
+                        TermFrequency = termFrequency,
+                        CharacterPositions = characterPositions,
+                        TermPositions = termPositionsList
+                    });
                     frequencyUpdates[termId] = (1, termFrequency);
                 }
             }
 
             // Step 3: Batch insert document-term mappings (single INSERT)
-            await _Repository.DocumentTerm.AddBatchAsync(documentId, docTermMappings, token).ConfigureAwait(false);
+            await _Driver.DocumentTerms.AddBatchAsync(_TenantId, _IndexId, docTermRecords, token).ConfigureAwait(false);
 
             // Step 4: Batch update term frequencies (single UPDATE)
-            await _Repository.Term.IncrementFrequenciesBatchAsync(frequencyUpdates, token).ConfigureAwait(false);
+            await _Driver.Terms.IncrementFrequenciesBatchAsync(_TenantId, _IndexId, frequencyUpdates, token).ConfigureAwait(false);
 
             // Step 5: Update document metadata (documentPath passed in to avoid extra query)
-            await _Repository.Document.UpdateAsync(
+            await _Driver.Documents.UpdateAsync(
+                _TenantId,
+                _IndexId,
                 documentId,
                 documentPath,
                 ComputeContentHash(content),

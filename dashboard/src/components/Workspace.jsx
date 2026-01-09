@@ -1,9 +1,24 @@
 import IndicesView from './IndicesView';
 import SearchView from './SearchView';
 import DocumentsView from './DocumentsView';
+import TenantsView from './TenantsView';
+import UsersView from './UsersView';
+import CredentialsView from './CredentialsView';
 import './Workspace.css';
 
-function Workspace({ activeView, selectedIndex, indices, isLoading, onRefresh, onIndexSelect, onIndexSelectAndNavigate }) {
+function Workspace({
+  activeView,
+  selectedIndex,
+  indices,
+  isLoading,
+  onRefresh,
+  onIndexSelect,
+  onIndexSelectAndNavigate,
+  tenants,
+  selectedTenant,
+  onTenantSelect,
+  onTenantSelectAndNavigate
+}) {
   const renderContent = () => {
     switch (activeView) {
       case 'indices':
@@ -30,6 +45,28 @@ function Workspace({ activeView, selectedIndex, indices, isLoading, onRefresh, o
             indices={indices}
             onRefresh={onRefresh}
             onIndexSelect={onIndexSelect}
+          />
+        );
+      case 'tenants':
+        return (
+          <TenantsView
+            onTenantSelect={onTenantSelectAndNavigate}
+          />
+        );
+      case 'users':
+        return (
+          <UsersView
+            selectedTenant={selectedTenant}
+            tenants={tenants}
+            onTenantSelect={onTenantSelect}
+          />
+        );
+      case 'credentials':
+        return (
+          <CredentialsView
+            selectedTenant={selectedTenant}
+            tenants={tenants}
+            onTenantSelect={onTenantSelect}
           />
         );
       default:

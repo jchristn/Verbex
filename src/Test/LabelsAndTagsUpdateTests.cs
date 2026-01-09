@@ -57,7 +57,7 @@ namespace Test
             await index.RemoveTagAsync(docId, "old-key").ConfigureAwait(false);
             await index.SetTagAsync(docId, "new-key", "new-value").ConfigureAwait(false);
 
-            Dictionary<string, string?> tags = await index.GetTagsAsync(docId).ConfigureAwait(false);
+            Dictionary<string, string> tags = await index.GetTagsAsync(docId).ConfigureAwait(false);
             TestAssert.AreEqual(1, tags.Count);
             TestAssert.IsTrue(tags.ContainsKey("new-key"));
             TestAssert.AreEqual("new-value", tags["new-key"]);
@@ -98,8 +98,8 @@ namespace Test
             }
 
             // Retrieve multiple times
-            Dictionary<string, string?> tags1 = await index.GetTagsAsync(docId).ConfigureAwait(false);
-            Dictionary<string, string?> tags2 = await index.GetTagsAsync(docId).ConfigureAwait(false);
+            Dictionary<string, string> tags1 = await index.GetTagsAsync(docId).ConfigureAwait(false);
+            Dictionary<string, string> tags2 = await index.GetTagsAsync(docId).ConfigureAwait(false);
 
             TestAssert.IsTrue(tags1.ContainsKey("persistent-key"));
             TestAssert.IsTrue(tags2.ContainsKey("persistent-key"));

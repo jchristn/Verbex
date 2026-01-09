@@ -69,7 +69,7 @@ namespace VerbexCli.Commands
 
                     if (indexManager.CurrentIndex != null)
                     {
-                        Verbex.Repositories.TermStatisticsResult? termStats = await indexManager.CurrentIndex.GetTermStatisticsAsync(term).ConfigureAwait(false);
+                        Verbex.Models.TermStatisticsResult? termStats = await indexManager.CurrentIndex.GetTermStatisticsAsync(term).ConfigureAwait(false);
                         if (termStats != null)
                         {
                             object result = new

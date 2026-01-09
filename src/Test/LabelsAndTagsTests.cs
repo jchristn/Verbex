@@ -60,7 +60,7 @@ namespace Test
 
             await index.SetTagAsync(docId, "author", "Test Author").ConfigureAwait(false);
 
-            Dictionary<string, string?> tags = await index.GetTagsAsync(docId).ConfigureAwait(false);
+            Dictionary<string, string> tags = await index.GetTagsAsync(docId).ConfigureAwait(false);
             TestAssert.AreEqual(1, tags.Count);
             TestAssert.AreEqual("Test Author", tags["author"]);
         }
@@ -75,7 +75,7 @@ namespace Test
             bool removed = await index.RemoveTagAsync(docId, "toremove").ConfigureAwait(false);
             TestAssert.IsTrue(removed);
 
-            Dictionary<string, string?> tags = await index.GetTagsAsync(docId).ConfigureAwait(false);
+            Dictionary<string, string> tags = await index.GetTagsAsync(docId).ConfigureAwait(false);
             TestAssert.AreEqual(0, tags.Count);
         }
 
@@ -102,7 +102,7 @@ namespace Test
 
             await index.SetIndexTagAsync("version", "1.0").ConfigureAwait(false);
 
-            Dictionary<string, string?> tags = await index.GetIndexTagsAsync().ConfigureAwait(false);
+            Dictionary<string, string> tags = await index.GetIndexTagsAsync().ConfigureAwait(false);
             TestAssert.AreEqual(1, tags.Count);
             TestAssert.AreEqual("1.0", tags["version"]);
 

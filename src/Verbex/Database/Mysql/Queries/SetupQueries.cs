@@ -1,0 +1,252 @@
+namespace Verbex.Database.Mysql.Queries
+{
+    using System.Collections.Generic;
+
+    /// <summary>
+    /// MySQL setup queries for creating and managing the database schema.
+    /// </summary>
+    internal static class SetupQueries
+    {
+        /// <summary>
+        /// Schema version for migration tracking.
+        /// </summary>
+        public const string SchemaVersion = "3.0";
+
+        /// <summary>
+        /// Creates all tables for the multi-tenant inverted index.
+        /// </summary>
+        public static readonly string CreateTables = @"
+-- Tenants table
+CREATE TABLE IF NOT EXISTS tenants (
+    identifier VARCHAR(48) PRIMARY KEY,
+    name VARCHAR(256) NOT NULL,
+    description TEXT,
+    active TINYINT(1) NOT NULL DEFAULT 1,
+    created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Administrators table (global admins)
+CREATE TABLE IF NOT EXISTS administrators (
+    identifier VARCHAR(48) PRIMARY KEY,
+    email VARCHAR(256) NOT NULL UNIQUE,
+    password_sha256 VARCHAR(128) NOT NULL,
+    first_name VARCHAR(128),
+    last_name VARCHAR(128),
+    active TINYINT(1) NOT NULL DEFAULT 1,
+    created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Users table (tenant-scoped)
+CREATE TABLE IF NOT EXISTS users (
+    identifier VARCHAR(48) PRIMARY KEY,
+    tenant_id VARCHAR(48) NOT NULL,
+    email VARCHAR(256) NOT NULL,
+    password_sha256 VARCHAR(128) NOT NULL,
+    first_name VARCHAR(128),
+    last_name VARCHAR(128),
+    is_admin TINYINT(1) NOT NULL DEFAULT 0,
+    active TINYINT(1) NOT NULL DEFAULT 1,
+    created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_tenant_email (tenant_id, email),
+    CONSTRAINT fk_users_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(identifier) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Credentials table (bearer tokens)
+CREATE TABLE IF NOT EXISTS credentials (
+    identifier VARCHAR(48) PRIMARY KEY,
+    tenant_id VARCHAR(48) NOT NULL,
+    user_id VARCHAR(48) NOT NULL,
+    bearer_token VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(256),
+    active TINYINT(1) NOT NULL DEFAULT 1,
+    created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_credentials_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(identifier) ON DELETE CASCADE,
+    CONSTRAINT fk_credentials_user FOREIGN KEY (user_id) REFERENCES users(identifier) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Indexes table (tenant-scoped)
+CREATE TABLE IF NOT EXISTS indexes (
+    identifier VARCHAR(48) PRIMARY KEY,
+    tenant_id VARCHAR(48) NOT NULL,
+    name VARCHAR(256) NOT NULL,
+    description TEXT,
+    created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_tenant_name (tenant_id, name),
+    CONSTRAINT fk_indexes_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(identifier) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Documents table
+CREATE TABLE IF NOT EXISTS documents (
+    id VARCHAR(48) PRIMARY KEY,
+    tenant_id VARCHAR(48) NOT NULL,
+    index_id VARCHAR(48) NOT NULL,
+    name VARCHAR(512) NOT NULL,
+    content_sha256 VARCHAR(64),
+    document_length INT NOT NULL DEFAULT 0,
+    term_count INT NOT NULL DEFAULT 0,
+    indexed_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_index_name (index_id, name),
+    CONSTRAINT fk_documents_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(identifier) ON DELETE CASCADE,
+    CONSTRAINT fk_documents_index FOREIGN KEY (index_id) REFERENCES indexes(identifier) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Terms table (vocabulary)
+CREATE TABLE IF NOT EXISTS terms (
+    id VARCHAR(48) PRIMARY KEY,
+    tenant_id VARCHAR(48) NOT NULL,
+    index_id VARCHAR(48) NOT NULL,
+    term VARCHAR(512) NOT NULL,
+    document_frequency INT NOT NULL DEFAULT 0,
+    total_frequency BIGINT NOT NULL DEFAULT 0,
+    last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_index_term (index_id, term),
+    CONSTRAINT fk_terms_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(identifier) ON DELETE CASCADE,
+    CONSTRAINT fk_terms_index FOREIGN KEY (index_id) REFERENCES indexes(identifier) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Document-Terms table (inverted index)
+CREATE TABLE IF NOT EXISTS document_terms (
+    id VARCHAR(48) PRIMARY KEY,
+    document_id VARCHAR(48) NOT NULL,
+    term_id VARCHAR(48) NOT NULL,
+    term_frequency INT NOT NULL DEFAULT 0,
+    character_positions TEXT,
+    term_positions TEXT,
+    last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_document_term (document_id, term_id),
+    CONSTRAINT fk_document_terms_document FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+    CONSTRAINT fk_document_terms_term FOREIGN KEY (term_id) REFERENCES terms(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Labels table (document or index level)
+CREATE TABLE IF NOT EXISTS labels (
+    id VARCHAR(48) PRIMARY KEY,
+    document_id VARCHAR(48),
+    index_id VARCHAR(48) NOT NULL,
+    label VARCHAR(256) NOT NULL,
+    last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_labels_document FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+    CONSTRAINT fk_labels_index FOREIGN KEY (index_id) REFERENCES indexes(identifier) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tags table (document or index level key-value pairs)
+CREATE TABLE IF NOT EXISTS tags (
+    id VARCHAR(48) PRIMARY KEY,
+    document_id VARCHAR(48),
+    index_id VARCHAR(48) NOT NULL,
+    `key` VARCHAR(256) NOT NULL,
+    value TEXT,
+    last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_tags_document FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+    CONSTRAINT fk_tags_index FOREIGN KEY (index_id) REFERENCES indexes(identifier) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Schema metadata table
+CREATE TABLE IF NOT EXISTS schema_metadata (
+    `key` VARCHAR(256) PRIMARY KEY,
+    value TEXT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+";
+
+        /// <summary>
+        /// Creates indexes for common queries. Each query should be executed individually
+        /// with error handling for duplicate index errors (MySQL error 1061).
+        /// </summary>
+        /// <remarks>
+        /// MySQL does not support CREATE INDEX IF NOT EXISTS syntax.
+        /// Each index creation must be wrapped in try/catch to handle duplicate key errors.
+        /// </remarks>
+        public static readonly List<string> CreateIndexes = new List<string>
+        {
+            // Tenant indexes
+            "CREATE INDEX idx_tenants_name ON tenants(name)",
+            "CREATE INDEX idx_tenants_active ON tenants(active)",
+
+            // Administrator indexes
+            "CREATE INDEX idx_administrators_email ON administrators(email)",
+            "CREATE INDEX idx_administrators_active ON administrators(active)",
+
+            // User indexes
+            "CREATE INDEX idx_users_tenant ON users(tenant_id)",
+            "CREATE INDEX idx_users_email ON users(tenant_id, email)",
+            "CREATE INDEX idx_users_active ON users(active)",
+            "CREATE INDEX idx_users_tenant_active ON users(tenant_id, active)",
+
+            // Credential indexes
+            "CREATE INDEX idx_credentials_tenant ON credentials(tenant_id)",
+            "CREATE INDEX idx_credentials_user ON credentials(user_id)",
+            "CREATE INDEX idx_credentials_bearer ON credentials(bearer_token)",
+            "CREATE INDEX idx_credentials_active ON credentials(active)",
+            "CREATE INDEX idx_credentials_tenant_active ON credentials(tenant_id, active)",
+
+            // Index (search index) indexes
+            "CREATE INDEX idx_indexes_tenant ON indexes(tenant_id)",
+            "CREATE INDEX idx_indexes_name ON indexes(tenant_id, name)",
+
+            // Document indexes
+            "CREATE INDEX idx_documents_tenant ON documents(tenant_id)",
+            "CREATE INDEX idx_documents_index ON documents(index_id)",
+            "CREATE INDEX idx_documents_tenant_index ON documents(tenant_id, index_id)",
+            "CREATE INDEX idx_documents_name ON documents(index_id, name)",
+            "CREATE INDEX idx_documents_content_sha256 ON documents(content_sha256)",
+
+            // Term indexes (critical for search performance)
+            "CREATE INDEX idx_terms_tenant ON terms(tenant_id)",
+            "CREATE INDEX idx_terms_index ON terms(index_id)",
+            "CREATE INDEX idx_terms_tenant_index ON terms(tenant_id, index_id)",
+            "CREATE INDEX idx_terms_term ON terms(index_id, term)",
+            "CREATE INDEX idx_terms_document_frequency ON terms(document_frequency DESC)",
+
+            // Document-term indexes (critical for inverted index lookups)
+            "CREATE INDEX idx_document_terms_document ON document_terms(document_id)",
+            "CREATE INDEX idx_document_terms_term ON document_terms(term_id)",
+            "CREATE INDEX idx_document_terms_frequency ON document_terms(term_frequency DESC)",
+            "CREATE INDEX idx_document_terms_term_doc ON document_terms(term_id, document_id)",
+
+            // Label indexes (for filtering by labels)
+            "CREATE INDEX idx_labels_document ON labels(document_id)",
+            "CREATE INDEX idx_labels_index ON labels(index_id)",
+            "CREATE INDEX idx_labels_label ON labels(label)",
+            "CREATE INDEX idx_labels_document_label ON labels(document_id, label)",
+            "CREATE INDEX idx_labels_index_label ON labels(index_id, label)",
+
+            // Tag indexes (for filtering by key-value pairs)
+            "CREATE INDEX idx_tags_document ON tags(document_id)",
+            "CREATE INDEX idx_tags_index ON tags(index_id)",
+            "CREATE INDEX idx_tags_key ON tags(`key`)",
+            "CREATE INDEX idx_tags_document_key ON tags(document_id, `key`)",
+            "CREATE INDEX idx_tags_index_key ON tags(index_id, `key`)",
+            "CREATE INDEX idx_tags_key_value ON tags(`key`, value(255))"
+        };
+
+        /// <summary>
+        /// Drops all tables in reverse order of creation.
+        /// </summary>
+        public static readonly string DropTables = @"
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS schema_metadata;
+DROP TABLE IF EXISTS tags;
+DROP TABLE IF EXISTS labels;
+DROP TABLE IF EXISTS document_terms;
+DROP TABLE IF EXISTS terms;
+DROP TABLE IF EXISTS documents;
+DROP TABLE IF EXISTS indexes;
+DROP TABLE IF EXISTS credentials;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS administrators;
+DROP TABLE IF EXISTS tenants;
+SET FOREIGN_KEY_CHECKS = 1;
+";
+    }
+}

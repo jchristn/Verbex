@@ -55,7 +55,7 @@ namespace Test
             await index.AddDocumentAsync("doc1.txt", "hello world hello").ConfigureAwait(false);
             await index.AddDocumentAsync("doc2.txt", "hello there").ConfigureAwait(false);
 
-            Verbex.Repositories.TermStatisticsResult? stats = await index.GetTermStatisticsAsync("hello").ConfigureAwait(false);
+            Verbex.Models.TermStatisticsResult? stats = await index.GetTermStatisticsAsync("hello").ConfigureAwait(false);
 
             TestAssert.IsNotNull(stats);
             TestAssert.AreEqual(2, stats!.DocumentFrequency);  // In 2 documents

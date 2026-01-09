@@ -1,0 +1,130 @@
+.users-view {
+  padding: 24px;
+}
+
+.tenant-selector-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.tenant-selector-card label {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tenant-select {
+  flex: 1;
+  max-width: 400px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 4px;
+  background-color: var(--input-bg, #fff);
+  color: var(--text-primary, #333);
+  font-size: 0.875rem;
+}
+
+.tenant-select:focus {
+  outline: none;
+  border-color: var(--primary-color, #0066cc);
+  box-shadow: 0 0 0 2px var(--primary-color-alpha, rgba(0, 102, 204, 0.2));
+}
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.users-table th,
+.users-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.users-table th {
+  font-weight: 600;
+  color: var(--text-secondary, #666);
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.users-table tbody tr:hover {
+  background-color: var(--hover-bg, #f5f5f5);
+}
+
+.user-email {
+  font-family: monospace;
+  font-size: 0.875rem;
+}
+
+.role-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.role-badge.admin {
+  background-color: var(--admin-bg, #e8f4fd);
+  color: var(--admin-color, #0066cc);
+}
+
+.role-badge.user {
+  background-color: var(--user-bg, #f0f0f0);
+  color: var(--user-color, #666);
+}
+
+.user-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+.checkbox-group {
+  display: flex;
+  align-items: center;
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.checkbox-group input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.error-card {
+  background-color: var(--error-bg, #fee);
+  border: 1px solid var(--error-border, #fcc);
+}
+
+.error-message {
+  color: var(--error-color, #c00);
+  margin: 0;
+}

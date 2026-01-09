@@ -8,7 +8,7 @@ namespace Verbex.Utilities
     /// Uses PrettyId library to generate IDs that are both unique and chronologically sortable.
     /// </summary>
     /// <remarks>
-    /// All generated IDs are exactly 32 characters in length including their entity-specific prefix.
+    /// All generated IDs are exactly 48 characters in length including their entity-specific prefix.
     /// IDs include a timestamp component ensuring chronological sorting when queried.
     /// </remarks>
     public static class IdGenerator
@@ -16,7 +16,7 @@ namespace Verbex.Utilities
         /// <summary>
         /// Total length for all generated IDs including prefix.
         /// </summary>
-        private const int TotalIdLength = 32;
+        private const int TotalIdLength = 48;
 
         /// <summary>
         /// Prefix for document IDs.
@@ -26,17 +26,17 @@ namespace Verbex.Utilities
         /// <summary>
         /// Prefix for term IDs.
         /// </summary>
-        private const string TermPrefix = "term_";
+        private const string TermPrefix = "trm_";
 
         /// <summary>
         /// Prefix for document-term mapping IDs.
         /// </summary>
-        private const string DocumentTermPrefix = "docterm_";
+        private const string DocumentTermPrefix = "dtrm_";
 
         /// <summary>
         /// Prefix for label IDs.
         /// </summary>
-        private const string LabelPrefix = "label_";
+        private const string LabelPrefix = "lbl_";
 
         /// <summary>
         /// Prefix for tag IDs.
@@ -49,6 +49,26 @@ namespace Verbex.Utilities
         private const string IndexMetadataPrefix = "idx_";
 
         /// <summary>
+        /// Prefix for tenant IDs.
+        /// </summary>
+        private const string TenantPrefix = "ten_";
+
+        /// <summary>
+        /// Prefix for user IDs.
+        /// </summary>
+        private const string UserPrefix = "usr_";
+
+        /// <summary>
+        /// Prefix for credential IDs.
+        /// </summary>
+        private const string CredentialPrefix = "cred_";
+
+        /// <summary>
+        /// Prefix for administrator IDs.
+        /// </summary>
+        private const string AdministratorPrefix = "adm_";
+
+        /// <summary>
         /// The PrettyId generator instance used for all ID generation.
         /// </summary>
         private static readonly PrettyId.IdGenerator Generator = new PrettyId.IdGenerator();
@@ -56,7 +76,7 @@ namespace Verbex.Utilities
         /// <summary>
         /// Generates a new k-sortable unique identifier for a document.
         /// </summary>
-        /// <returns>A 32-character k-sortable unique identifier with "doc_" prefix.</returns>
+        /// <returns>A 48-character k-sortable unique identifier with "doc_" prefix.</returns>
         public static string GenerateDocumentId()
         {
             int randomPartLength = TotalIdLength - DocumentPrefix.Length;
@@ -66,7 +86,7 @@ namespace Verbex.Utilities
         /// <summary>
         /// Generates a new k-sortable unique identifier for a term.
         /// </summary>
-        /// <returns>A 32-character k-sortable unique identifier with "term_" prefix.</returns>
+        /// <returns>A 48-character k-sortable unique identifier with "trm_" prefix.</returns>
         public static string GenerateTermId()
         {
             int randomPartLength = TotalIdLength - TermPrefix.Length;
@@ -76,7 +96,7 @@ namespace Verbex.Utilities
         /// <summary>
         /// Generates a new k-sortable unique identifier for a document-term mapping.
         /// </summary>
-        /// <returns>A 32-character k-sortable unique identifier with "docterm_" prefix.</returns>
+        /// <returns>A 48-character k-sortable unique identifier with "dtrm_" prefix.</returns>
         public static string GenerateDocumentTermId()
         {
             int randomPartLength = TotalIdLength - DocumentTermPrefix.Length;
@@ -86,7 +106,7 @@ namespace Verbex.Utilities
         /// <summary>
         /// Generates a new k-sortable unique identifier for a label.
         /// </summary>
-        /// <returns>A 32-character k-sortable unique identifier with "label_" prefix.</returns>
+        /// <returns>A 48-character k-sortable unique identifier with "lbl_" prefix.</returns>
         public static string GenerateLabelId()
         {
             int randomPartLength = TotalIdLength - LabelPrefix.Length;
@@ -96,7 +116,7 @@ namespace Verbex.Utilities
         /// <summary>
         /// Generates a new k-sortable unique identifier for a tag.
         /// </summary>
-        /// <returns>A 32-character k-sortable unique identifier with "tag_" prefix.</returns>
+        /// <returns>A 48-character k-sortable unique identifier with "tag_" prefix.</returns>
         public static string GenerateTagId()
         {
             int randomPartLength = TotalIdLength - TagPrefix.Length;
@@ -106,7 +126,7 @@ namespace Verbex.Utilities
         /// <summary>
         /// Generates a new k-sortable unique identifier for index metadata.
         /// </summary>
-        /// <returns>A 32-character k-sortable unique identifier with "idx_" prefix.</returns>
+        /// <returns>A 48-character k-sortable unique identifier with "idx_" prefix.</returns>
         public static string GenerateIndexMetadataId()
         {
             int randomPartLength = TotalIdLength - IndexMetadataPrefix.Length;
@@ -114,9 +134,49 @@ namespace Verbex.Utilities
         }
 
         /// <summary>
+        /// Generates a new k-sortable unique identifier for a tenant.
+        /// </summary>
+        /// <returns>A 48-character k-sortable unique identifier with "ten_" prefix.</returns>
+        public static string GenerateTenantId()
+        {
+            int randomPartLength = TotalIdLength - TenantPrefix.Length;
+            return Generator.GenerateKSortable(TenantPrefix, randomPartLength);
+        }
+
+        /// <summary>
+        /// Generates a new k-sortable unique identifier for a user.
+        /// </summary>
+        /// <returns>A 48-character k-sortable unique identifier with "usr_" prefix.</returns>
+        public static string GenerateUserId()
+        {
+            int randomPartLength = TotalIdLength - UserPrefix.Length;
+            return Generator.GenerateKSortable(UserPrefix, randomPartLength);
+        }
+
+        /// <summary>
+        /// Generates a new k-sortable unique identifier for a credential.
+        /// </summary>
+        /// <returns>A 48-character k-sortable unique identifier with "cred_" prefix.</returns>
+        public static string GenerateCredentialId()
+        {
+            int randomPartLength = TotalIdLength - CredentialPrefix.Length;
+            return Generator.GenerateKSortable(CredentialPrefix, randomPartLength);
+        }
+
+        /// <summary>
+        /// Generates a new k-sortable unique identifier for an administrator.
+        /// </summary>
+        /// <returns>A 48-character k-sortable unique identifier with "adm_" prefix.</returns>
+        public static string GenerateAdministratorId()
+        {
+            int randomPartLength = TotalIdLength - AdministratorPrefix.Length;
+            return Generator.GenerateKSortable(AdministratorPrefix, randomPartLength);
+        }
+
+        /// <summary>
         /// Generates a new k-sortable unique identifier without a prefix.
         /// </summary>
-        /// <returns>A 32-character k-sortable unique identifier.</returns>
+        /// <returns>A 48-character k-sortable unique identifier.</returns>
         /// <remarks>
         /// Prefer using the entity-specific methods (GenerateDocumentId, GenerateTermId, etc.)
         /// for better traceability. This method is provided for backward compatibility.
@@ -131,7 +191,7 @@ namespace Verbex.Utilities
         /// Generates a new k-sortable unique identifier with a custom prefix.
         /// </summary>
         /// <param name="prefix">The prefix to prepend to the generated ID.</param>
-        /// <returns>A 32-character k-sortable unique identifier string with the specified prefix.</returns>
+        /// <returns>A 48-character k-sortable unique identifier string with the specified prefix.</returns>
         /// <exception cref="ArgumentNullException">Thrown when prefix is null.</exception>
         /// <exception cref="ArgumentException">Thrown when prefix is 24 characters or longer.</exception>
         /// <remarks>

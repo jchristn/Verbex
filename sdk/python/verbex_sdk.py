@@ -154,6 +154,75 @@ class SearchResponse:
         )
 
 
+@dataclass
+class TenantInfo:
+    """Tenant information model."""
+    identifier: str
+    name: Optional[str]
+    active: bool
+    created_utc: Optional[str]
+
+    @staticmethod
+    def from_dict(d: Dict[str, Any]) -> 'TenantInfo':
+        """Create TenantInfo from dictionary."""
+        return TenantInfo(
+            identifier=d.get('identifier', ''),
+            name=d.get('name'),
+            active=d.get('active', False),
+            created_utc=d.get('createdUtc')
+        )
+
+
+@dataclass
+class UserInfo:
+    """User information model."""
+    identifier: str
+    tenant_id: str
+    email: str
+    first_name: Optional[str]
+    last_name: Optional[str]
+    is_admin: bool
+    active: bool
+    created_utc: Optional[str]
+
+    @staticmethod
+    def from_dict(d: Dict[str, Any]) -> 'UserInfo':
+        """Create UserInfo from dictionary."""
+        return UserInfo(
+            identifier=d.get('identifier', ''),
+            tenant_id=d.get('tenantId', ''),
+            email=d.get('email', ''),
+            first_name=d.get('firstName'),
+            last_name=d.get('lastName'),
+            is_admin=d.get('isAdmin', False),
+            active=d.get('active', False),
+            created_utc=d.get('createdUtc')
+        )
+
+
+@dataclass
+class CredentialInfo:
+    """Credential information model."""
+    identifier: str
+    tenant_id: str
+    name: Optional[str]
+    bearer_token: Optional[str]
+    active: bool
+    created_utc: Optional[str]
+
+    @staticmethod
+    def from_dict(d: Dict[str, Any]) -> 'CredentialInfo':
+        """Create CredentialInfo from dictionary."""
+        return CredentialInfo(
+            identifier=d.get('identifier', ''),
+            tenant_id=d.get('tenantId', ''),
+            name=d.get('name'),
+            bearer_token=d.get('bearerToken'),
+            active=d.get('active', False),
+            created_utc=d.get('createdUtc')
+        )
+
+
 class VerbexError(Exception):
     """Exception raised for Verbex API errors."""
     def __init__(self, message: str, status_code: int = 0, response: Optional[ApiResponse] = None):
@@ -621,6 +690,238 @@ class VerbexClient:
         """
         response = self.search(index_id, query, max_results, labels, tags)
         return SearchResponse.from_dict(response.data) if response.data else None
+
+    # ==================== Admin - Tenant Management Endpoints ====================
+
+    def list_tenants(self) -> ApiResponse:
+        """
+        List all tenants.
+
+        Returns:
+            ApiResponse containing list of tenants
+        """
+        return self._make_request('GET', '/v1.0/admin/tenants')
+
+    def get_tenants(self) -> List[TenantInfo]:
+        """
+        Get all tenants as TenantInfo objects.
+
+        Returns:
+            List of TenantInfo objects
+        """
+        response = self.list_tenants()
+        if response.data and 'tenants' in response.data:
+            return [TenantInfo.from_dict(t) for t in response.data['tenants']]
+        return []
+
+    def get_tenant(self, tenant_id: str) -> ApiResponse:
+        """
+        Get a specific tenant.
+
+        Args:
+            tenant_id: The tenant identifier
+
+        Returns:
+            ApiResponse containing tenant details
+        """
+        return self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}')
+
+    def create_tenant(
+        self,
+        name: str,
+        description: Optional[str] = None
+    ) -> ApiResponse:
+        """
+        Create a new tenant.
+
+        Args:
+            name: Tenant name
+            description: Optional description
+
+        Returns:
+            ApiResponse containing created tenant
+        """
+        data: Dict[str, Any] = {'name': name}
+        if description:
+            data['description'] = description
+        return self._make_request('POST', '/v1.0/admin/tenants', data=data)
+
+    def delete_tenant(self, tenant_id: str) -> ApiResponse:
+        """
+        Delete a tenant.
+
+        Args:
+            tenant_id: The tenant identifier
+
+        Returns:
+            ApiResponse confirming deletion
+        """
+        return self._make_request('DELETE', f'/v1.0/admin/tenants/{tenant_id}')
+
+    # ==================== Admin - User Management Endpoints ====================
+
+    def list_users(self, tenant_id: str) -> ApiResponse:
+        """
+        List all users in a tenant.
+
+        Args:
+            tenant_id: The tenant identifier
+
+        Returns:
+            ApiResponse containing list of users
+        """
+        return self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}/users')
+
+    def get_users(self, tenant_id: str) -> List[UserInfo]:
+        """
+        Get all users in a tenant as UserInfo objects.
+
+        Args:
+            tenant_id: The tenant identifier
+
+        Returns:
+            List of UserInfo objects
+        """
+        response = self.list_users(tenant_id)
+        if response.data and 'users' in response.data:
+            return [UserInfo.from_dict(u) for u in response.data['users']]
+        return []
+
+    def get_user(self, tenant_id: str, user_id: str) -> ApiResponse:
+        """
+        Get a specific user.
+
+        Args:
+            tenant_id: The tenant identifier
+            user_id: The user identifier
+
+        Returns:
+            ApiResponse containing user details
+        """
+        return self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}/users/{user_id}')
+
+    def create_user(
+        self,
+        tenant_id: str,
+        email: str,
+        password: str,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
+        is_admin: bool = False
+    ) -> ApiResponse:
+        """
+        Create a new user in a tenant.
+
+        Args:
+            tenant_id: The tenant identifier
+            email: User email
+            password: User password
+            first_name: Optional first name
+            last_name: Optional last name
+            is_admin: Whether user is tenant admin
+
+        Returns:
+            ApiResponse containing created user
+        """
+        data: Dict[str, Any] = {
+            'email': email,
+            'password': password
+        }
+        if first_name:
+            data['firstName'] = first_name
+        if last_name:
+            data['lastName'] = last_name
+        if is_admin:
+            data['isAdmin'] = is_admin
+        return self._make_request('POST', f'/v1.0/admin/tenants/{tenant_id}/users', data=data)
+
+    def delete_user(self, tenant_id: str, user_id: str) -> ApiResponse:
+        """
+        Delete a user.
+
+        Args:
+            tenant_id: The tenant identifier
+            user_id: The user identifier
+
+        Returns:
+            ApiResponse confirming deletion
+        """
+        return self._make_request('DELETE', f'/v1.0/admin/tenants/{tenant_id}/users/{user_id}')
+
+    # ==================== Admin - Credential Management Endpoints ====================
+
+    def list_credentials(self, tenant_id: str) -> ApiResponse:
+        """
+        List all credentials in a tenant.
+
+        Args:
+            tenant_id: The tenant identifier
+
+        Returns:
+            ApiResponse containing list of credentials
+        """
+        return self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}/credentials')
+
+    def get_credentials(self, tenant_id: str) -> List[CredentialInfo]:
+        """
+        Get all credentials in a tenant as CredentialInfo objects.
+
+        Args:
+            tenant_id: The tenant identifier
+
+        Returns:
+            List of CredentialInfo objects
+        """
+        response = self.list_credentials(tenant_id)
+        if response.data and 'credentials' in response.data:
+            return [CredentialInfo.from_dict(c) for c in response.data['credentials']]
+        return []
+
+    def get_credential(self, tenant_id: str, credential_id: str) -> ApiResponse:
+        """
+        Get a specific credential.
+
+        Args:
+            tenant_id: The tenant identifier
+            credential_id: The credential identifier
+
+        Returns:
+            ApiResponse containing credential details
+        """
+        return self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}/credentials/{credential_id}')
+
+    def create_credential(
+        self,
+        tenant_id: str,
+        description: Optional[str] = None
+    ) -> ApiResponse:
+        """
+        Create a new credential (API key) in a tenant.
+
+        Args:
+            tenant_id: The tenant identifier
+            description: Optional description
+
+        Returns:
+            ApiResponse containing created credential (includes bearer token)
+        """
+        data: Dict[str, Any] = {}
+        if description:
+            data['description'] = description
+        return self._make_request('POST', f'/v1.0/admin/tenants/{tenant_id}/credentials', data=data)
+
+    def delete_credential(self, tenant_id: str, credential_id: str) -> ApiResponse:
+        """
+        Delete a credential.
+
+        Args:
+            tenant_id: The tenant identifier
+            credential_id: The credential identifier
+
+        Returns:
+            ApiResponse confirming deletion
+        """
+        return self._make_request('DELETE', f'/v1.0/admin/tenants/{tenant_id}/credentials/{credential_id}')
 
     def close(self):
         """Close the HTTP session."""

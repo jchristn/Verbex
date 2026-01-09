@@ -225,7 +225,7 @@ namespace TestConsole
                 // Only flush on-disk indices
                 if (CurrentIndex.Configuration?.StorageMode == StorageMode.OnDisk)
                 {
-                    await CurrentIndex.FlushAsync(null, cancellationToken).ConfigureAwait(false);
+                    await CurrentIndex.FlushAsync(cancellationToken).ConfigureAwait(false);
                 }
 
                 // Store current index and document map
@@ -372,7 +372,7 @@ namespace TestConsole
                 // Flush current index if on-disk
                 if (CurrentIndex.Configuration?.StorageMode == StorageMode.OnDisk)
                 {
-                    await CurrentIndex.FlushAsync(null, cancellationToken).ConfigureAwait(false);
+                    await CurrentIndex.FlushAsync(cancellationToken).ConfigureAwait(false);
                 }
 
                 // If current index is in-memory, we need to create a new disk-backed version
@@ -550,7 +550,7 @@ namespace TestConsole
                 // Flush current index if it exists and is on-disk
                 if (CurrentIndex != null && CurrentIndex.Configuration?.StorageMode == StorageMode.OnDisk)
                 {
-                    await CurrentIndex.FlushAsync(null, CancellationToken.None).ConfigureAwait(false);
+                    await CurrentIndex.FlushAsync(CancellationToken.None).ConfigureAwait(false);
                 }
 
                 // Clean up all loaded indices
@@ -560,7 +560,7 @@ namespace TestConsole
                     {
                         if (kvp.Value.Configuration?.StorageMode == StorageMode.OnDisk)
                         {
-                            await kvp.Value.FlushAsync(null, CancellationToken.None).ConfigureAwait(false);
+                            await kvp.Value.FlushAsync(CancellationToken.None).ConfigureAwait(false);
                         }
                         await kvp.Value.DisposeAsync().ConfigureAwait(false);
                     }

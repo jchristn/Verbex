@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS documents (
     document_length INTEGER NOT NULL,
     term_count INTEGER NOT NULL DEFAULT 0,
     indexed_utc TEXT NOT NULL,
-    last_modified_utc TEXT,
+    last_update_utc TEXT,
     created_utc TEXT NOT NULL,
     UNIQUE(name)
 );
@@ -64,7 +64,7 @@ CREATE INDEX IF NOT EXISTS idx_documents_indexed_utc ON documents(indexed_utc);
 | `document_length` | INTEGER | Length of original content in characters |
 | `term_count` | INTEGER | Number of unique terms in document |
 | `indexed_utc` | TEXT | ISO8601 timestamp when indexed |
-| `last_modified_utc` | TEXT | ISO8601 timestamp of last modification |
+| `last_update_utc` | TEXT | ISO8601 timestamp of last modification |
 | `created_utc` | TEXT | ISO8601 timestamp of creation |
 
 ### Terms Table
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS terms (
     term TEXT NOT NULL UNIQUE,
     document_frequency INTEGER NOT NULL DEFAULT 0,
     total_frequency INTEGER NOT NULL DEFAULT 0,
-    last_updated_utc TEXT NOT NULL,
+    last_update_utc TEXT NOT NULL,
     created_utc TEXT NOT NULL
 );
 
@@ -88,7 +88,7 @@ CREATE INDEX IF NOT EXISTS idx_terms_document_frequency ON terms(document_freque
 | `term` | TEXT | The term/token (unique, lowercase) |
 | `document_frequency` | INTEGER | Number of documents containing this term |
 | `total_frequency` | INTEGER | Total occurrences across all documents |
-| `last_updated_utc` | TEXT | ISO8601 timestamp of last update |
+| `last_update_utc` | TEXT | ISO8601 timestamp of last update |
 | `created_utc` | TEXT | ISO8601 timestamp of creation |
 
 ### Document Terms Table
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS document_terms (
     term_frequency INTEGER NOT NULL,
     character_positions TEXT NOT NULL,
     term_positions TEXT NOT NULL,
-    last_modified_utc TEXT NOT NULL,
+    last_update_utc TEXT NOT NULL,
     created_utc TEXT NOT NULL,
     FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
     FOREIGN KEY (term_id) REFERENCES terms(id) ON DELETE CASCADE,
@@ -120,7 +120,7 @@ CREATE INDEX IF NOT EXISTS idx_document_terms_frequency ON document_terms(term_f
 | `term_frequency` | INTEGER | Frequency of term in this document |
 | `character_positions` | TEXT | JSON array of absolute byte offsets `[0,15,45,...]` |
 | `term_positions` | TEXT | JSON array of word indices `[0,3,10,...]` |
-| `last_modified_utc` | TEXT | ISO8601 timestamp of last modification |
+| `last_update_utc` | TEXT | ISO8601 timestamp of last modification |
 | `created_utc` | TEXT | ISO8601 timestamp of creation |
 
 ### Labels Table
@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS labels (
     id TEXT PRIMARY KEY,
     document_id TEXT,
     label TEXT NOT NULL,
-    last_modified_utc TEXT NOT NULL,
+    last_update_utc TEXT NOT NULL,
     created_utc TEXT NOT NULL,
     FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
     UNIQUE(document_id, label)
@@ -145,7 +145,7 @@ CREATE INDEX IF NOT EXISTS idx_labels_document_label ON labels(document_id, labe
 | `id` | TEXT | K-sortable unique ID (PrettyId with `label_` prefix) |
 | `document_id` | TEXT | Reference to documents.id (NULL for index-level labels) |
 | `label` | TEXT | Label string (case-insensitive matching) |
-| `last_modified_utc` | TEXT | ISO8601 timestamp of last modification |
+| `last_update_utc` | TEXT | ISO8601 timestamp of last modification |
 | `created_utc` | TEXT | ISO8601 timestamp of creation |
 
 ### Tags Table
@@ -155,7 +155,7 @@ CREATE TABLE IF NOT EXISTS tags (
     document_id TEXT,
     key TEXT NOT NULL,
     value TEXT,
-    last_modified_utc TEXT NOT NULL,
+    last_update_utc TEXT NOT NULL,
     created_utc TEXT NOT NULL,
     FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
     UNIQUE(document_id, key)
@@ -173,7 +173,7 @@ CREATE INDEX IF NOT EXISTS idx_tags_key_value ON tags(key, value);
 | `document_id` | TEXT | Reference to documents.id (NULL for index-level tags) |
 | `key` | TEXT | Tag key |
 | `value` | TEXT | Tag value (exact match) |
-| `last_modified_utc` | TEXT | ISO8601 timestamp of last modification |
+| `last_update_utc` | TEXT | ISO8601 timestamp of last modification |
 | `created_utc` | TEXT | ISO8601 timestamp of creation |
 
 ### Index Metadata Table
@@ -181,7 +181,7 @@ CREATE INDEX IF NOT EXISTS idx_tags_key_value ON tags(key, value);
 CREATE TABLE IF NOT EXISTS index_metadata (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    last_modified_utc TEXT NOT NULL,
+    last_update_utc TEXT NOT NULL,
     created_utc TEXT NOT NULL
 );
 ```
@@ -190,7 +190,7 @@ CREATE TABLE IF NOT EXISTS index_metadata (
 |--------|------|-------------|
 | `id` | TEXT | K-sortable unique ID (PrettyId with `idx_` prefix) |
 | `name` | TEXT | Index name |
-| `last_modified_utc` | TEXT | ISO8601 timestamp of last modification |
+| `last_update_utc` | TEXT | ISO8601 timestamp of last modification |
 | `created_utc` | TEXT | ISO8601 timestamp of creation |
 
 ### SQLite PRAGMA Settings

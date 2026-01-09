@@ -98,11 +98,15 @@ class ApiClient {
   }
 
   // Authentication endpoints
-  async login(username, password) {
+  async login(username, password, tenantId = null) {
+    const body = { Username: username, Password: password };
+    if (tenantId) {
+      body.TenantId = tenantId;
+    }
     const response = await fetch(`${this.baseUrl}/v1.0/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ Username: username, Password: password })
+      body: JSON.stringify(body)
     });
     const rawData = await response.json();
     const isSuccess = rawData.Success !== undefined ? rawData.Success : rawData.success;
@@ -233,6 +237,80 @@ class ApiClient {
       body.Tags = tags;
     }
     return this.post(`/v1.0/indices/${encodeURIComponent(indexId)}/search`, body);
+  }
+
+  // Admin - Tenant endpoints
+  async getTenants() {
+    return this.get('/v1.0/tenants');
+  }
+
+  async getTenant(tenantId) {
+    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}`);
+  }
+
+  async createTenant(tenant) {
+    const apiTenant = {
+      name: tenant.name
+    };
+    if (tenant.description) {
+      apiTenant.description = tenant.description;
+    }
+    return this.post('/v1.0/tenants', apiTenant);
+  }
+
+  async deleteTenant(tenantId) {
+    return this.delete(`/v1.0/tenants/${encodeURIComponent(tenantId)}`);
+  }
+
+  // Admin - User endpoints
+  async getUsers(tenantId) {
+    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/users`);
+  }
+
+  async getUser(tenantId, userId) {
+    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}`);
+  }
+
+  async createUser(tenantId, user) {
+    const apiUser = {
+      email: user.email,
+      password: user.password
+    };
+    if (user.firstName) {
+      apiUser.firstName = user.firstName;
+    }
+    if (user.lastName) {
+      apiUser.lastName = user.lastName;
+    }
+    if (user.isAdmin !== undefined) {
+      apiUser.isAdmin = user.isAdmin;
+    }
+    return this.post(`/v1.0/tenants/${encodeURIComponent(tenantId)}/users`, apiUser);
+  }
+
+  async deleteUser(tenantId, userId) {
+    return this.delete(`/v1.0/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}`);
+  }
+
+  // Admin - Credential endpoints
+  async getCredentials(tenantId) {
+    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials`);
+  }
+
+  async getCredential(tenantId, credentialId) {
+    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials/${encodeURIComponent(credentialId)}`);
+  }
+
+  async createCredential(tenantId, credential) {
+    const apiCredential = {};
+    if (credential.description) {
+      apiCredential.description = credential.description;
+    }
+    return this.post(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials`, apiCredential);
+  }
+
+  async deleteCredential(tenantId, credentialId) {
+    return this.delete(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials/${encodeURIComponent(credentialId)}`);
   }
 }
 

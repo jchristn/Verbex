@@ -1,0 +1,55 @@
+.tenants-view {
+  padding: 24px;
+}
+
+.tenants-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tenants-table th,
+.tenants-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.tenants-table th {
+  font-weight: 600;
+  color: var(--text-secondary, #666);
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tenants-table tbody tr:hover {
+  background-color: var(--hover-bg, #f5f5f5);
+}
+
+.tenant-id {
+  font-family: monospace;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #666);
+}
+
+.tenant-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tenant-details {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.error-card {
+  background-color: var(--error-bg, #fee);
+  border: 1px solid var(--error-border, #fcc);
+}
+
+.error-message {
+  color: var(--error-color, #c00);
+  margin: 0;
+}

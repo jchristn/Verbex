@@ -6,11 +6,15 @@ import Workspace from './Workspace';
 import './Dashboard.css';
 
 function Dashboard() {
-  const { apiClient } = useAuth();
+  const { apiClient, userInfo } = useAuth();
   const [activeView, setActiveView] = useState('indices');
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [indices, setIndices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Admin state
+  const [tenants, setTenants] = useState([]);
+  const [selectedTenant, setSelectedTenant] = useState(null);
 
   // Load saved state
   useEffect(() => {
@@ -49,8 +53,21 @@ function Dashboard() {
     }
   };
 
+  // Load tenants
+  const loadTenants = async () => {
+    if (!apiClient) return;
+
+    try {
+      const response = await apiClient.getTenants();
+      setTenants(response.data?.tenants || []);
+    } catch (err) {
+      console.error('Failed to load tenants:', err);
+    }
+  };
+
   useEffect(() => {
     loadIndices();
+    loadTenants();
   }, [apiClient]);
 
   const handleViewChange = (view) => {
@@ -68,6 +85,16 @@ function Dashboard() {
 
   const handleRefresh = () => {
     loadIndices();
+    loadTenants();
+  };
+
+  const handleTenantSelect = (tenantId) => {
+    setSelectedTenant(tenantId);
+  };
+
+  const handleTenantSelectAndNavigate = (tenantId, view) => {
+    setSelectedTenant(tenantId);
+    setActiveView(view || 'users');
   };
 
   return (
@@ -78,6 +105,7 @@ function Dashboard() {
           activeView={activeView}
           onViewChange={handleViewChange}
           indices={indices}
+          isAdmin={userInfo?.isAdmin || userInfo?.isGlobalAdmin || false}
         />
         <Workspace
           activeView={activeView}
@@ -87,6 +115,10 @@ function Dashboard() {
           onRefresh={handleRefresh}
           onIndexSelect={handleIndexSelect}
           onIndexSelectAndNavigate={handleIndexSelectAndNavigate}
+          tenants={tenants}
+          selectedTenant={selectedTenant}
+          onTenantSelect={handleTenantSelect}
+          onTenantSelectAndNavigate={handleTenantSelectAndNavigate}
         />
       </div>
     </div>

@@ -56,7 +56,7 @@ namespace Test
             await index.SetTagAsync(doc2, "department", "operations").ConfigureAwait(false);
 
             // Verify tags were added
-            Dictionary<string, string?> doc1Tags = await index.GetTagsAsync(doc1).ConfigureAwait(false);
+            Dictionary<string, string> doc1Tags = await index.GetTagsAsync(doc1).ConfigureAwait(false);
             TestAssert.AreEqual(1, doc1Tags.Count);
             TestAssert.AreEqual("engineering", doc1Tags["department"]);
         }

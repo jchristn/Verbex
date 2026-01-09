@@ -11,8 +11,4 @@
     <ProjectReference Include="..\Verbex\Verbex.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="System.Text.Json" Version="8.0.5" />
-  </ItemGroup>
-
 </Project>

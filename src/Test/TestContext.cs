@@ -4,18 +4,107 @@ namespace Test
     using System.IO;
     using System.Threading.Tasks;
     using Verbex;
+    using Verbex.Database;
 
     /// <summary>
-    /// Test context that manages storage mode settings for all tests.
+    /// Test context that manages storage mode settings and database configuration for all tests.
     /// </summary>
     public static class TestContext
     {
         private static StorageMode _CurrentStorageMode = StorageMode.InMemory;
+        private static CommandLineOptions? _Options = null;
+        private static DatabaseSettings? _DatabaseSettings = null;
 
         /// <summary>
         /// Gets the current storage mode for tests.
         /// </summary>
         public static StorageMode CurrentStorageMode => _CurrentStorageMode;
+
+        /// <summary>
+        /// Gets the command-line options.
+        /// </summary>
+        public static CommandLineOptions? Options => _Options;
+
+        /// <summary>
+        /// Gets the database settings for multi-tenancy tests.
+        /// </summary>
+        public static DatabaseSettings? DatabaseSettings => _DatabaseSettings;
+
+        /// <summary>
+        /// Gets whether cleanup should be performed after tests.
+        /// </summary>
+        public static bool ShouldCleanup => _Options == null || !_Options.NoCleanup;
+
+        /// <summary>
+        /// Initializes the test context with command-line options.
+        /// </summary>
+        /// <param name="options">Parsed command-line options.</param>
+        public static void Initialize(CommandLineOptions options)
+        {
+            _Options = options ?? throw new ArgumentNullException(nameof(options));
+            _DatabaseSettings = CreateDatabaseSettings(options);
+        }
+
+        /// <summary>
+        /// Creates database settings from command-line options.
+        /// </summary>
+        /// <param name="options">Command-line options.</param>
+        /// <returns>Database settings configured from the options.</returns>
+        private static DatabaseSettings CreateDatabaseSettings(CommandLineOptions options)
+        {
+            DatabaseSettings settings = new DatabaseSettings();
+
+            switch (options.DatabaseType)
+            {
+                case TestDatabaseType.SqliteRam:
+                    settings.Type = DatabaseTypeEnum.Sqlite;
+                    settings.InMemory = true;
+                    break;
+
+                case TestDatabaseType.Sqlite:
+                    settings.Type = DatabaseTypeEnum.Sqlite;
+                    settings.InMemory = false;
+                    settings.Filename = options.Filename;
+                    break;
+
+                case TestDatabaseType.SqlServer:
+                    settings.Type = DatabaseTypeEnum.SqlServer;
+                    settings.Hostname = options.Hostname;
+                    settings.Port = options.Port;
+                    settings.Username = options.Username;
+                    settings.Password = options.Password;
+                    settings.DatabaseName = options.DatabaseName;
+                    if (!string.IsNullOrEmpty(options.Schema))
+                    {
+                        settings.Schema = options.Schema;
+                    }
+                    break;
+
+                case TestDatabaseType.Postgres:
+                    settings.Type = DatabaseTypeEnum.Postgresql;
+                    settings.Hostname = options.Hostname;
+                    settings.Port = options.Port;
+                    settings.Username = options.Username;
+                    settings.Password = options.Password;
+                    settings.DatabaseName = options.DatabaseName;
+                    if (!string.IsNullOrEmpty(options.Schema))
+                    {
+                        settings.Schema = options.Schema;
+                    }
+                    break;
+
+                case TestDatabaseType.Mysql:
+                    settings.Type = DatabaseTypeEnum.Mysql;
+                    settings.Hostname = options.Hostname;
+                    settings.Port = options.Port;
+                    settings.Username = options.Username;
+                    settings.Password = options.Password;
+                    settings.DatabaseName = options.DatabaseName;
+                    break;
+            }
+
+            return settings;
+        }
 
         /// <summary>
         /// Sets the storage mode for tests.
@@ -82,6 +171,11 @@ namespace Test
         /// <param name="directory">Directory to clean.</param>
         public static void CleanupTestDirectory(string? directory)
         {
+            if (!ShouldCleanup)
+            {
+                return;
+            }
+
             if (string.IsNullOrEmpty(directory))
             {
                 return;
@@ -97,6 +191,70 @@ namespace Test
             catch
             {
                 // Ignore cleanup errors
+            }
+        }
+
+        /// <summary>
+        /// Cleans up a test database file (for SQLite file mode).
+        /// </summary>
+        /// <param name="filePath">Path to the database file.</param>
+        public static void CleanupTestDatabaseFile(string? filePath)
+        {
+            if (!ShouldCleanup)
+            {
+                return;
+            }
+
+            if (string.IsNullOrEmpty(filePath))
+            {
+                return;
+            }
+
+            try
+            {
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                }
+            }
+            catch
+            {
+                // Ignore cleanup errors
+            }
+        }
+
+        /// <summary>
+        /// Gets a description of the current database configuration for display.
+        /// </summary>
+        /// <returns>Description of the database configuration.</returns>
+        public static string GetDatabaseDescription()
+        {
+            if (_Options == null)
+            {
+                return "Not configured";
+            }
+
+            switch (_Options.DatabaseType)
+            {
+                case TestDatabaseType.SqliteRam:
+                    return "SQLite (in-memory)";
+
+                case TestDatabaseType.Sqlite:
+                    return $"SQLite (file: {_Options.Filename})";
+
+                case TestDatabaseType.SqlServer:
+                    string sqlSchema = string.IsNullOrEmpty(_Options.Schema) ? "dbo" : _Options.Schema;
+                    return $"SQL Server ({_Options.Hostname}:{_Options.Port}/{_Options.DatabaseName}, schema: {sqlSchema})";
+
+                case TestDatabaseType.Postgres:
+                    string pgSchema = string.IsNullOrEmpty(_Options.Schema) ? "public" : _Options.Schema;
+                    return $"PostgreSQL ({_Options.Hostname}:{_Options.Port}/{_Options.DatabaseName}, schema: {pgSchema})";
+
+                case TestDatabaseType.Mysql:
+                    return $"MySQL ({_Options.Hostname}:{_Options.Port}/{_Options.DatabaseName})";
+
+                default:
+                    return "Unknown";
             }
         }
     }

@@ -1,0 +1,232 @@
+namespace Verbex.Database.Postgresql.Queries
+{
+    using System.Collections.Generic;
+
+    /// <summary>
+    /// PostgreSQL setup queries for creating and managing the database schema.
+    /// </summary>
+    internal static class SetupQueries
+    {
+        /// <summary>
+        /// Schema version for migration tracking.
+        /// </summary>
+        public const string SchemaVersion = "3.0";
+
+        /// <summary>
+        /// Creates all tables for the multi-tenant inverted index.
+        /// </summary>
+        public static readonly string CreateTables = @"
+-- Tenants table
+CREATE TABLE IF NOT EXISTS tenants (
+    identifier VARCHAR(48) PRIMARY KEY,
+    name VARCHAR(256) NOT NULL,
+    description TEXT,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Administrators table (global admins)
+CREATE TABLE IF NOT EXISTS administrators (
+    identifier VARCHAR(48) PRIMARY KEY,
+    email VARCHAR(256) NOT NULL UNIQUE,
+    password_sha256 VARCHAR(128) NOT NULL,
+    first_name VARCHAR(128),
+    last_name VARCHAR(128),
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Users table (tenant-scoped)
+CREATE TABLE IF NOT EXISTS users (
+    identifier VARCHAR(48) PRIMARY KEY,
+    tenant_id VARCHAR(48) NOT NULL REFERENCES tenants(identifier) ON DELETE CASCADE,
+    email VARCHAR(256) NOT NULL,
+    password_sha256 VARCHAR(128) NOT NULL,
+    first_name VARCHAR(128),
+    last_name VARCHAR(128),
+    is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(tenant_id, email)
+);
+
+-- Credentials table (bearer tokens)
+CREATE TABLE IF NOT EXISTS credentials (
+    identifier VARCHAR(48) PRIMARY KEY,
+    tenant_id VARCHAR(48) NOT NULL REFERENCES tenants(identifier) ON DELETE CASCADE,
+    user_id VARCHAR(48) NOT NULL REFERENCES users(identifier) ON DELETE CASCADE,
+    bearer_token VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(256),
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes table (tenant-scoped)
+CREATE TABLE IF NOT EXISTS indexes (
+    identifier VARCHAR(48) PRIMARY KEY,
+    tenant_id VARCHAR(48) NOT NULL REFERENCES tenants(identifier) ON DELETE CASCADE,
+    name VARCHAR(256) NOT NULL,
+    description TEXT,
+    created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(tenant_id, name)
+);
+
+-- Documents table
+CREATE TABLE IF NOT EXISTS documents (
+    id VARCHAR(48) PRIMARY KEY,
+    tenant_id VARCHAR(48) NOT NULL REFERENCES tenants(identifier) ON DELETE CASCADE,
+    index_id VARCHAR(48) NOT NULL REFERENCES indexes(identifier) ON DELETE CASCADE,
+    name VARCHAR(512) NOT NULL,
+    content_sha256 VARCHAR(64),
+    document_length INTEGER NOT NULL DEFAULT 0,
+    term_count INTEGER NOT NULL DEFAULT 0,
+    indexed_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(index_id, name)
+);
+
+-- Terms table (vocabulary)
+CREATE TABLE IF NOT EXISTS terms (
+    id VARCHAR(48) PRIMARY KEY,
+    tenant_id VARCHAR(48) NOT NULL REFERENCES tenants(identifier) ON DELETE CASCADE,
+    index_id VARCHAR(48) NOT NULL REFERENCES indexes(identifier) ON DELETE CASCADE,
+    term VARCHAR(512) NOT NULL,
+    document_frequency INTEGER NOT NULL DEFAULT 0,
+    total_frequency BIGINT NOT NULL DEFAULT 0,
+    last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(index_id, term)
+);
+
+-- Document-Terms table (inverted index)
+CREATE TABLE IF NOT EXISTS document_terms (
+    id VARCHAR(48) PRIMARY KEY,
+    document_id VARCHAR(48) NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    term_id VARCHAR(48) NOT NULL REFERENCES terms(id) ON DELETE CASCADE,
+    term_frequency INTEGER NOT NULL DEFAULT 0,
+    character_positions TEXT,
+    term_positions TEXT,
+    last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(document_id, term_id)
+);
+
+-- Labels table (document or index level)
+CREATE TABLE IF NOT EXISTS labels (
+    id VARCHAR(48) PRIMARY KEY,
+    document_id VARCHAR(48) REFERENCES documents(id) ON DELETE CASCADE,
+    index_id VARCHAR(48) NOT NULL REFERENCES indexes(identifier) ON DELETE CASCADE,
+    label VARCHAR(256) NOT NULL,
+    last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Tags table (document or index level key-value pairs)
+CREATE TABLE IF NOT EXISTS tags (
+    id VARCHAR(48) PRIMARY KEY,
+    document_id VARCHAR(48) REFERENCES documents(id) ON DELETE CASCADE,
+    index_id VARCHAR(48) NOT NULL REFERENCES indexes(identifier) ON DELETE CASCADE,
+    key VARCHAR(256) NOT NULL,
+    value TEXT,
+    last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Schema metadata table
+CREATE TABLE IF NOT EXISTS schema_metadata (
+    key VARCHAR(256) PRIMARY KEY,
+    value TEXT NOT NULL
+);
+";
+
+        /// <summary>
+        /// Creates indexes for common queries. Each query should be executed individually.
+        /// PostgreSQL supports CREATE INDEX IF NOT EXISTS syntax.
+        /// </summary>
+        public static readonly List<string> CreateIndexes = new List<string>
+        {
+            // Tenant indexes
+            "CREATE INDEX IF NOT EXISTS idx_tenants_name ON tenants(name)",
+            "CREATE INDEX IF NOT EXISTS idx_tenants_active ON tenants(active)",
+
+            // Administrator indexes
+            "CREATE INDEX IF NOT EXISTS idx_administrators_email ON administrators(email)",
+            "CREATE INDEX IF NOT EXISTS idx_administrators_active ON administrators(active)",
+
+            // User indexes
+            "CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id)",
+            "CREATE INDEX IF NOT EXISTS idx_users_email ON users(tenant_id, email)",
+            "CREATE INDEX IF NOT EXISTS idx_users_active ON users(active)",
+            "CREATE INDEX IF NOT EXISTS idx_users_tenant_active ON users(tenant_id, active)",
+
+            // Credential indexes
+            "CREATE INDEX IF NOT EXISTS idx_credentials_tenant ON credentials(tenant_id)",
+            "CREATE INDEX IF NOT EXISTS idx_credentials_user ON credentials(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_credentials_bearer ON credentials(bearer_token)",
+            "CREATE INDEX IF NOT EXISTS idx_credentials_active ON credentials(active)",
+            "CREATE INDEX IF NOT EXISTS idx_credentials_tenant_active ON credentials(tenant_id, active)",
+
+            // Index (search index) indexes
+            "CREATE INDEX IF NOT EXISTS idx_indexes_tenant ON indexes(tenant_id)",
+            "CREATE INDEX IF NOT EXISTS idx_indexes_name ON indexes(tenant_id, name)",
+
+            // Document indexes
+            "CREATE INDEX IF NOT EXISTS idx_documents_tenant ON documents(tenant_id)",
+            "CREATE INDEX IF NOT EXISTS idx_documents_index ON documents(index_id)",
+            "CREATE INDEX IF NOT EXISTS idx_documents_tenant_index ON documents(tenant_id, index_id)",
+            "CREATE INDEX IF NOT EXISTS idx_documents_name ON documents(index_id, name)",
+            "CREATE INDEX IF NOT EXISTS idx_documents_content_sha256 ON documents(content_sha256)",
+
+            // Term indexes (critical for search performance)
+            "CREATE INDEX IF NOT EXISTS idx_terms_tenant ON terms(tenant_id)",
+            "CREATE INDEX IF NOT EXISTS idx_terms_index ON terms(index_id)",
+            "CREATE INDEX IF NOT EXISTS idx_terms_tenant_index ON terms(tenant_id, index_id)",
+            "CREATE INDEX IF NOT EXISTS idx_terms_term ON terms(index_id, term)",
+            "CREATE INDEX IF NOT EXISTS idx_terms_document_frequency ON terms(document_frequency DESC)",
+
+            // Document-term indexes (critical for inverted index lookups)
+            "CREATE INDEX IF NOT EXISTS idx_document_terms_document ON document_terms(document_id)",
+            "CREATE INDEX IF NOT EXISTS idx_document_terms_term ON document_terms(term_id)",
+            "CREATE INDEX IF NOT EXISTS idx_document_terms_frequency ON document_terms(term_frequency DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_document_terms_term_doc ON document_terms(term_id, document_id)",
+
+            // Label indexes (for filtering by labels)
+            "CREATE INDEX IF NOT EXISTS idx_labels_document ON labels(document_id)",
+            "CREATE INDEX IF NOT EXISTS idx_labels_index ON labels(index_id)",
+            "CREATE INDEX IF NOT EXISTS idx_labels_label ON labels(label)",
+            "CREATE INDEX IF NOT EXISTS idx_labels_document_label ON labels(document_id, label)",
+            "CREATE INDEX IF NOT EXISTS idx_labels_index_label ON labels(index_id, label)",
+
+            // Tag indexes (for filtering by key-value pairs)
+            "CREATE INDEX IF NOT EXISTS idx_tags_document ON tags(document_id)",
+            "CREATE INDEX IF NOT EXISTS idx_tags_index ON tags(index_id)",
+            "CREATE INDEX IF NOT EXISTS idx_tags_key ON tags(key)",
+            "CREATE INDEX IF NOT EXISTS idx_tags_document_key ON tags(document_id, key)",
+            "CREATE INDEX IF NOT EXISTS idx_tags_index_key ON tags(index_id, key)",
+            "CREATE INDEX IF NOT EXISTS idx_tags_key_value ON tags(key, value)"
+        };
+
+        /// <summary>
+        /// Drops all tables in reverse order of creation.
+        /// </summary>
+        public static readonly string DropTables = @"
+DROP TABLE IF EXISTS schema_metadata CASCADE;
+DROP TABLE IF EXISTS tags CASCADE;
+DROP TABLE IF EXISTS labels CASCADE;
+DROP TABLE IF EXISTS document_terms CASCADE;
+DROP TABLE IF EXISTS terms CASCADE;
+DROP TABLE IF EXISTS documents CASCADE;
+DROP TABLE IF EXISTS indexes CASCADE;
+DROP TABLE IF EXISTS credentials CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS administrators CASCADE;
+DROP TABLE IF EXISTS tenants CASCADE;
+";
+    }
+}

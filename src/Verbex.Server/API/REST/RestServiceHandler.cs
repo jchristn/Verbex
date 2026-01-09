@@ -12,6 +12,9 @@ namespace Verbex.Server.API.REST
     using System.Text.Json;
     using System.Text.Json.Serialization;
     using System.Threading.Tasks;
+    using Verbex.Database;
+    using Verbex.Database.Interfaces;
+    using Verbex.Models;
     using Verbex.Server.Classes;
     using Verbex.Server.Services;
     using Verbex.Utilities;
@@ -39,6 +42,7 @@ namespace Verbex.Server.API.REST
         private Settings? _Settings = null;
         private AuthenticationService? _Auth = null;
         private IndexManager? _IndexManager = null;
+        private DatabaseDriverBase? _Database = null;
         private LoggingModule? _Logging = null;
         private Webserver? _Webserver = null;
         private readonly string _Header = "[RestServiceHandler] ";
@@ -53,13 +57,15 @@ namespace Verbex.Server.API.REST
         /// <param name="settings">Settings.</param>
         /// <param name="auth">Authentication service.</param>
         /// <param name="indexManager">Index manager.</param>
+        /// <param name="database">Database driver for multi-tenant operations.</param>
         /// <param name="logging">Logging module.</param>
         /// <exception cref="ArgumentNullException">Thrown when required parameter is null.</exception>
-        public RestServiceHandler(Settings settings, AuthenticationService auth, IndexManager indexManager, LoggingModule logging)
+        public RestServiceHandler(Settings settings, AuthenticationService auth, IndexManager indexManager, DatabaseDriverBase database, LoggingModule logging)
         {
             _Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _Auth = auth ?? throw new ArgumentNullException(nameof(auth));
             _IndexManager = indexManager ?? throw new ArgumentNullException(nameof(indexManager));
+            _Database = database ?? throw new ArgumentNullException(nameof(database));
             _Logging = logging ?? throw new ArgumentNullException(nameof(logging));
 
             InitializeWebserver();
@@ -390,6 +396,88 @@ namespace Verbex.Server.API.REST
                     .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
                     .WithResponse(404, OpenApiResponseMetadata.NotFound()),
                 ExceptionRoute);
+
+            // ==================== Admin Routes ====================
+
+            // Tenant management routes (admin only)
+            _Webserver.Routes.PostAuthentication.Static.Add(
+                HttpMethod.GET, "/v1.0/tenants", GetTenantsRoute,
+                metadata => metadata
+                    .WithTag("Tenants")
+                    .WithDescription("List all tenants. Requires global admin access."),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Static.Add(
+                HttpMethod.POST, "/v1.0/tenants", PostTenantsRoute,
+                metadata => metadata
+                    .WithTag("Tenants")
+                    .WithDescription("Create a new tenant. Requires global admin access."),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.GET, "/v1.0/tenants/{id}", GetTenantRoute,
+                metadata => metadata
+                    .WithTag("Tenants")
+                    .WithDescription("Get a specific tenant by ID."),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.DELETE, "/v1.0/tenants/{id}", DeleteTenantRoute,
+                metadata => metadata
+                    .WithTag("Tenants")
+                    .WithDescription("Delete a tenant and all its data. Requires global admin access."),
+                ExceptionRoute);
+
+            // User management routes (admin only)
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.GET, "/v1.0/tenants/{id}/users", GetTenantUsersRoute,
+                metadata => metadata
+                    .WithTag("Users")
+                    .WithDescription("List all users for a tenant."),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.POST, "/v1.0/tenants/{id}/users", PostTenantUsersRoute,
+                metadata => metadata
+                    .WithTag("Users")
+                    .WithDescription("Create a new user for a tenant."),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.GET, "/v1.0/tenants/{id}/users/{userId}", GetTenantUserRoute,
+                metadata => metadata
+                    .WithTag("Users")
+                    .WithDescription("Get a specific user by ID."),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.DELETE, "/v1.0/tenants/{id}/users/{userId}", DeleteTenantUserRoute,
+                metadata => metadata
+                    .WithTag("Users")
+                    .WithDescription("Delete a user."),
+                ExceptionRoute);
+
+            // Credential management routes (admin only)
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.GET, "/v1.0/tenants/{id}/credentials", GetTenantCredentialsRoute,
+                metadata => metadata
+                    .WithTag("Credentials")
+                    .WithDescription("List all API credentials for a tenant."),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.POST, "/v1.0/tenants/{id}/credentials", PostTenantCredentialsRoute,
+                metadata => metadata
+                    .WithTag("Credentials")
+                    .WithDescription("Create a new API credential for a tenant."),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.DELETE, "/v1.0/tenants/{id}/credentials/{credId}", DeleteTenantCredentialRoute,
+                metadata => metadata
+                    .WithTag("Credentials")
+                    .WithDescription("Revoke an API credential."),
+                ExceptionRoute);
         }
 
         /// <summary>
@@ -532,16 +620,59 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 400, errorMessage);
                 }
 
-                // Simple authentication - in real implementation, validate against database
-                if (loginRequest.Username == "admin" && loginRequest.Password == "password")
+                // Try global admin authentication first
+                Administrator? admin = await _Auth!.AuthenticateAdminAsync(loginRequest.Username, loginRequest.Password).ConfigureAwait(false);
+                if (admin != null)
                 {
-                    string token = _Auth!.GenerateToken(loginRequest.Username);
+                    // Return global admin token
                     return new ResponseContext
                     {
                         Success = true,
                         StatusCode = 200,
-                        Data = new { Token = token, Username = loginRequest.Username }
+                        Data = new
+                        {
+                            Token = _Settings!.AdminBearerToken,
+                            Email = admin.Email,
+                            IsGlobalAdmin = true,
+                            IsAdmin = true
+                        }
                     };
+                }
+
+                // Try tenant user authentication if tenant ID is provided
+                if (!String.IsNullOrEmpty(loginRequest.TenantId))
+                {
+                    UserMaster? user = await _Auth.AuthenticateUserAsync(loginRequest.TenantId, loginRequest.Username, loginRequest.Password).ConfigureAwait(false);
+                    if (user != null)
+                    {
+                        // Find or create a credential for this user
+                        List<Credential> existingCreds = await _Database!.Credentials.ReadManyAsync(loginRequest.TenantId).ConfigureAwait(false);
+                        Credential? userCred = existingCreds.FirstOrDefault(c => c.UserId == user.Identifier && c.Active);
+
+                        if (userCred == null)
+                        {
+                            // Create a new credential for this user
+                            userCred = new Credential(loginRequest.TenantId, user.Identifier);
+                            userCred.Name = $"Login credential for {user.Email}";
+                            await _Database.Credentials.CreateAsync(userCred).ConfigureAwait(false);
+                        }
+
+                        return new ResponseContext
+                        {
+                            Success = true,
+                            StatusCode = 200,
+                            Data = new
+                            {
+                                Token = userCred.BearerToken,
+                                Email = user.Email,
+                                FirstName = user.FirstName,
+                                LastName = user.LastName,
+                                TenantId = loginRequest.TenantId,
+                                IsGlobalAdmin = false,
+                                IsAdmin = user.IsAdmin
+                            }
+                        };
+                    }
                 }
 
                 return new ResponseContext(false, 401, "Invalid credentials");
@@ -1266,6 +1397,413 @@ namespace Verbex.Server.API.REST
             });
         }
 
+        // ==================== Admin Route Handlers ====================
+
+        /// <summary>
+        /// Get all tenants route.
+        /// </summary>
+        private async Task GetTenantsRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.IsGlobalAdmin)
+                {
+                    return new ResponseContext(false, 403, "Global admin access required");
+                }
+
+                List<TenantMetadata> tenants = await _Database!.Tenants.ReadManyAsync().ConfigureAwait(false);
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { Tenants = tenants, Count = tenants.Count }
+                };
+            });
+        }
+
+        /// <summary>
+        /// Create tenant route.
+        /// </summary>
+        private async Task PostTenantsRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.IsGlobalAdmin)
+                {
+                    return new ResponseContext(false, 403, "Global admin access required");
+                }
+
+                string body = await GetRequestBody(ctx);
+                if (String.IsNullOrEmpty(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                CreateTenantRequest? request = JsonSerializer.Deserialize<CreateTenantRequest>(body, _JsonOptions);
+                string error = "Invalid request";
+                if (request == null || !request.Validate(out error))
+                {
+                    return new ResponseContext(false, 400, error);
+                }
+
+                TenantMetadata tenant = new TenantMetadata(request.Name, request.Description ?? "");
+
+                await _Database!.Tenants.CreateAsync(tenant).ConfigureAwait(false);
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 201,
+                    Data = new { Message = "Tenant created successfully", Tenant = tenant }
+                };
+            });
+        }
+
+        /// <summary>
+        /// Get tenant route.
+        /// </summary>
+        private async Task GetTenantRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(tenantId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID is required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                // Require admin access and correct tenant for non-global admins
+                if (auth == null || !auth.HasAdminAccess || (!auth.IsGlobalAdmin && auth.TenantId != tenantId))
+                {
+                    return new ResponseContext(false, 403, "Admin access required");
+                }
+
+                TenantMetadata? tenant = await _Database!.Tenants.ReadByIdentifierAsync(tenantId).ConfigureAwait(false);
+                if (tenant == null)
+                {
+                    return new ResponseContext(false, 404, "Tenant not found");
+                }
+
+                TenantStatistics stats = await _Database.Statistics.GetTenantStatisticsAsync(tenantId).ConfigureAwait(false);
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { Tenant = tenant, Statistics = stats }
+                };
+            });
+        }
+
+        /// <summary>
+        /// Delete tenant route.
+        /// </summary>
+        private async Task DeleteTenantRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.IsGlobalAdmin)
+                {
+                    return new ResponseContext(false, 403, "Global admin access required");
+                }
+
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(tenantId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID is required");
+                }
+
+                bool deleted = await _Database!.Tenants.DeleteByIdentifierAsync(tenantId).ConfigureAwait(false);
+                if (!deleted)
+                {
+                    return new ResponseContext(false, 404, "Tenant not found");
+                }
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { Message = "Tenant deleted successfully", TenantId = tenantId }
+                };
+            });
+        }
+
+        /// <summary>
+        /// Get tenant users route.
+        /// </summary>
+        private async Task GetTenantUsersRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(tenantId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID is required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                // Require admin access and correct tenant for non-global admins
+                if (auth == null || !auth.HasAdminAccess || (!auth.IsGlobalAdmin && auth.TenantId != tenantId))
+                {
+                    return new ResponseContext(false, 403, "Admin access required");
+                }
+
+                List<UserMaster> users = await _Database!.Users.ReadManyAsync(tenantId).ConfigureAwait(false);
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { Users = users.Select(u => new { u.Identifier, u.Email, u.FirstName, u.LastName, u.IsAdmin, u.Active, u.CreatedUtc }), Count = users.Count }
+                };
+            });
+        }
+
+        /// <summary>
+        /// Create tenant user route.
+        /// </summary>
+        private async Task PostTenantUsersRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(tenantId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID is required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                // Require admin access and correct tenant for non-global admins
+                if (auth == null || !auth.HasAdminAccess || (!auth.IsGlobalAdmin && auth.TenantId != tenantId))
+                {
+                    return new ResponseContext(false, 403, "Admin access required");
+                }
+
+                string body = await GetRequestBody(ctx);
+                if (String.IsNullOrEmpty(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                CreateUserRequest? request = JsonSerializer.Deserialize<CreateUserRequest>(body, _JsonOptions);
+                string error = "Invalid request";
+                if (request == null || !request.Validate(out error))
+                {
+                    return new ResponseContext(false, 400, error);
+                }
+
+                // Check if user already exists
+                UserMaster? existing = await _Database!.Users.ReadByEmailAsync(tenantId, request.Email).ConfigureAwait(false);
+                if (existing != null)
+                {
+                    return new ResponseContext(false, 409, "User with this email already exists");
+                }
+
+                UserMaster user = new UserMaster(tenantId, request.Email);
+                user.SetPassword(request.Password);
+                user.FirstName = request.FirstName;
+                user.LastName = request.LastName;
+                user.IsAdmin = request.IsAdmin;
+                user.Active = true;
+
+                await _Database.Users.CreateAsync(user).ConfigureAwait(false);
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 201,
+                    Data = new { Message = "User created successfully", User = new { user.Identifier, user.Email, user.FirstName, user.LastName, user.IsAdmin } }
+                };
+            });
+        }
+
+        /// <summary>
+        /// Get tenant user route.
+        /// </summary>
+        private async Task GetTenantUserRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                string? userId = ctx.Request.Url.Parameters["userId"];
+
+                if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(userId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID and User ID are required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                // Require admin access and correct tenant for non-global admins
+                if (auth == null || !auth.HasAdminAccess || (!auth.IsGlobalAdmin && auth.TenantId != tenantId))
+                {
+                    return new ResponseContext(false, 403, "Admin access required");
+                }
+
+                UserMaster? user = await _Database!.Users.ReadByIdentifierAsync(tenantId, userId).ConfigureAwait(false);
+                if (user == null)
+                {
+                    return new ResponseContext(false, 404, "User not found");
+                }
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { user.Identifier, user.Email, user.FirstName, user.LastName, user.IsAdmin, user.Active, user.CreatedUtc }
+                };
+            });
+        }
+
+        /// <summary>
+        /// Delete tenant user route.
+        /// </summary>
+        private async Task DeleteTenantUserRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                string? userId = ctx.Request.Url.Parameters["userId"];
+
+                if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(userId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID and User ID are required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                // Require admin access and correct tenant for non-global admins
+                if (auth == null || !auth.HasAdminAccess || (!auth.IsGlobalAdmin && auth.TenantId != tenantId))
+                {
+                    return new ResponseContext(false, 403, "Admin access required");
+                }
+
+                bool deleted = await _Database!.Users.DeleteByIdentifierAsync(tenantId, userId).ConfigureAwait(false);
+                if (!deleted)
+                {
+                    return new ResponseContext(false, 404, "User not found");
+                }
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { Message = "User deleted successfully", UserId = userId }
+                };
+            });
+        }
+
+        /// <summary>
+        /// Get tenant credentials route.
+        /// </summary>
+        private async Task GetTenantCredentialsRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(tenantId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID is required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                // Require admin access and correct tenant for non-global admins
+                if (auth == null || !auth.HasAdminAccess || (!auth.IsGlobalAdmin && auth.TenantId != tenantId))
+                {
+                    return new ResponseContext(false, 403, "Admin access required");
+                }
+
+                List<Credential> credentials = await _Database!.Credentials.ReadManyAsync(tenantId).ConfigureAwait(false);
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { Credentials = credentials.Select(c => new { c.Identifier, c.Name, c.Active, c.CreatedUtc, TokenPreview = c.BearerToken.Substring(0, Math.Min(8, c.BearerToken.Length)) + "..." }), Count = credentials.Count }
+                };
+            });
+        }
+
+        /// <summary>
+        /// Create tenant credential route.
+        /// </summary>
+        private async Task PostTenantCredentialsRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(tenantId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID is required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                // Require admin access and correct tenant for non-global admins
+                if (auth == null || !auth.HasAdminAccess || (!auth.IsGlobalAdmin && auth.TenantId != tenantId))
+                {
+                    return new ResponseContext(false, 403, "Admin access required");
+                }
+
+                string body = await GetRequestBody(ctx);
+                CreateCredentialRequest? request = null;
+                if (!String.IsNullOrEmpty(body))
+                {
+                    request = JsonSerializer.Deserialize<CreateCredentialRequest>(body, _JsonOptions);
+                }
+
+                Credential credential = new Credential(tenantId, "system");
+                if (request?.Description != null)
+                {
+                    credential.Name = request.Description;
+                }
+
+                await _Database!.Credentials.CreateAsync(credential).ConfigureAwait(false);
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 201,
+                    Data = new { Message = "Credential created successfully", Credential = new { credential.Identifier, credential.BearerToken, credential.Name } }
+                };
+            });
+        }
+
+        /// <summary>
+        /// Delete tenant credential route.
+        /// </summary>
+        private async Task DeleteTenantCredentialRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                string? credId = ctx.Request.Url.Parameters["credId"];
+
+                if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(credId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID and Credential ID are required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                // Require admin access and correct tenant for non-global admins
+                if (auth == null || !auth.HasAdminAccess || (!auth.IsGlobalAdmin && auth.TenantId != tenantId))
+                {
+                    return new ResponseContext(false, 403, "Admin access required");
+                }
+
+                bool deleted = await _Database!.Credentials.DeleteByIdentifierAsync(tenantId, credId).ConfigureAwait(false);
+                if (!deleted)
+                {
+                    return new ResponseContext(false, 404, "Credential not found");
+                }
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { Message = "Credential revoked successfully", CredentialId = credId }
+                };
+            });
+        }
 
         /// <summary>
         /// Wrapped request handler.

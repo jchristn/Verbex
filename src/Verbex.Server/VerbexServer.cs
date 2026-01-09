@@ -5,6 +5,8 @@ namespace Verbex.Server
     using System.Reflection;
     using System.Threading;
     using SyslogLogging;
+    using Verbex.Database;
+    using Verbex.Database.Interfaces;
     using Verbex.Server.Classes;
     using Verbex.Server.Services;
     using Verbex.Server.API.REST;
@@ -20,6 +22,11 @@ namespace Verbex.Server
         /// Settings.
         /// </summary>
         public static Settings? Settings = null;
+
+        /// <summary>
+        /// Database driver for multi-tenant data storage.
+        /// </summary>
+        public static DatabaseDriverBase? Database = null;
 
         /// <summary>
         /// Authentication service.
@@ -190,10 +197,15 @@ namespace Verbex.Server
         {
             if (Settings == null) throw new InvalidOperationException("Settings must be initialized before globals");
 
-            Authentication = new AuthenticationService(Settings.AdminBearerToken);
+            // Initialize database driver
+            Logging?.Info(_Header + "initializing database driver...");
+            Database = DatabaseDriverFactory.CreateAndInitializeAsync(Settings.Database).GetAwaiter().GetResult();
+            Logging?.Info(_Header + "database driver initialized (" + Settings.Database.Type + ")");
+
+            Authentication = new AuthenticationService(Settings.AdminBearerToken, Database);
             IndexManager = new IndexManager(Logging);
             IndexManager.DiscoverIndicesAsync(Settings.DataDirectory).GetAwaiter().GetResult();
-            RestService = new RestServiceHandler(Settings, Authentication, IndexManager, Logging!);
+            RestService = new RestServiceHandler(Settings, Authentication, IndexManager, Database, Logging!);
         }
 
         /// <summary>

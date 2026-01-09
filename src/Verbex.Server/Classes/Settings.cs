@@ -3,6 +3,7 @@ namespace Verbex.Server.Classes
     using System;
     using System.IO;
     using System.Text.Json;
+    using Verbex.Database;
 
     /// <summary>
     /// Settings.
@@ -49,6 +50,22 @@ namespace Verbex.Server.Classes
         }
 
         /// <summary>
+        /// Database settings for multi-tenant data storage.
+        /// </summary>
+        public DatabaseSettings Database
+        {
+            get
+            {
+                return _Database;
+            }
+            set
+            {
+                if (value == null) _Database = new DatabaseSettings();
+                else _Database = value;
+            }
+        }
+
+        /// <summary>
         /// Directory where index data is stored.
         /// Each subdirectory represents an index and contains an index.json metadata file.
         /// </summary>
@@ -67,6 +84,7 @@ namespace Verbex.Server.Classes
 
         /// <summary>
         /// Admin bearer token for administrative operations.
+        /// Used as fallback when no administrators exist in the database.
         /// </summary>
         public string AdminBearerToken
         {
@@ -103,6 +121,7 @@ namespace Verbex.Server.Classes
 
         private LoggingSettings _Logging = new LoggingSettings();
         private RestSettings _Rest = new RestSettings();
+        private DatabaseSettings _Database = new DatabaseSettings();
         private string _DataDirectory = "./data";
         private string _AdminBearerToken = "verbexadmin";
         private DebugSettings _Debug = new DebugSettings();
