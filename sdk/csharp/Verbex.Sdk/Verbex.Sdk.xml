@@ -1,0 +1,1493 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Verbex.Sdk</name>
+    </assembly>
+    <members>
+        <member name="T:Verbex.Sdk.AddDocumentData">
+            <summary>
+            Add document response data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.AddDocumentData.DocumentId">
+            <summary>
+            The created document identifier.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.AddDocumentData.Message">
+            <summary>
+            Success message.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.AddDocumentRequest">
+            <summary>
+            Request body for adding a document to an index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.AddDocumentRequest.Id">
+            <summary>
+            Document identifier (optional, will be auto-generated if not provided).
+            Must be a valid GUID format if specified.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.AddDocumentRequest.Content">
+            <summary>
+            Document content to be indexed.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.AddDocumentRequest.Labels">
+            <summary>
+            Labels for categorizing the document.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.AddDocumentRequest.Tags">
+            <summary>
+            Custom tags (key-value pairs) for the document.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.AddDocumentRequest.CustomMetadata">
+            <summary>
+            Custom metadata object for the document.
+            Can be any JSON-serializable object.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.AddDocumentRequest.#ctor">
+            <summary>
+            Instantiate an empty AddDocumentRequest.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.AddDocumentRequest.#ctor(System.String)">
+            <summary>
+            Instantiate an AddDocumentRequest with content.
+            </summary>
+            <param name="content">Document content to be indexed.</param>
+        </member>
+        <member name="M:Verbex.Sdk.AddDocumentRequest.#ctor(System.String,System.String,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String})">
+            <summary>
+            Instantiate an AddDocumentRequest with content and optional parameters.
+            </summary>
+            <param name="content">Document content to be indexed.</param>
+            <param name="id">Optional document identifier (GUID format).</param>
+            <param name="labels">Optional labels for categorization.</param>
+            <param name="tags">Optional custom tags.</param>
+        </member>
+        <member name="T:Verbex.Sdk.TenantInfo">
+            <summary>
+            Tenant information.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.TenantInfo.Identifier">
+            <summary>
+            Unique identifier for the tenant.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.TenantInfo.Name">
+            <summary>
+            Display name for the tenant.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.TenantInfo.Active">
+            <summary>
+            Whether the tenant is active.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.TenantInfo.CreatedUtc">
+            <summary>
+            UTC timestamp when the tenant was created.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.TenantInfo.Labels">
+            <summary>
+            Labels associated with the tenant.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.TenantInfo.Tags">
+            <summary>
+            Tags (key-value pairs) associated with the tenant.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.TenantsListData">
+            <summary>
+            Tenants list response data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.TenantsListData.Tenants">
+            <summary>
+            List of tenants.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.TenantsListData.Count">
+            <summary>
+            Total count of tenants.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.UserInfo">
+            <summary>
+            User information.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.UserInfo.Identifier">
+            <summary>
+            Unique identifier for the user.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.UserInfo.TenantId">
+            <summary>
+            Tenant identifier the user belongs to.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.UserInfo.Email">
+            <summary>
+            Email address of the user.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.UserInfo.FirstName">
+            <summary>
+            First name of the user.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.UserInfo.LastName">
+            <summary>
+            Last name of the user.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.UserInfo.IsAdmin">
+            <summary>
+            Whether the user has administrator privileges.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.UserInfo.Active">
+            <summary>
+            Whether the user is active.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.UserInfo.CreatedUtc">
+            <summary>
+            UTC timestamp when the user was created.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.UserInfo.Labels">
+            <summary>
+            Labels associated with the user.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.UserInfo.Tags">
+            <summary>
+            Tags (key-value pairs) associated with the user.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.UsersListData">
+            <summary>
+            Users list response data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.UsersListData.Users">
+            <summary>
+            List of users.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.UsersListData.Count">
+            <summary>
+            Total count of users.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.CredentialInfo">
+            <summary>
+            Credential information.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CredentialInfo.Identifier">
+            <summary>
+            Unique identifier for the credential.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CredentialInfo.TenantId">
+            <summary>
+            Tenant identifier the credential belongs to.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CredentialInfo.Name">
+            <summary>
+            Display name for the credential.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CredentialInfo.BearerToken">
+            <summary>
+            Bearer token for authentication.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CredentialInfo.Active">
+            <summary>
+            Whether the credential is active.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CredentialInfo.CreatedUtc">
+            <summary>
+            UTC timestamp when the credential was created.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CredentialInfo.Labels">
+            <summary>
+            Labels associated with the credential.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CredentialInfo.Tags">
+            <summary>
+            Tags (key-value pairs) associated with the credential.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.CredentialsListData">
+            <summary>
+            Credentials list response data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CredentialsListData.Credentials">
+            <summary>
+            List of credentials.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CredentialsListData.Count">
+            <summary>
+            Total count of credentials.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.CreateTenantRequest">
+            <summary>
+            Create tenant request.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateTenantRequest.Name">
+            <summary>
+            Display name for the tenant.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateTenantRequest.Description">
+            <summary>
+            Description of the tenant.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.CreateTenantRequest.#ctor(System.String,System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Verbex.Sdk.CreateTenantRequest"/> class.
+            </summary>
+            <param name="name">Display name for the tenant.</param>
+            <param name="description">Description of the tenant.</param>
+        </member>
+        <member name="T:Verbex.Sdk.CreateUserRequest">
+            <summary>
+            Create user request.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateUserRequest.Email">
+            <summary>
+            Email address of the user.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateUserRequest.Password">
+            <summary>
+            Password for the user.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateUserRequest.FirstName">
+            <summary>
+            First name of the user.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateUserRequest.LastName">
+            <summary>
+            Last name of the user.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateUserRequest.IsAdmin">
+            <summary>
+            Whether the user has administrator privileges.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.CreateUserRequest.#ctor(System.String,System.String,System.String,System.String,System.Boolean)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Verbex.Sdk.CreateUserRequest"/> class.
+            </summary>
+            <param name="email">Email address of the user.</param>
+            <param name="password">Password for the user.</param>
+            <param name="firstName">First name of the user.</param>
+            <param name="lastName">Last name of the user.</param>
+            <param name="isAdmin">Whether the user has administrator privileges.</param>
+        </member>
+        <member name="T:Verbex.Sdk.CreateCredentialRequest">
+            <summary>
+            Create credential request.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateCredentialRequest.Description">
+            <summary>
+            Description of the credential.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.CreateCredentialRequest.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Verbex.Sdk.CreateCredentialRequest"/> class.
+            </summary>
+            <param name="description">Description of the credential.</param>
+        </member>
+        <member name="T:Verbex.Sdk.CreateTenantData">
+            <summary>
+            Create tenant response data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateTenantData.Message">
+            <summary>
+            Response message.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateTenantData.Tenant">
+            <summary>
+            Created tenant information.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.CreateUserData">
+            <summary>
+            Create user response data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateUserData.Message">
+            <summary>
+            Response message.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateUserData.User">
+            <summary>
+            Created user information.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.CreateCredentialData">
+            <summary>
+            Create credential response data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateCredentialData.Message">
+            <summary>
+            Response message.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateCredentialData.Credential">
+            <summary>
+            Created credential information.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.DeleteData">
+            <summary>
+            Delete response data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DeleteData.Message">
+            <summary>
+            Response message.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.ApiResponse">
+            <summary>
+            Standard API response wrapper for all Verbex API calls.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ApiResponse.Guid">
+            <summary>
+            Unique request tracking identifier.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ApiResponse.Success">
+            <summary>
+            Indicates whether the request was successful.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ApiResponse.TimestampUtc">
+            <summary>
+            ISO 8601 timestamp of the response.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ApiResponse.StatusCode">
+            <summary>
+            HTTP status code of the response.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ApiResponse.ErrorMessage">
+            <summary>
+            Error message if the request failed.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ApiResponse.Data">
+            <summary>
+            Response payload data. Structure varies by endpoint.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ApiResponse.TotalCount">
+            <summary>
+            Total count for paginated results.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ApiResponse.ProcessingTimeMs">
+            <summary>
+            Request processing time in milliseconds.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.ApiResponse`1">
+            <summary>
+            Typed API response with strongly-typed data.
+            </summary>
+            <typeparam name="T">The type of the data payload.</typeparam>
+        </member>
+        <member name="P:Verbex.Sdk.ApiResponse`1.Guid">
+            <summary>
+            Unique request tracking identifier.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ApiResponse`1.Success">
+            <summary>
+            Indicates whether the request was successful.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ApiResponse`1.TimestampUtc">
+            <summary>
+            ISO 8601 timestamp of the response.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ApiResponse`1.StatusCode">
+            <summary>
+            HTTP status code of the response.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ApiResponse`1.ErrorMessage">
+            <summary>
+            Error message if the request failed.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ApiResponse`1.Data">
+            <summary>
+            Response payload data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ApiResponse`1.TotalCount">
+            <summary>
+            Total count for paginated results.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ApiResponse`1.ProcessingTimeMs">
+            <summary>
+            Request processing time in milliseconds.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.CreateIndexData">
+            <summary>
+            Create index response data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateIndexData.Message">
+            <summary>
+            Success message.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateIndexData.Index">
+            <summary>
+            The created index information.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.CreateIndexRequest">
+            <summary>
+            Request body for creating a new index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateIndexRequest.Name">
+            <summary>
+            Display name for the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateIndexRequest.Description">
+            <summary>
+            Description of the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateIndexRequest.InMemory">
+            <summary>
+            Whether this index should be in-memory only.
+            When true, index data is not persisted and will be lost on restart.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateIndexRequest.EnableLemmatizer">
+            <summary>
+            Whether to enable word lemmatization.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateIndexRequest.EnableStopWordRemover">
+            <summary>
+            Whether to enable stop word removal.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateIndexRequest.MinTokenLength">
+            <summary>
+            Minimum token length (0 = disabled).
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateIndexRequest.MaxTokenLength">
+            <summary>
+            Maximum token length (0 = disabled).
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateIndexRequest.Labels">
+            <summary>
+            Labels for categorizing the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateIndexRequest.Tags">
+            <summary>
+            Custom tags (key-value pairs) for the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateIndexRequest.CustomMetadata">
+            <summary>
+            Custom metadata object for the index.
+            Can be any JSON-serializable object.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.CreateIndexRequest.#ctor">
+            <summary>
+            Instantiate an empty CreateIndexRequest.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.CreateIndexRequest.#ctor(System.String)">
+            <summary>
+            Instantiate a CreateIndexRequest with required parameters.
+            </summary>
+            <param name="name">Display name for the index.</param>
+        </member>
+        <member name="M:Verbex.Sdk.CreateIndexRequest.#ctor(System.String,System.String)">
+            <summary>
+            Instantiate a CreateIndexRequest with name and description.
+            </summary>
+            <param name="name">Display name for the index.</param>
+            <param name="description">Description of the index.</param>
+        </member>
+        <member name="T:Verbex.Sdk.DeleteDocumentData">
+            <summary>
+            Delete document response data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DeleteDocumentData.DocumentId">
+            <summary>
+            The deleted document identifier.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DeleteDocumentData.Message">
+            <summary>
+            Success message.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.DeleteIndexData">
+            <summary>
+            Delete index response data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DeleteIndexData.Message">
+            <summary>
+            Success message.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DeleteIndexData.IndexId">
+            <summary>
+            The deleted index identifier.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.DocumentInfo">
+            <summary>
+            Document information model.
+            Matches the server's DocumentMetadata serialization format.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DocumentInfo.DocumentId">
+            <summary>
+            Unique identifier for the document.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DocumentInfo.Id">
+            <summary>
+            Document ID as string (alias for compatibility).
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DocumentInfo.DocumentPath">
+            <summary>
+            Document path.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DocumentInfo.OriginalFileName">
+            <summary>
+            Original file name.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DocumentInfo.DocumentLength">
+            <summary>
+            Document length in characters.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DocumentInfo.IndexedDate">
+            <summary>
+            UTC timestamp when the document was indexed.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DocumentInfo.LastModified">
+            <summary>
+            UTC timestamp when the document was last modified.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DocumentInfo.ContentSha256">
+            <summary>
+            SHA-256 hash of the document content.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DocumentInfo.Terms">
+            <summary>
+            Terms in the document.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DocumentInfo.IsDeleted">
+            <summary>
+            Whether the document is deleted.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DocumentInfo.CustomMetadata">
+            <summary>
+            Custom metadata object associated with the document.
+            Can be any JSON-serializable object.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DocumentInfo.Labels">
+            <summary>
+            Labels associated with the document.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DocumentInfo.Tags">
+            <summary>
+            Tags (key-value pairs) associated with the document.
+            Alias for CustomMetadata for API consistency.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.DocumentsListData">
+            <summary>
+            List documents response data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DocumentsListData.Documents">
+            <summary>
+            List of documents in the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DocumentsListData.Count">
+            <summary>
+            Total count of documents.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.HealthData">
+            <summary>
+            Health check response data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.HealthData.Status">
+            <summary>
+            Server health status (e.g., "Healthy").
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.HealthData.Version">
+            <summary>
+            Server version.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.HealthData.Timestamp">
+            <summary>
+            Server timestamp.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.IndexInfo">
+            <summary>
+            Index information model.
+            Matches the server's index metadata serialization format.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexInfo.Identifier">
+            <summary>
+            Unique identifier for the index (auto-generated).
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexInfo.TenantId">
+            <summary>
+            Tenant identifier the index belongs to.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexInfo.Name">
+            <summary>
+            Display name for the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexInfo.Description">
+            <summary>
+            Description of the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexInfo.Enabled">
+            <summary>
+            Whether the index is enabled.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexInfo.InMemory">
+            <summary>
+            Whether the index uses in-memory storage only.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexInfo.CreatedUtc">
+            <summary>
+            UTC timestamp when the index was created.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexInfo.Statistics">
+            <summary>
+            Index statistics (document count, term count, etc.).
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexInfo.Labels">
+            <summary>
+            Labels associated with the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexInfo.Tags">
+            <summary>
+            Tags (key-value pairs) associated with the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexInfo.CustomMetadata">
+            <summary>
+            Custom metadata object associated with the index.
+            Can be any JSON-serializable object.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.IndexStatistics">
+            <summary>
+            Index statistics model.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexStatistics.DocumentCount">
+            <summary>
+            Number of documents in the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexStatistics.TermCount">
+            <summary>
+            Number of unique terms in the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexStatistics.MemoryUsageMb">
+            <summary>
+            Memory usage in megabytes.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.IndicesListData">
+            <summary>
+            List indices response data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndicesListData.Indices">
+            <summary>
+            List of available indices.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndicesListData.Count">
+            <summary>
+            Total count of indices.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.LoginData">
+            <summary>
+            Login response data containing authentication token.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginData.Token">
+            <summary>
+            Bearer token for authenticated requests.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginData.Username">
+            <summary>
+            Authenticated username.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.LoginRequest">
+            <summary>
+            Request body for user authentication.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginRequest.Username">
+            <summary>
+            Username for authentication.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginRequest.Password">
+            <summary>
+            Password for authentication.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.LoginRequest.#ctor">
+            <summary>
+            Instantiate an empty LoginRequest.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.LoginRequest.#ctor(System.String,System.String)">
+            <summary>
+            Instantiate a LoginRequest with credentials.
+            </summary>
+            <param name="username">Username for authentication.</param>
+            <param name="password">Password for authentication.</param>
+        </member>
+        <member name="T:Verbex.Sdk.SearchData">
+            <summary>
+            Search response data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchData.Query">
+            <summary>
+            The search query that was executed.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchData.Results">
+            <summary>
+            List of search results.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchData.TotalCount">
+            <summary>
+            Total count of matching documents.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchData.MaxResults">
+            <summary>
+            Maximum results requested.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchData.SearchTime">
+            <summary>
+            Time taken for the search in milliseconds.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.SearchRequest">
+            <summary>
+            Request body for searching documents in an index with optional label and tag filters.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchRequest.Query">
+            <summary>
+            Search query string.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchRequest.MaxResults">
+            <summary>
+            Maximum number of results to return.
+            Default value is 100.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchRequest.Labels">
+            <summary>
+            Optional list of labels to filter by.
+            Documents must have ALL specified labels to match (AND logic).
+            Label matching is case-insensitive.
+            If null or empty, no label filtering is applied.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchRequest.Tags">
+            <summary>
+            Optional dictionary of tags (key-value pairs) to filter by.
+            Documents must have ALL specified tags with matching values to match (AND logic).
+            Tag matching is exact (case-sensitive for both key and value).
+            If null or empty, no tag filtering is applied.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.SearchRequest.#ctor">
+            <summary>
+            Instantiate an empty SearchRequest.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.SearchRequest.#ctor(System.String,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.Object})">
+            <summary>
+            Instantiate a SearchRequest with query parameters.
+            </summary>
+            <param name="query">Search query string.</param>
+            <param name="maxResults">Maximum number of results to return. Default is 100.</param>
+            <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
+            <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
+        </member>
+        <member name="T:Verbex.Sdk.SearchResult">
+            <summary>
+            Individual search result model.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchResult.DocumentId">
+            <summary>
+            The document identifier.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchResult.Score">
+            <summary>
+            Relevance score for the result.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchResult.Content">
+            <summary>
+            Document content or excerpt.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.ValidationData">
+            <summary>
+            Token validation response data.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ValidationData.Valid">
+            <summary>
+            Indicates whether the token is valid.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.VerbexClient">
+            <summary>
+            Verbex SDK Client for .NET.
+            Provides methods to interact with all Verbex REST API endpoints.
+            </summary>
+            <remarks>
+            This client is thread-safe and can be reused for multiple requests.
+            Implements IDisposable to properly clean up HTTP resources.
+            </remarks>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.#ctor(System.String,System.String)">
+            <summary>
+            Creates a new VerbexClient instance.
+            </summary>
+            <param name="endpoint">The base URL of the Verbex server (e.g., "http://localhost:8080").</param>
+            <param name="accessKey">The bearer token for authentication.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when endpoint or accessKey is null.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.Dispose">
+            <summary>
+            Disposes the HTTP client resources.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.Dispose(System.Boolean)">
+            <summary>
+            Disposes managed and unmanaged resources.
+            </summary>
+            <param name="disposing">True if disposing managed resources.</param>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.RootHealthCheckAsync(System.Threading.CancellationToken)">
+            <summary>
+            Checks server health via the root endpoint.
+            </summary>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Health check response.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.HealthCheckAsync(System.Threading.CancellationToken)">
+            <summary>
+            Checks server health via the /v1.0/health endpoint.
+            </summary>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Health check response.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.LoginAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Authenticates and receives a bearer token.
+            </summary>
+            <param name="username">The username.</param>
+            <param name="password">The password.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Login response with token.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when authentication fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.ValidateTokenAsync(System.Threading.CancellationToken)">
+            <summary>
+            Validates the current bearer token.
+            </summary>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Validation response.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when validation fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.ListIndicesAsync(System.Threading.CancellationToken)">
+            <summary>
+            Lists all available indices.
+            </summary>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>List of indices.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.GetIndicesAsync(System.Threading.CancellationToken)">
+            <summary>
+            Gets all indices as a list.
+            </summary>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>List of IndexInfo objects.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.CreateIndexAsync(System.String,System.String,System.Boolean,System.Boolean,System.Boolean,System.Int32,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Creates a new index.
+            </summary>
+            <param name="name">Display name for the index.</param>
+            <param name="description">Description of the index.</param>
+            <param name="inMemory">Whether to use in-memory storage only.</param>
+            <param name="enableLemmatizer">Enable word lemmatization.</param>
+            <param name="enableStopWordRemover">Enable stop word filtering.</param>
+            <param name="minTokenLength">Minimum token length (0 to disable).</param>
+            <param name="maxTokenLength">Maximum token length (0 to disable).</param>
+            <param name="labels">Optional list of labels to associate with the index.</param>
+            <param name="tags">Optional key-value tags to associate with the index.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Created index response.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when creation fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.GetIndexAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets detailed information about a specific index.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Index details response.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the index is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.GetIndexInfoAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets index information.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>IndexInfo object.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the index is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.IndexExistsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Checks if an index exists.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>True if the index exists, false otherwise.</returns>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.DeleteIndexAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Deletes an index.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Deletion confirmation.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the index is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.UpdateIndexLabelsAsync(System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Updates labels on an index (full replacement).
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="labels">The new labels to set.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Update confirmation with updated index info.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the index is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.UpdateIndexTagsAsync(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Updates tags on an index (full replacement).
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="tags">The new tags to set.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Update confirmation with updated index info.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the index is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.ListDocumentsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Lists all documents in an index.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>List of documents.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.GetDocumentsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets all documents in an index.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>List of DocumentInfo objects.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.AddDocumentAsync(System.String,System.String,System.String,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Adds a document to an index.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="content">The document content to index.</param>
+            <param name="documentId">Optional document ID (GUID format, auto-generated if not provided).</param>
+            <param name="labels">Optional list of labels to associate with the document.</param>
+            <param name="tags">Optional key-value tags to associate with the document.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Document creation response.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.GetDocumentAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets a specific document.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="documentId">The document identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Document details.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the document is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.GetDocumentInfoAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets document information.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="documentId">The document identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>DocumentInfo object.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the document is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.DocumentExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Checks if a document exists in an index.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="documentId">The document identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>True if the document exists, false otherwise.</returns>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.DeleteDocumentAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Deletes a document from an index.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="documentId">The document identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Deletion confirmation.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the document is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.UpdateDocumentLabelsAsync(System.String,System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Updates labels on a document (full replacement).
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="documentId">The document identifier.</param>
+            <param name="labels">The new labels to set.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Update confirmation with updated document.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the document is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.UpdateDocumentTagsAsync(System.String,System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Updates tags on a document (full replacement).
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="documentId">The document identifier.</param>
+            <param name="tags">The new tags to set.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Update confirmation with updated document.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the document is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.SearchAsync(System.String,System.String,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.Object},System.Threading.CancellationToken)">
+            <summary>
+            Searches documents in an index.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="query">The search query.</param>
+            <param name="maxResults">Maximum number of results to return.</param>
+            <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
+            <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Search results.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.SearchDocumentsAsync(System.String,System.String,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.Object},System.Threading.CancellationToken)">
+            <summary>
+            Searches documents and returns search data.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="query">The search query.</param>
+            <param name="maxResults">Maximum number of results to return.</param>
+            <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
+            <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>SearchData object.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.ListTenantsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Lists all tenants.
+            </summary>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>List of tenants.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.GetTenantsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Gets all tenants as a list.
+            </summary>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>List of TenantInfo objects.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.GetTenantAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets a specific tenant.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Tenant details.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the tenant is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.CreateTenantAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Creates a new tenant.
+            </summary>
+            <param name="name">Tenant name.</param>
+            <param name="description">Optional description.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Created tenant response.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when creation fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.DeleteTenantAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Deletes a tenant.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Deletion confirmation.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the tenant is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.ListUsersAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Lists all users in a tenant.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>List of users.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.GetUsersAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets all users in a tenant as a list.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>List of UserInfo objects.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.GetUserAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets a specific user.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="userId">The user identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>User details.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the user is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.CreateUserAsync(System.String,System.String,System.String,System.String,System.String,System.Boolean,System.Threading.CancellationToken)">
+            <summary>
+            Creates a new user in a tenant.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="email">User email.</param>
+            <param name="password">User password.</param>
+            <param name="firstName">Optional first name.</param>
+            <param name="lastName">Optional last name.</param>
+            <param name="isAdmin">Whether user is tenant admin.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Created user response.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when creation fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.DeleteUserAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Deletes a user.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="userId">The user identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Deletion confirmation.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the user is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.ListCredentialsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Lists all credentials in a tenant.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>List of credentials.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.GetCredentialsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets all credentials in a tenant as a list.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>List of CredentialInfo objects.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.GetCredentialAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets a specific credential.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="credentialId">The credential identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Credential details.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the credential is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.CreateCredentialAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Creates a new credential (API key) in a tenant.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="description">Optional description.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Created credential response (includes bearer token).</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when creation fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.DeleteCredentialAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Deletes a credential.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="credentialId">The credential identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Deletion confirmation.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the credential is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.UpdateTenantLabelsAsync(System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Updates labels on a tenant (full replacement).
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="labels">The new labels to set.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Update confirmation.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the tenant is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.UpdateTenantTagsAsync(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Updates tags on a tenant (full replacement).
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="tags">The new tags to set.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Update confirmation.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the tenant is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.UpdateUserLabelsAsync(System.String,System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Updates labels on a user (full replacement).
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="userId">The user identifier.</param>
+            <param name="labels">The new labels to set.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Update confirmation.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the user is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.UpdateUserTagsAsync(System.String,System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Updates tags on a user (full replacement).
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="userId">The user identifier.</param>
+            <param name="tags">The new tags to set.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Update confirmation.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the user is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.UpdateCredentialLabelsAsync(System.String,System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Updates labels on a credential (full replacement).
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="credentialId">The credential identifier.</param>
+            <param name="labels">The new labels to set.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Update confirmation.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the credential is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.UpdateCredentialTagsAsync(System.String,System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Updates tags on a credential (full replacement).
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="credentialId">The credential identifier.</param>
+            <param name="tags">The new tags to set.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Update confirmation.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the credential is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.UpdateIndexCustomMetadataAsync(System.String,System.Object,System.Threading.CancellationToken)">
+            <summary>
+            Updates custom metadata on an index (full replacement).
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="customMetadata">The custom metadata object to set. Can be any JSON-serializable object.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Updated index information.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the index is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.UpdateDocumentCustomMetadataAsync(System.String,System.String,System.Object,System.Threading.CancellationToken)">
+            <summary>
+            Updates custom metadata on a document (full replacement).
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="documentId">The document identifier.</param>
+            <param name="customMetadata">The custom metadata object to set. Can be any JSON-serializable object.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Updated document information.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the document is not found.</exception>
+        </member>
+        <member name="T:Verbex.Sdk.VerbexException">
+            <summary>
+            Exception thrown for Verbex API errors.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.VerbexException.StatusCode">
+            <summary>
+            HTTP status code from the API response.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.VerbexException.Response">
+            <summary>
+            The API response associated with this error.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexException.#ctor(System.String)">
+            <summary>
+            Creates a new VerbexException.
+            </summary>
+            <param name="message">The error message.</param>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexException.#ctor(System.String,System.Int32)">
+            <summary>
+            Creates a new VerbexException with status code.
+            </summary>
+            <param name="message">The error message.</param>
+            <param name="statusCode">The HTTP status code.</param>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexException.#ctor(System.String,System.Int32,Verbex.Sdk.ApiResponse)">
+            <summary>
+            Creates a new VerbexException with status code and response.
+            </summary>
+            <param name="message">The error message.</param>
+            <param name="statusCode">The HTTP status code.</param>
+            <param name="response">The API response.</param>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexException.#ctor(System.String,System.Exception)">
+            <summary>
+            Creates a new VerbexException with an inner exception.
+            </summary>
+            <param name="message">The error message.</param>
+            <param name="innerException">The inner exception.</param>
+        </member>
+    </members>
+</doc>

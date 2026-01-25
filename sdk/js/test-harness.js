@@ -277,6 +277,33 @@ class TestHarness {
         await this._client.deleteIndex(indexId);
     }
 
+    // ==================== HEAD API Tests ====================
+
+    async testIndexExists() {
+        const exists = await this._client.indexExists(this._testIndexId);
+        this._assertTrue(exists, 'index should exist');
+    }
+
+    async testIndexExistsNotFound() {
+        const exists = await this._client.indexExists('non-existent-index-99999');
+        this._assertFalse(exists, 'index should not exist');
+    }
+
+    async testDocumentExists() {
+        if (this._testDocuments.length === 0) {
+            throw new Error('No test documents available');
+        }
+        const docId = this._testDocuments[0];
+        const exists = await this._client.documentExists(this._testIndexId, docId);
+        this._assertTrue(exists, 'document should exist');
+    }
+
+    async testDocumentExistsNotFound() {
+        const fakeId = crypto.randomUUID();
+        const exists = await this._client.documentExists(this._testIndexId, fakeId);
+        this._assertFalse(exists, 'document should not exist');
+    }
+
     // ==================== Document Management Tests ====================
 
     async testListDocumentsEmpty() {
@@ -654,6 +681,8 @@ class TestHarness {
             await this._runTest('List indices (after create)', () => this.testListIndicesAfterCreate());
             await this._runTest('Create index with labels and tags', () => this.testCreateIndexWithLabelsAndTags());
             await this._runTest('Get index with labels and tags', () => this.testGetIndexWithLabelsAndTags());
+            await this._runTest('Index exists (HEAD)', () => this.testIndexExists());
+            await this._runTest('Index exists not found (HEAD)', () => this.testIndexExistsNotFound());
 
             // Document Management Tests
             this._printSubheader('Document Management');
@@ -666,6 +695,8 @@ class TestHarness {
             await this._runTest('Get document not found', () => this.testGetDocumentNotFound());
             await this._runTest('Add document with labels and tags', () => this.testAddDocumentWithLabelsAndTags());
             await this._runTest('Get document with labels and tags', () => this.testGetDocumentWithLabelsAndTags());
+            await this._runTest('Document exists (HEAD)', () => this.testDocumentExists());
+            await this._runTest('Document exists not found (HEAD)', () => this.testDocumentExistsNotFound());
 
             // Search Tests
             this._printSubheader('Search');

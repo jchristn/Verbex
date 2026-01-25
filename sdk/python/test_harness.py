@@ -276,6 +276,32 @@ class TestHarness:
         # Clean up
         self._client.delete_index(index_id)
 
+    # ==================== HEAD API Tests ====================
+
+    def test_index_exists(self):
+        """Test HEAD API for index existence."""
+        exists = self._client.index_exists(self._test_index_id)
+        self._assert_true(exists, "index should exist")
+
+    def test_index_exists_not_found(self):
+        """Test HEAD API for non-existent index."""
+        exists = self._client.index_exists("non-existent-index-99999")
+        self._assert_false(exists, "index should not exist")
+
+    def test_document_exists(self):
+        """Test HEAD API for document existence."""
+        if len(self._test_documents) == 0:
+            raise AssertionError("No test documents available")
+        doc_id = self._test_documents[0]
+        exists = self._client.document_exists(self._test_index_id, doc_id)
+        self._assert_true(exists, "document should exist")
+
+    def test_document_exists_not_found(self):
+        """Test HEAD API for non-existent document."""
+        fake_id = str(uuid.uuid4())
+        exists = self._client.document_exists(self._test_index_id, fake_id)
+        self._assert_false(exists, "document should not exist")
+
     # ==================== Document Management Tests ====================
 
     def test_list_documents_empty(self):
@@ -638,6 +664,8 @@ class TestHarness:
             self._run_test("List indices (after create)", self.test_list_indices_after_create)
             self._run_test("Create index with labels and tags", self.test_create_index_with_labels_and_tags)
             self._run_test("Get index with labels and tags", self.test_get_index_with_labels_and_tags)
+            self._run_test("Index exists (HEAD)", self.test_index_exists)
+            self._run_test("Index exists not found (HEAD)", self.test_index_exists_not_found)
 
             # Document Management Tests
             self._print_subheader("Document Management")
@@ -650,6 +678,8 @@ class TestHarness:
             self._run_test("Get document not found", self.test_get_document_not_found)
             self._run_test("Add document with labels and tags", self.test_add_document_with_labels_and_tags)
             self._run_test("Get document with labels and tags", self.test_get_document_with_labels_and_tags)
+            self._run_test("Document exists (HEAD)", self.test_document_exists)
+            self._run_test("Document exists not found (HEAD)", self.test_document_exists_not_found)
 
             # Search Tests
             self._print_subheader("Search")

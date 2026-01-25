@@ -32,7 +32,7 @@ namespace Verbex.Sdk.TestHarness
     {
         private readonly string _Endpoint;
         private readonly string _AccessKey;
-        private readonly string _TestIndexId;
+        private string _TestIndexId;
         private readonly List<string> _TestDocuments;
         private readonly List<TestResult> _Results;
         private VerbexClient? _Client;
@@ -43,7 +43,7 @@ namespace Verbex.Sdk.TestHarness
         {
             _Endpoint = endpoint;
             _AccessKey = accessKey;
-            _TestIndexId = $"test-index-{Guid.NewGuid().ToString("N")[..8]}";
+            _TestIndexId = string.Empty;
             _TestDocuments = new List<string>();
             _Results = new List<TestResult>();
             _Passed = 0;
@@ -213,32 +213,35 @@ namespace Verbex.Sdk.TestHarness
         private async Task TestCreateIndexAsync()
         {
             ApiResponse<CreateIndexData> response = await _Client!.CreateIndexAsync(
-                id: _TestIndexId,
                 name: "Test Index",
                 description: "A test index for SDK validation",
-                inMemory: true,
-                storageMode: "MemoryOnly"
+                inMemory: true
             ).ConfigureAwait(false);
             AssertTrue(response.Success, "response.Success");
             AssertEquals(response.StatusCode, 201, "response.StatusCode");
             AssertNotNull(response.Data, "response.Data");
             AssertNotNull(response.Data!.Message, "data.Message");
             AssertNotNull(response.Data.Index, "data.Index");
-            AssertEquals(response.Data.Index!.Id, _TestIndexId, "index.Id");
+            AssertNotNull(response.Data.Index!.Identifier, "index.Identifier");
             AssertEquals(response.Data.Index.Name, "Test Index", "index.Name");
+            _TestIndexId = response.Data.Index.Identifier;
         }
 
-        private async Task TestCreateDuplicateIndexAsync()
+        private async Task TestCreateDuplicateNameIndexAsync()
         {
-            try
-            {
-                await _Client!.CreateIndexAsync(id: _TestIndexId, name: "Duplicate").ConfigureAwait(false);
-                Assert(false, "Should have thrown VerbexException for duplicate");
-            }
-            catch (VerbexException ex)
-            {
-                AssertEquals(ex.StatusCode, 409, "error.StatusCode");
-            }
+            // Creating an index with the same name is allowed since IDs are auto-generated
+            ApiResponse<CreateIndexData> response = await _Client!.CreateIndexAsync(
+                name: "Test Index",
+                description: "Duplicate name index",
+                inMemory: true
+            ).ConfigureAwait(false);
+            AssertTrue(response.Success, "response.Success");
+            AssertEquals(response.StatusCode, 201, "response.StatusCode");
+            // Verify it got a different ID
+            AssertNotNull(response.Data!.Index, "data.Index");
+            Assert(response.Data.Index!.Identifier != _TestIndexId, "Should have different ID");
+            // Clean up the duplicate
+            await _Client!.DeleteIndexAsync(response.Data.Index.Identifier).ConfigureAwait(false);
         }
 
         private async Task TestGetIndexAsync()
@@ -247,7 +250,7 @@ namespace Verbex.Sdk.TestHarness
             AssertTrue(response.Success, "response.Success");
             AssertEquals(response.StatusCode, 200, "response.StatusCode");
             AssertNotNull(response.Data, "response.Data");
-            AssertEquals(response.Data!.Id, _TestIndexId, "data.Id");
+            AssertEquals(response.Data!.Identifier, _TestIndexId, "data.Identifier");
             AssertEquals(response.Data.Name, "Test Index", "data.Name");
             AssertNotNull(response.Data.CreatedUtc, "data.CreatedUtc");
         }
@@ -268,13 +271,12 @@ namespace Verbex.Sdk.TestHarness
         private async Task TestListIndicesAfterCreateAsync()
         {
             List<IndexInfo> indices = await _Client!.GetIndicesAsync().ConfigureAwait(false);
-            bool found = indices.Exists(idx => idx.Id == _TestIndexId);
+            bool found = indices.Exists(idx => idx.Identifier == _TestIndexId);
             AssertTrue(found, "test index should be in list");
         }
 
         private async Task TestCreateIndexWithLabelsAndTagsAsync()
         {
-            string indexId = $"test-labeled-{Guid.NewGuid().ToString("N")[..8]}";
             List<string> labels = new List<string> { "test", "labeled" };
             Dictionary<string, string> tags = new Dictionary<string, string>
             {
@@ -282,11 +284,9 @@ namespace Verbex.Sdk.TestHarness
                 { "owner", "sdk-harness" }
             };
             ApiResponse<CreateIndexData> response = await _Client!.CreateIndexAsync(
-                id: indexId,
                 name: "Labeled Test Index",
                 description: "An index with labels and tags",
                 inMemory: true,
-                storageMode: "MemoryOnly",
                 labels: labels,
                 tags: tags
             ).ConfigureAwait(false);
@@ -295,25 +295,24 @@ namespace Verbex.Sdk.TestHarness
             AssertNotNull(response.Data, "response.Data");
             AssertNotNull(response.Data!.Index, "data.Index");
             // Clean up
-            await _Client!.DeleteIndexAsync(indexId).ConfigureAwait(false);
+            await _Client!.DeleteIndexAsync(response.Data.Index!.Identifier).ConfigureAwait(false);
         }
 
         private async Task TestGetIndexWithLabelsAndTagsAsync()
         {
-            string indexId = $"test-labeled-get-{Guid.NewGuid().ToString("N")[..8]}";
             List<string> labels = new List<string> { "retrieval", "test" };
             Dictionary<string, string> tags = new Dictionary<string, string>
             {
                 { "purpose", "verification" },
                 { "version", "1.0" }
             };
-            await _Client!.CreateIndexAsync(
-                id: indexId,
+            ApiResponse<CreateIndexData> createResponse = await _Client!.CreateIndexAsync(
                 name: "Get Labeled Index",
                 inMemory: true,
                 labels: labels,
                 tags: tags
             ).ConfigureAwait(false);
+            string indexId = createResponse.Data!.Index!.Identifier;
             ApiResponse<IndexInfo> response = await _Client!.GetIndexAsync(indexId).ConfigureAwait(false);
             AssertTrue(response.Success, "response.Success");
             AssertNotNull(response.Data, "response.Data");
@@ -323,6 +322,38 @@ namespace Verbex.Sdk.TestHarness
             AssertEquals(response.Data.Tags!.Count, 2, "tags count");
             // Clean up
             await _Client!.DeleteIndexAsync(indexId).ConfigureAwait(false);
+        }
+
+        // ==================== HEAD API Tests ====================
+
+        private async Task TestIndexExistsAsync()
+        {
+            bool exists = await _Client!.IndexExistsAsync(_TestIndexId).ConfigureAwait(false);
+            AssertTrue(exists, "index should exist");
+        }
+
+        private async Task TestIndexExistsNotFoundAsync()
+        {
+            bool exists = await _Client!.IndexExistsAsync("non-existent-index-99999").ConfigureAwait(false);
+            AssertTrue(!exists, "index should not exist");
+        }
+
+        private async Task TestDocumentExistsAsync()
+        {
+            if (_TestDocuments.Count == 0)
+            {
+                throw new Exception("No test documents available");
+            }
+            string docId = _TestDocuments[0];
+            bool exists = await _Client!.DocumentExistsAsync(_TestIndexId, docId).ConfigureAwait(false);
+            AssertTrue(exists, "document should exist");
+        }
+
+        private async Task TestDocumentExistsNotFoundAsync()
+        {
+            string fakeId = Guid.NewGuid().ToString();
+            bool exists = await _Client!.DocumentExistsAsync(_TestIndexId, fakeId).ConfigureAwait(false);
+            AssertTrue(!exists, "document should not exist");
         }
 
         // ==================== Document Management Tests ====================
@@ -746,12 +777,14 @@ namespace Verbex.Sdk.TestHarness
                 PrintSubheader("Index Management");
                 await RunTestAsync("List indices (initial)", TestListIndicesInitialAsync).ConfigureAwait(false);
                 await RunTestAsync("Create index", TestCreateIndexAsync).ConfigureAwait(false);
-                await RunTestAsync("Create duplicate index fails", TestCreateDuplicateIndexAsync).ConfigureAwait(false);
+                await RunTestAsync("Create duplicate name index succeeds", TestCreateDuplicateNameIndexAsync).ConfigureAwait(false);
                 await RunTestAsync("Get index", TestGetIndexAsync).ConfigureAwait(false);
                 await RunTestAsync("Get index not found", TestGetIndexNotFoundAsync).ConfigureAwait(false);
                 await RunTestAsync("List indices (after create)", TestListIndicesAfterCreateAsync).ConfigureAwait(false);
                 await RunTestAsync("Create index with labels and tags", TestCreateIndexWithLabelsAndTagsAsync).ConfigureAwait(false);
                 await RunTestAsync("Get index with labels and tags", TestGetIndexWithLabelsAndTagsAsync).ConfigureAwait(false);
+                await RunTestAsync("Index exists (HEAD)", TestIndexExistsAsync).ConfigureAwait(false);
+                await RunTestAsync("Index exists not found (HEAD)", TestIndexExistsNotFoundAsync).ConfigureAwait(false);
 
                 // Document Management Tests
                 PrintSubheader("Document Management");
@@ -764,6 +797,8 @@ namespace Verbex.Sdk.TestHarness
                 await RunTestAsync("Get document not found", TestGetDocumentNotFoundAsync).ConfigureAwait(false);
                 await RunTestAsync("Add document with labels and tags", TestAddDocumentWithLabelsAndTagsAsync).ConfigureAwait(false);
                 await RunTestAsync("Get document with labels and tags", TestGetDocumentWithLabelsAndTagsAsync).ConfigureAwait(false);
+                await RunTestAsync("Document exists (HEAD)", TestDocumentExistsAsync).ConfigureAwait(false);
+                await RunTestAsync("Document exists not found (HEAD)", TestDocumentExistsNotFoundAsync).ConfigureAwait(false);
 
                 // Search Tests
                 PrintSubheader("Search");
