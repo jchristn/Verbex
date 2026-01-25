@@ -305,6 +305,8 @@ class VerbexClient:
         try:
             if method == 'GET':
                 response = self._session.get(url, headers=headers)
+            elif method == 'HEAD':
+                response = self._session.head(url, headers=headers)
             elif method == 'POST':
                 response = self._session.post(url, headers=headers, json=data)
             elif method == 'PUT':
@@ -483,6 +485,24 @@ class VerbexClient:
         response = self.get_index(index_id)
         return IndexInfo.from_dict(response.data) if response.data else None
 
+    def index_exists(self, index_id: str) -> bool:
+        """
+        Check if an index exists.
+
+        Args:
+            index_id: The index identifier
+
+        Returns:
+            True if the index exists, False otherwise
+        """
+        try:
+            self._make_request('HEAD', f'/v1.0/indices/{index_id}')
+            return True
+        except VerbexError as e:
+            if e.status_code == 404:
+                return False
+            raise
+
     def delete_index(self, index_id: str) -> ApiResponse:
         """
         Delete an index.
@@ -624,6 +644,25 @@ class VerbexClient:
         """
         response = self.get_document(index_id, document_id)
         return DocumentInfo.from_dict(response.data) if response.data else None
+
+    def document_exists(self, index_id: str, document_id: str) -> bool:
+        """
+        Check if a document exists in an index.
+
+        Args:
+            index_id: The index identifier
+            document_id: The document identifier
+
+        Returns:
+            True if the document exists, False otherwise
+        """
+        try:
+            self._make_request('HEAD', f'/v1.0/indices/{index_id}/documents/{document_id}')
+            return True
+        except VerbexError as e:
+            if e.status_code == 404:
+                return False
+            raise
 
     def delete_document(self, index_id: str, document_id: str) -> ApiResponse:
         """

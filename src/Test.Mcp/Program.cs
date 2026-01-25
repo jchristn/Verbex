@@ -178,6 +178,8 @@ namespace Test.Mcp
             await TestSearchNoResultsAsync().ConfigureAwait(false);
             await TestAddLabelsAsync().ConfigureAwait(false);
             await TestAddTagsAsync().ConfigureAwait(false);
+            await TestIndexExistsAsync().ConfigureAwait(false);
+            await TestDocumentExistsAsync().ConfigureAwait(false);
             await TestDeleteDocumentAsync().ConfigureAwait(false);
             await TestDeleteIndexAsync().ConfigureAwait(false);
             await TestBuiltInToolsAsync().ConfigureAwait(false);
@@ -575,6 +577,68 @@ namespace Test.Mcp
 
                 Assert(data.GetProperty("success").GetBoolean(), "Add tags should succeed");
                 Console.WriteLine("    Added 3 tags to document");
+            }).ConfigureAwait(false);
+        }
+
+        private static async Task TestIndexExistsAsync()
+        {
+            await RunTestAsync("Index Exists Check", async () =>
+            {
+                // Test existing index
+                JsonElement result = await CallToolAsync("verbex_index_exists", new
+                {
+                    name = _TestIndexName
+                }).ConfigureAwait(false);
+
+                JsonElement data = ParseToolResult(result);
+
+                Assert(data.GetProperty("exists").GetBoolean(), "Test index should exist");
+                AssertEquals(_TestIndexName, data.GetProperty("indexName").GetString()!, "Index name should match");
+                Console.WriteLine($"    Index {_TestIndexName} exists: true");
+
+                // Test non-existing index
+                JsonElement result2 = await CallToolAsync("verbex_index_exists", new
+                {
+                    name = "nonexistent-index-12345"
+                }).ConfigureAwait(false);
+
+                JsonElement data2 = ParseToolResult(result2);
+
+                Assert(!data2.GetProperty("exists").GetBoolean(), "Nonexistent index should not exist");
+                Console.WriteLine("    Index nonexistent-index-12345 exists: false");
+            }).ConfigureAwait(false);
+        }
+
+        private static async Task TestDocumentExistsAsync()
+        {
+            await RunTestAsync("Document Exists Check", async () =>
+            {
+                Assert(!string.IsNullOrEmpty(_TestDocumentId), "Test document ID should be set");
+
+                // Test existing document
+                JsonElement result = await CallToolAsync("verbex_document_exists", new
+                {
+                    index = _TestIndexName,
+                    documentId = _TestDocumentId
+                }).ConfigureAwait(false);
+
+                JsonElement data = ParseToolResult(result);
+
+                Assert(data.GetProperty("exists").GetBoolean(), "Test document should exist");
+                AssertEquals(_TestDocumentId, data.GetProperty("documentId").GetString()!, "Document ID should match");
+                Console.WriteLine($"    Document {_TestDocumentId} exists: true");
+
+                // Test non-existing document
+                JsonElement result2 = await CallToolAsync("verbex_document_exists", new
+                {
+                    index = _TestIndexName,
+                    documentId = "nonexistent-doc-12345"
+                }).ConfigureAwait(false);
+
+                JsonElement data2 = ParseToolResult(result2);
+
+                Assert(!data2.GetProperty("exists").GetBoolean(), "Nonexistent document should not exist");
+                Console.WriteLine("    Document nonexistent-doc-12345 exists: false");
             }).ConfigureAwait(false);
         }
 

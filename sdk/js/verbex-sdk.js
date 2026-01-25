@@ -426,6 +426,23 @@ class VerbexClient {
     }
 
     /**
+     * Check if an index exists.
+     * @param {string} indexId - The index identifier
+     * @returns {Promise<boolean>} True if index exists, false otherwise
+     */
+    async indexExists(indexId) {
+        try {
+            await this._makeRequest('HEAD', `/v1.0/indices/${indexId}`);
+            return true;
+        } catch (error) {
+            if (error instanceof VerbexError && error.statusCode === 404) {
+                return false;
+            }
+            throw error;
+        }
+    }
+
+    /**
      * Delete an index.
      * @param {string} indexId - The index identifier
      * @returns {Promise<ApiResponse>} Deletion confirmation
@@ -534,6 +551,24 @@ class VerbexClient {
     async getDocumentInfo(indexId, documentId) {
         const response = await this.getDocument(indexId, documentId);
         return response.data ? new DocumentInfo(response.data) : null;
+    }
+
+    /**
+     * Check if a document exists in an index.
+     * @param {string} indexId - The index identifier
+     * @param {string} documentId - The document identifier
+     * @returns {Promise<boolean>} True if document exists, false otherwise
+     */
+    async documentExists(indexId, documentId) {
+        try {
+            await this._makeRequest('HEAD', `/v1.0/indices/${indexId}/documents/${documentId}`);
+            return true;
+        } catch (error) {
+            if (error instanceof VerbexError && error.statusCode === 404) {
+                return false;
+            }
+            throw error;
+        }
     }
 
     /**

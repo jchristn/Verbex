@@ -269,6 +269,33 @@
 					"response": []
 				},
 				{
+					"name": "Check Index Exists",
+					"request": {
+						"method": "HEAD",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index"
+							]
+						},
+						"description": "Check if an index exists. Returns 200 if the index exists, 404 if not found. No response body is returned."
+					},
+					"response": []
+				},
+				{
 					"name": "Delete Index",
 					"request": {
 						"method": "DELETE",
@@ -427,6 +454,35 @@
 							]
 						},
 						"description": "Retrieve a specific document by its ID from the specified index."
+					},
+					"response": []
+				},
+				{
+					"name": "Check Document Exists",
+					"request": {
+						"method": "HEAD",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/documents/550e8400-e29b-41d4-a716-446655440000",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"documents",
+								"550e8400-e29b-41d4-a716-446655440000"
+							]
+						},
+						"description": "Check if a document exists in the specified index. Returns 200 if the document exists, 404 if not found. No response body is returned."
 					},
 					"response": []
 				},

@@ -363,6 +363,25 @@ namespace Verbex.Sdk
         }
 
         /// <summary>
+        /// Checks if an index exists.
+        /// </summary>
+        /// <param name="indexId">The index identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>True if the index exists, false otherwise.</returns>
+        public async Task<bool> IndexExistsAsync(string indexId, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                await MakeRequestAsync(HttpMethod.Head, $"/v1.0/indices/{indexId}", null, true, cancellationToken).ConfigureAwait(false);
+                return true;
+            }
+            catch (VerbexException ex) when (ex.StatusCode == 404)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Deletes an index.
         /// </summary>
         /// <param name="indexId">The index identifier.</param>
@@ -483,6 +502,26 @@ namespace Verbex.Sdk
         {
             ApiResponse<DocumentInfo> response = await GetDocumentAsync(indexId, documentId, cancellationToken).ConfigureAwait(false);
             return response.Data;
+        }
+
+        /// <summary>
+        /// Checks if a document exists in an index.
+        /// </summary>
+        /// <param name="indexId">The index identifier.</param>
+        /// <param name="documentId">The document identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>True if the document exists, false otherwise.</returns>
+        public async Task<bool> DocumentExistsAsync(string indexId, string documentId, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                await MakeRequestAsync(HttpMethod.Head, $"/v1.0/indices/{indexId}/documents/{documentId}", null, true, cancellationToken).ConfigureAwait(false);
+                return true;
+            }
+            catch (VerbexException ex) when (ex.StatusCode == 404)
+            {
+                return false;
+            }
         }
 
         /// <summary>

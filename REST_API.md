@@ -109,10 +109,12 @@ All API responses are wrapped in a standard format:
 | Index | GET | `/v1.0/indices` | List all indices | Yes |
 | Index | POST | `/v1.0/indices` | Create new index | Yes |
 | Index | GET | `/v1.0/indices/{id}` | Get index details | Yes |
+| Index | HEAD | `/v1.0/indices/{id}` | Check if index exists | Yes |
 | Index | DELETE | `/v1.0/indices/{id}` | Delete index | Yes |
 | Document | GET | `/v1.0/indices/{id}/documents` | List documents | Yes |
 | Document | POST | `/v1.0/indices/{id}/documents` | Add document | Yes |
 | Document | GET | `/v1.0/indices/{id}/documents/{docId}` | Get document | Yes |
+| Document | HEAD | `/v1.0/indices/{id}/documents/{docId}` | Check if document exists | Yes |
 | Document | DELETE | `/v1.0/indices/{id}/documents/{docId}` | Delete document | Yes |
 | Search | POST | `/v1.0/indices/{id}/search` | Search documents | Yes |
 | Tenant | GET | `/v1.0/tenants` | List tenants | Yes (Admin) |
@@ -360,6 +362,21 @@ Authorization: Bearer <token>
 }
 ```
 
+### HEAD `/v1.0/indices/{id}`
+**Description:** Check if an index exists
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Path Parameters:**
+- `id` (string): Index identifier
+
+**Response:**
+- Returns `200 OK` with no body if the index exists
+- Returns `404 Not Found` with no body if the index does not exist
+
 ### DELETE `/v1.0/indices/{id}`
 **Description:** Delete an index permanently
 
@@ -501,6 +518,22 @@ Authorization: Bearer <token>
   "ProcessingTimeMs": 3.45
 }
 ```
+
+### HEAD `/v1.0/indices/{id}/documents/{docId}`
+**Description:** Check if a document exists in an index
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Path Parameters:**
+- `id` (string): Index identifier
+- `docId` (string): Document identifier
+
+**Response:**
+- Returns `200 OK` with no body if the document exists
+- Returns `404 Not Found` with no body if the index or document does not exist
 
 ### DELETE `/v1.0/indices/{id}/documents/{docId}`
 **Description:** Remove a document from an index

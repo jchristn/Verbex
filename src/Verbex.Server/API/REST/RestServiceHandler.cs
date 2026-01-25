@@ -169,11 +169,11 @@ namespace Verbex.Server.API.REST
         /// </summary>
         private void InitializeRoutes()
         {
-            // General
+            #region General-Routes
+
             _Webserver!.Routes.Preflight = PreflightRoute;
             _Webserver.Routes.PostRouting = PostRoutingRoute;
 
-            // Health check routes
             _Webserver.Routes.PreAuthentication.Static.Add(
                 HttpMethod.GET, "/", GetHealthRoute,
                 metadata => metadata
@@ -196,7 +196,10 @@ namespace Verbex.Server.API.REST
                     .WithResponse(200, OpenApiResponseMetadata.Json("Service is healthy", CreateResponseSchema())),
                 ExceptionRoute);
 
-            // Authentication routes
+            #endregion
+
+            #region Authentication-Routes
+
             _Webserver.Routes.PreAuthentication.Static.Add(
                 HttpMethod.POST, "/v1.0/auth/login", PostAuthLoginRoute,
                 metadata => metadata
@@ -220,7 +223,10 @@ namespace Verbex.Server.API.REST
                     .WithResponse(401, OpenApiResponseMetadata.Unauthorized()),
                 ExceptionRoute);
 
-            // Index management routes
+            #endregion
+
+            #region Index-Management-Routes
+
             _Webserver.Routes.PostAuthentication.Static.Add(
                 HttpMethod.GET, "/v1.0/indices", GetIndicesRoute,
                 metadata => metadata
@@ -257,6 +263,17 @@ namespace Verbex.Server.API.REST
                 ExceptionRoute);
 
             _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.HEAD, "/v1.0/indices/{id}", HeadIndexRoute,
+                metadata => metadata
+                    .WithTag("Indices")
+                    .WithDescription("Check if an index exists. Returns 200 if found, 404 if not found.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithResponse(200, OpenApiResponseMetadata.Create("Index exists"))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
                 HttpMethod.DELETE, "/v1.0/indices/{id}", DeleteIndexRoute,
                 metadata => metadata
                     .WithTag("Indices")
@@ -267,7 +284,6 @@ namespace Verbex.Server.API.REST
                     .WithResponse(404, OpenApiResponseMetadata.NotFound()),
                 ExceptionRoute);
 
-            // Index labels and tags update routes
             _Webserver.Routes.PostAuthentication.Parameter.Add(
                 HttpMethod.PUT, "/v1.0/indices/{id}/labels", PutIndexLabelsRoute,
                 metadata => metadata
@@ -316,7 +332,26 @@ namespace Verbex.Server.API.REST
                     .WithResponse(404, OpenApiResponseMetadata.NotFound()),
                 ExceptionRoute);
 
-            // Index-specific document routes
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.POST, "/v1.0/indices/{id}/search", PostIndexSearchRoute,
+                metadata => metadata
+                    .WithTag("Search")
+                    .WithDescription("Perform a full-text search within an index. Supports AND/OR logic and label/tag filtering.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index to search"))
+                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
+                        CreateSearchRequestSchema(),
+                        "Search query and options",
+                        required: true))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Search results", CreateSearchResultsSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            #endregion
+
+            #region Document-Routes
+
             _Webserver.Routes.PostAuthentication.Parameter.Add(
                 HttpMethod.GET, "/v1.0/indices/{id}/documents", GetIndexDocumentsRoute,
                 metadata => metadata
@@ -357,6 +392,18 @@ namespace Verbex.Server.API.REST
                 ExceptionRoute);
 
             _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.HEAD, "/v1.0/indices/{id}/documents/{docId}", HeadIndexDocumentRoute,
+                metadata => metadata
+                    .WithTag("Documents")
+                    .WithDescription("Check if a document exists in an index. Returns 200 if found, 404 if not found.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithParameter(OpenApiParameterMetadata.Path("docId", "The unique identifier of the document"))
+                    .WithResponse(200, OpenApiResponseMetadata.Create("Document exists"))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
                 HttpMethod.DELETE, "/v1.0/indices/{id}/documents/{docId}", DeleteIndexDocumentRoute,
                 metadata => metadata
                     .WithTag("Documents")
@@ -368,7 +415,6 @@ namespace Verbex.Server.API.REST
                     .WithResponse(404, OpenApiResponseMetadata.NotFound()),
                 ExceptionRoute);
 
-            // Document labels and tags update routes
             _Webserver.Routes.PostAuthentication.Parameter.Add(
                 HttpMethod.PUT, "/v1.0/indices/{id}/documents/{docId}/labels", PutDocumentLabelsRoute,
                 metadata => metadata
@@ -420,26 +466,12 @@ namespace Verbex.Server.API.REST
                     .WithResponse(404, OpenApiResponseMetadata.NotFound()),
                 ExceptionRoute);
 
-            // Index-specific search routes
-            _Webserver.Routes.PostAuthentication.Parameter.Add(
-                HttpMethod.POST, "/v1.0/indices/{id}/search", PostIndexSearchRoute,
-                metadata => metadata
-                    .WithTag("Search")
-                    .WithDescription("Perform a full-text search within an index. Supports AND/OR logic and label/tag filtering.")
-                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index to search"))
-                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
-                        CreateSearchRequestSchema(),
-                        "Search query and options",
-                        required: true))
-                    .WithResponse(200, OpenApiResponseMetadata.Json("Search results", CreateSearchResultsSchema()))
-                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
-                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
-                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
-                ExceptionRoute);
+            #endregion
 
-            // ==================== Admin Routes ====================
+            #region Admin-Routes
 
-            // Tenant management routes (admin only)
+            #region Tenant-Routes
+
             _Webserver.Routes.PostAuthentication.Static.Add(
                 HttpMethod.GET, "/v1.0/tenants", GetTenantsRoute,
                 metadata => metadata
@@ -475,7 +507,10 @@ namespace Verbex.Server.API.REST
                     .WithDescription("Update a tenant. Requires global admin access."),
                 ExceptionRoute);
 
-            // User management routes (admin only)
+            #endregion
+
+            #region User-Routes
+
             _Webserver.Routes.PostAuthentication.Parameter.Add(
                 HttpMethod.GET, "/v1.0/tenants/{id}/users", GetTenantUsersRoute,
                 metadata => metadata
@@ -511,7 +546,10 @@ namespace Verbex.Server.API.REST
                     .WithDescription("Update a user."),
                 ExceptionRoute);
 
-            // Credential management routes (admin only)
+            #endregion
+
+            #region Credential-Routes
+
             _Webserver.Routes.PostAuthentication.Parameter.Add(
                 HttpMethod.GET, "/v1.0/tenants/{id}/credentials", GetTenantCredentialsRoute,
                 metadata => metadata
@@ -540,7 +578,10 @@ namespace Verbex.Server.API.REST
                     .WithDescription("Update an API credential (activate/deactivate)."),
                 ExceptionRoute);
 
-            // Tenant labels and tags routes
+            #endregion
+
+            #region Tags-and-Labels-Routes
+
             _Webserver.Routes.PostAuthentication.Parameter.Add(
                 HttpMethod.PUT, "/v1.0/tenants/{id}/labels", PutTenantLabelsRoute,
                 metadata => metadata
@@ -570,7 +611,6 @@ namespace Verbex.Server.API.REST
                     .WithDescription("Replace all tags on a user. This is a full replacement, not an additive operation."),
                 ExceptionRoute);
 
-            // Credential labels and tags routes
             _Webserver.Routes.PostAuthentication.Parameter.Add(
                 HttpMethod.PUT, "/v1.0/tenants/{id}/credentials/{credId}/labels", PutCredentialLabelsRoute,
                 metadata => metadata
@@ -584,6 +624,10 @@ namespace Verbex.Server.API.REST
                     .WithTag("Credentials")
                     .WithDescription("Replace all tags on a credential. This is a full replacement, not an additive operation."),
                 ExceptionRoute);
+
+            #endregion
+
+            #endregion
         }
 
         /// <summary>
@@ -1002,6 +1046,35 @@ namespace Verbex.Server.API.REST
                     StatusCode = 200,
                     Data = statistics
                 };
+            });
+        }
+
+        /// <summary>
+        /// Check if index exists route (HEAD).
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <returns>Task.</returns>
+        private async Task HeadIndexRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, (reqCtx) =>
+            {
+                string? indexId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(indexId))
+                {
+                    return Task.FromResult(new ResponseContext(false, 400, "Index ID is required"));
+                }
+
+                if (!_IndexManager!.IndexExists(indexId))
+                {
+                    return Task.FromResult(new ResponseContext(false, 404, "Index not found"));
+                }
+
+                return Task.FromResult(new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = null
+                });
             });
         }
 
@@ -1590,6 +1663,49 @@ namespace Verbex.Server.API.REST
                 {
                     return new ResponseContext(false, 500, $"Error retrieving document: {ex.Message}");
                 }
+            });
+        }
+
+        /// <summary>
+        /// Check if document exists in index route (HEAD).
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <returns>Task.</returns>
+        private async Task HeadIndexDocumentRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.Document, async (reqCtx) =>
+            {
+                string? indexId = ctx.Request.Url.Parameters["id"];
+                string? docId = ctx.Request.Url.Parameters["docId"];
+
+                if (String.IsNullOrEmpty(indexId))
+                {
+                    return new ResponseContext(false, 400, "Index ID is required");
+                }
+
+                if (String.IsNullOrEmpty(docId))
+                {
+                    return new ResponseContext(false, 400, "Document ID is required");
+                }
+
+                var index = _IndexManager!.GetIndex(indexId);
+                if (index == null)
+                {
+                    return new ResponseContext(false, 404, "Index not found");
+                }
+
+                bool exists = await index.DocumentExistsAsync(docId).ConfigureAwait(false);
+                if (!exists)
+                {
+                    return new ResponseContext(false, 404, "Document not found");
+                }
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = null
+                };
             });
         }
 

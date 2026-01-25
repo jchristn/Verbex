@@ -130,6 +130,8 @@ namespace Verbex.Mcp
             server.RegisterMethod("verbex_delete_index", DeleteIndexHandler);
             server.RegisterMethod("verbex_add_labels", AddLabelsHandler);
             server.RegisterMethod("verbex_add_tags", AddTagsHandler);
+            server.RegisterMethod("verbex_index_exists", IndexExistsHandler);
+            server.RegisterMethod("verbex_document_exists", DocumentExistsHandler);
         }
 
         private static void RegisterAllTools(McpWebsocketsServer server)
@@ -145,6 +147,8 @@ namespace Verbex.Mcp
             server.RegisterMethod("verbex_delete_index", DeleteIndexHandler);
             server.RegisterMethod("verbex_add_labels", AddLabelsHandler);
             server.RegisterMethod("verbex_add_tags", AddTagsHandler);
+            server.RegisterMethod("verbex_index_exists", IndexExistsHandler);
+            server.RegisterMethod("verbex_document_exists", DocumentExistsHandler);
         }
 
         private static void RegisterAllToolsHttp(McpHttpServer server)
@@ -318,6 +322,35 @@ namespace Verbex.Mcp
                     required = new[] { "documentId", "tags" }
                 },
                 AddTagsHandler);
+
+            server.RegisterTool(
+                "verbex_index_exists",
+                "Check if an index exists. Returns true if the index exists, false otherwise.",
+                new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        name = new { type = "string", description = "Index name to check" }
+                    },
+                    required = new[] { "name" }
+                },
+                IndexExistsHandler);
+
+            server.RegisterTool(
+                "verbex_document_exists",
+                "Check if a document exists in an index. Returns true if the document exists, false otherwise.",
+                new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        index = new { type = "string", description = "Index name (default: 'default')" },
+                        documentId = new { type = "string", description = "Document ID to check" }
+                    },
+                    required = new[] { "documentId" }
+                },
+                DocumentExistsHandler);
         }
 
         #region Tool Handlers
@@ -603,6 +636,39 @@ namespace Verbex.Mcp
             index.AddTagsBatchAsync(documentId, tags).GetAwaiter().GetResult();
 
             return ToJson(new { success = true });
+        }
+
+        private static object IndexExistsHandler(JsonElement? args)
+        {
+            string name = GetString(args, "name", "");
+
+            if (string.IsNullOrWhiteSpace(name))
+                return ToJson(new { error = "Index name is required" });
+
+            bool exists = _Indices.ContainsKey(name);
+
+            // Also check for persistent index on disk
+            if (!exists)
+            {
+                string indexDir = Path.Combine(_StorageDirectory, name);
+                exists = Directory.Exists(indexDir) && File.Exists(Path.Combine(indexDir, "index.db"));
+            }
+
+            return ToJson(new { exists = exists, indexName = name });
+        }
+
+        private static object DocumentExistsHandler(JsonElement? args)
+        {
+            string indexName = GetString(args, "index", _DefaultIndexName);
+            string documentId = GetString(args, "documentId", "");
+
+            if (string.IsNullOrWhiteSpace(documentId))
+                return ToJson(new { error = "Document ID is required" });
+
+            InvertedIndex index = GetOrCreateIndexAsync(indexName).GetAwaiter().GetResult();
+            bool exists = index.DocumentExistsAsync(documentId).GetAwaiter().GetResult();
+
+            return ToJson(new { exists = exists, documentId = documentId, indexName = indexName });
         }
 
         #endregion
