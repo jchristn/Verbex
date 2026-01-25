@@ -6,12 +6,40 @@ function CopyableId({ value }) {
 
   const handleCopy = async (e) => {
     e.stopPropagation();
-    try {
-      await navigator.clipboard.writeText(value);
+
+    let success = false;
+
+    // Try modern clipboard API first
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(value);
+        success = true;
+      } catch (err) {
+        console.warn('Clipboard API failed, trying fallback:', err);
+      }
+    }
+
+    // Fallback for non-HTTPS or older browsers
+    if (!success) {
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = value;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        success = document.execCommand('copy');
+        document.body.removeChild(textArea);
+      } catch (err) {
+        console.error('Fallback copy failed:', err);
+      }
+    }
+
+    if (success) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch (err) {
-      console.error('Failed to copy:', err);
     }
   };
 
@@ -19,6 +47,7 @@ function CopyableId({ value }) {
     <span className="copyable-id">
       <span className="copyable-id-value">{value}</span>
       <button
+        type="button"
         className={`copyable-id-btn ${copied ? 'copied' : ''}`}
         onClick={handleCopy}
         title="Copy to clipboard"

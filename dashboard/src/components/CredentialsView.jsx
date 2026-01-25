@@ -284,14 +284,41 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
   };
 
   const handleCopyToken = async () => {
-    if (newCredentialToken) {
+    if (!newCredentialToken) return;
+
+    let success = false;
+
+    // Try modern clipboard API first
+    if (navigator.clipboard && navigator.clipboard.writeText) {
       try {
         await navigator.clipboard.writeText(newCredentialToken);
-        setTokenCopied(true);
-        setTimeout(() => setTokenCopied(false), 2000);
+        success = true;
       } catch (err) {
-        console.error('Failed to copy token:', err);
+        console.warn('Clipboard API failed, trying fallback:', err);
       }
+    }
+
+    // Fallback for non-HTTPS or older browsers
+    if (!success) {
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = newCredentialToken;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        success = document.execCommand('copy');
+        document.body.removeChild(textArea);
+      } catch (err) {
+        console.error('Fallback copy failed:', err);
+      }
+    }
+
+    if (success) {
+      setTokenCopied(true);
+      setTimeout(() => setTokenCopied(false), 2000);
     }
   };
 
@@ -556,6 +583,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
           <div className="token-container">
             <code className="token-value">{newCredentialToken}</code>
             <button
+              type="button"
               className="btn btn-secondary copy-btn"
               onClick={handleCopyToken}
             >

@@ -8,12 +8,39 @@ function MetadataModal({ isOpen, onClose, title, data, isLoading = false }) {
   const jsonString = JSON.stringify(data, null, 2);
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(jsonString);
+    let success = false;
+
+    // Try modern clipboard API first
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(jsonString);
+        success = true;
+      } catch (err) {
+        console.warn('Clipboard API failed, trying fallback:', err);
+      }
+    }
+
+    // Fallback for non-HTTPS or older browsers
+    if (!success) {
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = jsonString;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        success = document.execCommand('copy');
+        document.body.removeChild(textArea);
+      } catch (err) {
+        console.error('Fallback copy failed:', err);
+      }
+    }
+
+    if (success) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy to clipboard:', err);
     }
   };
 
