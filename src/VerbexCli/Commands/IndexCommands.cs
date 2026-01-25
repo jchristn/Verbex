@@ -3,8 +3,10 @@ namespace VerbexCli.Commands
     using System;
     using System.Collections.Generic;
     using System.CommandLine;
+    using System.CommandLine.Invocation;
     using System.IO;
     using System.Linq;
+    using System.Text.Json;
     using System.Threading.Tasks;
     using VerbexCli.Infrastructure;
 
@@ -94,6 +96,13 @@ namespace VerbexCli.Commands
                 AllowMultipleArgumentsPerToken = true
             };
 
+            Option<string> customMetadataOption = new Option<string>(
+                aliases: new[] { "--custom-metadata", "-M" },
+                description: "Custom metadata as a JSON string (e.g., '{\"environment\": \"production\"}')")
+            {
+                IsRequired = false
+            };
+
             createCommand.AddArgument(nameArgument);
             createCommand.AddOption(storageOption);
             createCommand.AddOption(lemmatizerOption);
@@ -102,11 +111,22 @@ namespace VerbexCli.Commands
             createCommand.AddOption(maxLengthOption);
             createCommand.AddOption(tagOption);
             createCommand.AddOption(labelOption);
+            createCommand.AddOption(customMetadataOption);
 
-            createCommand.SetHandler(async (string name, string storage, bool lemmatizer, bool stopWords, int minLength, int maxLength, string[]? tags, string[]? labels) =>
+            createCommand.SetHandler(async (InvocationContext context) =>
             {
-                await HandleIndexCreateAsync(name, storage, lemmatizer, stopWords, minLength, maxLength, tags, labels).ConfigureAwait(false);
-            }, nameArgument, storageOption, lemmatizerOption, stopWordsOption, minLengthOption, maxLengthOption, tagOption, labelOption);
+                string name = context.ParseResult.GetValueForArgument(nameArgument);
+                string storage = context.ParseResult.GetValueForOption(storageOption) ?? "memory";
+                bool lemmatizer = context.ParseResult.GetValueForOption(lemmatizerOption);
+                bool stopWords = context.ParseResult.GetValueForOption(stopWordsOption);
+                int minLength = context.ParseResult.GetValueForOption(minLengthOption);
+                int maxLength = context.ParseResult.GetValueForOption(maxLengthOption);
+                string[]? tags = context.ParseResult.GetValueForOption(tagOption);
+                string[]? labels = context.ParseResult.GetValueForOption(labelOption);
+                string? customMetadata = context.ParseResult.GetValueForOption(customMetadataOption);
+
+                await HandleIndexCreateAsync(name, storage, lemmatizer, stopWords, minLength, maxLength, tags, labels, customMetadata).ConfigureAwait(false);
+            });
 
             return createCommand;
         }
@@ -224,7 +244,7 @@ namespace VerbexCli.Commands
         /// <summary>
         /// Handles the index create command
         /// </summary>
-        private static async Task HandleIndexCreateAsync(string name, string storage, bool lemmatizer, bool stopWords, int minLength, int maxLength, string[]? tags, string[]? labels)
+        private static async Task HandleIndexCreateAsync(string name, string storage, bool lemmatizer, bool stopWords, int minLength, int maxLength, string[]? tags, string[]? labels, string? customMetadata)
         {
             try
             {
@@ -257,7 +277,22 @@ namespace VerbexCli.Commands
                     labelsList = labels.Select(l => l.Trim().ToLowerInvariant()).ToList();
                 }
 
-                await IndexManager.Instance.CreateIndexAsync(name, storage, lemmatizer, stopWords, minLength, maxLength, tagsDict, labelsList).ConfigureAwait(false);
+                // Parse custom metadata JSON if provided
+                object? parsedCustomMetadata = null;
+                if (!string.IsNullOrWhiteSpace(customMetadata))
+                {
+                    try
+                    {
+                        parsedCustomMetadata = JsonSerializer.Deserialize<object>(customMetadata);
+                    }
+                    catch (JsonException ex)
+                    {
+                        OutputManager.WriteError($"Invalid custom metadata JSON: {ex.Message}");
+                        return;
+                    }
+                }
+
+                await IndexManager.Instance.CreateIndexAsync(name, storage, lemmatizer, stopWords, minLength, maxLength, tagsDict, labelsList, parsedCustomMetadata).ConfigureAwait(false);
 
                 OutputManager.WriteSuccess($"Index '{name}' created successfully");
 
@@ -273,6 +308,8 @@ namespace VerbexCli.Commands
                     OutputManager.WriteInfo($"Tags: {string.Join(", ", tagsDict.Select(kvp => $"{kvp.Key}={kvp.Value}"))}");
                 if (labelsList != null && labelsList.Count > 0)
                     OutputManager.WriteInfo($"Labels: {string.Join(", ", labelsList)}");
+                if (parsedCustomMetadata != null)
+                    OutputManager.WriteInfo($"Custom metadata: {customMetadata}");
             }
             catch (Exception ex)
             {

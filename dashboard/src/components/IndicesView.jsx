@@ -2,8 +2,11 @@ import { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import IndexForm from './IndexForm';
 import Modal from './Modal';
+import AlertModal from './AlertModal';
+import ConfirmModal from './ConfirmModal';
 import TagInput from './TagInput';
 import KeyValueEditor from './KeyValueEditor';
+import JsonEditor from './JsonEditor';
 import ActionMenu from './ActionMenu';
 import MetadataModal from './MetadataModal';
 import CopyableId from './CopyableId';
@@ -17,15 +20,21 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [indexDetails, setIndexDetails] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Alert and delete confirmation modals
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', variant: 'error' });
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, index: null, isDeleting: false });
 
   // Edit mode states
   const [editingLabels, setEditingLabels] = useState(false);
   const [editingTags, setEditingTags] = useState(false);
+  const [editingCustomMetadata, setEditingCustomMetadata] = useState(false);
   const [editLabels, setEditLabels] = useState([]);
   const [editTags, setEditTags] = useState({});
+  const [editCustomMetadata, setEditCustomMetadata] = useState(null);
   const [isSavingLabels, setIsSavingLabels] = useState(false);
   const [isSavingTags, setIsSavingTags] = useState(false);
+  const [isSavingCustomMetadata, setIsSavingCustomMetadata] = useState(false);
 
   // Metadata modal
   const [showMetadataModal, setShowMetadataModal] = useState(false);
@@ -106,20 +115,32 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
     }
   };
 
-  const handleDelete = async (indexId) => {
-    if (!confirm(`Are you sure you want to delete index "${indexId}"? This action cannot be undone.`)) {
-      return;
-    }
+  const showAlert = (title, message, variant = 'error') => {
+    setAlertModal({ isOpen: true, title, message, variant });
+  };
 
-    setIsDeleting(true);
+  const closeAlert = () => {
+    setAlertModal({ isOpen: false, title: '', message: '', variant: 'error' });
+  };
+
+  const handleDelete = (index) => {
+    setDeleteConfirm({ isOpen: true, index, isDeleting: false });
+  };
+
+  const confirmDelete = async () => {
+    const index = deleteConfirm.index;
+    setDeleteConfirm(prev => ({ ...prev, isDeleting: true }));
+
     try {
-      await apiClient.deleteIndex(indexId);
+      await apiClient.deleteIndex(index.identifier);
+      setDeleteConfirm({ isOpen: false, index: null, isDeleting: false });
       setShowDetailModal(false);
+      setSelectedIndex(null);
+      setIndexDetails(null);
       onRefresh();
     } catch (err) {
-      alert(`Failed to delete index: ${err.message}`);
-    } finally {
-      setIsDeleting(false);
+      setDeleteConfirm({ isOpen: false, index: null, isDeleting: false });
+      showAlert('Error', `Failed to delete index: ${err.message}`);
     }
   };
 
@@ -178,6 +199,31 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
     }
   };
 
+  const handleStartEditCustomMetadata = () => {
+    setEditCustomMetadata(indexDetails.customMetadata !== undefined ? indexDetails.customMetadata : null);
+    setEditingCustomMetadata(true);
+  };
+
+  const handleCancelEditCustomMetadata = () => {
+    setEditingCustomMetadata(false);
+    setEditCustomMetadata(null);
+  };
+
+  const handleSaveCustomMetadata = async () => {
+    setIsSavingCustomMetadata(true);
+    try {
+      await apiClient.updateIndexCustomMetadata(indexDetails.identifier, editCustomMetadata);
+      const response = await apiClient.getIndex(indexDetails.identifier);
+      setIndexDetails(response.data);
+      setEditingCustomMetadata(false);
+      onRefresh();
+    } catch (err) {
+      alert(`Failed to update custom metadata: ${err.message}`);
+    } finally {
+      setIsSavingCustomMetadata(false);
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleString();
@@ -206,8 +252,12 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
           <span className="count-badge">{filteredAndSortedIndices.length}</span>
         </div>
         <div className="workspace-actions">
-          <button className="btn btn-secondary" onClick={onRefresh}>
-            Refresh
+          <button className="btn btn-icon" onClick={onRefresh} title="Refresh">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 4v6h-6"></path>
+              <path d="M1 20v-6h6"></path>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
           </button>
           <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
             Create Index
@@ -311,6 +361,11 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                             setMetadataIndex(index);
                             setShowMetadataModal(true);
                           }
+                        },
+                        {
+                          label: 'Delete',
+                          variant: 'danger',
+                          onClick: () => handleDelete(index)
                         }
                       ]}
                     />
@@ -351,7 +406,8 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
           setSelectedIndex(null);
           setIndexDetails(null);
         }}
-        title={`Index: ${selectedIndex?.id || ''}`}
+        title={`Index: ${indexDetails?.name || selectedIndex?.name || selectedIndex?.identifier || ''}`}
+        size="large"
       >
         {indexDetails ? (
           <div className="index-details">
@@ -508,13 +564,53 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
               )}
             </div>
 
+            <div className="details-section">
+              <div className="section-header">
+                <h4>Custom Metadata</h4>
+                {!editingCustomMetadata && (
+                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditCustomMetadata}>
+                    Edit
+                  </button>
+                )}
+              </div>
+              {editingCustomMetadata ? (
+                <div className="edit-section">
+                  <JsonEditor
+                    value={editCustomMetadata}
+                    onChange={setEditCustomMetadata}
+                    placeholder='{"key": "value"}'
+                    label={null}
+                  />
+                  <div className="edit-actions">
+                    <button
+                      className="btn btn-sm btn-primary"
+                      onClick={handleSaveCustomMetadata}
+                      disabled={isSavingCustomMetadata}
+                    >
+                      {isSavingCustomMetadata ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={handleCancelEditCustomMetadata}
+                      disabled={isSavingCustomMetadata}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : indexDetails.customMetadata !== undefined && indexDetails.customMetadata !== null ? (
+                <pre className="custom-metadata-display">{JSON.stringify(indexDetails.customMetadata, null, 2)}</pre>
+              ) : (
+                <p className="no-content-notice">No custom metadata assigned to this index.</p>
+              )}
+            </div>
+
             <div className="details-actions">
               <button
                 className="btn btn-danger"
-                onClick={() => handleDelete(indexDetails.identifier)}
-                disabled={isDeleting}
+                onClick={() => handleDelete({ identifier: indexDetails.identifier, name: indexDetails.name })}
               >
-                {isDeleting ? 'Deleting...' : 'Delete Index'}
+                Delete Index
               </button>
               <button
                 className="btn btn-secondary"
@@ -542,6 +638,29 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
         }}
         title="Index Metadata"
         data={metadataIndex}
+      />
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.title}
+        message={alertModal.message}
+        variant={alertModal.variant}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, index: null, isDeleting: false })}
+        onConfirm={confirmDelete}
+        title="Delete Index"
+        message="Are you sure you want to delete this index? This will permanently delete all documents in the index."
+        entityName={deleteConfirm.index?.name || deleteConfirm.index?.identifier}
+        confirmLabel="Delete"
+        warningMessage="This action cannot be undone."
+        variant="danger"
+        isLoading={deleteConfirm.isDeleting}
       />
     </div>
   );

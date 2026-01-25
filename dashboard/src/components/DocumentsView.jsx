@@ -1,8 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Modal from './Modal';
+import AlertModal from './AlertModal';
+import ConfirmModal from './ConfirmModal';
 import TagInput from './TagInput';
 import KeyValueEditor from './KeyValueEditor';
+import JsonEditor from './JsonEditor';
 import ActionMenu from './ActionMenu';
 import MetadataModal from './MetadataModal';
 import CopyableId from './CopyableId';
@@ -22,6 +25,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
   const [newDocContent, setNewDocContent] = useState('');
   const [newDocLabels, setNewDocLabels] = useState([]);
   const [newDocTags, setNewDocTags] = useState({});
+  const [newDocCustomMetadata, setNewDocCustomMetadata] = useState(null);
   const [isAdding, setIsAdding] = useState(false);
   const [docIdError, setDocIdError] = useState('');
 
@@ -30,17 +34,27 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
   const [viewDocument, setViewDocument] = useState(null);
   const [isLoadingDoc, setIsLoadingDoc] = useState(false);
 
-  // Edit mode states for document labels/tags
+  // Edit mode states for document labels/tags/customMetadata
   const [editingDocLabels, setEditingDocLabels] = useState(false);
   const [editingDocTags, setEditingDocTags] = useState(false);
+  const [editingDocCustomMetadata, setEditingDocCustomMetadata] = useState(false);
   const [editDocLabels, setEditDocLabels] = useState([]);
   const [editDocTags, setEditDocTags] = useState({});
+  const [editDocCustomMetadata, setEditDocCustomMetadata] = useState(null);
   const [isSavingDocLabels, setIsSavingDocLabels] = useState(false);
   const [isSavingDocTags, setIsSavingDocTags] = useState(false);
+  const [isSavingDocCustomMetadata, setIsSavingDocCustomMetadata] = useState(false);
 
   // Metadata modal
   const [showMetadataModal, setShowMetadataModal] = useState(false);
   const [metadataDoc, setMetadataDoc] = useState(null);
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
+
+  // Alert modal state
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', variant: 'error' });
+
+  // Delete confirmation modal state
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, docId: null, isDeleting: false });
 
   // Sorting state
   const [sortColumn, setSortColumn] = useState('indexedDate');
@@ -52,6 +66,14 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  const showAlert = (title, message, variant = 'error') => {
+    setAlertModal({ isOpen: true, title, message, variant });
+  };
+
+  const closeAlert = () => {
+    setAlertModal({ isOpen: false, title: '', message: '', variant: 'error' });
+  };
 
   const selectedIndexInfo = indices.find((i) => i.identifier === selectedIndex);
 
@@ -139,14 +161,17 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
     }
   }, [indices, selectedIndex, onIndexSelect]);
 
-  const loadDocuments = useCallback(async (signal) => {
+  const loadDocuments = useCallback(async (signalOrEvent) => {
     if (!selectedIndex || !apiClient) return;
+
+    // Handle both AbortSignal (from useEffect) and no signal (from button click)
+    const signal = signalOrEvent instanceof AbortSignal ? signalOrEvent : undefined;
 
     setIsLoading(true);
     setError('');
 
     try {
-      const response = await apiClient.getDocuments(selectedIndex, { signal });
+      const response = await apiClient.getDocuments(selectedIndex, signal ? { signal } : {});
       setDocuments(response.data?.documents || []);
     } catch (err) {
       if (err.name === 'AbortError') return;
@@ -193,16 +218,21 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
         document.tags = newDocTags;
       }
 
+      if (newDocCustomMetadata !== null) {
+        document.customMetadata = newDocCustomMetadata;
+      }
+
       await apiClient.addDocument(selectedIndex, document);
       setShowAddModal(false);
       setNewDocId('');
       setNewDocContent('');
       setNewDocLabels([]);
       setNewDocTags({});
+      setNewDocCustomMetadata(null);
       setDocIdError('');
       loadDocuments();
     } catch (err) {
-      alert(`Failed to add document: ${err.message}`);
+      showAlert('Error', `Failed to add document: ${err.message}`);
     } finally {
       setIsAdding(false);
     }
@@ -219,25 +249,47 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
       const docData = response.data?.document || response.data;
       setViewDocument(docData);
     } catch (err) {
-      alert(`Failed to load document: ${err.message}`);
+      showAlert('Error', `Failed to load document: ${err.message}`);
       setShowViewModal(false);
     } finally {
       setIsLoadingDoc(false);
     }
   };
 
-  const handleDeleteDocument = async (docId) => {
-    if (!confirm(`Are you sure you want to delete this document? This action cannot be undone.`)) {
-      return;
+  const handleViewMetadata = async (docId) => {
+    setShowMetadataModal(true);
+    setIsLoadingMetadata(true);
+    setMetadataDoc(null);
+
+    try {
+      const response = await apiClient.getDocument(selectedIndex, docId);
+      const docData = response.data?.document || response.data;
+      setMetadataDoc(docData);
+    } catch (err) {
+      showAlert('Error', `Failed to load document metadata: ${err.message}`);
+      setShowMetadataModal(false);
+    } finally {
+      setIsLoadingMetadata(false);
     }
+  };
+
+  const handleDeleteDocument = (docId) => {
+    setDeleteConfirm({ isOpen: true, docId, isDeleting: false });
+  };
+
+  const confirmDeleteDocument = async () => {
+    const docId = deleteConfirm.docId;
+    setDeleteConfirm(prev => ({ ...prev, isDeleting: true }));
 
     try {
       await apiClient.deleteDocument(selectedIndex, docId);
+      setDeleteConfirm({ isOpen: false, docId: null, isDeleting: false });
       setShowViewModal(false);
       setViewDocument(null);
       loadDocuments();
     } catch (err) {
-      alert(`Failed to delete document: ${err.message}`);
+      setDeleteConfirm({ isOpen: false, docId: null, isDeleting: false });
+      showAlert('Error', `Failed to delete document: ${err.message}`);
     }
   };
 
@@ -273,7 +325,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
       setEditingDocLabels(false);
       loadDocuments();
     } catch (err) {
-      alert(`Failed to update labels: ${err.message}`);
+      showAlert('Error', `Failed to update labels: ${err.message}`);
     } finally {
       setIsSavingDocLabels(false);
     }
@@ -308,9 +360,37 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
       setEditingDocTags(false);
       loadDocuments();
     } catch (err) {
-      alert(`Failed to update tags: ${err.message}`);
+      showAlert('Error', `Failed to update tags: ${err.message}`);
     } finally {
       setIsSavingDocTags(false);
+    }
+  };
+
+  // Document custom metadata edit handlers
+  const handleStartEditDocCustomMetadata = () => {
+    setEditDocCustomMetadata(viewDocument.customMetadata !== undefined ? viewDocument.customMetadata : null);
+    setEditingDocCustomMetadata(true);
+  };
+
+  const handleCancelEditDocCustomMetadata = () => {
+    setEditingDocCustomMetadata(false);
+    setEditDocCustomMetadata(null);
+  };
+
+  const handleSaveDocCustomMetadata = async () => {
+    setIsSavingDocCustomMetadata(true);
+    try {
+      await apiClient.updateDocumentCustomMetadata(selectedIndex, viewDocument.documentId, editDocCustomMetadata);
+      // Refresh document details
+      const response = await apiClient.getDocument(selectedIndex, viewDocument.documentId);
+      const docData = response.data?.document || response.data;
+      setViewDocument(docData);
+      setEditingDocCustomMetadata(false);
+      loadDocuments();
+    } catch (err) {
+      showAlert('Error', `Failed to update custom metadata: ${err.message}`);
+    } finally {
+      setIsSavingDocCustomMetadata(false);
     }
   };
 
@@ -338,8 +418,12 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
           </div>
           {selectedIndex && (
             <>
-              <button className="btn btn-secondary" onClick={loadDocuments}>
-                Refresh
+              <button className="btn btn-icon" onClick={loadDocuments} title="Refresh">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 4v6h-6"></path>
+                  <path d="M1 20v-6h6"></path>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
               </button>
               <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
                 Add Document
@@ -443,10 +527,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                         },
                         {
                           label: 'View Metadata',
-                          onClick: () => {
-                            setMetadataDoc(doc);
-                            setShowMetadataModal(true);
-                          }
+                          onClick: () => handleViewMetadata(doc.documentId)
                         },
                         {
                           label: 'Delete',
@@ -483,6 +564,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
           setNewDocContent('');
           setNewDocLabels([]);
           setNewDocTags({});
+          setNewDocCustomMetadata(null);
           setDocIdError('');
         }}
         title="Add Document"
@@ -538,6 +620,15 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
             />
           </div>
 
+          <div className="form-group">
+            <JsonEditor
+              value={newDocCustomMetadata}
+              onChange={setNewDocCustomMetadata}
+              placeholder='{"key": "value"}'
+              label="Custom Metadata"
+            />
+          </div>
+
           <div className="form-actions">
             <button
               type="button"
@@ -548,6 +639,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                 setNewDocContent('');
                 setNewDocLabels([]);
                 setNewDocTags({});
+                setNewDocCustomMetadata(null);
                 setDocIdError('');
               }}
               disabled={isAdding}
@@ -720,6 +812,47 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
             </div>
 
             <div className="details-section">
+              <div className="section-header">
+                <h4>Custom Metadata</h4>
+                {!editingDocCustomMetadata && (
+                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditDocCustomMetadata}>
+                    Edit
+                  </button>
+                )}
+              </div>
+              {editingDocCustomMetadata ? (
+                <div className="edit-section">
+                  <JsonEditor
+                    value={editDocCustomMetadata}
+                    onChange={setEditDocCustomMetadata}
+                    placeholder='{"key": "value"}'
+                    label={null}
+                  />
+                  <div className="edit-actions">
+                    <button
+                      className="btn btn-sm btn-primary"
+                      onClick={handleSaveDocCustomMetadata}
+                      disabled={isSavingDocCustomMetadata}
+                    >
+                      {isSavingDocCustomMetadata ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={handleCancelEditDocCustomMetadata}
+                      disabled={isSavingDocCustomMetadata}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : viewDocument.customMetadata !== undefined && viewDocument.customMetadata !== null ? (
+                <pre className="custom-metadata-display">{JSON.stringify(viewDocument.customMetadata, null, 2)}</pre>
+              ) : (
+                <p className="no-content-notice">No custom metadata assigned to this document.</p>
+              )}
+            </div>
+
+            <div className="details-section">
               <h4>Indexed Terms ({viewDocument.terms?.length || 0})</h4>
               {viewDocument.terms && viewDocument.terms.length > 0 ? (
                 <div className="document-terms">
@@ -762,6 +895,30 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
         }}
         title="Document Metadata"
         data={metadataDoc}
+        isLoading={isLoadingMetadata}
+      />
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.title}
+        message={alertModal.message}
+        variant={alertModal.variant}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, docId: null, isDeleting: false })}
+        onConfirm={confirmDeleteDocument}
+        title="Delete Document"
+        message="Are you sure you want to delete this document?"
+        entityName={deleteConfirm.docId}
+        confirmLabel="Delete"
+        warningMessage="This action cannot be undone."
+        variant="danger"
+        isLoading={deleteConfirm.isDeleting}
       />
     </div>
   );

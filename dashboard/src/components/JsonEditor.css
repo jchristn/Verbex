@@ -1,0 +1,41 @@
+.json-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.json-editor-label {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.json-editor-textarea {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.85rem;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  resize: vertical;
+  min-height: 80px;
+}
+
+.json-editor-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.json-editor-textarea.json-error {
+  border-color: var(--color-error);
+}
+
+.json-error-message {
+  color: var(--color-error);
+  font-size: 0.8rem;
+}
+
+.json-hint {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}

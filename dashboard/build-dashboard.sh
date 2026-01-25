@@ -4,4 +4,4 @@ if [ -z "$1" ]; then
     echo "Usage: $0 <tag>"
     exit 1
 fi
-docker buildx build --platform linux/amd64,linux/arm64/v8 -t jchristn/verbex-dashboard:$1 --push .
+docker buildx build --platform linux/amd64,linux/arm64/v8 -t jchristn77/verbex-dashboard:$1 -t jchristn77/verbex-dashboard:latest --push .

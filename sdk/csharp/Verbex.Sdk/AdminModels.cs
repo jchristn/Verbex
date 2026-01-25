@@ -20,6 +20,12 @@ namespace Verbex.Sdk
 
         [JsonPropertyName("createdUtc")]
         public DateTime? CreatedUtc { get; set; }
+
+        [JsonPropertyName("labels")]
+        public List<string>? Labels { get; set; }
+
+        [JsonPropertyName("tags")]
+        public Dictionary<string, string>? Tags { get; set; }
     }
 
     /// <summary>
@@ -62,6 +68,12 @@ namespace Verbex.Sdk
 
         [JsonPropertyName("createdUtc")]
         public DateTime? CreatedUtc { get; set; }
+
+        [JsonPropertyName("labels")]
+        public List<string>? Labels { get; set; }
+
+        [JsonPropertyName("tags")]
+        public Dictionary<string, string>? Tags { get; set; }
     }
 
     /// <summary>
@@ -98,6 +110,12 @@ namespace Verbex.Sdk
 
         [JsonPropertyName("createdUtc")]
         public DateTime? CreatedUtc { get; set; }
+
+        [JsonPropertyName("labels")]
+        public List<string>? Labels { get; set; }
+
+        [JsonPropertyName("tags")]
+        public Dictionary<string, string>? Tags { get; set; }
     }
 
     /// <summary>

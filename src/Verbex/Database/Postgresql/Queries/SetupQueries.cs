@@ -10,7 +10,7 @@ namespace Verbex.Database.Postgresql.Queries
         /// <summary>
         /// Schema version for migration tracking.
         /// </summary>
-        public const string SchemaVersion = "3.0";
+        public const string SchemaVersion = "3.2";
 
         /// <summary>
         /// Creates all tables for the multi-tenant inverted index.
@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS indexes (
     tenant_id VARCHAR(48) NOT NULL REFERENCES tenants(identifier) ON DELETE CASCADE,
     name VARCHAR(256) NOT NULL,
     description TEXT,
+    custom_metadata TEXT,
     created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(tenant_id, name)
@@ -85,6 +86,7 @@ CREATE TABLE IF NOT EXISTS documents (
     content_sha256 VARCHAR(64),
     document_length INTEGER NOT NULL DEFAULT 0,
     term_count INTEGER NOT NULL DEFAULT 0,
+    custom_metadata TEXT,
     indexed_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -117,21 +119,27 @@ CREATE TABLE IF NOT EXISTS document_terms (
     UNIQUE(document_id, term_id)
 );
 
--- Labels table (document or index level)
+-- Labels table (tenant, user, credential, document, or index level)
 CREATE TABLE IF NOT EXISTS labels (
     id VARCHAR(48) PRIMARY KEY,
+    tenant_id VARCHAR(48) REFERENCES tenants(identifier) ON DELETE CASCADE,
+    user_id VARCHAR(48) REFERENCES users(identifier) ON DELETE CASCADE,
+    credential_id VARCHAR(48) REFERENCES credentials(identifier) ON DELETE CASCADE,
     document_id VARCHAR(48) REFERENCES documents(id) ON DELETE CASCADE,
-    index_id VARCHAR(48) NOT NULL REFERENCES indexes(identifier) ON DELETE CASCADE,
+    index_id VARCHAR(48) REFERENCES indexes(identifier) ON DELETE CASCADE,
     label VARCHAR(256) NOT NULL,
     last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Tags table (document or index level key-value pairs)
+-- Tags table (tenant, user, credential, document, or index level key-value pairs)
 CREATE TABLE IF NOT EXISTS tags (
     id VARCHAR(48) PRIMARY KEY,
+    tenant_id VARCHAR(48) REFERENCES tenants(identifier) ON DELETE CASCADE,
+    user_id VARCHAR(48) REFERENCES users(identifier) ON DELETE CASCADE,
+    credential_id VARCHAR(48) REFERENCES credentials(identifier) ON DELETE CASCADE,
     document_id VARCHAR(48) REFERENCES documents(id) ON DELETE CASCADE,
-    index_id VARCHAR(48) NOT NULL REFERENCES indexes(identifier) ON DELETE CASCADE,
+    index_id VARCHAR(48) REFERENCES indexes(identifier) ON DELETE CASCADE,
     key VARCHAR(256) NOT NULL,
     value TEXT,
     last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -202,6 +210,12 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
             "CREATE INDEX IF NOT EXISTS idx_labels_label ON labels(label)",
             "CREATE INDEX IF NOT EXISTS idx_labels_document_label ON labels(document_id, label)",
             "CREATE INDEX IF NOT EXISTS idx_labels_index_label ON labels(index_id, label)",
+            "CREATE INDEX IF NOT EXISTS idx_labels_tenant ON labels(tenant_id)",
+            "CREATE INDEX IF NOT EXISTS idx_labels_tenant_label ON labels(tenant_id, label)",
+            "CREATE INDEX IF NOT EXISTS idx_labels_user ON labels(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_labels_user_label ON labels(user_id, label)",
+            "CREATE INDEX IF NOT EXISTS idx_labels_credential ON labels(credential_id)",
+            "CREATE INDEX IF NOT EXISTS idx_labels_credential_label ON labels(credential_id, label)",
 
             // Tag indexes (for filtering by key-value pairs)
             "CREATE INDEX IF NOT EXISTS idx_tags_document ON tags(document_id)",
@@ -209,7 +223,13 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
             "CREATE INDEX IF NOT EXISTS idx_tags_key ON tags(key)",
             "CREATE INDEX IF NOT EXISTS idx_tags_document_key ON tags(document_id, key)",
             "CREATE INDEX IF NOT EXISTS idx_tags_index_key ON tags(index_id, key)",
-            "CREATE INDEX IF NOT EXISTS idx_tags_key_value ON tags(key, value)"
+            "CREATE INDEX IF NOT EXISTS idx_tags_key_value ON tags(key, value)",
+            "CREATE INDEX IF NOT EXISTS idx_tags_tenant ON tags(tenant_id)",
+            "CREATE INDEX IF NOT EXISTS idx_tags_tenant_key ON tags(tenant_id, key)",
+            "CREATE INDEX IF NOT EXISTS idx_tags_user ON tags(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_tags_user_key ON tags(user_id, key)",
+            "CREATE INDEX IF NOT EXISTS idx_tags_credential ON tags(credential_id)",
+            "CREATE INDEX IF NOT EXISTS idx_tags_credential_key ON tags(credential_id, key)"
         };
 
         /// <summary>
@@ -227,6 +247,29 @@ DROP TABLE IF EXISTS credentials CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS administrators CASCADE;
 DROP TABLE IF EXISTS tenants CASCADE;
+";
+
+        /// <summary>
+        /// Inserts the initial schema version into the metadata table.
+        /// </summary>
+        public static readonly string InsertSchemaVersion = @"
+INSERT INTO schema_metadata (key, value) VALUES ('schema_version', '3.2')
+ON CONFLICT (key) DO UPDATE SET value = '3.2';
+";
+
+        /// <summary>
+        /// Migration query from schema version 3.1 to 3.2.
+        /// Adds custom_metadata column to documents and indexes tables.
+        /// </summary>
+        public static readonly string MigrateFrom31To32 = @"
+-- Add custom_metadata column to documents table if it doesn't exist
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS custom_metadata TEXT;
+
+-- Add custom_metadata column to indexes table if it doesn't exist
+ALTER TABLE indexes ADD COLUMN IF NOT EXISTS custom_metadata TEXT;
+
+-- Update schema version
+UPDATE schema_metadata SET value = '3.2' WHERE key = 'schema_version';
 ";
     }
 }

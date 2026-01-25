@@ -4,22 +4,25 @@
   max-height: 70vh;
 }
 
-.metadata-actions {
+.metadata-loading {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 12px;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--text-secondary);
 }
 
 .metadata-copy-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   border: 1px solid var(--border-color);
   border-radius: 6px;
   background: var(--bg-secondary);
   color: var(--text-secondary);
-  font-size: 0.875rem;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }

@@ -80,6 +80,7 @@ class IndexInfo:
     statistics: Optional[Dict[str, Any]]
     labels: Optional[List[str]]
     tags: Optional[Dict[str, str]]
+    custom_metadata: Optional[Any] = None
 
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> 'IndexInfo':
@@ -94,7 +95,8 @@ class IndexInfo:
             created_utc=d.get('createdUtc'),
             statistics=d.get('statistics'),
             labels=d.get('labels'),
-            tags=d.get('tags')
+            tags=d.get('tags'),
+            custom_metadata=d.get('customMetadata')
         )
 
 
@@ -106,6 +108,7 @@ class DocumentInfo:
     created_utc: Optional[str]
     labels: Optional[List[str]]
     tags: Optional[Dict[str, str]]
+    custom_metadata: Optional[Any] = None
 
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> 'DocumentInfo':
@@ -115,7 +118,8 @@ class DocumentInfo:
             name=d.get('name'),
             created_utc=d.get('createdUtc'),
             labels=d.get('labels'),
-            tags=d.get('tags')
+            tags=d.get('tags'),
+            custom_metadata=d.get('customMetadata')
         )
 
 
@@ -163,6 +167,8 @@ class TenantInfo:
     name: Optional[str]
     active: bool
     created_utc: Optional[str]
+    labels: Optional[List[str]]
+    tags: Optional[Dict[str, str]]
 
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> 'TenantInfo':
@@ -171,7 +177,9 @@ class TenantInfo:
             identifier=d.get('identifier', ''),
             name=d.get('name'),
             active=d.get('active', False),
-            created_utc=d.get('createdUtc')
+            created_utc=d.get('createdUtc'),
+            labels=d.get('labels'),
+            tags=d.get('tags')
         )
 
 
@@ -186,6 +194,8 @@ class UserInfo:
     is_admin: bool
     active: bool
     created_utc: Optional[str]
+    labels: Optional[List[str]]
+    tags: Optional[Dict[str, str]]
 
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> 'UserInfo':
@@ -198,7 +208,9 @@ class UserInfo:
             last_name=d.get('lastName'),
             is_admin=d.get('isAdmin', False),
             active=d.get('active', False),
-            created_utc=d.get('createdUtc')
+            created_utc=d.get('createdUtc'),
+            labels=d.get('labels'),
+            tags=d.get('tags')
         )
 
 
@@ -211,6 +223,8 @@ class CredentialInfo:
     bearer_token: Optional[str]
     active: bool
     created_utc: Optional[str]
+    labels: Optional[List[str]]
+    tags: Optional[Dict[str, str]]
 
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> 'CredentialInfo':
@@ -221,7 +235,9 @@ class CredentialInfo:
             name=d.get('name'),
             bearer_token=d.get('bearerToken'),
             active=d.get('active', False),
-            created_utc=d.get('createdUtc')
+            created_utc=d.get('createdUtc'),
+            labels=d.get('labels'),
+            tags=d.get('tags')
         )
 
 
@@ -403,7 +419,8 @@ class VerbexClient:
         min_token_length: int = 0,
         max_token_length: int = 0,
         labels: Optional[List[str]] = None,
-        tags: Optional[Dict[str, str]] = None
+        tags: Optional[Dict[str, str]] = None,
+        custom_metadata: Optional[Any] = None
     ) -> ApiResponse:
         """
         Create a new index.
@@ -418,6 +435,7 @@ class VerbexClient:
             max_token_length: Maximum token length (0 to disable)
             labels: Optional list of labels to associate with the index
             tags: Optional key-value tags to associate with the index
+            custom_metadata: Optional custom metadata to associate with the index
 
         Returns:
             ApiResponse containing the created index information
@@ -436,6 +454,8 @@ class VerbexClient:
             data['Labels'] = labels
         if tags:
             data['Tags'] = tags
+        if custom_metadata is not None:
+            data['CustomMetadata'] = custom_metadata
         return self._make_request('POST', '/v1.0/indices', data=data)
 
     def get_index(self, index_id: str) -> ApiResponse:
@@ -501,6 +521,20 @@ class VerbexClient:
         """
         return self._make_request('PUT', f'/v1.0/indices/{index_id}/tags', data={'Tags': tags or {}})
 
+    def update_index_custom_metadata(self, index_id: str, custom_metadata: Any) -> IndexInfo:
+        """
+        Update custom metadata for an index.
+
+        Args:
+            index_id: The index identifier
+            custom_metadata: The custom metadata to set
+
+        Returns:
+            IndexInfo with updated index details
+        """
+        response = self._make_request('PUT', f'/v1.0/indices/{index_id}/customMetadata', data={'customMetadata': custom_metadata})
+        return IndexInfo.from_dict(response.data) if response.data else None
+
     # ==================== Document Management Endpoints ====================
 
     def list_documents(self, index_id: str) -> ApiResponse:
@@ -536,7 +570,8 @@ class VerbexClient:
         content: str,
         document_id: Optional[str] = None,
         labels: Optional[List[str]] = None,
-        tags: Optional[Dict[str, str]] = None
+        tags: Optional[Dict[str, str]] = None,
+        custom_metadata: Optional[Any] = None
     ) -> ApiResponse:
         """
         Add a document to an index.
@@ -547,6 +582,7 @@ class VerbexClient:
             document_id: Optional document ID (auto-generated if not provided)
             labels: Optional list of labels to associate with the document
             tags: Optional key-value tags to associate with the document
+            custom_metadata: Optional custom metadata to associate with the document
 
         Returns:
             ApiResponse containing the document ID and confirmation
@@ -558,6 +594,8 @@ class VerbexClient:
             data['Labels'] = labels
         if tags:
             data['Tags'] = tags
+        if custom_metadata is not None:
+            data['CustomMetadata'] = custom_metadata
         return self._make_request('POST', f'/v1.0/indices/{index_id}/documents', data=data)
 
     def get_document(self, index_id: str, document_id: str) -> ApiResponse:
@@ -627,6 +665,21 @@ class VerbexClient:
             ApiResponse with update confirmation and updated document
         """
         return self._make_request('PUT', f'/v1.0/indices/{index_id}/documents/{document_id}/tags', data={'Tags': tags or {}})
+
+    def update_document_custom_metadata(self, index_id: str, document_id: str, custom_metadata: Any) -> DocumentInfo:
+        """
+        Update custom metadata for a document.
+
+        Args:
+            index_id: The index identifier
+            document_id: The document identifier
+            custom_metadata: The custom metadata to set
+
+        Returns:
+            DocumentInfo with updated document details
+        """
+        response = self._make_request('PUT', f'/v1.0/indices/{index_id}/documents/{document_id}/customMetadata', data={'customMetadata': custom_metadata})
+        return DocumentInfo.from_dict(response.data) if response.data else None
 
     # ==================== Search Endpoint ====================
 
@@ -752,6 +805,32 @@ class VerbexClient:
         """
         return self._make_request('DELETE', f'/v1.0/admin/tenants/{tenant_id}')
 
+    def update_tenant_labels(self, tenant_id: str, labels: List[str]) -> ApiResponse:
+        """
+        Update labels on a tenant (full replacement).
+
+        Args:
+            tenant_id: The tenant identifier
+            labels: The new labels to set
+
+        Returns:
+            ApiResponse with update confirmation and updated tenant
+        """
+        return self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/labels', data={'Labels': labels or []})
+
+    def update_tenant_tags(self, tenant_id: str, tags: Dict[str, str]) -> ApiResponse:
+        """
+        Update tags on a tenant (full replacement).
+
+        Args:
+            tenant_id: The tenant identifier
+            tags: The new tags to set
+
+        Returns:
+            ApiResponse with update confirmation and updated tenant
+        """
+        return self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/tags', data={'Tags': tags or {}})
+
     # ==================== Admin - User Management Endpoints ====================
 
     def list_users(self, tenant_id: str) -> ApiResponse:
@@ -842,6 +921,34 @@ class VerbexClient:
         """
         return self._make_request('DELETE', f'/v1.0/admin/tenants/{tenant_id}/users/{user_id}')
 
+    def update_user_labels(self, tenant_id: str, user_id: str, labels: List[str]) -> ApiResponse:
+        """
+        Update labels on a user (full replacement).
+
+        Args:
+            tenant_id: The tenant identifier
+            user_id: The user identifier
+            labels: The new labels to set
+
+        Returns:
+            ApiResponse with update confirmation and updated user
+        """
+        return self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/users/{user_id}/labels', data={'Labels': labels or []})
+
+    def update_user_tags(self, tenant_id: str, user_id: str, tags: Dict[str, str]) -> ApiResponse:
+        """
+        Update tags on a user (full replacement).
+
+        Args:
+            tenant_id: The tenant identifier
+            user_id: The user identifier
+            tags: The new tags to set
+
+        Returns:
+            ApiResponse with update confirmation and updated user
+        """
+        return self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/users/{user_id}/tags', data={'Tags': tags or {}})
+
     # ==================== Admin - Credential Management Endpoints ====================
 
     def list_credentials(self, tenant_id: str) -> ApiResponse:
@@ -916,6 +1023,34 @@ class VerbexClient:
             ApiResponse confirming deletion
         """
         return self._make_request('DELETE', f'/v1.0/admin/tenants/{tenant_id}/credentials/{credential_id}')
+
+    def update_credential_labels(self, tenant_id: str, credential_id: str, labels: List[str]) -> ApiResponse:
+        """
+        Update labels on a credential (full replacement).
+
+        Args:
+            tenant_id: The tenant identifier
+            credential_id: The credential identifier
+            labels: The new labels to set
+
+        Returns:
+            ApiResponse with update confirmation and updated credential
+        """
+        return self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/credentials/{credential_id}/labels', data={'Labels': labels or []})
+
+    def update_credential_tags(self, tenant_id: str, credential_id: str, tags: Dict[str, str]) -> ApiResponse:
+        """
+        Update tags on a credential (full replacement).
+
+        Args:
+            tenant_id: The tenant identifier
+            credential_id: The credential identifier
+            tags: The new tags to set
+
+        Returns:
+            ApiResponse with update confirmation and updated credential
+        """
+        return self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/credentials/{credential_id}/tags', data={'Tags': tags or {}})
 
     def close(self):
         """Close the HTTP session."""

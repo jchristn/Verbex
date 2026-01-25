@@ -9,7 +9,7 @@ namespace Verbex.Database.Interfaces
     /// Interface for tag-related database operations.
     /// </summary>
     /// <remarks>
-    /// Provides operations for document and index-level key-value tags.
+    /// Provides operations for tenant, user, credential, document, and index-level key-value tags.
     /// Tags are used for metadata and filtering.
     /// </remarks>
     public interface ITagMethods
@@ -158,5 +158,98 @@ namespace Verbex.Database.Interfaces
         /// <param name="token">Cancellation token.</param>
         /// <returns>Number of tags deleted.</returns>
         Task<long> DeleteAllAsync(string tenantId, string indexId, CancellationToken token = default);
+
+        #region Tenant Tags
+
+        /// <summary>
+        /// Gets all tags for a tenant.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Dictionary of key-value pairs.</returns>
+        Task<Dictionary<string, string>> GetTenantTagsAsync(string tenantId, CancellationToken token = default);
+
+        /// <summary>
+        /// Replaces all tags on a tenant.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="tags">The new tags.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Task.</returns>
+        Task ReplaceTenantTagsAsync(string tenantId, IDictionary<string, string> tags, CancellationToken token = default);
+
+        /// <summary>
+        /// Deletes all tags for a tenant.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Number of tags deleted.</returns>
+        Task<long> DeleteAllTenantTagsAsync(string tenantId, CancellationToken token = default);
+
+        #endregion
+
+        #region User Tags
+
+        /// <summary>
+        /// Gets all tags for a user.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="userId">User identifier.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Dictionary of key-value pairs.</returns>
+        Task<Dictionary<string, string>> GetUserTagsAsync(string tenantId, string userId, CancellationToken token = default);
+
+        /// <summary>
+        /// Replaces all tags on a user.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="userId">User identifier.</param>
+        /// <param name="tags">The new tags.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Task.</returns>
+        Task ReplaceUserTagsAsync(string tenantId, string userId, IDictionary<string, string> tags, CancellationToken token = default);
+
+        /// <summary>
+        /// Deletes all tags for a user.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="userId">User identifier.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Number of tags deleted.</returns>
+        Task<long> DeleteAllUserTagsAsync(string tenantId, string userId, CancellationToken token = default);
+
+        #endregion
+
+        #region Credential Tags
+
+        /// <summary>
+        /// Gets all tags for a credential.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="credentialId">Credential identifier.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Dictionary of key-value pairs.</returns>
+        Task<Dictionary<string, string>> GetCredentialTagsAsync(string tenantId, string credentialId, CancellationToken token = default);
+
+        /// <summary>
+        /// Replaces all tags on a credential.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="credentialId">Credential identifier.</param>
+        /// <param name="tags">The new tags.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Task.</returns>
+        Task ReplaceCredentialTagsAsync(string tenantId, string credentialId, IDictionary<string, string> tags, CancellationToken token = default);
+
+        /// <summary>
+        /// Deletes all tags for a credential.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="credentialId">Credential identifier.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Number of tags deleted.</returns>
+        Task<long> DeleteAllCredentialTagsAsync(string tenantId, string credentialId, CancellationToken token = default);
+
+        #endregion
     }
 }

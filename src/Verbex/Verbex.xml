@@ -774,7 +774,7 @@
             Documents are scoped to a specific tenant and index.
             </remarks>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Threading.CancellationToken)">
             <summary>
             Adds a new document to the index.
             </summary>
@@ -784,6 +784,7 @@
             <param name="name">Document name.</param>
             <param name="contentSha256">SHA-256 hash for duplicate detection.</param>
             <param name="documentLength">Character count of document.</param>
+            <param name="customMetadata">Optional custom metadata (any JSON-serializable value).</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
@@ -877,7 +878,7 @@
             <param name="token">Cancellation token.</param>
             <returns>True if document exists.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Threading.CancellationToken)">
             <summary>
             Updates a document's metadata.
             </summary>
@@ -888,6 +889,18 @@
             <param name="contentSha256">New SHA-256 content hash.</param>
             <param name="documentLength">New document length.</param>
             <param name="termCount">New term count.</param>
+            <param name="customMetadata">Optional custom metadata (any JSON-serializable value).</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.String,System.Object,System.Threading.CancellationToken)">
+            <summary>
+            Updates only the custom metadata for a document.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="indexId">Index identifier.</param>
+            <param name="id">Document ID.</param>
+            <param name="customMetadata">Custom metadata (any JSON-serializable value, or null to clear).</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
@@ -1135,7 +1148,7 @@
             Interface for label-related database operations.
             </summary>
             <remarks>
-            Provides operations for document and index-level labels.
+            Provides operations for tenant, user, credential, document, and index-level labels.
             Labels are string tags used for categorization and filtering.
             </remarks>
         </member>
@@ -1261,6 +1274,87 @@
             <param name="token">Cancellation token.</param>
             <returns>Number of labels deleted.</returns>
         </member>
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.GetTenantLabelsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets all labels for a tenant.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of labels.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.ReplaceTenantLabelsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Replaces all labels on a tenant.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="labels">The new labels.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.DeleteAllTenantLabelsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Deletes all labels for a tenant.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of labels deleted.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.GetUserLabelsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets all labels for a user.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="userId">User identifier.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of labels.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.ReplaceUserLabelsAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Replaces all labels on a user.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="userId">User identifier.</param>
+            <param name="labels">The new labels.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.DeleteAllUserLabelsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Deletes all labels for a user.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="userId">User identifier.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of labels deleted.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.GetCredentialLabelsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets all labels for a credential.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="credentialId">Credential identifier.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of labels.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.ReplaceCredentialLabelsAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Replaces all labels on a credential.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="credentialId">Credential identifier.</param>
+            <param name="labels">The new labels.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.DeleteAllCredentialLabelsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Deletes all labels for a credential.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="credentialId">Credential identifier.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of labels deleted.</returns>
+        </member>
         <member name="T:Verbex.Database.Interfaces.IStatisticsMethods">
             <summary>
             Interface for statistics-related database operations.
@@ -1336,7 +1430,7 @@
             Interface for tag-related database operations.
             </summary>
             <remarks>
-            Provides operations for document and index-level key-value tags.
+            Provides operations for tenant, user, credential, document, and index-level key-value tags.
             Tags are used for metadata and filtering.
             </remarks>
         </member>
@@ -1482,6 +1576,87 @@
             </summary>
             <param name="tenantId">Tenant identifier.</param>
             <param name="indexId">Index identifier.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of tags deleted.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.GetTenantTagsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets all tags for a tenant.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Dictionary of key-value pairs.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.ReplaceTenantTagsAsync(System.String,System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Replaces all tags on a tenant.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="tags">The new tags.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.DeleteAllTenantTagsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Deletes all tags for a tenant.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of tags deleted.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.GetUserTagsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets all tags for a user.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="userId">User identifier.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Dictionary of key-value pairs.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.ReplaceUserTagsAsync(System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Replaces all tags on a user.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="userId">User identifier.</param>
+            <param name="tags">The new tags.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.DeleteAllUserTagsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Deletes all tags for a user.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="userId">User identifier.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of tags deleted.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.GetCredentialTagsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets all tags for a credential.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="credentialId">Credential identifier.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Dictionary of key-value pairs.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.ReplaceCredentialTagsAsync(System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Replaces all tags on a credential.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="credentialId">Credential identifier.</param>
+            <param name="tags">The new tags.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.DeleteAllCredentialTagsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Deletes all tags for a credential.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="credentialId">Credential identifier.</param>
             <param name="token">Cancellation token.</param>
             <returns>Number of tags deleted.</returns>
         </member>
@@ -1965,7 +2140,7 @@
             </summary>
             <param name="driver">The database driver.</param>
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
@@ -1995,7 +2170,10 @@
         <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.String,System.Object,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.DeleteAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
@@ -2263,6 +2441,12 @@
             Drops all tables in reverse order of creation.
             </summary>
         </member>
+        <member name="F:Verbex.Database.Mysql.Queries.SetupQueries.MigrateFrom31To32">
+            <summary>
+            Migration from schema version 3.1 to 3.2.
+            Adds custom_metadata column to documents and indexes tables.
+            </summary>
+        </member>
         <member name="T:Verbex.Database.Mysql.Sanitizer">
             <summary>
             Provides SQL sanitization methods for MySQL to prevent SQL injection.
@@ -2420,7 +2604,7 @@
             </summary>
             <param name="driver">The database driver.</param>
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
@@ -2450,7 +2634,10 @@
         <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.String,System.Object,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.DeleteAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
@@ -2713,6 +2900,17 @@
             Drops all tables in reverse order of creation.
             </summary>
         </member>
+        <member name="F:Verbex.Database.Postgresql.Queries.SetupQueries.InsertSchemaVersion">
+            <summary>
+            Inserts the initial schema version into the metadata table.
+            </summary>
+        </member>
+        <member name="F:Verbex.Database.Postgresql.Queries.SetupQueries.MigrateFrom31To32">
+            <summary>
+            Migration query from schema version 3.1 to 3.2.
+            Adds custom_metadata column to documents and indexes tables.
+            </summary>
+        </member>
         <member name="T:Verbex.Database.Postgresql.Sanitizer">
             <summary>
             Provides SQL sanitization methods for PostgreSQL to prevent SQL injection.
@@ -2870,7 +3068,7 @@
             </summary>
             <param name="driver">The database driver.</param>
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
@@ -2900,7 +3098,10 @@
         <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.String,System.Object,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.DeleteAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
@@ -3110,6 +3311,20 @@
             Gets migration SQL from schema v2 to v3.
             </summary>
             <returns>Migration SQL or null if no migration needed.</returns>
+        </member>
+        <member name="M:Verbex.Database.Sqlite.Queries.SetupQueries.GetMigrationFromV3">
+            <summary>
+            Gets migration SQL from schema v3.0 to v3.1.
+            Adds tenant_id, user_id, credential_id columns to labels and tags tables.
+            </summary>
+            <returns>Migration SQL.</returns>
+        </member>
+        <member name="M:Verbex.Database.Sqlite.Queries.SetupQueries.GetMigrationFromV31">
+            <summary>
+            Gets migration SQL from schema v3.1 to v3.2.
+            Adds custom_metadata column to indexes and documents tables.
+            </summary>
+            <returns>Migration SQL.</returns>
         </member>
         <member name="T:Verbex.Database.Sqlite.Sanitizer">
             <summary>
@@ -3366,7 +3581,7 @@
             </summary>
             <param name="driver">The database driver.</param>
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
@@ -3396,7 +3611,10 @@
         <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.String,System.Object,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.DeleteAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
@@ -3588,6 +3806,12 @@
         <member name="F:Verbex.Database.SqlServer.Queries.SetupQueries.DropTables">
             <summary>
             Drops all tables in reverse order of creation.
+            </summary>
+        </member>
+        <member name="F:Verbex.Database.SqlServer.Queries.SetupQueries.MigrateFrom31To32">
+            <summary>
+            Migration query from schema version 3.1 to 3.2.
+            Adds custom_metadata column to documents and indexes tables.
             </summary>
         </member>
         <member name="T:Verbex.Database.SqlServer.Sanitizer">
@@ -3828,13 +4052,13 @@
         </member>
         <member name="P:Verbex.DocumentMetadata.CustomMetadata">
             <summary>
-            Gets a read-only dictionary of custom metadata properties
+            Gets or sets custom metadata for the document.
+            Can be any JSON-serializable value (object, array, string, number, boolean, null).
             </summary>
         </member>
         <member name="P:Verbex.DocumentMetadata.Tags">
             <summary>
             Gets a read-only dictionary of tags (key-value pairs) associated with this document.
-            This is an alias for CustomMetadata for API consistency.
             </summary>
         </member>
         <member name="P:Verbex.DocumentMetadata.Labels">
@@ -3860,21 +4084,21 @@
             <returns>True if the term was removed, false if it didn't exist</returns>
             <exception cref="T:System.ArgumentNullException">Thrown when term is null</exception>
         </member>
-        <member name="M:Verbex.DocumentMetadata.SetCustomMetadata(System.String,System.Object)">
+        <member name="M:Verbex.DocumentMetadata.SetTag(System.String,System.Object)">
             <summary>
-            Sets custom metadata for the document
+            Sets a tag (key-value pair) for the document.
             </summary>
-            <param name="key">The metadata key</param>
-            <param name="value">The metadata value</param>
+            <param name="key">The tag key</param>
+            <param name="value">The tag value</param>
             <exception cref="T:System.ArgumentNullException">Thrown when key is null</exception>
             <exception cref="T:System.ArgumentException">Thrown when key is empty or whitespace</exception>
         </member>
-        <member name="M:Verbex.DocumentMetadata.RemoveCustomMetadata(System.String)">
+        <member name="M:Verbex.DocumentMetadata.RemoveTag(System.String)">
             <summary>
-            Removes custom metadata for the specified key
+            Removes a tag for the specified key.
             </summary>
-            <param name="key">The metadata key to remove</param>
-            <returns>True if the metadata was removed, false if key didn't exist</returns>
+            <param name="key">The tag key to remove</param>
+            <returns>True if the tag was removed, false if key didn't exist</returns>
             <exception cref="T:System.ArgumentNullException">Thrown when key is null</exception>
         </member>
         <member name="M:Verbex.DocumentMetadata.ClearTerms">
@@ -3913,24 +4137,10 @@
             Clears all labels from the document
             </summary>
         </member>
-        <member name="M:Verbex.DocumentMetadata.SetTag(System.String,System.Object)">
+        <member name="M:Verbex.DocumentMetadata.ClearTags">
             <summary>
-            Sets a tag (key-value pair) for the document.
-            This is an alias for SetCustomMetadata for API consistency.
+            Clears all tags from the document
             </summary>
-            <param name="key">The tag key</param>
-            <param name="value">The tag value</param>
-            <exception cref="T:System.ArgumentNullException">Thrown when key is null</exception>
-            <exception cref="T:System.ArgumentException">Thrown when key is empty or whitespace</exception>
-        </member>
-        <member name="M:Verbex.DocumentMetadata.RemoveTag(System.String)">
-            <summary>
-            Removes a tag for the specified key.
-            This is an alias for RemoveCustomMetadata for API consistency.
-            </summary>
-            <param name="key">The tag key to remove</param>
-            <returns>True if the tag was removed, false if key didn't exist</returns>
-            <exception cref="T:System.ArgumentNullException">Thrown when key is null</exception>
         </member>
         <member name="T:Verbex.ILemmatizer">
             <summary>
@@ -4428,6 +4638,16 @@
             <param name="key">Tag key.</param>
             <param name="token">Cancellation token.</param>
             <returns>True if tag was removed.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.SetCustomMetadataAsync(System.String,System.Object,System.Threading.CancellationToken)">
+            <summary>
+            Sets or updates the custom metadata for a document.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="customMetadata">Custom metadata (any JSON-serializable value, or null to clear).</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when documentId is null.</exception>
         </member>
         <member name="M:Verbex.InvertedIndex.GetStatisticsAsync(System.Threading.CancellationToken)">
             <summary>
@@ -5152,6 +5372,18 @@
             Default is true.
             </value>
         </member>
+        <member name="P:Verbex.Models.Credential.Labels">
+            <summary>
+            Gets or sets the labels for this credential.
+            </summary>
+            <value>A list of string labels for categorization and filtering.</value>
+        </member>
+        <member name="P:Verbex.Models.Credential.Tags">
+            <summary>
+            Gets or sets the tags for this credential.
+            </summary>
+            <value>A dictionary of key-value pairs for rich metadata.</value>
+        </member>
         <member name="P:Verbex.Models.Credential.CreatedUtc">
             <summary>
             Gets or sets the UTC timestamp when the credential was created.
@@ -5541,6 +5773,13 @@
             </summary>
             <value>Dictionary of string key-value pairs. Default is empty dictionary.</value>
         </member>
+        <member name="P:Verbex.Models.IndexMetadata.CustomMetadata">
+            <summary>
+            Gets or sets custom metadata for the index.
+            Can be any JSON-serializable value (object, array, string, number, boolean, null).
+            </summary>
+            <value>Any JSON-serializable value. Default is null.</value>
+        </member>
         <member name="M:Verbex.Models.IndexMetadata.#ctor">
             <summary>
             Initializes a new instance of the <see cref="T:Verbex.Models.IndexMetadata"/> class.
@@ -5569,10 +5808,10 @@
         </member>
         <member name="T:Verbex.Models.Label">
             <summary>
-            Represents a label (string tag) attached to a document or index.
+            Represents a label (string tag) attached to a tenant, user, credential, document, or index.
             </summary>
             <remarks>
-            Labels are simple string identifiers that can be attached to documents or indexes
+            Labels are simple string identifiers that can be attached to entities
             for categorization and filtering. Multiple labels can be attached to a single entity.
             </remarks>
         </member>
@@ -5583,6 +5822,30 @@
             <value>
             A k-sortable unique identifier with "lbl_" prefix.
             Example: "lbl_01ar5xxlajk1sxr6hzf29ksz4o01234567890abc".
+            </value>
+        </member>
+        <member name="P:Verbex.Models.Label.TenantId">
+            <summary>
+            Gets or sets the tenant ID this label is attached to.
+            </summary>
+            <value>
+            The identifier of the tenant, or empty string if not a tenant-level label.
+            </value>
+        </member>
+        <member name="P:Verbex.Models.Label.UserId">
+            <summary>
+            Gets or sets the user ID this label is attached to.
+            </summary>
+            <value>
+            The identifier of the user, or empty string if not a user-level label.
+            </value>
+        </member>
+        <member name="P:Verbex.Models.Label.CredentialId">
+            <summary>
+            Gets or sets the credential ID this label is attached to.
+            </summary>
+            <value>
+            The identifier of the credential, or empty string if not a credential-level label.
             </value>
         </member>
         <member name="P:Verbex.Models.Label.DocumentId">
@@ -5619,6 +5882,24 @@
             </summary>
             <value>The creation timestamp in UTC.</value>
         </member>
+        <member name="P:Verbex.Models.Label.IsTenantLabel">
+            <summary>
+            Gets a value indicating whether this is a tenant-level label.
+            </summary>
+            <value>True if this label is attached to a tenant.</value>
+        </member>
+        <member name="P:Verbex.Models.Label.IsUserLabel">
+            <summary>
+            Gets a value indicating whether this is a user-level label.
+            </summary>
+            <value>True if this label is attached to a user.</value>
+        </member>
+        <member name="P:Verbex.Models.Label.IsCredentialLabel">
+            <summary>
+            Gets a value indicating whether this is a credential-level label.
+            </summary>
+            <value>True if this label is attached to a credential.</value>
+        </member>
         <member name="P:Verbex.Models.Label.IsDocumentLabel">
             <summary>
             Gets a value indicating whether this is a document-level label.
@@ -5652,6 +5933,33 @@
             <returns>A new Label instance for the index.</returns>
             <exception cref="T:System.ArgumentNullException">Thrown when any parameter is null or whitespace.</exception>
         </member>
+        <member name="M:Verbex.Models.Label.CreateTenantLabel(System.String,System.String)">
+            <summary>
+            Creates a tenant-level label.
+            </summary>
+            <param name="tenantId">The tenant ID this label is attached to.</param>
+            <param name="labelText">The label text.</param>
+            <returns>A new Label instance for the tenant.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when any parameter is null or whitespace.</exception>
+        </member>
+        <member name="M:Verbex.Models.Label.CreateUserLabel(System.String,System.String)">
+            <summary>
+            Creates a user-level label.
+            </summary>
+            <param name="userId">The user ID this label is attached to.</param>
+            <param name="labelText">The label text.</param>
+            <returns>A new Label instance for the user.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when any parameter is null or whitespace.</exception>
+        </member>
+        <member name="M:Verbex.Models.Label.CreateCredentialLabel(System.String,System.String)">
+            <summary>
+            Creates a credential-level label.
+            </summary>
+            <param name="credentialId">The credential ID this label is attached to.</param>
+            <param name="labelText">The label text.</param>
+            <returns>A new Label instance for the credential.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when any parameter is null or whitespace.</exception>
+        </member>
         <member name="T:Verbex.Models.LabelRecord">
             <summary>
             Record type for labels table rows.
@@ -5659,6 +5967,15 @@
         </member>
         <member name="P:Verbex.Models.LabelRecord.Id">
             <summary>Record ID (k-sortable unique identifier).</summary>
+        </member>
+        <member name="P:Verbex.Models.LabelRecord.TenantId">
+            <summary>Tenant ID (null for non-tenant labels).</summary>
+        </member>
+        <member name="P:Verbex.Models.LabelRecord.UserId">
+            <summary>User ID (null for non-user labels).</summary>
+        </member>
+        <member name="P:Verbex.Models.LabelRecord.CredentialId">
+            <summary>Credential ID (null for non-credential labels).</summary>
         </member>
         <member name="P:Verbex.Models.LabelRecord.DocumentId">
             <summary>Document ID (null for index-level labels).</summary>
@@ -5699,10 +6016,10 @@
         </member>
         <member name="T:Verbex.Models.Tag">
             <summary>
-            Represents a key-value tag attached to a document or index.
+            Represents a key-value tag attached to a tenant, user, credential, document, or index.
             </summary>
             <remarks>
-            Tags are key-value pairs that can be attached to documents or indexes
+            Tags are key-value pairs that can be attached to entities
             for rich metadata and filtering. Multiple tags with the same key can exist on a single entity.
             </remarks>
         </member>
@@ -5713,6 +6030,30 @@
             <value>
             A k-sortable unique identifier with "tag_" prefix.
             Example: "tag_01ar5xxlajk1sxr6hzf29ksz4o01234567890abc".
+            </value>
+        </member>
+        <member name="P:Verbex.Models.Tag.TenantId">
+            <summary>
+            Gets or sets the tenant ID this tag is attached to.
+            </summary>
+            <value>
+            The identifier of the tenant, or empty string if not a tenant-level tag.
+            </value>
+        </member>
+        <member name="P:Verbex.Models.Tag.UserId">
+            <summary>
+            Gets or sets the user ID this tag is attached to.
+            </summary>
+            <value>
+            The identifier of the user, or empty string if not a user-level tag.
+            </value>
+        </member>
+        <member name="P:Verbex.Models.Tag.CredentialId">
+            <summary>
+            Gets or sets the credential ID this tag is attached to.
+            </summary>
+            <value>
+            The identifier of the credential, or empty string if not a credential-level tag.
             </value>
         </member>
         <member name="P:Verbex.Models.Tag.DocumentId">
@@ -5755,6 +6096,24 @@
             </summary>
             <value>The creation timestamp in UTC.</value>
         </member>
+        <member name="P:Verbex.Models.Tag.IsTenantTag">
+            <summary>
+            Gets a value indicating whether this is a tenant-level tag.
+            </summary>
+            <value>True if this tag is attached to a tenant.</value>
+        </member>
+        <member name="P:Verbex.Models.Tag.IsUserTag">
+            <summary>
+            Gets a value indicating whether this is a user-level tag.
+            </summary>
+            <value>True if this tag is attached to a user.</value>
+        </member>
+        <member name="P:Verbex.Models.Tag.IsCredentialTag">
+            <summary>
+            Gets a value indicating whether this is a credential-level tag.
+            </summary>
+            <value>True if this tag is attached to a credential.</value>
+        </member>
         <member name="P:Verbex.Models.Tag.IsDocumentTag">
             <summary>
             Gets a value indicating whether this is a document-level tag.
@@ -5790,6 +6149,36 @@
             <returns>A new Tag instance for the index.</returns>
             <exception cref="T:System.ArgumentNullException">Thrown when indexId or key is null or whitespace.</exception>
         </member>
+        <member name="M:Verbex.Models.Tag.CreateTenantTag(System.String,System.String,System.String)">
+            <summary>
+            Creates a tenant-level tag.
+            </summary>
+            <param name="tenantId">The tenant ID this tag is attached to.</param>
+            <param name="key">The tag key.</param>
+            <param name="value">The tag value.</param>
+            <returns>A new Tag instance for the tenant.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when tenantId or key is null or whitespace.</exception>
+        </member>
+        <member name="M:Verbex.Models.Tag.CreateUserTag(System.String,System.String,System.String)">
+            <summary>
+            Creates a user-level tag.
+            </summary>
+            <param name="userId">The user ID this tag is attached to.</param>
+            <param name="key">The tag key.</param>
+            <param name="value">The tag value.</param>
+            <returns>A new Tag instance for the user.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when userId or key is null or whitespace.</exception>
+        </member>
+        <member name="M:Verbex.Models.Tag.CreateCredentialTag(System.String,System.String,System.String)">
+            <summary>
+            Creates a credential-level tag.
+            </summary>
+            <param name="credentialId">The credential ID this tag is attached to.</param>
+            <param name="key">The tag key.</param>
+            <param name="value">The tag value.</param>
+            <returns>A new Tag instance for the credential.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when credentialId or key is null or whitespace.</exception>
+        </member>
         <member name="T:Verbex.Models.TagRecord">
             <summary>
             Record type for tags table rows.
@@ -5797,6 +6186,15 @@
         </member>
         <member name="P:Verbex.Models.TagRecord.Id">
             <summary>Record ID (k-sortable unique identifier).</summary>
+        </member>
+        <member name="P:Verbex.Models.TagRecord.TenantId">
+            <summary>Tenant ID (null for non-tenant tags).</summary>
+        </member>
+        <member name="P:Verbex.Models.TagRecord.UserId">
+            <summary>User ID (null for non-user tags).</summary>
+        </member>
+        <member name="P:Verbex.Models.TagRecord.CredentialId">
+            <summary>Credential ID (null for non-credential tags).</summary>
         </member>
         <member name="P:Verbex.Models.TagRecord.DocumentId">
             <summary>Document ID (null for index-level tags).</summary>
@@ -5857,6 +6255,18 @@
             True if the tenant is active and can be accessed; false if the tenant is disabled.
             Default is true.
             </value>
+        </member>
+        <member name="P:Verbex.Models.TenantMetadata.Labels">
+            <summary>
+            Gets or sets the labels for this tenant.
+            </summary>
+            <value>A list of string labels for categorization and filtering.</value>
+        </member>
+        <member name="P:Verbex.Models.TenantMetadata.Tags">
+            <summary>
+            Gets or sets the tags for this tenant.
+            </summary>
+            <value>A dictionary of key-value pairs for rich metadata.</value>
         </member>
         <member name="P:Verbex.Models.TenantMetadata.CreatedUtc">
             <summary>
@@ -6108,6 +6518,18 @@
             True if the user account is active and can authenticate; false if disabled.
             Default is true.
             </value>
+        </member>
+        <member name="P:Verbex.Models.UserMaster.Labels">
+            <summary>
+            Gets or sets the labels for this user.
+            </summary>
+            <value>A list of string labels for categorization and filtering.</value>
+        </member>
+        <member name="P:Verbex.Models.UserMaster.Tags">
+            <summary>
+            Gets or sets the tags for this user.
+            </summary>
+            <value>A dictionary of key-value pairs for rich metadata.</value>
         </member>
         <member name="P:Verbex.Models.UserMaster.CreatedUtc">
             <summary>

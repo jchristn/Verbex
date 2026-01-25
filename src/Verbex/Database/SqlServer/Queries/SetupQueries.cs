@@ -8,7 +8,7 @@ namespace Verbex.Database.SqlServer.Queries
         /// <summary>
         /// Schema version for migration tracking.
         /// </summary>
-        public const string SchemaVersion = "3.0";
+        public const string SchemaVersion = "3.2";
 
         /// <summary>
         /// Creates all tables for the multi-tenant inverted index.
@@ -77,6 +77,7 @@ CREATE TABLE indexes (
     tenant_id NVARCHAR(48) NOT NULL,
     name NVARCHAR(256) NOT NULL,
     description NVARCHAR(MAX),
+    custom_metadata NVARCHAR(MAX),
     created_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
     last_update_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
     CONSTRAINT fk_indexes_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(identifier) ON DELETE CASCADE,
@@ -93,6 +94,7 @@ CREATE TABLE documents (
     content_sha256 NVARCHAR(64),
     document_length INT NOT NULL DEFAULT 0,
     term_count INT NOT NULL DEFAULT 0,
+    custom_metadata NVARCHAR(MAX),
     indexed_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
     last_update_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
     created_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
@@ -133,29 +135,41 @@ CREATE TABLE document_terms (
     CONSTRAINT unique_document_term UNIQUE (document_id, term_id)
 );
 
--- Labels table (document or index level)
+-- Labels table (tenant, user, credential, document, or index level)
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='labels' AND xtype='U')
 CREATE TABLE labels (
     id NVARCHAR(48) PRIMARY KEY,
+    tenant_id NVARCHAR(48),
+    user_id NVARCHAR(48),
+    credential_id NVARCHAR(48),
     document_id NVARCHAR(48),
-    index_id NVARCHAR(48) NOT NULL,
+    index_id NVARCHAR(48),
     label NVARCHAR(256) NOT NULL,
     last_update_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
     created_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT fk_labels_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(identifier) ON DELETE NO ACTION,
+    CONSTRAINT fk_labels_user FOREIGN KEY (user_id) REFERENCES users(identifier) ON DELETE NO ACTION,
+    CONSTRAINT fk_labels_credential FOREIGN KEY (credential_id) REFERENCES credentials(identifier) ON DELETE NO ACTION,
     CONSTRAINT fk_labels_document FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
     CONSTRAINT fk_labels_index FOREIGN KEY (index_id) REFERENCES indexes(identifier)
 );
 
--- Tags table (document or index level key-value pairs)
+-- Tags table (tenant, user, credential, document, or index level key-value pairs)
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='tags' AND xtype='U')
 CREATE TABLE tags (
     id NVARCHAR(48) PRIMARY KEY,
+    tenant_id NVARCHAR(48),
+    user_id NVARCHAR(48),
+    credential_id NVARCHAR(48),
     document_id NVARCHAR(48),
-    index_id NVARCHAR(48) NOT NULL,
+    index_id NVARCHAR(48),
     [key] NVARCHAR(256) NOT NULL,
     value NVARCHAR(MAX),
     last_update_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
     created_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT fk_tags_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(identifier) ON DELETE NO ACTION,
+    CONSTRAINT fk_tags_user FOREIGN KEY (user_id) REFERENCES users(identifier) ON DELETE NO ACTION,
+    CONSTRAINT fk_tags_credential FOREIGN KEY (credential_id) REFERENCES credentials(identifier) ON DELETE NO ACTION,
     CONSTRAINT fk_tags_document FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
     CONSTRAINT fk_tags_index FOREIGN KEY (index_id) REFERENCES indexes(identifier)
 );
@@ -284,6 +298,24 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_labels_document_label
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_labels_index_label')
     CREATE INDEX idx_labels_index_label ON labels(index_id, label);
 
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_labels_tenant')
+    CREATE INDEX idx_labels_tenant ON labels(tenant_id);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_labels_tenant_label')
+    CREATE INDEX idx_labels_tenant_label ON labels(tenant_id, label);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_labels_user')
+    CREATE INDEX idx_labels_user ON labels(user_id);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_labels_user_label')
+    CREATE INDEX idx_labels_user_label ON labels(user_id, label);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_labels_credential')
+    CREATE INDEX idx_labels_credential ON labels(credential_id);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_labels_credential_label')
+    CREATE INDEX idx_labels_credential_label ON labels(credential_id, label);
+
 -- Tag indexes (for filtering by key-value pairs)
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_document')
     CREATE INDEX idx_tags_document ON tags(document_id);
@@ -299,6 +331,24 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_document_key')
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_index_key')
     CREATE INDEX idx_tags_index_key ON tags(index_id, [key]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_tenant')
+    CREATE INDEX idx_tags_tenant ON tags(tenant_id);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_tenant_key')
+    CREATE INDEX idx_tags_tenant_key ON tags(tenant_id, [key]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_user')
+    CREATE INDEX idx_tags_user ON tags(user_id);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_user_key')
+    CREATE INDEX idx_tags_user_key ON tags(user_id, [key]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_credential')
+    CREATE INDEX idx_tags_credential ON tags(credential_id);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_credential_key')
+    CREATE INDEX idx_tags_credential_key ON tags(credential_id, [key]);
 ";
 
         /// <summary>
@@ -316,6 +366,27 @@ DROP TABLE IF EXISTS credentials;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS administrators;
 DROP TABLE IF EXISTS tenants;
+";
+
+        /// <summary>
+        /// Migration query from schema version 3.1 to 3.2.
+        /// Adds custom_metadata column to documents and indexes tables.
+        /// </summary>
+        public static readonly string MigrateFrom31To32 = @"
+-- Add custom_metadata column to documents table if it doesn't exist
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('documents') AND name = 'custom_metadata')
+BEGIN
+    ALTER TABLE documents ADD custom_metadata NVARCHAR(MAX);
+END
+
+-- Add custom_metadata column to indexes table if it doesn't exist
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('indexes') AND name = 'custom_metadata')
+BEGIN
+    ALTER TABLE indexes ADD custom_metadata NVARCHAR(MAX);
+END
+
+-- Update schema version
+UPDATE schema_metadata SET value = '3.2' WHERE [key] = 'schema_version';
 ";
     }
 }

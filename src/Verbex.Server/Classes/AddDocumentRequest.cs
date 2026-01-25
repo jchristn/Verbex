@@ -71,6 +71,22 @@ namespace Verbex.Server.Classes
             }
         }
 
+        /// <summary>
+        /// Custom metadata for the document.
+        /// Can be any JSON-serializable value (object, array, string, number, boolean, null).
+        /// </summary>
+        public object? CustomMetadata
+        {
+            get
+            {
+                return _CustomMetadata;
+            }
+            set
+            {
+                _CustomMetadata = value;
+            }
+        }
+
         #endregion
 
         #region Private-Members
@@ -79,6 +95,7 @@ namespace Verbex.Server.Classes
         private string _Content = "";
         private List<string> _Labels = new List<string>();
         private Dictionary<string, string> _Tags = new Dictionary<string, string>();
+        private object? _CustomMetadata = null;
 
         #endregion
 

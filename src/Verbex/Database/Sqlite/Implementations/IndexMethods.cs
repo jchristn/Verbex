@@ -4,6 +4,7 @@ namespace Verbex.Database.Sqlite.Implementations
     using System.Collections.Generic;
     using System.Data;
     using System.Runtime.CompilerServices;
+    using System.Text.Json;
     using System.Threading;
     using System.Threading.Tasks;
     using Verbex.Database.Interfaces;
@@ -42,13 +43,18 @@ namespace Verbex.Database.Sqlite.Implementations
             index.CreatedUtc = DateTime.UtcNow;
             index.LastUpdateUtc = DateTime.UtcNow;
 
+            string? customMetadataJson = index.CustomMetadata != null
+                ? Sanitizer.Sanitize(JsonSerializer.Serialize(index.CustomMetadata))
+                : null;
+
             string query = $@"
-INSERT INTO indexes (identifier, tenant_id, name, description, created_utc, last_update_utc)
+INSERT INTO indexes (identifier, tenant_id, name, description, custom_metadata, created_utc, last_update_utc)
 VALUES (
     '{Sanitizer.Sanitize(index.Identifier)}',
     '{Sanitizer.Sanitize(index.TenantId)}',
     '{Sanitizer.Sanitize(index.Name)}',
     {Sanitizer.FormatNullableString(index.Description)},
+    {Sanitizer.FormatNullableString(customMetadataJson)},
     '{Sanitizer.FormatDateTime(index.CreatedUtc)}',
     '{Sanitizer.FormatDateTime(index.LastUpdateUtc)}'
 );";
@@ -66,7 +72,7 @@ VALUES (
             }
 
             string query = $@"
-SELECT identifier, tenant_id, name, description, created_utc, last_update_utc
+SELECT identifier, tenant_id, name, description, custom_metadata, created_utc, last_update_utc
 FROM indexes
 WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND identifier = '{Sanitizer.Sanitize(identifier)}';";
 
@@ -89,7 +95,7 @@ WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND identifier = '{Sanitizer.
             }
 
             string query = $@"
-SELECT identifier, tenant_id, name, description, created_utc, last_update_utc
+SELECT identifier, tenant_id, name, description, custom_metadata, created_utc, last_update_utc
 FROM indexes
 WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND name = '{Sanitizer.Sanitize(name)}';";
 
@@ -107,7 +113,7 @@ WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND name = '{Sanitizer.Saniti
         public async Task<List<IndexMetadata>> ReadManyAsync(string tenantId, int limit = 100, int offset = 0, CancellationToken token = default)
         {
             string query = $@"
-SELECT identifier, tenant_id, name, description, created_utc, last_update_utc
+SELECT identifier, tenant_id, name, description, custom_metadata, created_utc, last_update_utc
 FROM indexes
 WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}'
 ORDER BY created_utc DESC
@@ -128,7 +134,7 @@ LIMIT {limit} OFFSET {offset};";
         public async IAsyncEnumerable<IndexMetadata> ReadAllAsync(string tenantId, [EnumeratorCancellation] CancellationToken token = default)
         {
             string query = $@"
-SELECT identifier, tenant_id, name, description, created_utc, last_update_utc
+SELECT identifier, tenant_id, name, description, custom_metadata, created_utc, last_update_utc
 FROM indexes
 WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}'
 ORDER BY created_utc DESC;";
@@ -152,10 +158,15 @@ ORDER BY created_utc DESC;";
 
             index.LastUpdateUtc = DateTime.UtcNow;
 
+            string? customMetadataJson = index.CustomMetadata != null
+                ? Sanitizer.Sanitize(JsonSerializer.Serialize(index.CustomMetadata))
+                : null;
+
             string query = $@"
 UPDATE indexes SET
     name = '{Sanitizer.Sanitize(index.Name)}',
     description = {Sanitizer.FormatNullableString(index.Description)},
+    custom_metadata = {Sanitizer.FormatNullableString(customMetadataJson)},
     last_update_utc = '{Sanitizer.FormatDateTime(index.LastUpdateUtc)}'
 WHERE tenant_id = '{Sanitizer.Sanitize(index.TenantId)}' AND identifier = '{Sanitizer.Sanitize(index.Identifier)}';";
 
@@ -248,7 +259,7 @@ WHERE tenant_id = '{Sanitizer.Sanitize(index.TenantId)}' AND identifier = '{Sani
 
         private static IndexMetadata MapRowToIndex(DataRow row)
         {
-            return new IndexMetadata
+            IndexMetadata index = new IndexMetadata
             {
                 Identifier = row["identifier"]?.ToString() ?? string.Empty,
                 TenantId = row["tenant_id"]?.ToString() ?? string.Empty,
@@ -257,6 +268,21 @@ WHERE tenant_id = '{Sanitizer.Sanitize(index.TenantId)}' AND identifier = '{Sani
                 CreatedUtc = DateTime.Parse(row["created_utc"]?.ToString() ?? DateTime.UtcNow.ToString("o")),
                 LastUpdateUtc = DateTime.Parse(row["last_update_utc"]?.ToString() ?? DateTime.UtcNow.ToString("o"))
             };
+
+            string? customMetadataJson = row["custom_metadata"]?.ToString();
+            if (!string.IsNullOrEmpty(customMetadataJson))
+            {
+                try
+                {
+                    index.CustomMetadata = JsonSerializer.Deserialize<object>(customMetadataJson);
+                }
+                catch
+                {
+                    index.CustomMetadata = null;
+                }
+            }
+
+            return index;
         }
     }
 }

@@ -31,5 +31,10 @@ namespace VerbexCli.Infrastructure
         /// Gets or sets the last accessed timestamp.
         /// </summary>
         public DateTime LastAccessedAt { get; set; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// Gets or sets the custom metadata for the index.
+        /// </summary>
+        public object? CustomMetadata { get; set; } = null;
     }
 }

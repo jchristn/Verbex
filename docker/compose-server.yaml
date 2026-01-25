@@ -1,6 +1,6 @@
 services:
   verbex-server:
-    image: jchristn/verbex-server:v0.1.0
+    image: jchristn77/verbex-server:v0.1.0
     container_name: verbex-server
     ports:
       - "8080:8080"

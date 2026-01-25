@@ -1,6 +1,6 @@
 services:
   verbex-server:
-    image: jchristn/verbex-server:v0.1.0
+    image: jchristn77/verbex-server:v0.1.0
     container_name: verbex-server
     ports:
       - "8080:8080"
@@ -14,7 +14,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
 
   verbex-dashboard:
-    image: jchristn/verbex-dashboard:v0.1.0
+    image: jchristn77/verbex-dashboard:v0.1.0
     container_name: verbex-dashboard
     ports:
       - "8200:8200"

@@ -1,11 +1,15 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Modal from './Modal';
+import AlertModal from './AlertModal';
+import ConfirmModal from './ConfirmModal';
 import ActionMenu from './ActionMenu';
 import MetadataModal from './MetadataModal';
 import CopyableId from './CopyableId';
 import Pagination from './Pagination';
 import SortableHeader from './SortableHeader';
+import TagInput from './TagInput';
+import KeyValueEditor from './KeyValueEditor';
 import './UsersView.css';
 
 function UsersView({ selectedTenant, tenants, onTenantSelect }) {
@@ -15,8 +19,11 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState(null);
+
+  // Alert and delete confirmation modals
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', variant: 'error' });
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, user: null, isDeleting: false });
 
   // Create form state
   const [createEmail, setCreateEmail] = useState('');
@@ -36,6 +43,8 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
   const [editLastName, setEditLastName] = useState('');
   const [editIsAdmin, setEditIsAdmin] = useState(false);
   const [editActive, setEditActive] = useState(true);
+  const [editLabels, setEditLabels] = useState([]);
+  const [editTags, setEditTags] = useState({});
   const [isEditingUser, setIsEditingUser] = useState(false);
   const [editError, setEditError] = useState(null);
 
@@ -61,13 +70,16 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
     }
   }, [tenants, selectedTenant, onTenantSelect]);
 
-  const loadUsers = useCallback(async (signal) => {
+  const loadUsers = useCallback(async (signalOrEvent) => {
     if (!apiClient || !selectedTenant) return;
+
+    // Handle both AbortSignal (from useEffect) and no signal (from button click)
+    const signal = signalOrEvent instanceof AbortSignal ? signalOrEvent : undefined;
 
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiClient.getUsers(selectedTenant, { signal });
+      const response = await apiClient.getUsers(selectedTenant, signal ? { signal } : {});
       setUsers(response.data?.users || []);
     } catch (err) {
       if (err.name === 'AbortError') return;
@@ -148,21 +160,31 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
     setShowDetailModal(true);
   };
 
-  const handleDelete = async (userId) => {
-    if (!confirm(`Are you sure you want to delete this user? This action cannot be undone.`)) {
-      return;
-    }
+  const showAlert = (title, message, variant = 'error') => {
+    setAlertModal({ isOpen: true, title, message, variant });
+  };
 
-    setIsDeleting(true);
+  const closeAlert = () => {
+    setAlertModal({ isOpen: false, title: '', message: '', variant: 'error' });
+  };
+
+  const handleDelete = (user) => {
+    setDeleteConfirm({ isOpen: true, user, isDeleting: false });
+  };
+
+  const confirmDelete = async () => {
+    const user = deleteConfirm.user;
+    setDeleteConfirm(prev => ({ ...prev, isDeleting: true }));
+
     try {
-      await apiClient.deleteUser(selectedTenant, userId);
+      await apiClient.deleteUser(selectedTenant, user.identifier);
+      setDeleteConfirm({ isOpen: false, user: null, isDeleting: false });
       setShowDetailModal(false);
       setSelectedUser(null);
       loadUsers();
     } catch (err) {
-      alert(`Failed to delete user: ${err.message}`);
-    } finally {
-      setIsDeleting(false);
+      setDeleteConfirm({ isOpen: false, user: null, isDeleting: false });
+      showAlert('Error', `Failed to delete user: ${err.message}`);
     }
   };
 
@@ -226,6 +248,8 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
     setEditLastName(user.lastName || '');
     setEditIsAdmin(user.isAdmin || false);
     setEditActive(user.active);
+    setEditLabels(user.labels || []);
+    setEditTags(user.tags || {});
     setEditError(null);
     setShowEditModal(true);
   };
@@ -239,6 +263,8 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
     setEditLastName('');
     setEditIsAdmin(false);
     setEditActive(true);
+    setEditLabels([]);
+    setEditTags({});
     setEditError(null);
   };
 
@@ -269,6 +295,9 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
         updates.password = editPassword;
       }
       await apiClient.updateUser(selectedTenant, editUser.identifier, updates);
+      // Update labels and tags
+      await apiClient.updateUserLabels(selectedTenant, editUser.identifier, editLabels);
+      await apiClient.updateUserTags(selectedTenant, editUser.identifier, editTags);
       handleCloseEditModal();
       loadUsers();
     } catch (err) {
@@ -295,8 +324,12 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
         <div className="workspace-actions">
           {selectedTenant && (
             <>
-              <button className="btn btn-secondary" onClick={loadUsers}>
-                Refresh
+              <button className="btn btn-icon" onClick={loadUsers} title="Refresh">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 4v6h-6"></path>
+                  <path d="M1 20v-6h6"></path>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
               </button>
               <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
                 Create User
@@ -454,6 +487,11 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
                             setMetadataUser(user);
                             setShowMetadataModal(true);
                           }
+                        },
+                        {
+                          label: 'Delete',
+                          variant: 'danger',
+                          onClick: () => handleDelete(user)
                         }
                       ]}
                     />
@@ -617,10 +655,9 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
             <div className="details-actions">
               <button
                 className="btn btn-danger"
-                onClick={() => handleDelete(selectedUser.identifier)}
-                disabled={isDeleting}
+                onClick={() => handleDelete(selectedUser)}
               >
-                {isDeleting ? 'Deleting...' : 'Delete User'}
+                Delete User
               </button>
               <button
                 className="btn btn-secondary"
@@ -733,6 +770,21 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
               <span>Active</span>
             </label>
           </div>
+          <div className="form-group">
+            <label>Labels</label>
+            <TagInput
+              value={editLabels}
+              onChange={setEditLabels}
+              placeholder="Add a label..."
+            />
+          </div>
+          <div className="form-group">
+            <label>Tags</label>
+            <KeyValueEditor
+              value={editTags}
+              onChange={setEditTags}
+            />
+          </div>
           <div className="form-actions">
             <button
               type="button"
@@ -752,6 +804,29 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
           </div>
         </form>
       </Modal>
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.title}
+        message={alertModal.message}
+        variant={alertModal.variant}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, user: null, isDeleting: false })}
+        onConfirm={confirmDelete}
+        title="Delete User"
+        message="Are you sure you want to delete this user? This will also delete all credentials associated with this user."
+        entityName={deleteConfirm.user?.email}
+        confirmLabel="Delete"
+        warningMessage="This action cannot be undone."
+        variant="danger"
+        isLoading={deleteConfirm.isDeleting}
+      />
     </div>
   );
 }

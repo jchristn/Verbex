@@ -90,14 +90,14 @@ ports:
 
 ```bash
 cd src
-docker build -t jchristn/verbex-server:v0.1.0 -f Verbex.Server/Dockerfile .
+docker build -t jchristn77/verbex-server:v0.1.0 -f Verbex.Server/Dockerfile .
 ```
 
 ### Build Dashboard Image
 
 ```bash
 cd dashboard
-docker build -t jchristn/verbex-dashboard:v0.1.0 .
+docker build -t jchristn77/verbex-dashboard:v0.1.0 .
 ```
 
 ## Production Considerations

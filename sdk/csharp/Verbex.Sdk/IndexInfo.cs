@@ -57,5 +57,11 @@ namespace Verbex.Sdk
         /// Tags (key-value pairs) associated with the index.
         /// </summary>
         public Dictionary<string, string>? Tags { get; set; }
+
+        /// <summary>
+        /// Custom metadata object associated with the index.
+        /// Can be any JSON-serializable object.
+        /// </summary>
+        public object? CustomMetadata { get; set; }
     }
 }

@@ -1,11 +1,15 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Modal from './Modal';
+import AlertModal from './AlertModal';
+import ConfirmModal from './ConfirmModal';
 import ActionMenu from './ActionMenu';
 import MetadataModal from './MetadataModal';
 import CopyableId from './CopyableId';
 import Pagination from './Pagination';
 import SortableHeader from './SortableHeader';
+import TagInput from './TagInput';
+import KeyValueEditor from './KeyValueEditor';
 import './TenantsView.css';
 
 function TenantsView({ onTenantSelect }) {
@@ -15,8 +19,11 @@ function TenantsView({ onTenantSelect }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState(null);
+
+  // Alert and delete confirmation modals
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', variant: 'error' });
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, tenant: null, isDeleting: false });
 
   // Create form state
   const [createName, setCreateName] = useState('');
@@ -30,6 +37,8 @@ function TenantsView({ onTenantSelect }) {
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editActive, setEditActive] = useState(true);
+  const [editLabels, setEditLabels] = useState([]);
+  const [editTags, setEditTags] = useState({});
   const [isEditing, setIsEditing] = useState(false);
   const [editError, setEditError] = useState(null);
 
@@ -48,13 +57,16 @@ function TenantsView({ onTenantSelect }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const loadTenants = useCallback(async (signal) => {
+  const loadTenants = useCallback(async (signalOrEvent) => {
     if (!apiClient) return;
+
+    // Handle both AbortSignal (from useEffect) and no signal (from button click)
+    const signal = signalOrEvent instanceof AbortSignal ? signalOrEvent : undefined;
 
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiClient.getTenants({ signal });
+      const response = await apiClient.getTenants(signal ? { signal } : {});
       setTenants(response.data?.tenants || []);
     } catch (err) {
       if (err.name === 'AbortError') return;
@@ -131,21 +143,31 @@ function TenantsView({ onTenantSelect }) {
     setShowDetailModal(true);
   };
 
-  const handleDelete = async (tenantId) => {
-    if (!confirm(`Are you sure you want to delete tenant "${tenantId}"? This will delete all users, credentials, and data associated with this tenant. This action cannot be undone.`)) {
-      return;
-    }
+  const showAlert = (title, message, variant = 'error') => {
+    setAlertModal({ isOpen: true, title, message, variant });
+  };
 
-    setIsDeleting(true);
+  const closeAlert = () => {
+    setAlertModal({ isOpen: false, title: '', message: '', variant: 'error' });
+  };
+
+  const handleDelete = (tenant) => {
+    setDeleteConfirm({ isOpen: true, tenant, isDeleting: false });
+  };
+
+  const confirmDelete = async () => {
+    const tenant = deleteConfirm.tenant;
+    setDeleteConfirm(prev => ({ ...prev, isDeleting: true }));
+
     try {
-      await apiClient.deleteTenant(tenantId);
+      await apiClient.deleteTenant(tenant.identifier);
+      setDeleteConfirm({ isOpen: false, tenant: null, isDeleting: false });
       setShowDetailModal(false);
       setSelectedTenant(null);
       loadTenants();
     } catch (err) {
-      alert(`Failed to delete tenant: ${err.message}`);
-    } finally {
-      setIsDeleting(false);
+      setDeleteConfirm({ isOpen: false, tenant: null, isDeleting: false });
+      showAlert('Error', `Failed to delete tenant: ${err.message}`);
     }
   };
 
@@ -187,6 +209,8 @@ function TenantsView({ onTenantSelect }) {
     setEditName(tenant.name || '');
     setEditDescription(tenant.description || '');
     setEditActive(tenant.active);
+    setEditLabels(tenant.labels || []);
+    setEditTags(tenant.tags || {});
     setEditError(null);
     setShowEditModal(true);
   };
@@ -197,6 +221,8 @@ function TenantsView({ onTenantSelect }) {
     setEditName('');
     setEditDescription('');
     setEditActive(true);
+    setEditLabels([]);
+    setEditTags({});
     setEditError(null);
   };
 
@@ -216,6 +242,9 @@ function TenantsView({ onTenantSelect }) {
         description: editDescription.trim(),
         active: editActive
       });
+      // Update labels and tags
+      await apiClient.updateTenantLabels(editTenant.identifier, editLabels);
+      await apiClient.updateTenantTags(editTenant.identifier, editTags);
       handleCloseEditModal();
       loadTenants();
     } catch (err) {
@@ -246,8 +275,12 @@ function TenantsView({ onTenantSelect }) {
           <span className="count-badge">{filteredAndSortedTenants.length}</span>
         </div>
         <div className="workspace-actions">
-          <button className="btn btn-secondary" onClick={loadTenants}>
-            Refresh
+          <button className="btn btn-icon" onClick={loadTenants} title="Refresh">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 4v6h-6"></path>
+              <path d="M1 20v-6h6"></path>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
           </button>
           <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
             Create Tenant
@@ -356,6 +389,11 @@ function TenantsView({ onTenantSelect }) {
                             setMetadataTenant(tenant);
                             setShowMetadataModal(true);
                           }
+                        },
+                        {
+                          label: 'Delete',
+                          variant: 'danger',
+                          onClick: () => handleDelete(tenant)
                         }
                       ]}
                     />
@@ -466,10 +504,9 @@ function TenantsView({ onTenantSelect }) {
             <div className="details-actions">
               <button
                 className="btn btn-danger"
-                onClick={() => handleDelete(selectedTenant.identifier)}
-                disabled={isDeleting}
+                onClick={() => handleDelete(selectedTenant)}
               >
-                {isDeleting ? 'Deleting...' : 'Delete Tenant'}
+                Delete Tenant
               </button>
               <button
                 className="btn btn-secondary"
@@ -546,6 +583,21 @@ function TenantsView({ onTenantSelect }) {
               <span>Active</span>
             </label>
           </div>
+          <div className="form-group">
+            <label>Labels</label>
+            <TagInput
+              value={editLabels}
+              onChange={setEditLabels}
+              placeholder="Add a label..."
+            />
+          </div>
+          <div className="form-group">
+            <label>Tags</label>
+            <KeyValueEditor
+              value={editTags}
+              onChange={setEditTags}
+            />
+          </div>
           <div className="form-actions">
             <button
               type="button"
@@ -565,6 +617,29 @@ function TenantsView({ onTenantSelect }) {
           </div>
         </form>
       </Modal>
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.title}
+        message={alertModal.message}
+        variant={alertModal.variant}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, tenant: null, isDeleting: false })}
+        onConfirm={confirmDelete}
+        title="Delete Tenant"
+        message="Are you sure you want to delete this tenant? This will permanently delete all users, credentials, indexes, and documents associated with this tenant."
+        entityName={deleteConfirm.tenant?.name || deleteConfirm.tenant?.identifier}
+        confirmLabel="Delete"
+        warningMessage="This action cannot be undone."
+        variant="danger"
+        isLoading={deleteConfirm.isDeleting}
+      />
     </div>
   );
 }

@@ -305,6 +305,29 @@ namespace Verbex.Server.Services
         }
 
         /// <summary>
+        /// Update index custom metadata (full replacement).
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="indexId">Index identifier.</param>
+        /// <param name="customMetadata">New custom metadata (can be any JSON-serializable value or null).</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Updated metadata if successful, null if index not found.</returns>
+        public async Task<IndexMetadata?> UpdateIndexCustomMetadataAsync(string tenantId, string indexId, object? customMetadata, CancellationToken token = default)
+        {
+            if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(indexId)) return null;
+            if (!_Metadata.TryGetValue(indexId, out IndexMetadata? metadata)) return null;
+
+            metadata.CustomMetadata = customMetadata;
+            metadata.LastUpdateUtc = DateTime.UtcNow;
+
+            IndexMetadata updated = await _Database.Indexes.UpdateAsync(metadata, token).ConfigureAwait(false);
+            _Metadata[indexId] = updated;
+
+            _Logging?.Info(_Header + "updated custom metadata for index '" + indexId + "'");
+            return updated;
+        }
+
+        /// <summary>
         /// Dispose all indices and clean up resources.
         /// </summary>
         public async Task DisposeAllAsync()

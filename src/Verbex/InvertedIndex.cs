@@ -209,7 +209,7 @@ namespace Verbex
             string documentId = IdGenerator.GenerateDocumentId();
             string contentSha256 = ComputeContentHash(content);
 
-            await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, token).ConfigureAwait(false);
+            await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, null, token).ConfigureAwait(false);
 
             await IndexDocumentContentAsync(documentId, documentName, content, token).ConfigureAwait(false);
 
@@ -242,7 +242,7 @@ namespace Verbex
 
             string contentSha256 = ComputeContentHash(content);
 
-            await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, token).ConfigureAwait(false);
+            await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, null, token).ConfigureAwait(false);
 
             await IndexDocumentContentAsync(documentId, documentName, content, token).ConfigureAwait(false);
         }
@@ -932,6 +932,27 @@ namespace Verbex
 
         #endregion
 
+        #region Custom-Metadata
+
+        /// <summary>
+        /// Sets or updates the custom metadata for a document.
+        /// </summary>
+        /// <param name="documentId">Document ID.</param>
+        /// <param name="customMetadata">Custom metadata (any JSON-serializable value, or null to clear).</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Task.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when documentId is null.</exception>
+        public async Task SetCustomMetadataAsync(string documentId, object? customMetadata, CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotOpen();
+            ArgumentNullException.ThrowIfNull(documentId);
+
+            await _Driver.Documents.UpdateCustomMetadataAsync(_TenantId, _IndexId, documentId, customMetadata, token).ConfigureAwait(false);
+        }
+
+        #endregion
+
         #region Statistics
 
         /// <summary>
@@ -1179,6 +1200,7 @@ namespace Verbex
                 ComputeContentHash(content),
                 content.Length,
                 distinctTermCount,
+                null,
                 token).ConfigureAwait(false);
         }
 

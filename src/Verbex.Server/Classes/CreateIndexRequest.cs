@@ -94,6 +94,16 @@ namespace Verbex.Server.Classes
             set => _Tags = value ?? new Dictionary<string, string>();
         }
 
+        /// <summary>
+        /// Custom metadata for the index.
+        /// Can be any JSON-serializable value (object, array, string, number, boolean, null).
+        /// </summary>
+        public object? CustomMetadata
+        {
+            get => _CustomMetadata;
+            set => _CustomMetadata = value;
+        }
+
         #endregion
 
         #region Private-Members
@@ -106,6 +116,7 @@ namespace Verbex.Server.Classes
         private int _MaxTokenLength = 0;
         private List<string> _Labels = new List<string>();
         private Dictionary<string, string> _Tags = new Dictionary<string, string>();
+        private object? _CustomMetadata = null;
 
         #endregion
 
@@ -160,7 +171,8 @@ namespace Verbex.Server.Classes
                 MinTokenLength = _MinTokenLength,
                 MaxTokenLength = _MaxTokenLength,
                 Labels = _Labels,
-                Tags = _Tags
+                Tags = _Tags,
+                CustomMetadata = _CustomMetadata
             };
         }
 

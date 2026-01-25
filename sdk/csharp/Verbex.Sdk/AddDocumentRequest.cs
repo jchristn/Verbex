@@ -74,6 +74,23 @@ namespace Verbex.Sdk
             }
         }
 
+        /// <summary>
+        /// Custom metadata object for the document.
+        /// Can be any JSON-serializable object.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public object? CustomMetadata
+        {
+            get
+            {
+                return _CustomMetadata;
+            }
+            set
+            {
+                _CustomMetadata = value;
+            }
+        }
+
         #endregion
 
         #region Private-Members
@@ -82,6 +99,7 @@ namespace Verbex.Sdk
         private string _Content = "";
         private List<string>? _Labels = null;
         private Dictionary<string, string>? _Tags = null;
+        private object? _CustomMetadata = null;
 
         #endregion
 

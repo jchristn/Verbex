@@ -22,9 +22,10 @@ namespace Verbex.Database.Interfaces
         /// <param name="name">Document name.</param>
         /// <param name="contentSha256">SHA-256 hash for duplicate detection.</param>
         /// <param name="documentLength">Character count of document.</param>
+        /// <param name="customMetadata">Optional custom metadata (any JSON-serializable value).</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Task.</returns>
-        Task AddAsync(string tenantId, string indexId, string id, string name, string? contentSha256, int documentLength, CancellationToken token = default);
+        Task AddAsync(string tenantId, string indexId, string id, string name, string? contentSha256, int documentLength, object? customMetadata = null, CancellationToken token = default);
 
         /// <summary>
         /// Gets a document by ID.
@@ -126,9 +127,21 @@ namespace Verbex.Database.Interfaces
         /// <param name="contentSha256">New SHA-256 content hash.</param>
         /// <param name="documentLength">New document length.</param>
         /// <param name="termCount">New term count.</param>
+        /// <param name="customMetadata">Optional custom metadata (any JSON-serializable value).</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Task.</returns>
-        Task UpdateAsync(string tenantId, string indexId, string id, string name, string? contentSha256, int documentLength, int termCount, CancellationToken token = default);
+        Task UpdateAsync(string tenantId, string indexId, string id, string name, string? contentSha256, int documentLength, int termCount, object? customMetadata = null, CancellationToken token = default);
+
+        /// <summary>
+        /// Updates only the custom metadata for a document.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="indexId">Index identifier.</param>
+        /// <param name="id">Document ID.</param>
+        /// <param name="customMetadata">Custom metadata (any JSON-serializable value, or null to clear).</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Task.</returns>
+        Task UpdateCustomMetadataAsync(string tenantId, string indexId, string id, object? customMetadata, CancellationToken token = default);
 
         /// <summary>
         /// Deletes a document and all associated data.

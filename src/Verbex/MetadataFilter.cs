@@ -293,7 +293,7 @@ namespace Verbex
 
             foreach (KeyValuePair<string, object> filter in _Filters)
             {
-                if (!metadata.CustomMetadata.TryGetValue(filter.Key, out object? metadataValue))
+                if (!metadata.Tags.TryGetValue(filter.Key, out object? metadataValue))
                 {
                     return false;
                 }

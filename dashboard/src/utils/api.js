@@ -166,6 +166,9 @@ class ApiClient {
     if (indexConfig.tags && Object.keys(indexConfig.tags).length > 0) {
       apiConfig.Tags = indexConfig.tags;
     }
+    if (indexConfig.customMetadata !== undefined && indexConfig.customMetadata !== null) {
+      apiConfig.CustomMetadata = indexConfig.customMetadata;
+    }
 
     return this.post('/v1.0/indices', apiConfig);
   }
@@ -180,6 +183,10 @@ class ApiClient {
 
   async updateIndexTags(indexId, tags) {
     return this.put(`/v1.0/indices/${encodeURIComponent(indexId)}/tags`, { Tags: tags || {} });
+  }
+
+  async updateIndexCustomMetadata(indexId, customMetadata) {
+    return this.put(`/v1.0/indices/${encodeURIComponent(indexId)}/customMetadata`, { CustomMetadata: customMetadata });
   }
 
   // Document endpoints
@@ -206,6 +213,9 @@ class ApiClient {
     if (document.tags && Object.keys(document.tags).length > 0) {
       apiDocument.Tags = document.tags;
     }
+    if (document.customMetadata !== undefined && document.customMetadata !== null) {
+      apiDocument.CustomMetadata = document.customMetadata;
+    }
 
     return this.post(`/v1.0/indices/${encodeURIComponent(indexId)}/documents`, apiDocument);
   }
@@ -220,6 +230,10 @@ class ApiClient {
 
   async updateDocumentTags(indexId, docId, tags) {
     return this.put(`/v1.0/indices/${encodeURIComponent(indexId)}/documents/${encodeURIComponent(docId)}/tags`, { Tags: tags || {} });
+  }
+
+  async updateDocumentCustomMetadata(indexId, docId, customMetadata) {
+    return this.put(`/v1.0/indices/${encodeURIComponent(indexId)}/documents/${encodeURIComponent(docId)}/customMetadata`, { CustomMetadata: customMetadata });
   }
 
   // Search endpoints
@@ -265,6 +279,14 @@ class ApiClient {
     return this.put(`/v1.0/tenants/${encodeURIComponent(tenantId)}`, updates);
   }
 
+  async updateTenantLabels(tenantId, labels) {
+    return this.put(`/v1.0/tenants/${encodeURIComponent(tenantId)}/labels`, { Labels: labels || [] });
+  }
+
+  async updateTenantTags(tenantId, tags) {
+    return this.put(`/v1.0/tenants/${encodeURIComponent(tenantId)}/tags`, { Tags: tags || {} });
+  }
+
   // Admin - User endpoints
   async getUsers(tenantId, options = {}) {
     return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/users`, options);
@@ -299,6 +321,14 @@ class ApiClient {
     return this.put(`/v1.0/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}`, updates);
   }
 
+  async updateUserLabels(tenantId, userId, labels) {
+    return this.put(`/v1.0/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}/labels`, { Labels: labels || [] });
+  }
+
+  async updateUserTags(tenantId, userId, tags) {
+    return this.put(`/v1.0/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}/tags`, { Tags: tags || {} });
+  }
+
   // Admin - Credential endpoints
   async getCredentials(tenantId, options = {}) {
     return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials`, options);
@@ -322,6 +352,14 @@ class ApiClient {
 
   async deleteCredential(tenantId, credentialId) {
     return this.delete(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials/${encodeURIComponent(credentialId)}`);
+  }
+
+  async updateCredentialLabels(tenantId, credentialId, labels) {
+    return this.put(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials/${encodeURIComponent(credentialId)}/labels`, { Labels: labels || [] });
+  }
+
+  async updateCredentialTags(tenantId, credentialId, tags) {
+    return this.put(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials/${encodeURIComponent(credentialId)}/tags`, { Tags: tags || {} });
   }
 }
 

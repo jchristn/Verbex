@@ -9,7 +9,7 @@ namespace Verbex.Database.Interfaces
     /// Interface for label-related database operations.
     /// </summary>
     /// <remarks>
-    /// Provides operations for document and index-level labels.
+    /// Provides operations for tenant, user, credential, document, and index-level labels.
     /// Labels are string tags used for categorization and filtering.
     /// </remarks>
     public interface ILabelMethods
@@ -135,5 +135,98 @@ namespace Verbex.Database.Interfaces
         /// <param name="token">Cancellation token.</param>
         /// <returns>Number of labels deleted.</returns>
         Task<long> DeleteAllAsync(string tenantId, string indexId, CancellationToken token = default);
+
+        #region Tenant Labels
+
+        /// <summary>
+        /// Gets all labels for a tenant.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>List of labels.</returns>
+        Task<List<string>> GetTenantLabelsAsync(string tenantId, CancellationToken token = default);
+
+        /// <summary>
+        /// Replaces all labels on a tenant.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="labels">The new labels.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Task.</returns>
+        Task ReplaceTenantLabelsAsync(string tenantId, IEnumerable<string> labels, CancellationToken token = default);
+
+        /// <summary>
+        /// Deletes all labels for a tenant.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Number of labels deleted.</returns>
+        Task<long> DeleteAllTenantLabelsAsync(string tenantId, CancellationToken token = default);
+
+        #endregion
+
+        #region User Labels
+
+        /// <summary>
+        /// Gets all labels for a user.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="userId">User identifier.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>List of labels.</returns>
+        Task<List<string>> GetUserLabelsAsync(string tenantId, string userId, CancellationToken token = default);
+
+        /// <summary>
+        /// Replaces all labels on a user.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="userId">User identifier.</param>
+        /// <param name="labels">The new labels.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Task.</returns>
+        Task ReplaceUserLabelsAsync(string tenantId, string userId, IEnumerable<string> labels, CancellationToken token = default);
+
+        /// <summary>
+        /// Deletes all labels for a user.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="userId">User identifier.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Number of labels deleted.</returns>
+        Task<long> DeleteAllUserLabelsAsync(string tenantId, string userId, CancellationToken token = default);
+
+        #endregion
+
+        #region Credential Labels
+
+        /// <summary>
+        /// Gets all labels for a credential.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="credentialId">Credential identifier.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>List of labels.</returns>
+        Task<List<string>> GetCredentialLabelsAsync(string tenantId, string credentialId, CancellationToken token = default);
+
+        /// <summary>
+        /// Replaces all labels on a credential.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="credentialId">Credential identifier.</param>
+        /// <param name="labels">The new labels.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Task.</returns>
+        Task ReplaceCredentialLabelsAsync(string tenantId, string credentialId, IEnumerable<string> labels, CancellationToken token = default);
+
+        /// <summary>
+        /// Deletes all labels for a credential.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="credentialId">Credential identifier.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Number of labels deleted.</returns>
+        Task<long> DeleteAllCredentialLabelsAsync(string tenantId, string credentialId, CancellationToken token = default);
+
+        #endregion
     }
 }

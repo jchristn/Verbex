@@ -60,9 +60,10 @@ namespace Verbex.Sdk
         public bool IsDeleted { get; set; }
 
         /// <summary>
-        /// Custom metadata (key-value pairs) associated with the document.
+        /// Custom metadata object associated with the document.
+        /// Can be any JSON-serializable object.
         /// </summary>
-        public Dictionary<string, object>? CustomMetadata { get; set; }
+        public object? CustomMetadata { get; set; }
 
         /// <summary>
         /// Labels associated with the document.

@@ -182,6 +182,13 @@ namespace Verbex.Server.API.REST
                 ExceptionRoute);
 
             _Webserver.Routes.PreAuthentication.Static.Add(
+                HttpMethod.HEAD, "/", HeadHealthRoute,
+                metadata => metadata
+                    .WithTag("Health")
+                    .WithDescription("Root health check endpoint. Returns 200/OK."),
+                ExceptionRoute);
+
+            _Webserver.Routes.PreAuthentication.Static.Add(
                 HttpMethod.GET, "/v1.0/health", GetHealthRoute,
                 metadata => metadata
                     .WithTag("Health")
@@ -293,6 +300,22 @@ namespace Verbex.Server.API.REST
                     .WithResponse(404, OpenApiResponseMetadata.NotFound()),
                 ExceptionRoute);
 
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.PUT, "/v1.0/indices/{id}/customMetadata", PutIndexCustomMetadataRoute,
+                metadata => metadata
+                    .WithTag("Indices")
+                    .WithDescription("Replace custom metadata on an index. Can be any JSON-serializable value.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
+                        CreateUpdateCustomMetadataRequestSchema(),
+                        "New custom metadata for the index",
+                        required: true))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Custom metadata updated successfully", CreateIndexUpdateSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
             // Index-specific document routes
             _Webserver.Routes.PostAuthentication.Parameter.Add(
                 HttpMethod.GET, "/v1.0/indices/{id}/documents", GetIndexDocumentsRoute,
@@ -375,6 +398,23 @@ namespace Verbex.Server.API.REST
                         "New tags for the document",
                         required: true))
                     .WithResponse(200, OpenApiResponseMetadata.Json("Tags updated successfully", CreateDocumentUpdateSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.PUT, "/v1.0/indices/{id}/documents/{docId}/customMetadata", PutDocumentCustomMetadataRoute,
+                metadata => metadata
+                    .WithTag("Documents")
+                    .WithDescription("Replace custom metadata on a document. Can be any JSON-serializable value.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithParameter(OpenApiParameterMetadata.Path("docId", "The unique identifier of the document"))
+                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
+                        CreateUpdateCustomMetadataRequestSchema(),
+                        "New custom metadata for the document",
+                        required: true))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Custom metadata updated successfully", CreateDocumentUpdateSchema()))
                     .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
                     .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
                     .WithResponse(404, OpenApiResponseMetadata.NotFound()),
@@ -499,6 +539,51 @@ namespace Verbex.Server.API.REST
                     .WithTag("Credentials")
                     .WithDescription("Update an API credential (activate/deactivate)."),
                 ExceptionRoute);
+
+            // Tenant labels and tags routes
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.PUT, "/v1.0/tenants/{id}/labels", PutTenantLabelsRoute,
+                metadata => metadata
+                    .WithTag("Tenants")
+                    .WithDescription("Replace all labels on a tenant. This is a full replacement, not an additive operation."),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.PUT, "/v1.0/tenants/{id}/tags", PutTenantTagsRoute,
+                metadata => metadata
+                    .WithTag("Tenants")
+                    .WithDescription("Replace all tags on a tenant. This is a full replacement, not an additive operation."),
+                ExceptionRoute);
+
+            // User labels and tags routes
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.PUT, "/v1.0/tenants/{id}/users/{userId}/labels", PutUserLabelsRoute,
+                metadata => metadata
+                    .WithTag("Users")
+                    .WithDescription("Replace all labels on a user. This is a full replacement, not an additive operation."),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.PUT, "/v1.0/tenants/{id}/users/{userId}/tags", PutUserTagsRoute,
+                metadata => metadata
+                    .WithTag("Users")
+                    .WithDescription("Replace all tags on a user. This is a full replacement, not an additive operation."),
+                ExceptionRoute);
+
+            // Credential labels and tags routes
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.PUT, "/v1.0/tenants/{id}/credentials/{credId}/labels", PutCredentialLabelsRoute,
+                metadata => metadata
+                    .WithTag("Credentials")
+                    .WithDescription("Replace all labels on a credential. This is a full replacement, not an additive operation."),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.PUT, "/v1.0/tenants/{id}/credentials/{credId}/tags", PutCredentialTagsRoute,
+                metadata => metadata
+                    .WithTag("Credentials")
+                    .WithDescription("Replace all tags on a credential. This is a full replacement, not an additive operation."),
+                ExceptionRoute);
         }
 
         /// <summary>
@@ -611,6 +696,24 @@ namespace Verbex.Server.API.REST
                         Version = "1.0.0",
                         Timestamp = DateTime.UtcNow
                     }
+                });
+            });
+        }
+
+        /// <summary>
+        /// Health check route.
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <returns>Task.</returns>
+        private async Task HeadHealthRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.HealthCheck, (reqCtx) =>
+            {
+                return Task.FromResult(new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = null
                 });
             });
         }
@@ -859,7 +962,8 @@ namespace Verbex.Server.API.REST
                                 InMemory = created.InMemory,
                                 CreatedUtc = created.CreatedUtc,
                                 Labels = created.Labels,
-                                Tags = created.Tags
+                                Tags = created.Tags,
+                                CustomMetadata = created.CustomMetadata
                             }
                         }
                     };
@@ -1069,6 +1173,70 @@ namespace Verbex.Server.API.REST
         }
 
         /// <summary>
+        /// Update index custom metadata route.
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <returns>Task.</returns>
+        private async Task PutIndexCustomMetadataRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                // Get tenant from auth context
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                string tenantId = !String.IsNullOrEmpty(auth?.TenantId) ? auth.TenantId : "default";
+
+                string? indexId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(indexId))
+                {
+                    return new ResponseContext(false, 400, "Index ID is required");
+                }
+
+                if (!_IndexManager!.IndexExists(indexId))
+                {
+                    return new ResponseContext(false, 404, "Index not found");
+                }
+
+                string body = await GetRequestBody(ctx).ConfigureAwait(false);
+                if (String.IsNullOrEmpty(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                UpdateCustomMetadataRequest? request = JsonSerializer.Deserialize<UpdateCustomMetadataRequest>(body, _JsonOptions);
+                if (request == null)
+                {
+                    return new ResponseContext(false, 400, "Invalid JSON in request body");
+                }
+
+                IndexMetadata? updated = await _IndexManager.UpdateIndexCustomMetadataAsync(tenantId, indexId, request.CustomMetadata).ConfigureAwait(false);
+                if (updated != null)
+                {
+                    return new ResponseContext
+                    {
+                        Success = true,
+                        StatusCode = 200,
+                        Data = new
+                        {
+                            Message = "Custom metadata updated successfully",
+                            Index = new
+                            {
+                                Identifier = updated.Identifier,
+                                Name = updated.Name,
+                                Labels = updated.Labels,
+                                Tags = updated.Tags,
+                                CustomMetadata = updated.CustomMetadata
+                            }
+                        }
+                    };
+                }
+                else
+                {
+                    return new ResponseContext(false, 500, "Failed to update custom metadata");
+                }
+            });
+        }
+
+        /// <summary>
         /// Update document labels route.
         /// </summary>
         /// <param name="ctx">HTTP context.</param>
@@ -1197,6 +1365,68 @@ namespace Verbex.Server.API.REST
         }
 
         /// <summary>
+        /// Update document custom metadata route.
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <returns>Task.</returns>
+        private async Task PutDocumentCustomMetadataRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.Document, async (reqCtx) =>
+            {
+                string? indexId = ctx.Request.Url.Parameters["id"];
+                string? docId = ctx.Request.Url.Parameters["docId"];
+
+                if (String.IsNullOrEmpty(indexId))
+                {
+                    return new ResponseContext(false, 400, "Index ID is required");
+                }
+
+                if (String.IsNullOrEmpty(docId))
+                {
+                    return new ResponseContext(false, 400, "Document ID is required");
+                }
+
+                InvertedIndex? index = _IndexManager!.GetIndex(indexId);
+                if (index == null)
+                {
+                    return new ResponseContext(false, 404, "Index not found");
+                }
+
+                string body = await GetRequestBody(ctx).ConfigureAwait(false);
+                if (String.IsNullOrEmpty(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                UpdateCustomMetadataRequest? request = JsonSerializer.Deserialize<UpdateCustomMetadataRequest>(body, _JsonOptions);
+                if (request == null)
+                {
+                    return new ResponseContext(false, 400, "Invalid JSON in request body");
+                }
+
+                try
+                {
+                    await index.SetCustomMetadataAsync(docId, request.CustomMetadata).ConfigureAwait(false);
+                    DocumentMetadata? document = await index.GetDocumentAsync(docId).ConfigureAwait(false);
+                    return new ResponseContext
+                    {
+                        Success = true,
+                        StatusCode = 200,
+                        Data = new
+                        {
+                            Message = "Custom metadata updated successfully",
+                            Document = document
+                        }
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return new ResponseContext(false, 500, $"Failed to update custom metadata: {ex.Message}");
+                }
+            });
+        }
+
+        /// <summary>
         /// Get documents for specific index route.
         /// </summary>
         /// <param name="ctx">HTTP context.</param>
@@ -1290,6 +1520,12 @@ namespace Verbex.Server.API.REST
                     if (documentRequest.Tags != null && documentRequest.Tags.Count > 0)
                     {
                         await index.AddTagsBatchAsync(documentId, documentRequest.Tags).ConfigureAwait(false);
+                    }
+
+                    // Set custom metadata if provided
+                    if (documentRequest.CustomMetadata != null)
+                    {
+                        await index.SetCustomMetadataAsync(documentId, documentRequest.CustomMetadata).ConfigureAwait(false);
                     }
 
                     return new ResponseContext
@@ -1967,7 +2203,34 @@ namespace Verbex.Server.API.REST
                     request = JsonSerializer.Deserialize<CreateCredentialRequest>(body, _JsonOptions);
                 }
 
-                Credential credential = new Credential(tenantId, "system");
+                // Determine the user ID to associate with the credential
+                string userId;
+                if (!String.IsNullOrEmpty(auth.UserId) && auth.TenantId == tenantId)
+                {
+                    // Use the authenticated user's ID if they belong to this tenant
+                    userId = auth.UserId;
+                }
+                else
+                {
+                    // For global admin or cross-tenant operations, find the first admin user for the tenant
+                    List<UserMaster> tenantUsers = new List<UserMaster>();
+                    await foreach (UserMaster user in _Database!.Users.ReadAllAsync(tenantId).ConfigureAwait(false))
+                    {
+                        tenantUsers.Add(user);
+                    }
+                    UserMaster? adminUser = tenantUsers.FirstOrDefault(u => u.IsAdmin && u.Active);
+                    if (adminUser == null)
+                    {
+                        adminUser = tenantUsers.FirstOrDefault(u => u.Active);
+                    }
+                    if (adminUser == null)
+                    {
+                        return new ResponseContext(false, 400, "No active users found for this tenant. Create a user first before creating credentials.");
+                    }
+                    userId = adminUser.Identifier;
+                }
+
+                Credential credential = new Credential(tenantId, userId);
                 if (request?.Description != null)
                 {
                     credential.Name = request.Description;
@@ -2081,6 +2344,302 @@ namespace Verbex.Server.API.REST
         }
 
         /// <summary>
+        /// Update tenant labels route.
+        /// </summary>
+        private async Task PutTenantLabelsRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(tenantId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID is required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.HasAdminAccess || (!auth.IsGlobalAdmin && auth.TenantId != tenantId))
+                {
+                    return new ResponseContext(false, 403, "Admin access required");
+                }
+
+                TenantMetadata? tenant = await _Database!.Tenants.ReadByIdentifierAsync(tenantId).ConfigureAwait(false);
+                if (tenant == null)
+                {
+                    return new ResponseContext(false, 404, "Tenant not found");
+                }
+
+                string body = await GetRequestBody(ctx);
+                if (String.IsNullOrEmpty(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                UpdateLabelsRequest? request = JsonSerializer.Deserialize<UpdateLabelsRequest>(body, _JsonOptions);
+                if (request == null)
+                {
+                    return new ResponseContext(false, 400, "Invalid request");
+                }
+
+                await _Database.Labels.ReplaceTenantLabelsAsync(tenantId, request.Labels).ConfigureAwait(false);
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { Message = "Tenant labels updated successfully", TenantId = tenantId, Labels = request.Labels }
+                };
+            });
+        }
+
+        /// <summary>
+        /// Update tenant tags route.
+        /// </summary>
+        private async Task PutTenantTagsRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(tenantId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID is required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.HasAdminAccess || (!auth.IsGlobalAdmin && auth.TenantId != tenantId))
+                {
+                    return new ResponseContext(false, 403, "Admin access required");
+                }
+
+                TenantMetadata? tenant = await _Database!.Tenants.ReadByIdentifierAsync(tenantId).ConfigureAwait(false);
+                if (tenant == null)
+                {
+                    return new ResponseContext(false, 404, "Tenant not found");
+                }
+
+                string body = await GetRequestBody(ctx);
+                if (String.IsNullOrEmpty(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                UpdateTagsRequest? request = JsonSerializer.Deserialize<UpdateTagsRequest>(body, _JsonOptions);
+                if (request == null)
+                {
+                    return new ResponseContext(false, 400, "Invalid request");
+                }
+
+                await _Database.Tags.ReplaceTenantTagsAsync(tenantId, request.Tags).ConfigureAwait(false);
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { Message = "Tenant tags updated successfully", TenantId = tenantId, Tags = request.Tags }
+                };
+            });
+        }
+
+        /// <summary>
+        /// Update user labels route.
+        /// </summary>
+        private async Task PutUserLabelsRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                string? userId = ctx.Request.Url.Parameters["userId"];
+
+                if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(userId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID and User ID are required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.HasAdminAccess || (!auth.IsGlobalAdmin && auth.TenantId != tenantId))
+                {
+                    return new ResponseContext(false, 403, "Admin access required");
+                }
+
+                UserMaster? user = await _Database!.Users.ReadByIdentifierAsync(tenantId, userId).ConfigureAwait(false);
+                if (user == null)
+                {
+                    return new ResponseContext(false, 404, "User not found");
+                }
+
+                string body = await GetRequestBody(ctx);
+                if (String.IsNullOrEmpty(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                UpdateLabelsRequest? request = JsonSerializer.Deserialize<UpdateLabelsRequest>(body, _JsonOptions);
+                if (request == null)
+                {
+                    return new ResponseContext(false, 400, "Invalid request");
+                }
+
+                await _Database.Labels.ReplaceUserLabelsAsync(tenantId, userId, request.Labels).ConfigureAwait(false);
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { Message = "User labels updated successfully", UserId = userId, Labels = request.Labels }
+                };
+            });
+        }
+
+        /// <summary>
+        /// Update user tags route.
+        /// </summary>
+        private async Task PutUserTagsRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                string? userId = ctx.Request.Url.Parameters["userId"];
+
+                if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(userId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID and User ID are required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.HasAdminAccess || (!auth.IsGlobalAdmin && auth.TenantId != tenantId))
+                {
+                    return new ResponseContext(false, 403, "Admin access required");
+                }
+
+                UserMaster? user = await _Database!.Users.ReadByIdentifierAsync(tenantId, userId).ConfigureAwait(false);
+                if (user == null)
+                {
+                    return new ResponseContext(false, 404, "User not found");
+                }
+
+                string body = await GetRequestBody(ctx);
+                if (String.IsNullOrEmpty(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                UpdateTagsRequest? request = JsonSerializer.Deserialize<UpdateTagsRequest>(body, _JsonOptions);
+                if (request == null)
+                {
+                    return new ResponseContext(false, 400, "Invalid request");
+                }
+
+                await _Database.Tags.ReplaceUserTagsAsync(tenantId, userId, request.Tags).ConfigureAwait(false);
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { Message = "User tags updated successfully", UserId = userId, Tags = request.Tags }
+                };
+            });
+        }
+
+        /// <summary>
+        /// Update credential labels route.
+        /// </summary>
+        private async Task PutCredentialLabelsRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                string? credId = ctx.Request.Url.Parameters["credId"];
+
+                if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(credId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID and Credential ID are required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.HasAdminAccess || (!auth.IsGlobalAdmin && auth.TenantId != tenantId))
+                {
+                    return new ResponseContext(false, 403, "Admin access required");
+                }
+
+                Credential? credential = await _Database!.Credentials.ReadByIdentifierAsync(tenantId, credId).ConfigureAwait(false);
+                if (credential == null)
+                {
+                    return new ResponseContext(false, 404, "Credential not found");
+                }
+
+                string body = await GetRequestBody(ctx);
+                if (String.IsNullOrEmpty(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                UpdateLabelsRequest? request = JsonSerializer.Deserialize<UpdateLabelsRequest>(body, _JsonOptions);
+                if (request == null)
+                {
+                    return new ResponseContext(false, 400, "Invalid request");
+                }
+
+                await _Database.Labels.ReplaceCredentialLabelsAsync(tenantId, credId, request.Labels).ConfigureAwait(false);
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { Message = "Credential labels updated successfully", CredentialId = credId, Labels = request.Labels }
+                };
+            });
+        }
+
+        /// <summary>
+        /// Update credential tags route.
+        /// </summary>
+        private async Task PutCredentialTagsRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? tenantId = ctx.Request.Url.Parameters["id"];
+                string? credId = ctx.Request.Url.Parameters["credId"];
+
+                if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(credId))
+                {
+                    return new ResponseContext(false, 400, "Tenant ID and Credential ID are required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.HasAdminAccess || (!auth.IsGlobalAdmin && auth.TenantId != tenantId))
+                {
+                    return new ResponseContext(false, 403, "Admin access required");
+                }
+
+                Credential? credential = await _Database!.Credentials.ReadByIdentifierAsync(tenantId, credId).ConfigureAwait(false);
+                if (credential == null)
+                {
+                    return new ResponseContext(false, 404, "Credential not found");
+                }
+
+                string body = await GetRequestBody(ctx);
+                if (String.IsNullOrEmpty(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                UpdateTagsRequest? request = JsonSerializer.Deserialize<UpdateTagsRequest>(body, _JsonOptions);
+                if (request == null)
+                {
+                    return new ResponseContext(false, 400, "Invalid request");
+                }
+
+                await _Database.Tags.ReplaceCredentialTagsAsync(tenantId, credId, request.Tags).ConfigureAwait(false);
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new { Message = "Credential tags updated successfully", CredentialId = credId, Tags = request.Tags }
+                };
+            });
+        }
+
+        /// <summary>
         /// Wrapped request handler.
         /// </summary>
         /// <param name="ctx">HTTP context.</param>
@@ -2181,7 +2740,18 @@ namespace Verbex.Server.API.REST
                 ctx.Response.Headers.Add(header.Key, header.Value);
             }
 
-            string json = JsonSerializer.Serialize(response, _JsonOptions);
+            string json;
+            try
+            {
+                json = JsonSerializer.Serialize(response, _JsonOptions);
+            }
+            catch (Exception serializationEx)
+            {
+                _Logging?.Error(_Header + "serialization error: " + serializationEx.Message);
+                // Create a safe fallback response that doesn't contain problematic data
+                ResponseContext fallbackResponse = new ResponseContext(false, 500, "Serialization error: " + serializationEx.Message);
+                json = JsonSerializer.Serialize(fallbackResponse, _JsonOptions);
+            }
 
             await ctx.Response.Send(json);
         }
@@ -2470,6 +3040,24 @@ namespace Verbex.Server.API.REST
                     {
                         Type = "object",
                         Description = "Key-value pairs to replace existing tags"
+                    }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Create update custom metadata request schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateUpdateCustomMetadataRequestSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["customMetadata"] = new OpenApiSchemaMetadata
+                    {
+                        Description = "Custom metadata value (can be any JSON-serializable value: object, array, string, number, boolean, or null)"
                     }
                 }
             };

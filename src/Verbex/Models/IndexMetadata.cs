@@ -37,6 +37,7 @@ namespace Verbex.Models
         private int _ExpectedTerms = 1000000;
         private List<string> _Labels = new List<string>();
         private Dictionary<string, string> _Tags = new Dictionary<string, string>();
+        private object? _CustomMetadata = null;
 
         /// <summary>
         /// Gets or sets the unique identifier for the index.
@@ -238,6 +239,18 @@ namespace Verbex.Models
         {
             get => _Tags;
             set => _Tags = value ?? new Dictionary<string, string>();
+        }
+
+        /// <summary>
+        /// Gets or sets custom metadata for the index.
+        /// Can be any JSON-serializable value (object, array, string, number, boolean, null).
+        /// </summary>
+        /// <value>Any JSON-serializable value. Default is null.</value>
+        [JsonPropertyName("customMetadata")]
+        public object? CustomMetadata
+        {
+            get => _CustomMetadata;
+            set => _CustomMetadata = value;
         }
 
         /// <summary>

@@ -10,7 +10,7 @@ namespace Verbex.Database.Mysql.Queries
         /// <summary>
         /// Schema version for migration tracking.
         /// </summary>
-        public const string SchemaVersion = "3.0";
+        public const string SchemaVersion = "3.2";
 
         /// <summary>
         /// Creates all tables for the multi-tenant inverted index.
@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS indexes (
     tenant_id VARCHAR(48) NOT NULL,
     name VARCHAR(256) NOT NULL,
     description TEXT,
+    custom_metadata TEXT,
     created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY unique_tenant_name (tenant_id, name),
@@ -89,6 +90,7 @@ CREATE TABLE IF NOT EXISTS documents (
     content_sha256 VARCHAR(64),
     document_length INT NOT NULL DEFAULT 0,
     term_count INT NOT NULL DEFAULT 0,
+    custom_metadata TEXT,
     indexed_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -127,27 +129,39 @@ CREATE TABLE IF NOT EXISTS document_terms (
     CONSTRAINT fk_document_terms_term FOREIGN KEY (term_id) REFERENCES terms(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Labels table (document or index level)
+-- Labels table (tenant, user, credential, document, or index level)
 CREATE TABLE IF NOT EXISTS labels (
     id VARCHAR(48) PRIMARY KEY,
+    tenant_id VARCHAR(48),
+    user_id VARCHAR(48),
+    credential_id VARCHAR(48),
     document_id VARCHAR(48),
-    index_id VARCHAR(48) NOT NULL,
+    index_id VARCHAR(48),
     label VARCHAR(256) NOT NULL,
     last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_labels_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(identifier) ON DELETE CASCADE,
+    CONSTRAINT fk_labels_user FOREIGN KEY (user_id) REFERENCES users(identifier) ON DELETE CASCADE,
+    CONSTRAINT fk_labels_credential FOREIGN KEY (credential_id) REFERENCES credentials(identifier) ON DELETE CASCADE,
     CONSTRAINT fk_labels_document FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
     CONSTRAINT fk_labels_index FOREIGN KEY (index_id) REFERENCES indexes(identifier) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Tags table (document or index level key-value pairs)
+-- Tags table (tenant, user, credential, document, or index level key-value pairs)
 CREATE TABLE IF NOT EXISTS tags (
     id VARCHAR(48) PRIMARY KEY,
+    tenant_id VARCHAR(48),
+    user_id VARCHAR(48),
+    credential_id VARCHAR(48),
     document_id VARCHAR(48),
-    index_id VARCHAR(48) NOT NULL,
+    index_id VARCHAR(48),
     `key` VARCHAR(256) NOT NULL,
     value TEXT,
     last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_tags_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(identifier) ON DELETE CASCADE,
+    CONSTRAINT fk_tags_user FOREIGN KEY (user_id) REFERENCES users(identifier) ON DELETE CASCADE,
+    CONSTRAINT fk_tags_credential FOREIGN KEY (credential_id) REFERENCES credentials(identifier) ON DELETE CASCADE,
     CONSTRAINT fk_tags_document FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
     CONSTRAINT fk_tags_index FOREIGN KEY (index_id) REFERENCES indexes(identifier) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -220,6 +234,12 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
             "CREATE INDEX idx_labels_label ON labels(label)",
             "CREATE INDEX idx_labels_document_label ON labels(document_id, label)",
             "CREATE INDEX idx_labels_index_label ON labels(index_id, label)",
+            "CREATE INDEX idx_labels_tenant ON labels(tenant_id)",
+            "CREATE INDEX idx_labels_tenant_label ON labels(tenant_id, label)",
+            "CREATE INDEX idx_labels_user ON labels(user_id)",
+            "CREATE INDEX idx_labels_user_label ON labels(user_id, label)",
+            "CREATE INDEX idx_labels_credential ON labels(credential_id)",
+            "CREATE INDEX idx_labels_credential_label ON labels(credential_id, label)",
 
             // Tag indexes (for filtering by key-value pairs)
             "CREATE INDEX idx_tags_document ON tags(document_id)",
@@ -227,7 +247,13 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
             "CREATE INDEX idx_tags_key ON tags(`key`)",
             "CREATE INDEX idx_tags_document_key ON tags(document_id, `key`)",
             "CREATE INDEX idx_tags_index_key ON tags(index_id, `key`)",
-            "CREATE INDEX idx_tags_key_value ON tags(`key`, value(255))"
+            "CREATE INDEX idx_tags_key_value ON tags(`key`, value(255))",
+            "CREATE INDEX idx_tags_tenant ON tags(tenant_id)",
+            "CREATE INDEX idx_tags_tenant_key ON tags(tenant_id, `key`)",
+            "CREATE INDEX idx_tags_user ON tags(user_id)",
+            "CREATE INDEX idx_tags_user_key ON tags(user_id, `key`)",
+            "CREATE INDEX idx_tags_credential ON tags(credential_id)",
+            "CREATE INDEX idx_tags_credential_key ON tags(credential_id, `key`)"
         };
 
         /// <summary>
@@ -247,6 +273,21 @@ DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS administrators;
 DROP TABLE IF EXISTS tenants;
 SET FOREIGN_KEY_CHECKS = 1;
+";
+
+        /// <summary>
+        /// Migration from schema version 3.1 to 3.2.
+        /// Adds custom_metadata column to documents and indexes tables.
+        /// </summary>
+        public static readonly string MigrateFrom31To32 = @"
+-- Add custom_metadata column to documents table
+ALTER TABLE documents ADD COLUMN custom_metadata TEXT AFTER term_count;
+
+-- Add custom_metadata column to indexes table
+ALTER TABLE indexes ADD COLUMN custom_metadata TEXT AFTER description;
+
+-- Update schema version
+UPDATE schema_metadata SET value = '3.2' WHERE `key` = 'schema_version';
 ";
     }
 }

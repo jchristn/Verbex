@@ -90,6 +90,7 @@ class IndexInfo {
         this.inMemory = data.inMemory || null;
         this.createdUtc = data.createdUtc || null;
         this.statistics = data.statistics || null;
+        this.customMetadata = data.customMetadata || null;
         this.labels = data.labels || null;
         this.tags = data.tags || null;
     }
@@ -167,6 +168,8 @@ class TenantInfo {
         this.name = data.name || null;
         this.active = data.active || false;
         this.createdUtc = data.createdUtc || null;
+        this.labels = data.labels || null;
+        this.tags = data.tags || null;
     }
 }
 
@@ -187,6 +190,8 @@ class UserInfo {
         this.isAdmin = data.isAdmin || false;
         this.active = data.active || false;
         this.createdUtc = data.createdUtc || null;
+        this.labels = data.labels || null;
+        this.tags = data.tags || null;
     }
 }
 
@@ -205,6 +210,8 @@ class CredentialInfo {
         this.bearerToken = data.bearerToken || null;
         this.active = data.active || false;
         this.createdUtc = data.createdUtc || null;
+        this.labels = data.labels || null;
+        this.tags = data.tags || null;
     }
 }
 
@@ -372,6 +379,7 @@ class VerbexClient {
      * @param {number} [options.maxTokenLength=0] - Maximum token length
      * @param {string[]} [options.labels] - Labels to associate with the index
      * @param {object} [options.tags] - Key-value tags to associate with the index
+     * @param {object} [options.customMetadata] - Custom metadata to associate with the index
      * @returns {Promise<ApiResponse>} Created index response
      */
     async createIndex(options) {
@@ -391,6 +399,9 @@ class VerbexClient {
         }
         if (options.tags) {
             data.Tags = options.tags;
+        }
+        if (options.customMetadata) {
+            data.CustomMetadata = options.customMetadata;
         }
         return this._makeRequest('POST', '/v1.0/indices', data);
     }
@@ -443,6 +454,16 @@ class VerbexClient {
         return this._makeRequest('PUT', `/v1.0/indices/${indexId}/tags`, { Tags: tags || {} });
     }
 
+    /**
+     * Update custom metadata on an index (full replacement).
+     * @param {string} indexId - The index identifier
+     * @param {object} customMetadata - The new custom metadata to set
+     * @returns {Promise<ApiResponse>} Update confirmation with updated index
+     */
+    async updateIndexCustomMetadata(indexId, customMetadata) {
+        return this._makeRequest('PUT', `/v1.0/indices/${indexId}/customMetadata`, { CustomMetadata: customMetadata });
+    }
+
     // ==================== Document Management Endpoints ====================
 
     /**
@@ -474,9 +495,10 @@ class VerbexClient {
      * @param {string} [documentId] - Optional document ID (GUID)
      * @param {string[]} [labels] - Optional labels to associate with the document
      * @param {object} [tags] - Optional key-value tags to associate with the document
+     * @param {object} [customMetadata] - Optional custom metadata to associate with the document
      * @returns {Promise<ApiResponse>} Document creation response
      */
-    async addDocument(indexId, content, documentId = null, labels = null, tags = null) {
+    async addDocument(indexId, content, documentId = null, labels = null, tags = null, customMetadata = null) {
         const data = { Content: content };
         if (documentId) {
             data.Id = documentId;
@@ -486,6 +508,9 @@ class VerbexClient {
         }
         if (tags) {
             data.Tags = tags;
+        }
+        if (customMetadata) {
+            data.CustomMetadata = customMetadata;
         }
         return this._makeRequest('POST', `/v1.0/indices/${indexId}/documents`, data);
     }
@@ -541,6 +566,17 @@ class VerbexClient {
      */
     async updateDocumentTags(indexId, documentId, tags) {
         return this._makeRequest('PUT', `/v1.0/indices/${indexId}/documents/${documentId}/tags`, { Tags: tags || {} });
+    }
+
+    /**
+     * Update custom metadata on a document (full replacement).
+     * @param {string} indexId - The index identifier
+     * @param {string} documentId - The document identifier
+     * @param {object} customMetadata - The new custom metadata to set
+     * @returns {Promise<ApiResponse>} Update confirmation with updated document
+     */
+    async updateDocumentCustomMetadata(indexId, documentId, customMetadata) {
+        return this._makeRequest('PUT', `/v1.0/indices/${indexId}/documents/${documentId}/customMetadata`, { CustomMetadata: customMetadata });
     }
 
     // ==================== Search Endpoint ====================
@@ -634,6 +670,26 @@ class VerbexClient {
         return this._makeRequest('DELETE', `/v1.0/admin/tenants/${tenantId}`);
     }
 
+    /**
+     * Update labels on a tenant (full replacement).
+     * @param {string} tenantId - The tenant identifier
+     * @param {string[]} labels - The new labels to set
+     * @returns {Promise<ApiResponse>} Update confirmation with updated tenant
+     */
+    async updateTenantLabels(tenantId, labels) {
+        return this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/labels`, { Labels: labels || [] });
+    }
+
+    /**
+     * Update tags on a tenant (full replacement).
+     * @param {string} tenantId - The tenant identifier
+     * @param {object} tags - The new tags to set
+     * @returns {Promise<ApiResponse>} Update confirmation with updated tenant
+     */
+    async updateTenantTags(tenantId, tags) {
+        return this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/tags`, { Tags: tags || {} });
+    }
+
     // ==================== Admin - User Management Endpoints ====================
 
     /**
@@ -706,6 +762,28 @@ class VerbexClient {
         return this._makeRequest('DELETE', `/v1.0/admin/tenants/${tenantId}/users/${userId}`);
     }
 
+    /**
+     * Update labels on a user (full replacement).
+     * @param {string} tenantId - The tenant identifier
+     * @param {string} userId - The user identifier
+     * @param {string[]} labels - The new labels to set
+     * @returns {Promise<ApiResponse>} Update confirmation with updated user
+     */
+    async updateUserLabels(tenantId, userId, labels) {
+        return this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/users/${userId}/labels`, { Labels: labels || [] });
+    }
+
+    /**
+     * Update tags on a user (full replacement).
+     * @param {string} tenantId - The tenant identifier
+     * @param {string} userId - The user identifier
+     * @param {object} tags - The new tags to set
+     * @returns {Promise<ApiResponse>} Update confirmation with updated user
+     */
+    async updateUserTags(tenantId, userId, tags) {
+        return this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/users/${userId}/tags`, { Tags: tags || {} });
+    }
+
     // ==================== Admin - Credential Management Endpoints ====================
 
     /**
@@ -763,6 +841,28 @@ class VerbexClient {
      */
     async deleteCredential(tenantId, credentialId) {
         return this._makeRequest('DELETE', `/v1.0/admin/tenants/${tenantId}/credentials/${credentialId}`);
+    }
+
+    /**
+     * Update labels on a credential (full replacement).
+     * @param {string} tenantId - The tenant identifier
+     * @param {string} credentialId - The credential identifier
+     * @param {string[]} labels - The new labels to set
+     * @returns {Promise<ApiResponse>} Update confirmation with updated credential
+     */
+    async updateCredentialLabels(tenantId, credentialId, labels) {
+        return this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/credentials/${credentialId}/labels`, { Labels: labels || [] });
+    }
+
+    /**
+     * Update tags on a credential (full replacement).
+     * @param {string} tenantId - The tenant identifier
+     * @param {string} credentialId - The credential identifier
+     * @param {object} tags - The new tags to set
+     * @returns {Promise<ApiResponse>} Update confirmation with updated credential
+     */
+    async updateCredentialTags(tenantId, credentialId, tags) {
+        return this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/credentials/${credentialId}/tags`, { Tags: tags || {} });
     }
 }
 

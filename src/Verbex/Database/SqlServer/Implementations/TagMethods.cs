@@ -179,5 +179,134 @@ VALUES (N'{Sanitizer.Sanitize(id)}', {Sanitizer.FormatNullableString(documentId)
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
             return count;
         }
+
+        #region Tenant Tags
+
+        public async Task<Dictionary<string, string>> GetTenantTagsAsync(string tenantId, CancellationToken token = default)
+        {
+            string query = $"SELECT [key], value FROM tags WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND user_id IS NULL AND credential_id IS NULL AND document_id IS NULL AND index_id IS NULL;";
+            DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
+            Dictionary<string, string> result = new Dictionary<string, string>();
+            foreach (DataRow row in dt.Rows)
+            {
+                string k = row["key"]?.ToString() ?? string.Empty;
+                string v = row["value"]?.ToString() ?? string.Empty;
+                result[k] = v;
+            }
+            return result;
+        }
+
+        public async Task ReplaceTenantTagsAsync(string tenantId, IDictionary<string, string> tags, CancellationToken token = default)
+        {
+            await DeleteAllTenantTagsAsync(tenantId, token).ConfigureAwait(false);
+            DateTime now = DateTime.UtcNow;
+            foreach (KeyValuePair<string, string> kvp in tags)
+            {
+                string id = IdGenerator.GenerateTagId();
+                string query = $@"
+INSERT INTO tags (id, tenant_id, [key], value, last_update_utc, created_utc)
+VALUES (N'{Sanitizer.Sanitize(id)}', N'{Sanitizer.Sanitize(tenantId)}', N'{Sanitizer.Sanitize(kvp.Key)}', {Sanitizer.FormatNullableString(kvp.Value)}, '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
+                await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
+            }
+        }
+
+        public async Task<long> DeleteAllTenantTagsAsync(string tenantId, CancellationToken token = default)
+        {
+            string countQuery = $"SELECT COUNT(*) FROM tags WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND user_id IS NULL AND credential_id IS NULL AND document_id IS NULL AND index_id IS NULL;";
+            DataTable countResult = await _Driver.ExecuteQueryAsync(countQuery, false, token).ConfigureAwait(false);
+            long count = countResult.Rows.Count > 0 ? Convert.ToInt64(countResult.Rows[0][0]) : 0;
+
+            string query = $"DELETE FROM tags WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND user_id IS NULL AND credential_id IS NULL AND document_id IS NULL AND index_id IS NULL;";
+            await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
+            return count;
+        }
+
+        #endregion
+
+        #region User Tags
+
+        public async Task<Dictionary<string, string>> GetUserTagsAsync(string tenantId, string userId, CancellationToken token = default)
+        {
+            string query = $"SELECT [key], value FROM tags WHERE user_id = N'{Sanitizer.Sanitize(userId)}';";
+            DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
+            Dictionary<string, string> result = new Dictionary<string, string>();
+            foreach (DataRow row in dt.Rows)
+            {
+                string k = row["key"]?.ToString() ?? string.Empty;
+                string v = row["value"]?.ToString() ?? string.Empty;
+                result[k] = v;
+            }
+            return result;
+        }
+
+        public async Task ReplaceUserTagsAsync(string tenantId, string userId, IDictionary<string, string> tags, CancellationToken token = default)
+        {
+            await DeleteAllUserTagsAsync(tenantId, userId, token).ConfigureAwait(false);
+            DateTime now = DateTime.UtcNow;
+            foreach (KeyValuePair<string, string> kvp in tags)
+            {
+                string id = IdGenerator.GenerateTagId();
+                string query = $@"
+INSERT INTO tags (id, user_id, [key], value, last_update_utc, created_utc)
+VALUES (N'{Sanitizer.Sanitize(id)}', N'{Sanitizer.Sanitize(userId)}', N'{Sanitizer.Sanitize(kvp.Key)}', {Sanitizer.FormatNullableString(kvp.Value)}, '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
+                await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
+            }
+        }
+
+        public async Task<long> DeleteAllUserTagsAsync(string tenantId, string userId, CancellationToken token = default)
+        {
+            string countQuery = $"SELECT COUNT(*) FROM tags WHERE user_id = N'{Sanitizer.Sanitize(userId)}';";
+            DataTable countResult = await _Driver.ExecuteQueryAsync(countQuery, false, token).ConfigureAwait(false);
+            long count = countResult.Rows.Count > 0 ? Convert.ToInt64(countResult.Rows[0][0]) : 0;
+
+            string query = $"DELETE FROM tags WHERE user_id = N'{Sanitizer.Sanitize(userId)}';";
+            await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
+            return count;
+        }
+
+        #endregion
+
+        #region Credential Tags
+
+        public async Task<Dictionary<string, string>> GetCredentialTagsAsync(string tenantId, string credentialId, CancellationToken token = default)
+        {
+            string query = $"SELECT [key], value FROM tags WHERE credential_id = N'{Sanitizer.Sanitize(credentialId)}';";
+            DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
+            Dictionary<string, string> result = new Dictionary<string, string>();
+            foreach (DataRow row in dt.Rows)
+            {
+                string k = row["key"]?.ToString() ?? string.Empty;
+                string v = row["value"]?.ToString() ?? string.Empty;
+                result[k] = v;
+            }
+            return result;
+        }
+
+        public async Task ReplaceCredentialTagsAsync(string tenantId, string credentialId, IDictionary<string, string> tags, CancellationToken token = default)
+        {
+            await DeleteAllCredentialTagsAsync(tenantId, credentialId, token).ConfigureAwait(false);
+            DateTime now = DateTime.UtcNow;
+            foreach (KeyValuePair<string, string> kvp in tags)
+            {
+                string id = IdGenerator.GenerateTagId();
+                string query = $@"
+INSERT INTO tags (id, credential_id, [key], value, last_update_utc, created_utc)
+VALUES (N'{Sanitizer.Sanitize(id)}', N'{Sanitizer.Sanitize(credentialId)}', N'{Sanitizer.Sanitize(kvp.Key)}', {Sanitizer.FormatNullableString(kvp.Value)}, '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
+                await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
+            }
+        }
+
+        public async Task<long> DeleteAllCredentialTagsAsync(string tenantId, string credentialId, CancellationToken token = default)
+        {
+            string countQuery = $"SELECT COUNT(*) FROM tags WHERE credential_id = N'{Sanitizer.Sanitize(credentialId)}';";
+            DataTable countResult = await _Driver.ExecuteQueryAsync(countQuery, false, token).ConfigureAwait(false);
+            long count = countResult.Rows.Count > 0 ? Convert.ToInt64(countResult.Rows[0][0]) : 0;
+
+            string query = $"DELETE FROM tags WHERE credential_id = N'{Sanitizer.Sanitize(credentialId)}';";
+            await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
+            return count;
+        }
+
+        #endregion
     }
 }

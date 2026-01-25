@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import TagInput from './TagInput';
 import KeyValueEditor from './KeyValueEditor';
+import JsonEditor from './JsonEditor';
 import CopyableId from './CopyableId';
 import './IndexForm.css';
 
@@ -11,6 +12,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
   const [error, setError] = useState('');
   const [labels, setLabels] = useState([]);
   const [tags, setTags] = useState({});
+  const [customMetadata, setCustomMetadata] = useState(null);
   const [selectedTenantId, setSelectedTenantId] = useState('');
 
   const isGlobalAdmin = userInfo?.isGlobalAdmin;
@@ -79,6 +81,9 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
       }
       if (Object.keys(tags).length > 0) {
         indexConfig.tags = tags;
+      }
+      if (customMetadata !== null) {
+        indexConfig.customMetadata = customMetadata;
       }
 
       await apiClient.createIndex(indexConfig);
@@ -163,6 +168,15 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
             onChange={setTags}
             keyPlaceholder="Tag name"
             valuePlaceholder="Tag value"
+          />
+        </div>
+
+        <div className="form-group">
+          <JsonEditor
+            value={customMetadata}
+            onChange={setCustomMetadata}
+            placeholder='{"key": "value"}'
+            label="Custom Metadata"
           />
         </div>
       </div>

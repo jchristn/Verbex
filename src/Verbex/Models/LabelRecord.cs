@@ -10,6 +10,15 @@ namespace Verbex.Models
         /// <summary>Record ID (k-sortable unique identifier).</summary>
         public string Id { get; set; } = string.Empty;
 
+        /// <summary>Tenant ID (null for non-tenant labels).</summary>
+        public string? TenantId { get; set; }
+
+        /// <summary>User ID (null for non-user labels).</summary>
+        public string? UserId { get; set; }
+
+        /// <summary>Credential ID (null for non-credential labels).</summary>
+        public string? CredentialId { get; set; }
+
         /// <summary>Document ID (null for index-level labels).</summary>
         public string? DocumentId { get; set; }
 

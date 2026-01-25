@@ -12,6 +12,9 @@ This document describes the REST API endpoints available in the Verbex inverted 
 - [Index Management APIs](#index-management-apis)
 - [Document Management APIs](#document-management-apis)
 - [Search APIs](#search-apis)
+- [Admin - Tenant APIs](#admin---tenant-apis)
+- [Admin - User APIs](#admin---user-apis)
+- [Admin - Credential APIs](#admin---credential-apis)
 - [Error Handling](#error-handling)
 
 ## Authentication
@@ -112,6 +115,27 @@ All API responses are wrapped in a standard format:
 | Document | GET | `/v1.0/indices/{id}/documents/{docId}` | Get document | Yes |
 | Document | DELETE | `/v1.0/indices/{id}/documents/{docId}` | Delete document | Yes |
 | Search | POST | `/v1.0/indices/{id}/search` | Search documents | Yes |
+| Tenant | GET | `/v1.0/tenants` | List tenants | Yes (Admin) |
+| Tenant | POST | `/v1.0/tenants` | Create tenant | Yes (Admin) |
+| Tenant | GET | `/v1.0/tenants/{id}` | Get tenant | Yes (Admin) |
+| Tenant | PUT | `/v1.0/tenants/{id}` | Update tenant | Yes (Admin) |
+| Tenant | DELETE | `/v1.0/tenants/{id}` | Delete tenant | Yes (Admin) |
+| Tenant | PUT | `/v1.0/tenants/{id}/labels` | Update tenant labels | Yes (Admin) |
+| Tenant | PUT | `/v1.0/tenants/{id}/tags` | Update tenant tags | Yes (Admin) |
+| User | GET | `/v1.0/tenants/{id}/users` | List users | Yes (Admin) |
+| User | POST | `/v1.0/tenants/{id}/users` | Create user | Yes (Admin) |
+| User | GET | `/v1.0/tenants/{id}/users/{userId}` | Get user | Yes (Admin) |
+| User | PUT | `/v1.0/tenants/{id}/users/{userId}` | Update user | Yes (Admin) |
+| User | DELETE | `/v1.0/tenants/{id}/users/{userId}` | Delete user | Yes (Admin) |
+| User | PUT | `/v1.0/tenants/{id}/users/{userId}/labels` | Update user labels | Yes (Admin) |
+| User | PUT | `/v1.0/tenants/{id}/users/{userId}/tags` | Update user tags | Yes (Admin) |
+| Credential | GET | `/v1.0/tenants/{id}/credentials` | List credentials | Yes (Admin) |
+| Credential | POST | `/v1.0/tenants/{id}/credentials` | Create credential | Yes (Admin) |
+| Credential | GET | `/v1.0/tenants/{id}/credentials/{credId}` | Get credential | Yes (Admin) |
+| Credential | PUT | `/v1.0/tenants/{id}/credentials/{credId}` | Update credential | Yes (Admin) |
+| Credential | DELETE | `/v1.0/tenants/{id}/credentials/{credId}` | Delete credential | Yes (Admin) |
+| Credential | PUT | `/v1.0/tenants/{id}/credentials/{credId}/labels` | Update credential labels | Yes (Admin) |
+| Credential | PUT | `/v1.0/tenants/{id}/credentials/{credId}/tags` | Update credential tags | Yes (Admin) |
 
 ## Health and Status
 
@@ -576,6 +600,220 @@ Note: `Labels` and `Tags` are optional. When provided, documents must match ALL 
   "TotalCount": null,
   "Skip": null,
   "ProcessingTimeMs": 12.34
+}
+```
+
+## Admin - Tenant APIs
+
+### PUT `/v1.0/tenants/{id}/labels`
+**Description:** Update labels on a tenant (full replacement)
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Path Parameters:**
+- `id` (string): Tenant identifier
+
+**Request Body:**
+```json
+{
+  "Labels": ["production", "active"]
+}
+```
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Message": "Labels updated successfully"
+  },
+  "ProcessingTimeMs": 3.45
+}
+```
+
+### PUT `/v1.0/tenants/{id}/tags`
+**Description:** Update tags on a tenant (full replacement)
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Path Parameters:**
+- `id` (string): Tenant identifier
+
+**Request Body:**
+```json
+{
+  "Tags": {"environment": "production", "region": "us-west"}
+}
+```
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Message": "Tags updated successfully"
+  },
+  "ProcessingTimeMs": 3.45
+}
+```
+
+## Admin - User APIs
+
+### PUT `/v1.0/tenants/{id}/users/{userId}/labels`
+**Description:** Update labels on a user (full replacement)
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Path Parameters:**
+- `id` (string): Tenant identifier
+- `userId` (string): User identifier
+
+**Request Body:**
+```json
+{
+  "Labels": ["admin", "developer"]
+}
+```
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Message": "Labels updated successfully"
+  },
+  "ProcessingTimeMs": 3.45
+}
+```
+
+### PUT `/v1.0/tenants/{id}/users/{userId}/tags`
+**Description:** Update tags on a user (full replacement)
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Path Parameters:**
+- `id` (string): Tenant identifier
+- `userId` (string): User identifier
+
+**Request Body:**
+```json
+{
+  "Tags": {"department": "engineering", "role": "senior"}
+}
+```
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Message": "Tags updated successfully"
+  },
+  "ProcessingTimeMs": 3.45
+}
+```
+
+## Admin - Credential APIs
+
+### PUT `/v1.0/tenants/{id}/credentials/{credId}/labels`
+**Description:** Update labels on a credential (full replacement)
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Path Parameters:**
+- `id` (string): Tenant identifier
+- `credId` (string): Credential identifier
+
+**Request Body:**
+```json
+{
+  "Labels": ["production", "api-key"]
+}
+```
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Message": "Labels updated successfully"
+  },
+  "ProcessingTimeMs": 3.45
+}
+```
+
+### PUT `/v1.0/tenants/{id}/credentials/{credId}/tags`
+**Description:** Update tags on a credential (full replacement)
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Path Parameters:**
+- `id` (string): Tenant identifier
+- `credId` (string): Credential identifier
+
+**Request Body:**
+```json
+{
+  "Tags": {"environment": "production", "service": "backend"}
+}
+```
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Message": "Tags updated successfully"
+  },
+  "ProcessingTimeMs": 3.45
 }
 ```
 

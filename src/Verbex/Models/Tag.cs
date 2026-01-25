@@ -5,10 +5,10 @@ namespace Verbex.Models
     using PrettyId;
 
     /// <summary>
-    /// Represents a key-value tag attached to a document or index.
+    /// Represents a key-value tag attached to a tenant, user, credential, document, or index.
     /// </summary>
     /// <remarks>
-    /// Tags are key-value pairs that can be attached to documents or indexes
+    /// Tags are key-value pairs that can be attached to entities
     /// for rich metadata and filtering. Multiple tags with the same key can exist on a single entity.
     /// </remarks>
     public class Tag
@@ -18,6 +18,9 @@ namespace Verbex.Models
         private const string IdPrefix = "tag_";
 
         private string _Identifier = string.Empty;
+        private string _TenantId = string.Empty;
+        private string _UserId = string.Empty;
+        private string _CredentialId = string.Empty;
         private string _DocumentId = string.Empty;
         private string _IndexId = string.Empty;
         private string _Key = string.Empty;
@@ -37,6 +40,45 @@ namespace Verbex.Models
         {
             get => _Identifier;
             set => _Identifier = value ?? string.Empty;
+        }
+
+        /// <summary>
+        /// Gets or sets the tenant ID this tag is attached to.
+        /// </summary>
+        /// <value>
+        /// The identifier of the tenant, or empty string if not a tenant-level tag.
+        /// </value>
+        [JsonPropertyName("tenantId")]
+        public string TenantId
+        {
+            get => _TenantId;
+            set => _TenantId = value ?? string.Empty;
+        }
+
+        /// <summary>
+        /// Gets or sets the user ID this tag is attached to.
+        /// </summary>
+        /// <value>
+        /// The identifier of the user, or empty string if not a user-level tag.
+        /// </value>
+        [JsonPropertyName("userId")]
+        public string UserId
+        {
+            get => _UserId;
+            set => _UserId = value ?? string.Empty;
+        }
+
+        /// <summary>
+        /// Gets or sets the credential ID this tag is attached to.
+        /// </summary>
+        /// <value>
+        /// The identifier of the credential, or empty string if not a credential-level tag.
+        /// </value>
+        [JsonPropertyName("credentialId")]
+        public string CredentialId
+        {
+            get => _CredentialId;
+            set => _CredentialId = value ?? string.Empty;
         }
 
         /// <summary>
@@ -108,6 +150,27 @@ namespace Verbex.Models
             get => _CreatedUtc;
             set => _CreatedUtc = value;
         }
+
+        /// <summary>
+        /// Gets a value indicating whether this is a tenant-level tag.
+        /// </summary>
+        /// <value>True if this tag is attached to a tenant.</value>
+        [JsonIgnore]
+        public bool IsTenantTag => !string.IsNullOrEmpty(_TenantId);
+
+        /// <summary>
+        /// Gets a value indicating whether this is a user-level tag.
+        /// </summary>
+        /// <value>True if this tag is attached to a user.</value>
+        [JsonIgnore]
+        public bool IsUserTag => !string.IsNullOrEmpty(_UserId);
+
+        /// <summary>
+        /// Gets a value indicating whether this is a credential-level tag.
+        /// </summary>
+        /// <value>True if this tag is attached to a credential.</value>
+        [JsonIgnore]
+        public bool IsCredentialTag => !string.IsNullOrEmpty(_CredentialId);
 
         /// <summary>
         /// Gets a value indicating whether this is a document-level tag.
@@ -183,6 +246,87 @@ namespace Verbex.Models
 
             Tag tag = new Tag();
             tag._IndexId = indexId;
+            tag._Key = key;
+            tag._Value = value ?? string.Empty;
+            return tag;
+        }
+
+        /// <summary>
+        /// Creates a tenant-level tag.
+        /// </summary>
+        /// <param name="tenantId">The tenant ID this tag is attached to.</param>
+        /// <param name="key">The tag key.</param>
+        /// <param name="value">The tag value.</param>
+        /// <returns>A new Tag instance for the tenant.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when tenantId or key is null or whitespace.</exception>
+        public static Tag CreateTenantTag(string tenantId, string key, string value)
+        {
+            if (string.IsNullOrWhiteSpace(tenantId))
+            {
+                throw new ArgumentNullException(nameof(tenantId), "Tenant ID cannot be null or whitespace.");
+            }
+
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                throw new ArgumentNullException(nameof(key), "Tag key cannot be null or whitespace.");
+            }
+
+            Tag tag = new Tag();
+            tag._TenantId = tenantId;
+            tag._Key = key;
+            tag._Value = value ?? string.Empty;
+            return tag;
+        }
+
+        /// <summary>
+        /// Creates a user-level tag.
+        /// </summary>
+        /// <param name="userId">The user ID this tag is attached to.</param>
+        /// <param name="key">The tag key.</param>
+        /// <param name="value">The tag value.</param>
+        /// <returns>A new Tag instance for the user.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when userId or key is null or whitespace.</exception>
+        public static Tag CreateUserTag(string userId, string key, string value)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                throw new ArgumentNullException(nameof(userId), "User ID cannot be null or whitespace.");
+            }
+
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                throw new ArgumentNullException(nameof(key), "Tag key cannot be null or whitespace.");
+            }
+
+            Tag tag = new Tag();
+            tag._UserId = userId;
+            tag._Key = key;
+            tag._Value = value ?? string.Empty;
+            return tag;
+        }
+
+        /// <summary>
+        /// Creates a credential-level tag.
+        /// </summary>
+        /// <param name="credentialId">The credential ID this tag is attached to.</param>
+        /// <param name="key">The tag key.</param>
+        /// <param name="value">The tag value.</param>
+        /// <returns>A new Tag instance for the credential.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when credentialId or key is null or whitespace.</exception>
+        public static Tag CreateCredentialTag(string credentialId, string key, string value)
+        {
+            if (string.IsNullOrWhiteSpace(credentialId))
+            {
+                throw new ArgumentNullException(nameof(credentialId), "Credential ID cannot be null or whitespace.");
+            }
+
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                throw new ArgumentNullException(nameof(key), "Tag key cannot be null or whitespace.");
+            }
+
+            Tag tag = new Tag();
+            tag._CredentialId = credentialId;
             tag._Key = key;
             tag._Value = value ?? string.Empty;
             return tag;

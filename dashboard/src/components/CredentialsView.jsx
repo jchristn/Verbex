@@ -7,6 +7,8 @@ import MetadataModal from './MetadataModal';
 import CopyableId from './CopyableId';
 import Pagination from './Pagination';
 import SortableHeader from './SortableHeader';
+import TagInput from './TagInput';
+import KeyValueEditor from './KeyValueEditor';
 import './CredentialsView.css';
 
 function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
@@ -30,6 +32,8 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
   const [editCredential, setEditCredential] = useState(null);
   const [editName, setEditName] = useState('');
   const [editActive, setEditActive] = useState(true);
+  const [editLabels, setEditLabels] = useState([]);
+  const [editTags, setEditTags] = useState({});
   const [isEditingCredential, setIsEditingCredential] = useState(false);
   const [editError, setEditError] = useState(null);
 
@@ -65,13 +69,16 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
     }
   }, [tenants, selectedTenant, onTenantSelect]);
 
-  const loadCredentials = useCallback(async (signal) => {
+  const loadCredentials = useCallback(async (signalOrEvent) => {
     if (!apiClient || !selectedTenant) return;
+
+    // Handle both AbortSignal (from useEffect) and no signal (from button click)
+    const signal = signalOrEvent instanceof AbortSignal ? signalOrEvent : undefined;
 
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiClient.getCredentials(selectedTenant, { signal });
+      const response = await apiClient.getCredentials(selectedTenant, signal ? { signal } : {});
       setCredentials(response.data?.credentials || []);
     } catch (err) {
       if (err.name === 'AbortError') return;
@@ -238,6 +245,8 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
     setEditCredential(credential);
     setEditName(credential.name || '');
     setEditActive(credential.active);
+    setEditLabels(credential.labels || []);
+    setEditTags(credential.tags || {});
     setEditError(null);
     setShowEditModal(true);
   };
@@ -247,6 +256,8 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
     setEditCredential(null);
     setEditName('');
     setEditActive(true);
+    setEditLabels([]);
+    setEditTags({});
     setEditError(null);
   };
 
@@ -260,6 +271,9 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
         name: editName.trim() || null,
         active: editActive
       });
+      // Update labels and tags
+      await apiClient.updateCredentialLabels(selectedTenant, editCredential.identifier, editLabels);
+      await apiClient.updateCredentialTags(selectedTenant, editCredential.identifier, editTags);
       handleCloseEditModal();
       loadCredentials();
     } catch (err) {
@@ -308,8 +322,12 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
         <div className="workspace-actions">
           {selectedTenant && (
             <>
-              <button className="btn btn-secondary" onClick={loadCredentials}>
-                Refresh
+              <button className="btn btn-icon" onClick={loadCredentials} title="Refresh">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 4v6h-6"></path>
+                  <path d="M1 20v-6h6"></path>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
               </button>
               <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
                 Create Credential
@@ -456,6 +474,11 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
                             setMetadataCredential(credential);
                             setShowMetadataModal(true);
                           }
+                        },
+                        {
+                          label: 'Delete',
+                          variant: 'danger',
+                          onClick: () => handleDelete(credential)
                         }
                       ]}
                     />
@@ -707,6 +730,21 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
               />
               <span>Active</span>
             </label>
+          </div>
+          <div className="form-group">
+            <label>Labels</label>
+            <TagInput
+              value={editLabels}
+              onChange={setEditLabels}
+              placeholder="Add a label..."
+            />
+          </div>
+          <div className="form-group">
+            <label>Tags</label>
+            <KeyValueEditor
+              value={editTags}
+              onChange={setEditTags}
+            />
           </div>
           <div className="form-actions">
             <button

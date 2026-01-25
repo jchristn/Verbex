@@ -19,8 +19,9 @@ namespace Verbex
         private string _ContentSha256;
         private HashSet<string> _Terms;
         private bool _IsDeleted;
-        private Dictionary<string, object> _CustomMetadata;
+        private Dictionary<string, object> _Tags;
         private List<string> _Labels;
+        private object? _CustomMetadata;
 
         /// <summary>
         /// Initializes a new instance of the DocumentMetadata class with minimal parameters.
@@ -50,8 +51,9 @@ namespace Verbex
             _LastModified = DateTime.UtcNow;
             _Terms = new HashSet<string>();
             _IsDeleted = false;
-            _CustomMetadata = new Dictionary<string, object>();
+            _Tags = new Dictionary<string, object>();
             _Labels = new List<string>();
+            _CustomMetadata = null;
         }
 
         /// <summary>
@@ -91,8 +93,9 @@ namespace Verbex
             _LastModified = DateTime.UtcNow;
             _Terms = new HashSet<string>();
             _IsDeleted = false;
-            _CustomMetadata = new Dictionary<string, object>();
+            _Tags = new Dictionary<string, object>();
             _Labels = new List<string>();
+            _CustomMetadata = null;
         }
 
         /// <summary>
@@ -209,21 +212,28 @@ namespace Verbex
         }
 
         /// <summary>
-        /// Gets a read-only dictionary of custom metadata properties
+        /// Gets or sets custom metadata for the document.
+        /// Can be any JSON-serializable value (object, array, string, number, boolean, null).
         /// </summary>
-        public IReadOnlyDictionary<string, object> CustomMetadata
+        [JsonPropertyName("customMetadata")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public object? CustomMetadata
         {
-            get { return new ReadOnlyDictionary<string, object>(_CustomMetadata); }
+            get { return _CustomMetadata; }
+            set
+            {
+                _CustomMetadata = value;
+                _LastModified = DateTime.UtcNow;
+            }
         }
 
         /// <summary>
         /// Gets a read-only dictionary of tags (key-value pairs) associated with this document.
-        /// This is an alias for CustomMetadata for API consistency.
         /// </summary>
         [JsonInclude]
         public IReadOnlyDictionary<string, object> Tags
         {
-            get { return CustomMetadata; }
+            get { return new ReadOnlyDictionary<string, object>(_Tags); }
         }
 
         /// <summary>
@@ -279,13 +289,13 @@ namespace Verbex
         }
 
         /// <summary>
-        /// Sets custom metadata for the document
+        /// Sets a tag (key-value pair) for the document.
         /// </summary>
-        /// <param name="key">The metadata key</param>
-        /// <param name="value">The metadata value</param>
+        /// <param name="key">The tag key</param>
+        /// <param name="value">The tag value</param>
         /// <exception cref="ArgumentNullException">Thrown when key is null</exception>
         /// <exception cref="ArgumentException">Thrown when key is empty or whitespace</exception>
-        public void SetCustomMetadata(string key, object value)
+        public void SetTag(string key, object value)
         {
             ArgumentNullException.ThrowIfNull(key);
 
@@ -294,21 +304,21 @@ namespace Verbex
                 throw new ArgumentException("Key cannot be empty or whitespace", nameof(key));
             }
 
-            _CustomMetadata[key] = value;
+            _Tags[key] = value;
             _LastModified = DateTime.UtcNow;
         }
 
         /// <summary>
-        /// Removes custom metadata for the specified key
+        /// Removes a tag for the specified key.
         /// </summary>
-        /// <param name="key">The metadata key to remove</param>
-        /// <returns>True if the metadata was removed, false if key didn't exist</returns>
+        /// <param name="key">The tag key to remove</param>
+        /// <returns>True if the tag was removed, false if key didn't exist</returns>
         /// <exception cref="ArgumentNullException">Thrown when key is null</exception>
-        public bool RemoveCustomMetadata(string key)
+        public bool RemoveTag(string key)
         {
             ArgumentNullException.ThrowIfNull(key);
 
-            bool removed = _CustomMetadata.Remove(key);
+            bool removed = _Tags.Remove(key);
             if (removed)
             {
                 _LastModified = DateTime.UtcNow;
@@ -395,28 +405,12 @@ namespace Verbex
         }
 
         /// <summary>
-        /// Sets a tag (key-value pair) for the document.
-        /// This is an alias for SetCustomMetadata for API consistency.
+        /// Clears all tags from the document
         /// </summary>
-        /// <param name="key">The tag key</param>
-        /// <param name="value">The tag value</param>
-        /// <exception cref="ArgumentNullException">Thrown when key is null</exception>
-        /// <exception cref="ArgumentException">Thrown when key is empty or whitespace</exception>
-        public void SetTag(string key, object value)
+        public void ClearTags()
         {
-            SetCustomMetadata(key, value);
-        }
-
-        /// <summary>
-        /// Removes a tag for the specified key.
-        /// This is an alias for RemoveCustomMetadata for API consistency.
-        /// </summary>
-        /// <param name="key">The tag key to remove</param>
-        /// <returns>True if the tag was removed, false if key didn't exist</returns>
-        /// <exception cref="ArgumentNullException">Thrown when key is null</exception>
-        public bool RemoveTag(string key)
-        {
-            return RemoveCustomMetadata(key);
+            _Tags.Clear();
+            _LastModified = DateTime.UtcNow;
         }
     }
 }

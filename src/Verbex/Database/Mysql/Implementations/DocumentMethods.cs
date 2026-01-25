@@ -3,6 +3,7 @@ namespace Verbex.Database.Mysql.Implementations
     using System;
     using System.Collections.Generic;
     using System.Data;
+    using System.Text.Json;
     using System.Threading;
     using System.Threading.Tasks;
     using Verbex.Database.Interfaces;
@@ -27,11 +28,15 @@ namespace Verbex.Database.Mysql.Implementations
         }
 
         /// <inheritdoc />
-        public async Task AddAsync(string tenantId, string indexId, string id, string name, string? contentSha256, int documentLength, CancellationToken token = default)
+        public async Task AddAsync(string tenantId, string indexId, string id, string name, string? contentSha256, int documentLength, object? customMetadata = null, CancellationToken token = default)
         {
             DateTime now = DateTime.UtcNow;
+            string? customMetadataJson = customMetadata != null
+                ? Sanitizer.Sanitize(JsonSerializer.Serialize(customMetadata))
+                : null;
+
             string query = $@"
-INSERT INTO documents (id, tenant_id, index_id, name, content_sha256, document_length, term_count, indexed_utc, last_update_utc, created_utc)
+INSERT INTO documents (id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexed_utc, last_update_utc, created_utc)
 VALUES (
     '{Sanitizer.Sanitize(id)}',
     '{Sanitizer.Sanitize(tenantId)}',
@@ -40,6 +45,7 @@ VALUES (
     {Sanitizer.FormatNullableString(contentSha256)},
     {documentLength},
     0,
+    {Sanitizer.FormatNullableString(customMetadataJson)},
     '{Sanitizer.FormatDateTime(now)}',
     '{Sanitizer.FormatDateTime(now)}',
     '{Sanitizer.FormatDateTime(now)}'
@@ -51,7 +57,7 @@ VALUES (
         public async Task<DocumentMetadata?> GetAsync(string tenantId, string indexId, string id, CancellationToken token = default)
         {
             string query = $@"
-SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, indexed_utc, last_update_utc, created_utc
+SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexed_utc, last_update_utc, created_utc
 FROM documents
 WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND id = '{Sanitizer.Sanitize(id)}';";
 
@@ -68,7 +74,7 @@ WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sa
         public async Task<DocumentMetadata?> GetByNameAsync(string tenantId, string indexId, string name, CancellationToken token = default)
         {
             string query = $@"
-SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, indexed_utc, last_update_utc, created_utc
+SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexed_utc, last_update_utc, created_utc
 FROM documents
 WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND name = '{Sanitizer.Sanitize(name)}';";
 
@@ -111,7 +117,7 @@ WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sa
         public async Task<List<DocumentMetadata>> GetByContentSha256Async(string tenantId, string indexId, string contentSha256, CancellationToken token = default)
         {
             string query = $@"
-SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, indexed_utc, last_update_utc, created_utc
+SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexed_utc, last_update_utc, created_utc
 FROM documents
 WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND content_sha256 = '{Sanitizer.Sanitize(contentSha256)}';";
 
@@ -128,7 +134,7 @@ WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sa
         public async Task<List<DocumentMetadata>> GetAllAsync(string tenantId, string indexId, int limit = 100, int offset = 0, CancellationToken token = default)
         {
             string query = $@"
-SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, indexed_utc, last_update_utc, created_utc
+SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexed_utc, last_update_utc, created_utc
 FROM documents
 WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}'
 ORDER BY created_utc DESC
@@ -154,7 +160,7 @@ LIMIT {limit} OFFSET {offset};";
 
             string inClause = string.Join(",", idList.ConvertAll(id => $"'{Sanitizer.Sanitize(id)}'"));
             string query = $@"
-SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, indexed_utc, last_update_utc, created_utc
+SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexed_utc, last_update_utc, created_utc
 FROM documents
 WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND id IN ({inClause});";
 
@@ -192,15 +198,36 @@ WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sa
         }
 
         /// <inheritdoc />
-        public async Task UpdateAsync(string tenantId, string indexId, string id, string name, string? contentSha256, int documentLength, int termCount, CancellationToken token = default)
+        public async Task UpdateAsync(string tenantId, string indexId, string id, string name, string? contentSha256, int documentLength, int termCount, object? customMetadata = null, CancellationToken token = default)
         {
             DateTime now = DateTime.UtcNow;
+            string? customMetadataJson = customMetadata != null
+                ? Sanitizer.Sanitize(JsonSerializer.Serialize(customMetadata))
+                : null;
+
             string query = $@"
 UPDATE documents SET
     name = '{Sanitizer.Sanitize(name)}',
     content_sha256 = {Sanitizer.FormatNullableString(contentSha256)},
     document_length = {documentLength},
     term_count = {termCount},
+    custom_metadata = {Sanitizer.FormatNullableString(customMetadataJson)},
+    last_update_utc = '{Sanitizer.FormatDateTime(now)}'
+WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND id = '{Sanitizer.Sanitize(id)}';";
+            await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc />
+        public async Task UpdateCustomMetadataAsync(string tenantId, string indexId, string id, object? customMetadata, CancellationToken token = default)
+        {
+            DateTime now = DateTime.UtcNow;
+            string? customMetadataJson = customMetadata != null
+                ? Sanitizer.Sanitize(JsonSerializer.Serialize(customMetadata))
+                : null;
+
+            string query = $@"
+UPDATE documents SET
+    custom_metadata = {Sanitizer.FormatNullableString(customMetadataJson)},
     last_update_utc = '{Sanitizer.FormatDateTime(now)}'
 WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND id = '{Sanitizer.Sanitize(id)}';";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
@@ -233,7 +260,7 @@ WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sa
 
         private static DocumentMetadata MapRowToDocument(DataRow row)
         {
-            return new DocumentMetadata(
+            DocumentMetadata doc = new DocumentMetadata(
                 row["id"]?.ToString() ?? string.Empty,
                 row["name"]?.ToString() ?? string.Empty
             )
@@ -243,6 +270,21 @@ WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sa
                 IndexedDate = row["indexed_utc"] != DBNull.Value ? DateTime.Parse(row["indexed_utc"]?.ToString() ?? DateTime.UtcNow.ToString("o")) : DateTime.UtcNow,
                 LastModified = row["last_update_utc"] != DBNull.Value ? DateTime.Parse(row["last_update_utc"]?.ToString() ?? DateTime.UtcNow.ToString("o")) : DateTime.UtcNow
             };
+
+            string? customMetadataJson = row["custom_metadata"]?.ToString();
+            if (!string.IsNullOrEmpty(customMetadataJson))
+            {
+                try
+                {
+                    doc.CustomMetadata = JsonSerializer.Deserialize<object>(customMetadataJson);
+                }
+                catch
+                {
+                    doc.CustomMetadata = null;
+                }
+            }
+
+            return doc;
         }
     }
 }

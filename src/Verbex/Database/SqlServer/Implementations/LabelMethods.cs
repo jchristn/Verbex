@@ -128,5 +128,113 @@ VALUES (N'{Sanitizer.Sanitize(id)}', {Sanitizer.FormatNullableString(documentId)
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
             return count;
         }
+
+        #region Tenant Labels
+
+        public async Task<List<string>> GetTenantLabelsAsync(string tenantId, CancellationToken token = default)
+        {
+            string query = $"SELECT DISTINCT label FROM labels WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND user_id IS NULL AND credential_id IS NULL AND document_id IS NULL AND index_id IS NULL;";
+            DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
+            return dt.Rows.Cast<DataRow>().Select(r => r["label"]?.ToString() ?? string.Empty).ToList();
+        }
+
+        public async Task ReplaceTenantLabelsAsync(string tenantId, IEnumerable<string> labels, CancellationToken token = default)
+        {
+            await DeleteAllTenantLabelsAsync(tenantId, token).ConfigureAwait(false);
+            DateTime now = DateTime.UtcNow;
+            foreach (string label in labels)
+            {
+                string id = IdGenerator.GenerateLabelId();
+                string query = $@"
+INSERT INTO labels (id, tenant_id, label, last_update_utc, created_utc)
+VALUES (N'{Sanitizer.Sanitize(id)}', N'{Sanitizer.Sanitize(tenantId)}', N'{Sanitizer.Sanitize(label)}', '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
+                await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
+            }
+        }
+
+        public async Task<long> DeleteAllTenantLabelsAsync(string tenantId, CancellationToken token = default)
+        {
+            string countQuery = $"SELECT COUNT(*) FROM labels WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND user_id IS NULL AND credential_id IS NULL AND document_id IS NULL AND index_id IS NULL;";
+            DataTable countResult = await _Driver.ExecuteQueryAsync(countQuery, false, token).ConfigureAwait(false);
+            long count = countResult.Rows.Count > 0 ? Convert.ToInt64(countResult.Rows[0][0]) : 0;
+
+            string query = $"DELETE FROM labels WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND user_id IS NULL AND credential_id IS NULL AND document_id IS NULL AND index_id IS NULL;";
+            await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
+            return count;
+        }
+
+        #endregion
+
+        #region User Labels
+
+        public async Task<List<string>> GetUserLabelsAsync(string tenantId, string userId, CancellationToken token = default)
+        {
+            string query = $"SELECT DISTINCT label FROM labels WHERE user_id = N'{Sanitizer.Sanitize(userId)}';";
+            DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
+            return dt.Rows.Cast<DataRow>().Select(r => r["label"]?.ToString() ?? string.Empty).ToList();
+        }
+
+        public async Task ReplaceUserLabelsAsync(string tenantId, string userId, IEnumerable<string> labels, CancellationToken token = default)
+        {
+            await DeleteAllUserLabelsAsync(tenantId, userId, token).ConfigureAwait(false);
+            DateTime now = DateTime.UtcNow;
+            foreach (string label in labels)
+            {
+                string id = IdGenerator.GenerateLabelId();
+                string query = $@"
+INSERT INTO labels (id, user_id, label, last_update_utc, created_utc)
+VALUES (N'{Sanitizer.Sanitize(id)}', N'{Sanitizer.Sanitize(userId)}', N'{Sanitizer.Sanitize(label)}', '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
+                await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
+            }
+        }
+
+        public async Task<long> DeleteAllUserLabelsAsync(string tenantId, string userId, CancellationToken token = default)
+        {
+            string countQuery = $"SELECT COUNT(*) FROM labels WHERE user_id = N'{Sanitizer.Sanitize(userId)}';";
+            DataTable countResult = await _Driver.ExecuteQueryAsync(countQuery, false, token).ConfigureAwait(false);
+            long count = countResult.Rows.Count > 0 ? Convert.ToInt64(countResult.Rows[0][0]) : 0;
+
+            string query = $"DELETE FROM labels WHERE user_id = N'{Sanitizer.Sanitize(userId)}';";
+            await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
+            return count;
+        }
+
+        #endregion
+
+        #region Credential Labels
+
+        public async Task<List<string>> GetCredentialLabelsAsync(string tenantId, string credentialId, CancellationToken token = default)
+        {
+            string query = $"SELECT DISTINCT label FROM labels WHERE credential_id = N'{Sanitizer.Sanitize(credentialId)}';";
+            DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
+            return dt.Rows.Cast<DataRow>().Select(r => r["label"]?.ToString() ?? string.Empty).ToList();
+        }
+
+        public async Task ReplaceCredentialLabelsAsync(string tenantId, string credentialId, IEnumerable<string> labels, CancellationToken token = default)
+        {
+            await DeleteAllCredentialLabelsAsync(tenantId, credentialId, token).ConfigureAwait(false);
+            DateTime now = DateTime.UtcNow;
+            foreach (string label in labels)
+            {
+                string id = IdGenerator.GenerateLabelId();
+                string query = $@"
+INSERT INTO labels (id, credential_id, label, last_update_utc, created_utc)
+VALUES (N'{Sanitizer.Sanitize(id)}', N'{Sanitizer.Sanitize(credentialId)}', N'{Sanitizer.Sanitize(label)}', '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
+                await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
+            }
+        }
+
+        public async Task<long> DeleteAllCredentialLabelsAsync(string tenantId, string credentialId, CancellationToken token = default)
+        {
+            string countQuery = $"SELECT COUNT(*) FROM labels WHERE credential_id = N'{Sanitizer.Sanitize(credentialId)}';";
+            DataTable countResult = await _Driver.ExecuteQueryAsync(countQuery, false, token).ConfigureAwait(false);
+            long count = countResult.Rows.Count > 0 ? Convert.ToInt64(countResult.Rows[0][0]) : 0;
+
+            string query = $"DELETE FROM labels WHERE credential_id = N'{Sanitizer.Sanitize(credentialId)}';";
+            await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
+            return count;
+        }
+
+        #endregion
     }
 }

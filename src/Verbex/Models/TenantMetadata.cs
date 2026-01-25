@@ -1,6 +1,7 @@
 namespace Verbex.Models
 {
     using System;
+    using System.Collections.Generic;
     using System.Text.Json.Serialization;
     using PrettyId;
 
@@ -21,6 +22,8 @@ namespace Verbex.Models
         private string _Name = string.Empty;
         private string _Description = string.Empty;
         private bool _Active = true;
+        private List<string> _Labels = new List<string>();
+        private Dictionary<string, string> _Tags = new Dictionary<string, string>();
         private DateTime _CreatedUtc = DateTime.UtcNow;
         private DateTime _LastUpdateUtc = DateTime.UtcNow;
 
@@ -83,6 +86,28 @@ namespace Verbex.Models
         {
             get => _Active;
             set => _Active = value;
+        }
+
+        /// <summary>
+        /// Gets or sets the labels for this tenant.
+        /// </summary>
+        /// <value>A list of string labels for categorization and filtering.</value>
+        [JsonPropertyName("labels")]
+        public List<string> Labels
+        {
+            get => _Labels;
+            set => _Labels = value ?? new List<string>();
+        }
+
+        /// <summary>
+        /// Gets or sets the tags for this tenant.
+        /// </summary>
+        /// <value>A dictionary of key-value pairs for rich metadata.</value>
+        [JsonPropertyName("tags")]
+        public Dictionary<string, string> Tags
+        {
+            get => _Tags;
+            set => _Tags = value ?? new Dictionary<string, string>();
         }
 
         /// <summary>

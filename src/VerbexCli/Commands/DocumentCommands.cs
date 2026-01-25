@@ -5,6 +5,7 @@ namespace VerbexCli.Commands
     using System.CommandLine;
     using System.IO;
     using System.Linq;
+    using System.Text.Json;
     using System.Threading.Tasks;
     using VerbexCli.Infrastructure;
 
@@ -76,17 +77,25 @@ namespace VerbexCli.Commands
                 AllowMultipleArgumentsPerToken = true
             };
 
+            Option<string> customMetadataOption = new Option<string>(
+                aliases: new[] { "--custom-metadata", "-M" },
+                description: "Custom metadata as a JSON string (e.g., '{\"key\": \"value\"}')")
+            {
+                IsRequired = false
+            };
+
             addCommand.AddArgument(nameArgument);
             addCommand.AddOption(indexOption);
             addCommand.AddOption(contentOption);
             addCommand.AddOption(fileOption);
             addCommand.AddOption(metadataOption);
             addCommand.AddOption(labelOption);
+            addCommand.AddOption(customMetadataOption);
 
-            addCommand.SetHandler(async (string name, string? index, string? content, string? file, string[]? metadata, string[]? labels) =>
+            addCommand.SetHandler(async (string name, string? index, string? content, string? file, string[]? metadata, string[]? labels, string? customMetadata) =>
             {
-                await HandleDocumentAddAsync(index, name, content, file, metadata, labels).ConfigureAwait(false);
-            }, nameArgument, indexOption, contentOption, fileOption, metadataOption, labelOption);
+                await HandleDocumentAddAsync(index, name, content, file, metadata, labels, customMetadata).ConfigureAwait(false);
+            }, nameArgument, indexOption, contentOption, fileOption, metadataOption, labelOption, customMetadataOption);
 
             return addCommand;
         }
@@ -180,7 +189,7 @@ namespace VerbexCli.Commands
         /// <summary>
         /// Handles the unified document add command
         /// </summary>
-        private static async Task HandleDocumentAddAsync(string? index, string name, string? content, string? file, string[]? metadata, string[]? labels)
+        private static async Task HandleDocumentAddAsync(string? index, string name, string? content, string? file, string[]? metadata, string[]? labels, string? customMetadata)
         {
             try
             {
@@ -265,7 +274,22 @@ namespace VerbexCli.Commands
                     labelsList = labels.Select(l => l.Trim().ToLowerInvariant()).ToList();
                 }
 
-                await IndexManager.Instance.AddDocumentAsync(actualIndex, name, documentContent, metadataDict, labelsList).ConfigureAwait(false);
+                // Parse custom metadata JSON if provided
+                object? parsedCustomMetadata = null;
+                if (!string.IsNullOrWhiteSpace(customMetadata))
+                {
+                    try
+                    {
+                        parsedCustomMetadata = JsonSerializer.Deserialize<object>(customMetadata);
+                    }
+                    catch (JsonException ex)
+                    {
+                        OutputManager.WriteError($"Invalid custom metadata JSON: {ex.Message}");
+                        return;
+                    }
+                }
+
+                await IndexManager.Instance.AddDocumentAsync(actualIndex, name, documentContent, metadataDict, labelsList, parsedCustomMetadata).ConfigureAwait(false);
                 OutputManager.WriteSuccess($"Document '{name}' added to index '{actualIndex}'");
                 OutputManager.WriteInfo($"Content length: {documentContent.Length} characters");
 
@@ -277,6 +301,11 @@ namespace VerbexCli.Commands
                 if (labelsList != null && labelsList.Count > 0)
                 {
                     OutputManager.WriteInfo($"Labels: {string.Join(", ", labelsList)}");
+                }
+
+                if (parsedCustomMetadata != null)
+                {
+                    OutputManager.WriteInfo($"Custom metadata: {customMetadata}");
                 }
             }
             catch (Exception ex)

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import './Modal.css';
 
-function Modal({ isOpen, onClose, title, children, size = 'medium' }) {
+function Modal({ isOpen, onClose, title, children, size = 'medium', headerAction = null }) {
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape') {
@@ -29,7 +29,10 @@ function Modal({ isOpen, onClose, title, children, size = 'medium' }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
-          <h3 className="modal-title">{title}</h3>
+          <div className="modal-title-row">
+            <h3 className="modal-title">{title}</h3>
+            {headerAction}
+          </div>
           <button className="modal-close" onClick={onClose}>
             &times;
           </button>

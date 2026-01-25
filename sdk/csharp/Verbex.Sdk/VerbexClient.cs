@@ -299,12 +299,9 @@ namespace Verbex.Sdk
         /// <summary>
         /// Creates a new index.
         /// </summary>
-        /// <param name="id">Unique identifier for the index.</param>
         /// <param name="name">Display name for the index.</param>
         /// <param name="description">Description of the index.</param>
-        /// <param name="repositoryFilename">Filename for persistence.</param>
         /// <param name="inMemory">Whether to use in-memory storage only.</param>
-        /// <param name="storageMode">Storage mode (MemoryOnly, PersistenceOnly, Hybrid).</param>
         /// <param name="enableLemmatizer">Enable word lemmatization.</param>
         /// <param name="enableStopWordRemover">Enable stop word filtering.</param>
         /// <param name="minTokenLength">Minimum token length (0 to disable).</param>
@@ -315,12 +312,9 @@ namespace Verbex.Sdk
         /// <returns>Created index response.</returns>
         /// <exception cref="VerbexException">Thrown when creation fails.</exception>
         public async Task<ApiResponse<CreateIndexData>> CreateIndexAsync(
-            string id,
-            string? name = null,
+            string name,
             string? description = null,
-            string? repositoryFilename = null,
             bool inMemory = false,
-            string storageMode = "MemoryOnly",
             bool enableLemmatizer = false,
             bool enableStopWordRemover = false,
             int minTokenLength = 0,
@@ -329,12 +323,10 @@ namespace Verbex.Sdk
             Dictionary<string, string>? tags = null,
             CancellationToken cancellationToken = default)
         {
-            CreateIndexRequest request = new CreateIndexRequest(id, name)
+            CreateIndexRequest request = new CreateIndexRequest(name)
             {
                 Description = description ?? string.Empty,
-                RepositoryFilename = repositoryFilename ?? $"{id}.db",
                 InMemory = inMemory,
-                StorageMode = storageMode,
                 EnableLemmatizer = enableLemmatizer,
                 EnableStopWordRemover = enableStopWordRemover,
                 MinTokenLength = minTokenLength,
@@ -804,6 +796,162 @@ namespace Verbex.Sdk
         public async Task<ApiResponse<DeleteData>> DeleteCredentialAsync(string tenantId, string credentialId, CancellationToken cancellationToken = default)
         {
             return await MakeRequestAsync<DeleteData>(HttpMethod.Delete, $"/v1.0/admin/tenants/{tenantId}/credentials/{credentialId}", null, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        // ==================== Tenant Labels and Tags Endpoints ====================
+
+        /// <summary>
+        /// Updates labels on a tenant (full replacement).
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="labels">The new labels to set.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Update confirmation.</returns>
+        /// <exception cref="VerbexException">Thrown when the tenant is not found.</exception>
+        public async Task<ApiResponse> UpdateTenantLabelsAsync(
+            string tenantId,
+            List<string> labels,
+            CancellationToken cancellationToken = default)
+        {
+            object request = new { Labels = labels ?? new List<string>() };
+            return await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/labels", request, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Updates tags on a tenant (full replacement).
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="tags">The new tags to set.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Update confirmation.</returns>
+        /// <exception cref="VerbexException">Thrown when the tenant is not found.</exception>
+        public async Task<ApiResponse> UpdateTenantTagsAsync(
+            string tenantId,
+            Dictionary<string, string> tags,
+            CancellationToken cancellationToken = default)
+        {
+            object request = new { Tags = tags ?? new Dictionary<string, string>() };
+            return await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/tags", request, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        // ==================== User Labels and Tags Endpoints ====================
+
+        /// <summary>
+        /// Updates labels on a user (full replacement).
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="userId">The user identifier.</param>
+        /// <param name="labels">The new labels to set.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Update confirmation.</returns>
+        /// <exception cref="VerbexException">Thrown when the user is not found.</exception>
+        public async Task<ApiResponse> UpdateUserLabelsAsync(
+            string tenantId,
+            string userId,
+            List<string> labels,
+            CancellationToken cancellationToken = default)
+        {
+            object request = new { Labels = labels ?? new List<string>() };
+            return await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/users/{userId}/labels", request, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Updates tags on a user (full replacement).
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="userId">The user identifier.</param>
+        /// <param name="tags">The new tags to set.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Update confirmation.</returns>
+        /// <exception cref="VerbexException">Thrown when the user is not found.</exception>
+        public async Task<ApiResponse> UpdateUserTagsAsync(
+            string tenantId,
+            string userId,
+            Dictionary<string, string> tags,
+            CancellationToken cancellationToken = default)
+        {
+            object request = new { Tags = tags ?? new Dictionary<string, string>() };
+            return await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/users/{userId}/tags", request, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        // ==================== Credential Labels and Tags Endpoints ====================
+
+        /// <summary>
+        /// Updates labels on a credential (full replacement).
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="credentialId">The credential identifier.</param>
+        /// <param name="labels">The new labels to set.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Update confirmation.</returns>
+        /// <exception cref="VerbexException">Thrown when the credential is not found.</exception>
+        public async Task<ApiResponse> UpdateCredentialLabelsAsync(
+            string tenantId,
+            string credentialId,
+            List<string> labels,
+            CancellationToken cancellationToken = default)
+        {
+            object request = new { Labels = labels ?? new List<string>() };
+            return await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/credentials/{credentialId}/labels", request, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Updates tags on a credential (full replacement).
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="credentialId">The credential identifier.</param>
+        /// <param name="tags">The new tags to set.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Update confirmation.</returns>
+        /// <exception cref="VerbexException">Thrown when the credential is not found.</exception>
+        public async Task<ApiResponse> UpdateCredentialTagsAsync(
+            string tenantId,
+            string credentialId,
+            Dictionary<string, string> tags,
+            CancellationToken cancellationToken = default)
+        {
+            object request = new { Tags = tags ?? new Dictionary<string, string>() };
+            return await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/credentials/{credentialId}/tags", request, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        // ==================== Custom Metadata Endpoints ====================
+
+        /// <summary>
+        /// Updates custom metadata on an index (full replacement).
+        /// </summary>
+        /// <param name="indexId">The index identifier.</param>
+        /// <param name="customMetadata">The custom metadata object to set. Can be any JSON-serializable object.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Updated index information.</returns>
+        /// <exception cref="VerbexException">Thrown when the index is not found.</exception>
+        public async Task<IndexInfo> UpdateIndexCustomMetadataAsync(
+            string indexId,
+            object? customMetadata,
+            CancellationToken cancellationToken = default)
+        {
+            object request = new { customMetadata };
+            ApiResponse<IndexInfo> response = await MakeRequestAsync<IndexInfo>(HttpMethod.Put, $"/v1.0/indices/{indexId}/customMetadata", request, true, cancellationToken).ConfigureAwait(false);
+            return response.Data ?? new IndexInfo();
+        }
+
+        /// <summary>
+        /// Updates custom metadata on a document (full replacement).
+        /// </summary>
+        /// <param name="indexId">The index identifier.</param>
+        /// <param name="documentId">The document identifier.</param>
+        /// <param name="customMetadata">The custom metadata object to set. Can be any JSON-serializable object.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Updated document information.</returns>
+        /// <exception cref="VerbexException">Thrown when the document is not found.</exception>
+        public async Task<DocumentInfo> UpdateDocumentCustomMetadataAsync(
+            string indexId,
+            string documentId,
+            object? customMetadata,
+            CancellationToken cancellationToken = default)
+        {
+            object request = new { customMetadata };
+            ApiResponse<DocumentInfo> response = await MakeRequestAsync<DocumentInfo>(HttpMethod.Put, $"/v1.0/indices/{indexId}/documents/{documentId}/customMetadata", request, true, cancellationToken).ConfigureAwait(false);
+            return response.Data ?? new DocumentInfo();
         }
     }
 }

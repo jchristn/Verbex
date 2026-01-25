@@ -93,6 +93,15 @@ namespace VerbexCli.Infrastructure
         public async Task CreateIndexAsync(string name, string storageMode, bool enableLemmatizer, bool enableStopWords,
             int minTokenLength, int maxTokenLength, Dictionary<string, string>? tags, List<string>? labels, CancellationToken cancellationToken = default)
         {
+            await CreateIndexAsync(name, storageMode, enableLemmatizer, enableStopWords, minTokenLength, maxTokenLength, tags, labels, null, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Creates a new index with the specified configuration including tags, labels, and custom metadata
+        /// </summary>
+        public async Task CreateIndexAsync(string name, string storageMode, bool enableLemmatizer, bool enableStopWords,
+            int minTokenLength, int maxTokenLength, Dictionary<string, string>? tags, List<string>? labels, object? customMetadata, CancellationToken cancellationToken = default)
+        {
             if (_Configurations.ContainsKey(name))
             {
                 throw new InvalidOperationException($"Index '{name}' already exists");
@@ -141,12 +150,31 @@ namespace VerbexCli.Infrastructure
                 Description = BuildDescription(mode, enableLemmatizer, enableStopWords, minTokenLength, maxTokenLength),
                 VerbexConfig = config,
                 CreatedAt = DateTime.UtcNow,
-                LastAccessedAt = DateTime.UtcNow
+                LastAccessedAt = DateTime.UtcNow,
+                CustomMetadata = customMetadata
             };
 
             _Configurations[name] = indexConfig;
             _LoadedIndices[name] = index;
             _DocumentMaps[name] = new Dictionary<string, string>();
+
+            // Add index-level tags if provided
+            if (tags != null)
+            {
+                foreach (KeyValuePair<string, string> tag in tags)
+                {
+                    await index.SetIndexTagAsync(tag.Key, tag.Value, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            // Add index-level labels if provided
+            if (labels != null)
+            {
+                foreach (string label in labels)
+                {
+                    await index.AddIndexLabelAsync(label, cancellationToken).ConfigureAwait(false);
+                }
+            }
 
             // Save configuration
             await SaveConfigurationAsync(name, indexConfig, cancellationToken).ConfigureAwait(false);
@@ -317,6 +345,14 @@ namespace VerbexCli.Infrastructure
         /// </summary>
         public async Task AddDocumentAsync(string indexName, string documentName, string content, Dictionary<string, object>? metadata, List<string>? labels, CancellationToken cancellationToken = default)
         {
+            await AddDocumentAsync(indexName, documentName, content, metadata, labels, null, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Adds a document to the specified index with optional metadata, labels, and custom metadata
+        /// </summary>
+        public async Task AddDocumentAsync(string indexName, string documentName, string content, Dictionary<string, object>? metadata, List<string>? labels, object? customMetadata, CancellationToken cancellationToken = default)
+        {
             InvertedIndex index = await GetIndexAsync(indexName, cancellationToken).ConfigureAwait(false);
 
             if (_DocumentMaps[indexName].ContainsKey(documentName))
@@ -343,6 +379,12 @@ namespace VerbexCli.Infrastructure
                 {
                     await index.SetTagAsync(docId, kvp.Key, kvp.Value?.ToString(), cancellationToken).ConfigureAwait(false);
                 }
+            }
+
+            // Set custom metadata if provided
+            if (customMetadata != null)
+            {
+                await index.SetCustomMetadataAsync(docId, customMetadata, cancellationToken).ConfigureAwait(false);
             }
 
             // Flush on-disk indices
@@ -540,6 +582,7 @@ namespace VerbexCli.Infrastructure
                                 Description = serializableConfig.Description,
                                 CreatedAt = serializableConfig.CreatedAt,
                                 LastAccessedAt = serializableConfig.LastAccessedAt,
+                                CustomMetadata = serializableConfig.CustomMetadata,
                                 VerbexConfig = new VerbexConfiguration
                                 {
                                     StorageMode = serializableConfig.VerbexConfig.StorageMode,
@@ -614,6 +657,7 @@ namespace VerbexCli.Infrastructure
                         Description = config.Description,
                         CreatedAt = config.CreatedAt,
                         LastAccessedAt = config.LastAccessedAt,
+                        CustomMetadata = config.CustomMetadata,
                         VerbexConfig = new SerializableVerbexConfiguration
                         {
                             StorageMode = config.VerbexConfig.StorageMode,

@@ -13,7 +13,7 @@ namespace Verbex.Database.Sqlite.Queries
         /// <summary>
         /// The current schema version.
         /// </summary>
-        public const string SchemaVersion = "3.0";
+        public const string SchemaVersion = "3.2";
 
         /// <summary>
         /// Gets the SQL statements to create all tables.
@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS indexes (
     tenant_id TEXT NOT NULL,
     name TEXT NOT NULL,
     description TEXT,
+    custom_metadata TEXT,
     created_utc TEXT NOT NULL,
     last_update_utc TEXT NOT NULL,
     FOREIGN KEY (tenant_id) REFERENCES tenants(identifier) ON DELETE CASCADE,
@@ -97,6 +98,7 @@ CREATE TABLE IF NOT EXISTS documents (
     content_sha256 TEXT,
     document_length INTEGER,
     term_count INTEGER,
+    custom_metadata TEXT,
     indexed_utc TEXT,
     last_update_utc TEXT,
     created_utc TEXT NOT NULL,
@@ -135,27 +137,39 @@ CREATE TABLE IF NOT EXISTS document_terms (
     UNIQUE(document_id, term_id)
 );
 
--- Labels for documents and indexes
+-- Labels for tenants, users, credentials, documents, and indexes
 CREATE TABLE IF NOT EXISTS labels (
     id TEXT PRIMARY KEY,
+    tenant_id TEXT,
+    user_id TEXT,
+    credential_id TEXT,
     document_id TEXT,
     index_id TEXT,
     label TEXT NOT NULL,
     last_update_utc TEXT,
     created_utc TEXT NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(identifier) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(identifier) ON DELETE CASCADE,
+    FOREIGN KEY (credential_id) REFERENCES credentials(identifier) ON DELETE CASCADE,
     FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
     FOREIGN KEY (index_id) REFERENCES indexes(identifier) ON DELETE CASCADE
 );
 
--- Tags (key-value pairs) for documents and indexes
+-- Tags (key-value pairs) for tenants, users, credentials, documents, and indexes
 CREATE TABLE IF NOT EXISTS tags (
     id TEXT PRIMARY KEY,
+    tenant_id TEXT,
+    user_id TEXT,
+    credential_id TEXT,
     document_id TEXT,
     index_id TEXT,
     key TEXT NOT NULL,
     value TEXT,
     last_update_utc TEXT,
     created_utc TEXT NOT NULL,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(identifier) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(identifier) ON DELETE CASCADE,
+    FOREIGN KEY (credential_id) REFERENCES credentials(identifier) ON DELETE CASCADE,
     FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
     FOREIGN KEY (index_id) REFERENCES indexes(identifier) ON DELETE CASCADE
 );
@@ -167,7 +181,7 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
 );
 
 -- Insert schema version
-INSERT OR REPLACE INTO schema_metadata (key, value) VALUES ('schema_version', '3.0');
+INSERT OR REPLACE INTO schema_metadata (key, value) VALUES ('schema_version', '3.2');
 INSERT OR REPLACE INTO schema_metadata (key, value) VALUES ('created_utc', datetime('now'));
 ";
         }
@@ -230,6 +244,12 @@ CREATE INDEX IF NOT EXISTS idx_labels_index ON labels(index_id);
 CREATE INDEX IF NOT EXISTS idx_labels_label ON labels(label);
 CREATE INDEX IF NOT EXISTS idx_labels_document_label ON labels(document_id, label);
 CREATE INDEX IF NOT EXISTS idx_labels_index_label ON labels(index_id, label);
+CREATE INDEX IF NOT EXISTS idx_labels_tenant ON labels(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_labels_tenant_label ON labels(tenant_id, label);
+CREATE INDEX IF NOT EXISTS idx_labels_user ON labels(user_id);
+CREATE INDEX IF NOT EXISTS idx_labels_user_label ON labels(user_id, label);
+CREATE INDEX IF NOT EXISTS idx_labels_credential ON labels(credential_id);
+CREATE INDEX IF NOT EXISTS idx_labels_credential_label ON labels(credential_id, label);
 
 -- Tag indexes (for filtering by key-value pairs)
 CREATE INDEX IF NOT EXISTS idx_tags_document ON tags(document_id);
@@ -238,6 +258,12 @@ CREATE INDEX IF NOT EXISTS idx_tags_key ON tags(key);
 CREATE INDEX IF NOT EXISTS idx_tags_document_key ON tags(document_id, key);
 CREATE INDEX IF NOT EXISTS idx_tags_index_key ON tags(index_id, key);
 CREATE INDEX IF NOT EXISTS idx_tags_key_value ON tags(key, value);
+CREATE INDEX IF NOT EXISTS idx_tags_tenant ON tags(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tags_tenant_key ON tags(tenant_id, key);
+CREATE INDEX IF NOT EXISTS idx_tags_user ON tags(user_id);
+CREATE INDEX IF NOT EXISTS idx_tags_user_key ON tags(user_id, key);
+CREATE INDEX IF NOT EXISTS idx_tags_credential ON tags(credential_id);
+CREATE INDEX IF NOT EXISTS idx_tags_credential_key ON tags(credential_id, key);
 ";
         }
 
@@ -348,6 +374,70 @@ ALTER TABLE terms ADD COLUMN index_id TEXT;
 
 -- Update schema version
 UPDATE schema_metadata SET value = '3.0' WHERE key = 'schema_version';
+";
+        }
+
+        /// <summary>
+        /// Gets migration SQL from schema v3.0 to v3.1.
+        /// Adds tenant_id, user_id, credential_id columns to labels and tags tables.
+        /// </summary>
+        /// <returns>Migration SQL.</returns>
+        public static string? GetMigrationFromV3()
+        {
+            return @"
+-- Migration from Schema v3.0 to v3.1
+-- Adds labels and tags support for tenants, users, and credentials
+
+-- Add new columns to labels table
+ALTER TABLE labels ADD COLUMN tenant_id TEXT REFERENCES tenants(identifier) ON DELETE CASCADE;
+ALTER TABLE labels ADD COLUMN user_id TEXT REFERENCES users(identifier) ON DELETE CASCADE;
+ALTER TABLE labels ADD COLUMN credential_id TEXT REFERENCES credentials(identifier) ON DELETE CASCADE;
+
+-- Add new columns to tags table
+ALTER TABLE tags ADD COLUMN tenant_id TEXT REFERENCES tenants(identifier) ON DELETE CASCADE;
+ALTER TABLE tags ADD COLUMN user_id TEXT REFERENCES users(identifier) ON DELETE CASCADE;
+ALTER TABLE tags ADD COLUMN credential_id TEXT REFERENCES credentials(identifier) ON DELETE CASCADE;
+
+-- Create new indexes for labels
+CREATE INDEX IF NOT EXISTS idx_labels_tenant ON labels(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_labels_tenant_label ON labels(tenant_id, label);
+CREATE INDEX IF NOT EXISTS idx_labels_user ON labels(user_id);
+CREATE INDEX IF NOT EXISTS idx_labels_user_label ON labels(user_id, label);
+CREATE INDEX IF NOT EXISTS idx_labels_credential ON labels(credential_id);
+CREATE INDEX IF NOT EXISTS idx_labels_credential_label ON labels(credential_id, label);
+
+-- Create new indexes for tags
+CREATE INDEX IF NOT EXISTS idx_tags_tenant ON tags(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tags_tenant_key ON tags(tenant_id, key);
+CREATE INDEX IF NOT EXISTS idx_tags_user ON tags(user_id);
+CREATE INDEX IF NOT EXISTS idx_tags_user_key ON tags(user_id, key);
+CREATE INDEX IF NOT EXISTS idx_tags_credential ON tags(credential_id);
+CREATE INDEX IF NOT EXISTS idx_tags_credential_key ON tags(credential_id, key);
+
+-- Update schema version
+UPDATE schema_metadata SET value = '3.1' WHERE key = 'schema_version';
+";
+        }
+
+        /// <summary>
+        /// Gets migration SQL from schema v3.1 to v3.2.
+        /// Adds custom_metadata column to indexes and documents tables.
+        /// </summary>
+        /// <returns>Migration SQL.</returns>
+        public static string? GetMigrationFromV31()
+        {
+            return @"
+-- Migration from Schema v3.1 to v3.2
+-- Adds custom_metadata support for indexes and documents
+
+-- Add custom_metadata column to indexes table
+ALTER TABLE indexes ADD COLUMN custom_metadata TEXT;
+
+-- Add custom_metadata column to documents table
+ALTER TABLE documents ADD COLUMN custom_metadata TEXT;
+
+-- Update schema version
+UPDATE schema_metadata SET value = '3.2' WHERE key = 'schema_version';
 ";
         }
     }

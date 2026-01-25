@@ -1,6 +1,6 @@
 services:
   verbex-dashboard:
-    image: jchristn/verbex-dashboard:v0.1.0
+    image: jchristn77/verbex-dashboard:v0.1.0
     container_name: verbex-dashboard
     ports:
       - "8200:8200"

@@ -1,0 +1,91 @@
+.alert-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 16px 0;
+}
+
+.alert-icon {
+  margin-bottom: 16px;
+}
+
+.alert-icon-error {
+  color: var(--color-error);
+}
+
+.alert-icon-success {
+  color: var(--color-success);
+}
+
+.alert-icon-warning {
+  color: var(--color-warning);
+}
+
+.alert-icon-info {
+  color: var(--color-primary);
+}
+
+.alert-message {
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.alert-actions {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.btn-alert {
+  min-width: 100px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn-alert-error {
+  background: var(--color-error);
+  color: white;
+  border: none;
+}
+
+.btn-alert-error:hover {
+  opacity: 0.9;
+}
+
+.btn-alert-success {
+  background: var(--color-success);
+  color: white;
+  border: none;
+}
+
+.btn-alert-success:hover {
+  opacity: 0.9;
+}
+
+.btn-alert-warning {
+  background: var(--color-warning);
+  color: #1a1a1a;
+  border: none;
+}
+
+.btn-alert-warning:hover {
+  opacity: 0.9;
+}
+
+.btn-alert-info {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+}
+
+.btn-alert-info:hover {
+  background: var(--color-secondary);
+}
