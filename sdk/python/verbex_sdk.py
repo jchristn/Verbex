@@ -177,7 +177,7 @@ class DocumentInfo:
     is_deleted: bool = False
     custom_metadata: Optional[Any] = None
     labels: Optional[List[str]] = None
-    tags: Optional[Dict[str, Any]] = None
+    tags: Optional[Dict[str, str]] = None
 
     @property
     def id(self) -> str:
@@ -838,7 +838,7 @@ class VerbexClient:
         query: str,
         max_results: int = 100,
         labels: Optional[List[str]] = None,
-        tags: Optional[Dict[str, Any]] = None
+        tags: Optional[Dict[str, str]] = None
     ) -> SearchData:
         """
         Search documents in an index with optional label and tag filters.

@@ -656,7 +656,7 @@ namespace Verbex.Sdk
             string query,
             int maxResults = 100,
             List<string>? labels = null,
-            Dictionary<string, object>? tags = null,
+            Dictionary<string, string>? tags = null,
             CancellationToken cancellationToken = default)
         {
             SearchRequest request = new SearchRequest(query, maxResults, labels, tags);

@@ -67,7 +67,7 @@ namespace Verbex.Sdk
         /// If null or empty, no tag filtering is applied.
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public Dictionary<string, object>? Tags
+        public Dictionary<string, string>? Tags
         {
             get
             {
@@ -86,7 +86,7 @@ namespace Verbex.Sdk
         private string _Query = "";
         private int _MaxResults = 100;
         private List<string>? _Labels = null;
-        private Dictionary<string, object>? _Tags = null;
+        private Dictionary<string, string>? _Tags = null;
 
         #endregion
 
@@ -106,7 +106,7 @@ namespace Verbex.Sdk
         /// <param name="maxResults">Maximum number of results to return. Default is 100.</param>
         /// <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
         /// <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
-        public SearchRequest(string query, int maxResults = 100, List<string>? labels = null, Dictionary<string, object>? tags = null)
+        public SearchRequest(string query, int maxResults = 100, List<string>? labels = null, Dictionary<string, string>? tags = null)
         {
             Query = query;
             MaxResults = maxResults;

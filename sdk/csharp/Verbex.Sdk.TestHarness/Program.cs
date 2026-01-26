@@ -590,7 +590,7 @@ namespace Verbex.Sdk.TestHarness
                 "taggable",
                 100,
                 null,
-                new Dictionary<string, object> { { "searchcategory", "testfilter" } }
+                new Dictionary<string, string> { { "searchcategory", "testfilter" } }
             ).ConfigureAwait(false);
             AssertNotNull(searchResult, "searchResult");
             AssertGreaterThan(searchResult.Results.Count, 0, "should find documents with matching tag");
@@ -601,7 +601,7 @@ namespace Verbex.Sdk.TestHarness
                 "taggable",
                 100,
                 null,
-                new Dictionary<string, object> { { "searchcategory", "wrongvalue" } }
+                new Dictionary<string, string> { { "searchcategory", "wrongvalue" } }
             ).ConfigureAwait(false);
             AssertNotNull(noMatchResult, "noMatchResult");
             AssertEquals(noMatchResult.Results.Count, 0, "should find no documents with non-matching tag");
@@ -631,7 +631,7 @@ namespace Verbex.Sdk.TestHarness
                 "comprehensive",
                 100,
                 new List<string> { "combined" },
-                new Dictionary<string, object> { { "combinedcategory", "both" } }
+                new Dictionary<string, string> { { "combinedcategory", "both" } }
             ).ConfigureAwait(false);
             AssertNotNull(searchResult, "searchResult");
             AssertGreaterThan(searchResult.Results.Count, 0, "should find documents matching both label and tag");

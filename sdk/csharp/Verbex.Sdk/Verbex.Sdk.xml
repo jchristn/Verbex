@@ -1104,7 +1104,7 @@
             Instantiate an empty SearchRequest.
             </summary>
         </member>
-        <member name="M:Verbex.Sdk.SearchRequest.#ctor(System.String,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.Object})">
+        <member name="M:Verbex.Sdk.SearchRequest.#ctor(System.String,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String})">
             <summary>
             Instantiate a SearchRequest with query parameters.
             </summary>
@@ -1379,7 +1379,7 @@
             <param name="cancellationToken">Cancellation token.</param>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the document is not found.</exception>
         </member>
-        <member name="M:Verbex.Sdk.VerbexClient.SearchAsync(System.String,System.String,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.Object},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Sdk.VerbexClient.SearchAsync(System.String,System.String,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
             <summary>
             Searches documents in an index.
             </summary>
