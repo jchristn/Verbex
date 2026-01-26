@@ -110,23 +110,19 @@ class TestHarness {
     // ==================== Health Tests ====================
 
     async testRootHealthCheck() {
-        const response = await this._client.rootHealthCheck();
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.statusCode, 200, 'response.statusCode');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertEquals(response.data.status, 'Healthy', 'data.status');
-        this._assertNotNull(response.data.version, 'data.version');
-        this._assertNotNull(response.data.timestamp, 'data.timestamp');
+        const health = await this._client.rootHealthCheck();
+        this._assertNotNull(health, 'health');
+        this._assertEquals(health.status, 'Healthy', 'health.status');
+        this._assertNotNull(health.version, 'health.version');
+        this._assertNotNull(health.timestamp, 'health.timestamp');
     }
 
     async testHealthEndpoint() {
-        const response = await this._client.healthCheck();
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.statusCode, 200, 'response.statusCode');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertEquals(response.data.status, 'Healthy', 'data.status');
-        this._assertNotNull(response.data.version, 'data.version');
-        this._assertNotNull(response.data.timestamp, 'data.timestamp');
+        const health = await this._client.healthCheck();
+        this._assertNotNull(health, 'health');
+        this._assertEquals(health.status, 'Healthy', 'health.status');
+        this._assertNotNull(health.version, 'health.version');
+        this._assertNotNull(health.timestamp, 'health.timestamp');
     }
 
     // ==================== Authentication Tests ====================
@@ -168,11 +164,9 @@ class TestHarness {
     }
 
     async testValidateToken() {
-        const response = await this._client.validateToken();
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.statusCode, 200, 'response.statusCode');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertTrue(response.data.valid, 'data.valid');
+        const validation = await this._client.validateToken();
+        this._assertNotNull(validation, 'validation');
+        this._assertTrue(validation.valid, 'validation.valid');
     }
 
     async testValidateInvalidToken() {
@@ -189,29 +183,21 @@ class TestHarness {
     // ==================== Index Management Tests ====================
 
     async testListIndicesInitial() {
-        const response = await this._client.listIndices();
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.statusCode, 200, 'response.statusCode');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertNotNull(response.data.indices, 'data.indices');
-        this._assertNotNull(response.data.count, 'data.count');
+        const indices = await this._client.listIndices();
+        this._assertNotNull(indices, 'indices');
     }
 
     async testCreateIndex() {
-        const response = await this._client.createIndex({
+        const index = await this._client.createIndex({
             name: 'Test Index',
             description: 'A test index for SDK validation',
             inMemory: true
         });
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.statusCode, 201, 'response.statusCode');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertNotNull(response.data.message, 'data.message');
-        this._assertNotNull(response.data.index, 'data.index');
-        this._assertNotNull(response.data.index.identifier, 'index.identifier');
-        this._assertEquals(response.data.index.name, 'Test Index', 'index.name');
+        this._assertNotNull(index, 'index');
+        this._assertNotNull(index.identifier, 'index.identifier');
+        this._assertEquals(index.name, 'Test Index', 'index.name');
         // Store the returned index ID for subsequent tests
-        this._testIndexId = response.data.index.identifier;
+        this._testIndexId = index.identifier;
     }
 
     async testCreateDuplicateIndex() {
@@ -227,13 +213,11 @@ class TestHarness {
     }
 
     async testGetIndex() {
-        const response = await this._client.getIndex(this._testIndexId);
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.statusCode, 200, 'response.statusCode');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertEquals(response.data.identifier, this._testIndexId, 'data.identifier');
-        this._assertEquals(response.data.name, 'Test Index', 'data.name');
-        this._assertNotNull(response.data.createdUtc, 'data.createdUtc');
+        const index = await this._client.getIndex(this._testIndexId);
+        this._assertNotNull(index, 'index');
+        this._assertEquals(index.identifier, this._testIndexId, 'index.identifier');
+        this._assertEquals(index.name, 'Test Index', 'index.name');
+        this._assertNotNull(index.createdUtc, 'index.createdUtc');
     }
 
     async testGetIndexNotFound() {
@@ -247,7 +231,7 @@ class TestHarness {
     }
 
     async testListIndicesAfterCreate() {
-        const indices = await this._client.getIndices();
+        const indices = await this._client.listIndices();
         const found = indices.some(idx => idx.identifier === this._testIndexId);
         this._assertTrue(found, 'test index should be in list');
     }
@@ -255,19 +239,16 @@ class TestHarness {
     async testCreateIndexWithLabelsAndTags() {
         const labels = ['test', 'labeled'];
         const tags = { environment: 'testing', owner: 'sdk-harness' };
-        const response = await this._client.createIndex({
+        const index = await this._client.createIndex({
             name: 'Labeled Test Index',
             description: 'An index with labels and tags',
             inMemory: true,
             labels: labels,
             tags: tags
         });
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.statusCode, 201, 'response.statusCode');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertNotNull(response.data.index, 'data.index');
+        this._assertNotNull(index, 'index');
         // Clean up using the returned identifier
-        const indexId = response.data.index.identifier;
+        const indexId = index.identifier;
         if (indexId) {
             await this._client.deleteIndex(indexId);
         }
@@ -276,21 +257,20 @@ class TestHarness {
     async testGetIndexWithLabelsAndTags() {
         const labels = ['retrieval', 'test'];
         const tags = { purpose: 'verification', version: '1.0' };
-        const createResponse = await this._client.createIndex({
+        const createdIndex = await this._client.createIndex({
             name: 'Get Labeled Index',
             inMemory: true,
             labels: labels,
             tags: tags
         });
-        const indexId = createResponse.data.index.identifier;
+        const indexId = createdIndex.identifier;
         this._assertNotNull(indexId, 'created index identifier');
-        const response = await this._client.getIndex(indexId);
-        this._assertTrue(response.success, 'response.success');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertNotNull(response.data.labels, 'data.labels');
-        this._assertNotNull(response.data.tags, 'data.tags');
-        this._assertEquals(response.data.labels.length, 2, 'labels count');
-        this._assertEquals(Object.keys(response.data.tags).length, 2, 'tags count');
+        const index = await this._client.getIndex(indexId);
+        this._assertNotNull(index, 'index');
+        this._assertNotNull(index.labels, 'index.labels');
+        this._assertNotNull(index.tags, 'index.tags');
+        this._assertEquals(index.labels.length, 2, 'labels count');
+        this._assertEquals(Object.keys(index.tags).length, 2, 'tags count');
         // Clean up
         await this._client.deleteIndex(indexId);
     }
@@ -325,37 +305,31 @@ class TestHarness {
     // ==================== Document Management Tests ====================
 
     async testListDocumentsEmpty() {
-        const response = await this._client.listDocuments(this._testIndexId);
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.statusCode, 200, 'response.statusCode');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertNotNull(response.data.documents, 'data.documents');
-        this._assertEquals(response.data.count, 0, 'data.count');
+        const documents = await this._client.listDocuments(this._testIndexId);
+        this._assertNotNull(documents, 'documents');
+        this._assertEquals(documents.length, 0, 'documents.length');
     }
 
     async testAddDocument() {
-        const response = await this._client.addDocument(
+        const result = await this._client.addDocument(
             this._testIndexId,
             'The quick brown fox jumps over the lazy dog.'
         );
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.statusCode, 201, 'response.statusCode');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertNotNull(response.data.documentId, 'data.documentId');
-        this._assertNotNull(response.data.message, 'data.message');
-        this._testDocuments.push(response.data.documentId);
+        this._assertNotNull(result, 'result');
+        this._assertNotNull(result.documentId, 'result.documentId');
+        this._assertNotNull(result.message, 'result.message');
+        this._testDocuments.push(result.documentId);
     }
 
     async testAddDocumentWithId() {
         const docId = crypto.randomUUID();
-        const response = await this._client.addDocument(
+        const result = await this._client.addDocument(
             this._testIndexId,
             'JavaScript is a versatile programming language used for web development and server-side applications.',
             docId
         );
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.statusCode, 201, 'response.statusCode');
-        this._assertEquals(response.data.documentId, docId, 'data.documentId');
+        this._assertNotNull(result, 'result');
+        this._assertEquals(result.documentId, docId, 'result.documentId');
         this._testDocuments.push(docId);
     }
 
@@ -367,30 +341,26 @@ class TestHarness {
             'Cloud computing provides scalable infrastructure for modern applications.'
         ];
         for (const content of docs) {
-            const response = await this._client.addDocument(this._testIndexId, content);
-            this._assertTrue(response.success, 'response.success');
-            this._testDocuments.push(response.data.documentId);
+            const result = await this._client.addDocument(this._testIndexId, content);
+            this._assertNotNull(result, 'result');
+            this._testDocuments.push(result.documentId);
         }
     }
 
     async testListDocumentsAfterAdd() {
-        const response = await this._client.listDocuments(this._testIndexId);
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.data.count, this._testDocuments.length, 'data.count');
-        const docs = response.data.documents;
-        this._assertEquals(docs.length, this._testDocuments.length, 'documents length');
-        for (const doc of docs) {
+        const documents = await this._client.listDocuments(this._testIndexId);
+        this._assertNotNull(documents, 'documents');
+        this._assertEquals(documents.length, this._testDocuments.length, 'documents.length');
+        for (const doc of documents) {
             this._assertNotNull(doc.id, 'document.id');
         }
     }
 
     async testGetDocument() {
         const docId = this._testDocuments[0];
-        const response = await this._client.getDocument(this._testIndexId, docId);
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.statusCode, 200, 'response.statusCode');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertEquals(response.data.id, docId, 'data.id');
+        const document = await this._client.getDocument(this._testIndexId, docId);
+        this._assertNotNull(document, 'document');
+        this._assertEquals(document.id, docId, 'document.id');
     }
 
     async testGetDocumentNotFound() {
@@ -407,18 +377,16 @@ class TestHarness {
     async testAddDocumentWithLabelsAndTags() {
         const labels = ['important', 'reviewed'];
         const tags = { author: 'test-harness', category: 'technical' };
-        const response = await this._client.addDocument(
+        const result = await this._client.addDocument(
             this._testIndexId,
             'This document has labels and tags for testing metadata support.',
             null,
             labels,
             tags
         );
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.statusCode, 201, 'response.statusCode');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertNotNull(response.data.documentId, 'data.documentId');
-        this._testDocuments.push(response.data.documentId);
+        this._assertNotNull(result, 'result');
+        this._assertNotNull(result.documentId, 'result.documentId');
+        this._testDocuments.push(result.documentId);
     }
 
     async testGetDocumentWithLabelsAndTags() {
@@ -432,33 +400,30 @@ class TestHarness {
             labels,
             tags
         );
-        const response = await this._client.getDocument(this._testIndexId, docId);
-        this._assertTrue(response.success, 'response.success');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertNotNull(response.data.labels, 'data.labels');
-        this._assertNotNull(response.data.tags, 'data.tags');
-        this._assertEquals(response.data.labels.length, 2, 'labels count');
-        this._assertEquals(Object.keys(response.data.tags).length, 2, 'tags count');
+        const document = await this._client.getDocument(this._testIndexId, docId);
+        this._assertNotNull(document, 'document');
+        this._assertNotNull(document.labels, 'document.labels');
+        this._assertNotNull(document.tags, 'document.tags');
+        this._assertEquals(document.labels.length, 2, 'labels count');
+        this._assertEquals(Object.keys(document.tags).length, 2, 'tags count');
         this._testDocuments.push(docId);
     }
 
     // ==================== Search Tests ====================
 
     async testSearchBasic() {
-        const response = await this._client.search(this._testIndexId, 'fox');
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.statusCode, 200, 'response.statusCode');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertEquals(response.data.query, 'fox', 'data.query');
-        this._assertNotNull(response.data.results, 'data.results');
-        this._assertNotNull(response.data.totalCount, 'data.totalCount');
-        this._assertNotNull(response.data.maxResults, 'data.maxResults');
+        const searchResult = await this._client.search(this._testIndexId, 'fox');
+        this._assertNotNull(searchResult, 'searchResult');
+        this._assertEquals(searchResult.query, 'fox', 'searchResult.query');
+        this._assertNotNull(searchResult.results, 'searchResult.results');
+        this._assertNotNull(searchResult.totalCount, 'searchResult.totalCount');
+        this._assertNotNull(searchResult.maxResults, 'searchResult.maxResults');
     }
 
     async testSearchWithResults() {
-        const response = await this._client.search(this._testIndexId, 'learning');
-        this._assertTrue(response.success, 'response.success');
-        const results = response.data.results || [];
+        const searchResult = await this._client.search(this._testIndexId, 'learning');
+        this._assertNotNull(searchResult, 'searchResult');
+        const results = searchResult.results || [];
         this._assertGreaterThan(results.length, 0, 'results count');
         for (const result of results) {
             this._assertNotNull(result.documentId, 'result.documentId');
@@ -467,30 +432,22 @@ class TestHarness {
     }
 
     async testSearchMultipleTerms() {
-        const response = await this._client.search(this._testIndexId, 'machine learning');
-        this._assertTrue(response.success, 'response.success');
-        this._assertNotNull(response.data.results, 'data.results');
+        const searchResult = await this._client.search(this._testIndexId, 'machine learning');
+        this._assertNotNull(searchResult, 'searchResult');
+        this._assertNotNull(searchResult.results, 'searchResult.results');
     }
 
     async testSearchMaxResults() {
-        const response = await this._client.search(this._testIndexId, 'the', 2);
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.data.maxResults, 2, 'data.maxResults');
+        const searchResult = await this._client.search(this._testIndexId, 'the', 2);
+        this._assertNotNull(searchResult, 'searchResult');
+        this._assertEquals(searchResult.maxResults, 2, 'searchResult.maxResults');
     }
 
     async testSearchNoResults() {
-        const response = await this._client.search(this._testIndexId, 'xyznonexistent12345');
-        this._assertTrue(response.success, 'response.success');
-        const results = response.data.results || [];
+        const searchResult = await this._client.search(this._testIndexId, 'xyznonexistent12345');
+        this._assertNotNull(searchResult, 'searchResult');
+        const results = searchResult.results || [];
         this._assertEquals(results.length, 0, 'results should be empty');
-    }
-
-    async testSearchDocumentsHelper() {
-        const searchResponse = await this._client.searchDocuments(this._testIndexId, 'programming');
-        this._assertNotNull(searchResponse, 'searchResponse');
-        this._assertEquals(searchResponse.query, 'programming', 'query');
-        this._assertNotNull(searchResponse.results, 'results');
-        this._assertNotNull(searchResponse.totalCount, 'totalCount');
     }
 
     async testSearchWithLabelFilter() {
@@ -507,26 +464,26 @@ class TestHarness {
         this._testDocuments.push(docId);
 
         // Search with matching label filter
-        const response = await this._client.search(
+        const searchResult = await this._client.search(
             this._testIndexId,
             'searchable',
             100,
             ['searchtest'],
             null
         );
-        this._assertTrue(response.success, 'response.success');
-        this._assertGreaterThan(response.data.results.length, 0, 'should find documents with matching label');
+        this._assertNotNull(searchResult, 'searchResult');
+        this._assertGreaterThan(searchResult.results.length, 0, 'should find documents with matching label');
 
         // Search with non-matching label filter
-        const noMatchResponse = await this._client.search(
+        const noMatchResult = await this._client.search(
             this._testIndexId,
             'searchable',
             100,
             ['nonexistentlabel99'],
             null
         );
-        this._assertTrue(noMatchResponse.success, 'noMatchResponse.success');
-        this._assertEquals(noMatchResponse.data.results.length, 0, 'should find no documents with non-matching label');
+        this._assertNotNull(noMatchResult, 'noMatchResult');
+        this._assertEquals(noMatchResult.results.length, 0, 'should find no documents with non-matching label');
     }
 
     async testSearchWithTagFilter() {
@@ -546,26 +503,26 @@ class TestHarness {
         this._testDocuments.push(docId);
 
         // Search with matching tag filter
-        const response = await this._client.search(
+        const searchResult = await this._client.search(
             this._testIndexId,
             'taggable',
             100,
             null,
             { searchcategory: 'testfilter' }
         );
-        this._assertTrue(response.success, 'response.success');
-        this._assertGreaterThan(response.data.results.length, 0, 'should find documents with matching tag');
+        this._assertNotNull(searchResult, 'searchResult');
+        this._assertGreaterThan(searchResult.results.length, 0, 'should find documents with matching tag');
 
         // Search with non-matching tag filter
-        const noMatchResponse = await this._client.search(
+        const noMatchResult = await this._client.search(
             this._testIndexId,
             'taggable',
             100,
             null,
             { searchcategory: 'wrongvalue' }
         );
-        this._assertTrue(noMatchResponse.success, 'noMatchResponse.success');
-        this._assertEquals(noMatchResponse.data.results.length, 0, 'should find no documents with non-matching tag');
+        this._assertNotNull(noMatchResult, 'noMatchResult');
+        this._assertEquals(noMatchResult.results.length, 0, 'should find no documents with non-matching tag');
     }
 
     async testSearchWithLabelsAndTags() {
@@ -583,15 +540,15 @@ class TestHarness {
         this._testDocuments.push(docId);
 
         // Search with both label and tag filters
-        const response = await this._client.search(
+        const searchResult = await this._client.search(
             this._testIndexId,
             'comprehensive',
             100,
             ['combined'],
             { combinedcategory: 'both' }
         );
-        this._assertTrue(response.success, 'response.success');
-        this._assertGreaterThan(response.data.results.length, 0, 'should find documents matching both label and tag');
+        this._assertNotNull(searchResult, 'searchResult');
+        this._assertGreaterThan(searchResult.results.length, 0, 'should find documents matching both label and tag');
     }
 
     // ==================== Document Deletion Tests ====================
@@ -601,12 +558,8 @@ class TestHarness {
             throw new Error('No test documents to delete');
         }
         const docId = this._testDocuments.pop();
-        const response = await this._client.deleteDocument(this._testIndexId, docId);
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.statusCode, 200, 'response.statusCode');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertEquals(response.data.documentId, docId, 'data.documentId');
-        this._assertNotNull(response.data.message, 'data.message');
+        await this._client.deleteDocument(this._testIndexId, docId);
+        // If we get here without exception, the delete succeeded
     }
 
     async testDeleteDocumentNotFound() {
@@ -638,12 +591,8 @@ class TestHarness {
     // ==================== Index Deletion Tests ====================
 
     async testDeleteIndex() {
-        const response = await this._client.deleteIndex(this._testIndexId);
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.statusCode, 200, 'response.statusCode');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertEquals(response.data.indexId, this._testIndexId, 'data.indexId');
-        this._assertNotNull(response.data.message, 'data.message');
+        await this._client.deleteIndex(this._testIndexId);
+        // If we get here without exception, the delete succeeded
     }
 
     async testDeleteIndexNotFound() {
@@ -724,7 +673,6 @@ class TestHarness {
             await this._runTest('Search multiple terms', () => this.testSearchMultipleTerms());
             await this._runTest('Search with max results', () => this.testSearchMaxResults());
             await this._runTest('Search with no results', () => this.testSearchNoResults());
-            await this._runTest('Search documents helper', () => this.testSearchDocumentsHelper());
             await this._runTest('Search with label filter', () => this.testSearchWithLabelFilter());
             await this._runTest('Search with tag filter', () => this.testSearchWithTagFilter());
             await this._runTest('Search with labels and tags', () => this.testSearchWithLabelsAndTags());

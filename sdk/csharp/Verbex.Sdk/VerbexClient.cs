@@ -16,6 +16,7 @@ namespace Verbex.Sdk
     /// <remarks>
     /// This client is thread-safe and can be reused for multiple requests.
     /// Implements IDisposable to properly clean up HTTP resources.
+    /// All methods return domain objects directly rather than wrapped responses.
     /// </remarks>
     public class VerbexClient : IDisposable
     {
@@ -75,7 +76,7 @@ namespace Verbex.Sdk
             _Disposed = true;
         }
 
-        private async Task<ApiResponse<T>> MakeRequestAsync<T>(
+        private async Task<T> MakeRequestAsync<T>(
             HttpMethod method,
             string path,
             object? data = null,
@@ -138,7 +139,12 @@ namespace Verbex.Sdk
                     throw new VerbexException(errorMessage, apiResponse.StatusCode, errorResponse);
                 }
 
-                return apiResponse;
+                if (apiResponse.Data == null)
+                {
+                    throw new VerbexException("API response data was null");
+                }
+
+                return apiResponse.Data;
             }
             catch (HttpRequestException ex)
             {
@@ -154,7 +160,7 @@ namespace Verbex.Sdk
             }
         }
 
-        private async Task<ApiResponse> MakeRequestAsync(
+        private async Task MakeRequestAsync(
             HttpMethod method,
             string path,
             object? data = null,
@@ -206,8 +212,39 @@ namespace Verbex.Sdk
                     string errorMessage = apiResponse.ErrorMessage ?? $"Request failed with status {apiResponse.StatusCode}";
                     throw new VerbexException(errorMessage, apiResponse.StatusCode, apiResponse);
                 }
+            }
+            catch (HttpRequestException ex)
+            {
+                throw new VerbexException($"Request failed: {ex.Message}", ex);
+            }
+            catch (TaskCanceledException ex) when (ex.CancellationToken == cancellationToken)
+            {
+                throw;
+            }
+            catch (TaskCanceledException ex)
+            {
+                throw new VerbexException("Request timed out", ex);
+            }
+        }
 
-                return apiResponse;
+        private async Task<bool> MakeHeadRequestAsync(
+            string path,
+            bool requireAuth = true,
+            CancellationToken cancellationToken = default)
+        {
+            string url = $"{_Endpoint}{path}";
+
+            using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Head, url);
+
+            if (requireAuth)
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _AccessKey);
+            }
+
+            try
+            {
+                HttpResponseMessage response = await _HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+                return response.IsSuccessStatusCode;
             }
             catch (HttpRequestException ex)
             {
@@ -229,9 +266,9 @@ namespace Verbex.Sdk
         /// Checks server health via the root endpoint.
         /// </summary>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Health check response.</returns>
+        /// <returns>Health check data including status and version.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<ApiResponse<HealthData>> RootHealthCheckAsync(CancellationToken cancellationToken = default)
+        public async Task<HealthData> RootHealthCheckAsync(CancellationToken cancellationToken = default)
         {
             return await MakeRequestAsync<HealthData>(HttpMethod.Get, "/", null, false, cancellationToken).ConfigureAwait(false);
         }
@@ -240,9 +277,9 @@ namespace Verbex.Sdk
         /// Checks server health via the /v1.0/health endpoint.
         /// </summary>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Health check response.</returns>
+        /// <returns>Health check data including status and version.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<ApiResponse<HealthData>> HealthCheckAsync(CancellationToken cancellationToken = default)
+        public async Task<HealthData> HealthCheckAsync(CancellationToken cancellationToken = default)
         {
             return await MakeRequestAsync<HealthData>(HttpMethod.Get, "/v1.0/health", null, false, cancellationToken).ConfigureAwait(false);
         }
@@ -267,22 +304,14 @@ namespace Verbex.Sdk
 
             try
             {
-                ApiResponse<LoginData> response = await MakeRequestAsync<LoginData>(HttpMethod.Post, "/v1.0/auth/login", request, false, cancellationToken).ConfigureAwait(false);
+                LoginData loginData = await MakeRequestAsync<LoginData>(HttpMethod.Post, "/v1.0/auth/login", request, false, cancellationToken).ConfigureAwait(false);
 
-                if (response.Success && response.Data != null)
-                {
-                    return LoginResult.Successful(
-                        token: response.Data.Token ?? string.Empty,
-                        tenantId: tenantId,
-                        email: email,
-                        isAdmin: response.Data.IsAdmin,
-                        isGlobalAdmin: response.Data.IsGlobalAdmin);
-                }
-
-                return LoginResult.Failed(
-                    AuthenticationResultEnum.InvalidCredentials,
-                    AuthorizationResultEnum.Unauthorized,
-                    response.ErrorMessage ?? "Login failed");
+                return LoginResult.Successful(
+                    token: loginData.Token ?? string.Empty,
+                    tenantId: tenantId,
+                    email: email,
+                    isAdmin: loginData.IsAdmin,
+                    isGlobalAdmin: loginData.IsGlobalAdmin);
             }
             catch (VerbexException ex)
             {
@@ -324,17 +353,17 @@ namespace Verbex.Sdk
                 System.Reflection.FieldInfo? field = typeof(VerbexClient).GetField("_AccessKey", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                 field?.SetValue(this, bearerToken);
 
-                ApiResponse<ValidationData> response = await MakeRequestAsync<ValidationData>(HttpMethod.Get, "/v1.0/auth/validate", null, true, cancellationToken).ConfigureAwait(false);
+                ValidationData validationData = await MakeRequestAsync<ValidationData>(HttpMethod.Get, "/v1.0/auth/validate", null, true, cancellationToken).ConfigureAwait(false);
 
-                if (response.Success && response.Data != null && response.Data.Valid)
+                if (validationData.Valid)
                 {
                     return LoginResult.Successful(
                         token: bearerToken,
-                        tenantId: response.Data.TenantId,
-                        userId: response.Data.UserId,
-                        email: response.Data.Email,
-                        isAdmin: response.Data.IsAdmin,
-                        isGlobalAdmin: response.Data.IsGlobalAdmin);
+                        tenantId: validationData.TenantId,
+                        userId: validationData.UserId,
+                        email: validationData.Email,
+                        isAdmin: validationData.IsAdmin,
+                        isGlobalAdmin: validationData.IsGlobalAdmin);
                 }
 
                 // Restore original access key on failure
@@ -363,27 +392,12 @@ namespace Verbex.Sdk
         }
 
         /// <summary>
-        /// Authenticates and receives a bearer token.
-        /// </summary>
-        /// <param name="username">The username.</param>
-        /// <param name="password">The password.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Login response with token.</returns>
-        /// <exception cref="VerbexException">Thrown when authentication fails.</exception>
-        [Obsolete("Use LoginAsync(tenantId, email, password) or LoginAsync(bearerToken) instead.")]
-        public async Task<ApiResponse<LoginData>> LoginLegacyAsync(string username, string password, CancellationToken cancellationToken = default)
-        {
-            LoginRequest request = new LoginRequest(username, password);
-            return await MakeRequestAsync<LoginData>(HttpMethod.Post, "/v1.0/auth/login", request, false, cancellationToken).ConfigureAwait(false);
-        }
-
-        /// <summary>
         /// Validates the current bearer token.
         /// </summary>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Validation response.</returns>
+        /// <returns>Validation data including whether the token is valid and user details.</returns>
         /// <exception cref="VerbexException">Thrown when validation fails.</exception>
-        public async Task<ApiResponse<ValidationData>> ValidateTokenAsync(CancellationToken cancellationToken = default)
+        public async Task<ValidationData> ValidateTokenAsync(CancellationToken cancellationToken = default)
         {
             return await MakeRequestAsync<ValidationData>(HttpMethod.Get, "/v1.0/auth/validate", null, true, cancellationToken).ConfigureAwait(false);
         }
@@ -394,23 +408,12 @@ namespace Verbex.Sdk
         /// Lists all available indices.
         /// </summary>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>List of indices.</returns>
+        /// <returns>List of index information objects.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<ApiResponse<IndicesListData>> ListIndicesAsync(CancellationToken cancellationToken = default)
+        public async Task<List<IndexInfo>> ListIndicesAsync(CancellationToken cancellationToken = default)
         {
-            return await MakeRequestAsync<IndicesListData>(HttpMethod.Get, "/v1.0/indices", null, true, cancellationToken).ConfigureAwait(false);
-        }
-
-        /// <summary>
-        /// Gets all indices as a list.
-        /// </summary>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>List of IndexInfo objects.</returns>
-        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<List<IndexInfo>> GetIndicesAsync(CancellationToken cancellationToken = default)
-        {
-            ApiResponse<IndicesListData> response = await ListIndicesAsync(cancellationToken).ConfigureAwait(false);
-            return response.Data?.Indices ?? new List<IndexInfo>();
+            IndicesListData data = await MakeRequestAsync<IndicesListData>(HttpMethod.Get, "/v1.0/indices", null, true, cancellationToken).ConfigureAwait(false);
+            return data.Indices ?? new List<IndexInfo>();
         }
 
         /// <summary>
@@ -427,9 +430,9 @@ namespace Verbex.Sdk
         /// <param name="tags">Optional key-value tags to associate with the index.</param>
         /// <param name="tenantId">Tenant ID (required for global admin users, optional for tenant users).</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Created index response.</returns>
+        /// <returns>The created index information.</returns>
         /// <exception cref="VerbexException">Thrown when creation fails.</exception>
-        public async Task<ApiResponse<CreateIndexData>> CreateIndexAsync(
+        public async Task<IndexInfo> CreateIndexAsync(
             string name,
             string? description = null,
             bool inMemory = false,
@@ -454,7 +457,8 @@ namespace Verbex.Sdk
                 Labels = labels,
                 Tags = tags
             };
-            return await MakeRequestAsync<CreateIndexData>(HttpMethod.Post, "/v1.0/indices", request, true, cancellationToken).ConfigureAwait(false);
+            CreateIndexData data = await MakeRequestAsync<CreateIndexData>(HttpMethod.Post, "/v1.0/indices", request, true, cancellationToken).ConfigureAwait(false);
+            return data.Index ?? new IndexInfo();
         }
 
         /// <summary>
@@ -462,24 +466,11 @@ namespace Verbex.Sdk
         /// </summary>
         /// <param name="indexId">The index identifier.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Index details response.</returns>
+        /// <returns>Index information including statistics.</returns>
         /// <exception cref="VerbexException">Thrown when the index is not found.</exception>
-        public async Task<ApiResponse<IndexInfo>> GetIndexAsync(string indexId, CancellationToken cancellationToken = default)
+        public async Task<IndexInfo> GetIndexAsync(string indexId, CancellationToken cancellationToken = default)
         {
             return await MakeRequestAsync<IndexInfo>(HttpMethod.Get, $"/v1.0/indices/{indexId}", null, true, cancellationToken).ConfigureAwait(false);
-        }
-
-        /// <summary>
-        /// Gets index information.
-        /// </summary>
-        /// <param name="indexId">The index identifier.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>IndexInfo object.</returns>
-        /// <exception cref="VerbexException">Thrown when the index is not found.</exception>
-        public async Task<IndexInfo?> GetIndexInfoAsync(string indexId, CancellationToken cancellationToken = default)
-        {
-            ApiResponse<IndexInfo> response = await GetIndexAsync(indexId, cancellationToken).ConfigureAwait(false);
-            return response.Data;
         }
 
         /// <summary>
@@ -490,15 +481,7 @@ namespace Verbex.Sdk
         /// <returns>True if the index exists, false otherwise.</returns>
         public async Task<bool> IndexExistsAsync(string indexId, CancellationToken cancellationToken = default)
         {
-            try
-            {
-                await MakeRequestAsync(HttpMethod.Head, $"/v1.0/indices/{indexId}", null, true, cancellationToken).ConfigureAwait(false);
-                return true;
-            }
-            catch (VerbexException ex) when (ex.StatusCode == 404)
-            {
-                return false;
-            }
+            return await MakeHeadRequestAsync($"/v1.0/indices/{indexId}", true, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -506,11 +489,10 @@ namespace Verbex.Sdk
         /// </summary>
         /// <param name="indexId">The index identifier.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Deletion confirmation.</returns>
         /// <exception cref="VerbexException">Thrown when the index is not found.</exception>
-        public async Task<ApiResponse<DeleteIndexData>> DeleteIndexAsync(string indexId, CancellationToken cancellationToken = default)
+        public async Task DeleteIndexAsync(string indexId, CancellationToken cancellationToken = default)
         {
-            return await MakeRequestAsync<DeleteIndexData>(HttpMethod.Delete, $"/v1.0/indices/{indexId}", null, true, cancellationToken).ConfigureAwait(false);
+            await MakeRequestAsync<DeleteIndexData>(HttpMethod.Delete, $"/v1.0/indices/{indexId}", null, true, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -519,15 +501,14 @@ namespace Verbex.Sdk
         /// <param name="indexId">The index identifier.</param>
         /// <param name="labels">The new labels to set.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Update confirmation with updated index info.</returns>
         /// <exception cref="VerbexException">Thrown when the index is not found.</exception>
-        public async Task<ApiResponse> UpdateIndexLabelsAsync(
+        public async Task UpdateIndexLabelsAsync(
             string indexId,
             List<string> labels,
             CancellationToken cancellationToken = default)
         {
             object request = new { Labels = labels ?? new List<string>() };
-            return await MakeRequestAsync(HttpMethod.Put, $"/v1.0/indices/{indexId}/labels", request, true, cancellationToken).ConfigureAwait(false);
+            await MakeRequestAsync(HttpMethod.Put, $"/v1.0/indices/{indexId}/labels", request, true, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -536,15 +517,14 @@ namespace Verbex.Sdk
         /// <param name="indexId">The index identifier.</param>
         /// <param name="tags">The new tags to set.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Update confirmation with updated index info.</returns>
         /// <exception cref="VerbexException">Thrown when the index is not found.</exception>
-        public async Task<ApiResponse> UpdateIndexTagsAsync(
+        public async Task UpdateIndexTagsAsync(
             string indexId,
             Dictionary<string, string> tags,
             CancellationToken cancellationToken = default)
         {
             object request = new { Tags = tags ?? new Dictionary<string, string>() };
-            return await MakeRequestAsync(HttpMethod.Put, $"/v1.0/indices/{indexId}/tags", request, true, cancellationToken).ConfigureAwait(false);
+            await MakeRequestAsync(HttpMethod.Put, $"/v1.0/indices/{indexId}/tags", request, true, cancellationToken).ConfigureAwait(false);
         }
 
         // ==================== Document Management Endpoints ====================
@@ -554,24 +534,12 @@ namespace Verbex.Sdk
         /// </summary>
         /// <param name="indexId">The index identifier.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>List of documents.</returns>
+        /// <returns>List of document information objects.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<ApiResponse<DocumentsListData>> ListDocumentsAsync(string indexId, CancellationToken cancellationToken = default)
+        public async Task<List<DocumentInfo>> ListDocumentsAsync(string indexId, CancellationToken cancellationToken = default)
         {
-            return await MakeRequestAsync<DocumentsListData>(HttpMethod.Get, $"/v1.0/indices/{indexId}/documents", null, true, cancellationToken).ConfigureAwait(false);
-        }
-
-        /// <summary>
-        /// Gets all documents in an index.
-        /// </summary>
-        /// <param name="indexId">The index identifier.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>List of DocumentInfo objects.</returns>
-        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<List<DocumentInfo>> GetDocumentsAsync(string indexId, CancellationToken cancellationToken = default)
-        {
-            ApiResponse<DocumentsListData> response = await ListDocumentsAsync(indexId, cancellationToken).ConfigureAwait(false);
-            return response.Data?.Documents ?? new List<DocumentInfo>();
+            DocumentsListData data = await MakeRequestAsync<DocumentsListData>(HttpMethod.Get, $"/v1.0/indices/{indexId}/documents", null, true, cancellationToken).ConfigureAwait(false);
+            return data.Documents ?? new List<DocumentInfo>();
         }
 
         /// <summary>
@@ -583,9 +551,9 @@ namespace Verbex.Sdk
         /// <param name="labels">Optional list of labels to associate with the document.</param>
         /// <param name="tags">Optional key-value tags to associate with the document.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Document creation response.</returns>
+        /// <returns>The created document data including the document ID.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<ApiResponse<AddDocumentData>> AddDocumentAsync(
+        public async Task<AddDocumentData> AddDocumentAsync(
             string indexId,
             string content,
             string? documentId = null,
@@ -603,25 +571,11 @@ namespace Verbex.Sdk
         /// <param name="indexId">The index identifier.</param>
         /// <param name="documentId">The document identifier.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Document details.</returns>
+        /// <returns>Document information.</returns>
         /// <exception cref="VerbexException">Thrown when the document is not found.</exception>
-        public async Task<ApiResponse<DocumentInfo>> GetDocumentAsync(string indexId, string documentId, CancellationToken cancellationToken = default)
+        public async Task<DocumentInfo> GetDocumentAsync(string indexId, string documentId, CancellationToken cancellationToken = default)
         {
             return await MakeRequestAsync<DocumentInfo>(HttpMethod.Get, $"/v1.0/indices/{indexId}/documents/{documentId}", null, true, cancellationToken).ConfigureAwait(false);
-        }
-
-        /// <summary>
-        /// Gets document information.
-        /// </summary>
-        /// <param name="indexId">The index identifier.</param>
-        /// <param name="documentId">The document identifier.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>DocumentInfo object.</returns>
-        /// <exception cref="VerbexException">Thrown when the document is not found.</exception>
-        public async Task<DocumentInfo?> GetDocumentInfoAsync(string indexId, string documentId, CancellationToken cancellationToken = default)
-        {
-            ApiResponse<DocumentInfo> response = await GetDocumentAsync(indexId, documentId, cancellationToken).ConfigureAwait(false);
-            return response.Data;
         }
 
         /// <summary>
@@ -633,15 +587,7 @@ namespace Verbex.Sdk
         /// <returns>True if the document exists, false otherwise.</returns>
         public async Task<bool> DocumentExistsAsync(string indexId, string documentId, CancellationToken cancellationToken = default)
         {
-            try
-            {
-                await MakeRequestAsync(HttpMethod.Head, $"/v1.0/indices/{indexId}/documents/{documentId}", null, true, cancellationToken).ConfigureAwait(false);
-                return true;
-            }
-            catch (VerbexException ex) when (ex.StatusCode == 404)
-            {
-                return false;
-            }
+            return await MakeHeadRequestAsync($"/v1.0/indices/{indexId}/documents/{documentId}", true, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -650,11 +596,10 @@ namespace Verbex.Sdk
         /// <param name="indexId">The index identifier.</param>
         /// <param name="documentId">The document identifier.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Deletion confirmation.</returns>
         /// <exception cref="VerbexException">Thrown when the document is not found.</exception>
-        public async Task<ApiResponse<DeleteDocumentData>> DeleteDocumentAsync(string indexId, string documentId, CancellationToken cancellationToken = default)
+        public async Task DeleteDocumentAsync(string indexId, string documentId, CancellationToken cancellationToken = default)
         {
-            return await MakeRequestAsync<DeleteDocumentData>(HttpMethod.Delete, $"/v1.0/indices/{indexId}/documents/{documentId}", null, true, cancellationToken).ConfigureAwait(false);
+            await MakeRequestAsync<DeleteDocumentData>(HttpMethod.Delete, $"/v1.0/indices/{indexId}/documents/{documentId}", null, true, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -664,16 +609,15 @@ namespace Verbex.Sdk
         /// <param name="documentId">The document identifier.</param>
         /// <param name="labels">The new labels to set.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Update confirmation with updated document.</returns>
         /// <exception cref="VerbexException">Thrown when the document is not found.</exception>
-        public async Task<ApiResponse> UpdateDocumentLabelsAsync(
+        public async Task UpdateDocumentLabelsAsync(
             string indexId,
             string documentId,
             List<string> labels,
             CancellationToken cancellationToken = default)
         {
             object request = new { Labels = labels ?? new List<string>() };
-            return await MakeRequestAsync(HttpMethod.Put, $"/v1.0/indices/{indexId}/documents/{documentId}/labels", request, true, cancellationToken).ConfigureAwait(false);
+            await MakeRequestAsync(HttpMethod.Put, $"/v1.0/indices/{indexId}/documents/{documentId}/labels", request, true, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -683,16 +627,15 @@ namespace Verbex.Sdk
         /// <param name="documentId">The document identifier.</param>
         /// <param name="tags">The new tags to set.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Update confirmation with updated document.</returns>
         /// <exception cref="VerbexException">Thrown when the document is not found.</exception>
-        public async Task<ApiResponse> UpdateDocumentTagsAsync(
+        public async Task UpdateDocumentTagsAsync(
             string indexId,
             string documentId,
             Dictionary<string, string> tags,
             CancellationToken cancellationToken = default)
         {
             object request = new { Tags = tags ?? new Dictionary<string, string>() };
-            return await MakeRequestAsync(HttpMethod.Put, $"/v1.0/indices/{indexId}/documents/{documentId}/tags", request, true, cancellationToken).ConfigureAwait(false);
+            await MakeRequestAsync(HttpMethod.Put, $"/v1.0/indices/{indexId}/documents/{documentId}/tags", request, true, cancellationToken).ConfigureAwait(false);
         }
 
         // ==================== Search Endpoint ====================
@@ -706,9 +649,9 @@ namespace Verbex.Sdk
         /// <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
         /// <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Search results.</returns>
+        /// <returns>Search data including results and metadata.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<ApiResponse<SearchData>> SearchAsync(
+        public async Task<SearchData> SearchAsync(
             string indexId,
             string query,
             int maxResults = 100,
@@ -720,52 +663,18 @@ namespace Verbex.Sdk
             return await MakeRequestAsync<SearchData>(HttpMethod.Post, $"/v1.0/indices/{indexId}/search", request, true, cancellationToken).ConfigureAwait(false);
         }
 
-        /// <summary>
-        /// Searches documents and returns search data.
-        /// </summary>
-        /// <param name="indexId">The index identifier.</param>
-        /// <param name="query">The search query.</param>
-        /// <param name="maxResults">Maximum number of results to return.</param>
-        /// <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
-        /// <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>SearchData object.</returns>
-        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<SearchData?> SearchDocumentsAsync(
-            string indexId,
-            string query,
-            int maxResults = 100,
-            List<string>? labels = null,
-            Dictionary<string, object>? tags = null,
-            CancellationToken cancellationToken = default)
-        {
-            ApiResponse<SearchData> response = await SearchAsync(indexId, query, maxResults, labels, tags, cancellationToken).ConfigureAwait(false);
-            return response.Data;
-        }
-
         // ==================== Admin - Tenant Management Endpoints ====================
 
         /// <summary>
         /// Lists all tenants.
         /// </summary>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>List of tenants.</returns>
+        /// <returns>List of tenant information objects.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<ApiResponse<TenantsListData>> ListTenantsAsync(CancellationToken cancellationToken = default)
+        public async Task<List<TenantInfo>> ListTenantsAsync(CancellationToken cancellationToken = default)
         {
-            return await MakeRequestAsync<TenantsListData>(HttpMethod.Get, "/v1.0/admin/tenants", null, true, cancellationToken).ConfigureAwait(false);
-        }
-
-        /// <summary>
-        /// Gets all tenants as a list.
-        /// </summary>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>List of TenantInfo objects.</returns>
-        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<List<TenantInfo>> GetTenantsAsync(CancellationToken cancellationToken = default)
-        {
-            ApiResponse<TenantsListData> response = await ListTenantsAsync(cancellationToken).ConfigureAwait(false);
-            return response.Data?.Tenants ?? new List<TenantInfo>();
+            TenantsListData data = await MakeRequestAsync<TenantsListData>(HttpMethod.Get, "/v1.0/admin/tenants", null, true, cancellationToken).ConfigureAwait(false);
+            return data.Tenants ?? new List<TenantInfo>();
         }
 
         /// <summary>
@@ -773,9 +682,9 @@ namespace Verbex.Sdk
         /// </summary>
         /// <param name="tenantId">The tenant identifier.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Tenant details.</returns>
+        /// <returns>Tenant information.</returns>
         /// <exception cref="VerbexException">Thrown when the tenant is not found.</exception>
-        public async Task<ApiResponse<TenantInfo>> GetTenantAsync(string tenantId, CancellationToken cancellationToken = default)
+        public async Task<TenantInfo> GetTenantAsync(string tenantId, CancellationToken cancellationToken = default)
         {
             return await MakeRequestAsync<TenantInfo>(HttpMethod.Get, $"/v1.0/admin/tenants/{tenantId}", null, true, cancellationToken).ConfigureAwait(false);
         }
@@ -786,15 +695,16 @@ namespace Verbex.Sdk
         /// <param name="name">Tenant name.</param>
         /// <param name="description">Optional description.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Created tenant response.</returns>
+        /// <returns>The created tenant information.</returns>
         /// <exception cref="VerbexException">Thrown when creation fails.</exception>
-        public async Task<ApiResponse<CreateTenantData>> CreateTenantAsync(
+        public async Task<TenantInfo> CreateTenantAsync(
             string name,
             string? description = null,
             CancellationToken cancellationToken = default)
         {
             CreateTenantRequest request = new CreateTenantRequest(name, description);
-            return await MakeRequestAsync<CreateTenantData>(HttpMethod.Post, "/v1.0/admin/tenants", request, true, cancellationToken).ConfigureAwait(false);
+            CreateTenantData data = await MakeRequestAsync<CreateTenantData>(HttpMethod.Post, "/v1.0/admin/tenants", request, true, cancellationToken).ConfigureAwait(false);
+            return data.Tenant ?? new TenantInfo();
         }
 
         /// <summary>
@@ -802,11 +712,10 @@ namespace Verbex.Sdk
         /// </summary>
         /// <param name="tenantId">The tenant identifier.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Deletion confirmation.</returns>
         /// <exception cref="VerbexException">Thrown when the tenant is not found.</exception>
-        public async Task<ApiResponse<DeleteData>> DeleteTenantAsync(string tenantId, CancellationToken cancellationToken = default)
+        public async Task DeleteTenantAsync(string tenantId, CancellationToken cancellationToken = default)
         {
-            return await MakeRequestAsync<DeleteData>(HttpMethod.Delete, $"/v1.0/admin/tenants/{tenantId}", null, true, cancellationToken).ConfigureAwait(false);
+            await MakeRequestAsync<DeleteData>(HttpMethod.Delete, $"/v1.0/admin/tenants/{tenantId}", null, true, cancellationToken).ConfigureAwait(false);
         }
 
         // ==================== Admin - User Management Endpoints ====================
@@ -816,24 +725,12 @@ namespace Verbex.Sdk
         /// </summary>
         /// <param name="tenantId">The tenant identifier.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>List of users.</returns>
+        /// <returns>List of user information objects.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<ApiResponse<UsersListData>> ListUsersAsync(string tenantId, CancellationToken cancellationToken = default)
+        public async Task<List<UserInfo>> ListUsersAsync(string tenantId, CancellationToken cancellationToken = default)
         {
-            return await MakeRequestAsync<UsersListData>(HttpMethod.Get, $"/v1.0/admin/tenants/{tenantId}/users", null, true, cancellationToken).ConfigureAwait(false);
-        }
-
-        /// <summary>
-        /// Gets all users in a tenant as a list.
-        /// </summary>
-        /// <param name="tenantId">The tenant identifier.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>List of UserInfo objects.</returns>
-        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<List<UserInfo>> GetUsersAsync(string tenantId, CancellationToken cancellationToken = default)
-        {
-            ApiResponse<UsersListData> response = await ListUsersAsync(tenantId, cancellationToken).ConfigureAwait(false);
-            return response.Data?.Users ?? new List<UserInfo>();
+            UsersListData data = await MakeRequestAsync<UsersListData>(HttpMethod.Get, $"/v1.0/admin/tenants/{tenantId}/users", null, true, cancellationToken).ConfigureAwait(false);
+            return data.Users ?? new List<UserInfo>();
         }
 
         /// <summary>
@@ -842,9 +739,9 @@ namespace Verbex.Sdk
         /// <param name="tenantId">The tenant identifier.</param>
         /// <param name="userId">The user identifier.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>User details.</returns>
+        /// <returns>User information.</returns>
         /// <exception cref="VerbexException">Thrown when the user is not found.</exception>
-        public async Task<ApiResponse<UserInfo>> GetUserAsync(string tenantId, string userId, CancellationToken cancellationToken = default)
+        public async Task<UserInfo> GetUserAsync(string tenantId, string userId, CancellationToken cancellationToken = default)
         {
             return await MakeRequestAsync<UserInfo>(HttpMethod.Get, $"/v1.0/admin/tenants/{tenantId}/users/{userId}", null, true, cancellationToken).ConfigureAwait(false);
         }
@@ -859,9 +756,9 @@ namespace Verbex.Sdk
         /// <param name="lastName">Optional last name.</param>
         /// <param name="isAdmin">Whether user is tenant admin.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Created user response.</returns>
+        /// <returns>The created user information.</returns>
         /// <exception cref="VerbexException">Thrown when creation fails.</exception>
-        public async Task<ApiResponse<CreateUserData>> CreateUserAsync(
+        public async Task<UserInfo> CreateUserAsync(
             string tenantId,
             string email,
             string password,
@@ -871,7 +768,8 @@ namespace Verbex.Sdk
             CancellationToken cancellationToken = default)
         {
             CreateUserRequest request = new CreateUserRequest(email, password, firstName, lastName, isAdmin);
-            return await MakeRequestAsync<CreateUserData>(HttpMethod.Post, $"/v1.0/admin/tenants/{tenantId}/users", request, true, cancellationToken).ConfigureAwait(false);
+            CreateUserData data = await MakeRequestAsync<CreateUserData>(HttpMethod.Post, $"/v1.0/admin/tenants/{tenantId}/users", request, true, cancellationToken).ConfigureAwait(false);
+            return data.User ?? new UserInfo();
         }
 
         /// <summary>
@@ -880,11 +778,10 @@ namespace Verbex.Sdk
         /// <param name="tenantId">The tenant identifier.</param>
         /// <param name="userId">The user identifier.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Deletion confirmation.</returns>
         /// <exception cref="VerbexException">Thrown when the user is not found.</exception>
-        public async Task<ApiResponse<DeleteData>> DeleteUserAsync(string tenantId, string userId, CancellationToken cancellationToken = default)
+        public async Task DeleteUserAsync(string tenantId, string userId, CancellationToken cancellationToken = default)
         {
-            return await MakeRequestAsync<DeleteData>(HttpMethod.Delete, $"/v1.0/admin/tenants/{tenantId}/users/{userId}", null, true, cancellationToken).ConfigureAwait(false);
+            await MakeRequestAsync<DeleteData>(HttpMethod.Delete, $"/v1.0/admin/tenants/{tenantId}/users/{userId}", null, true, cancellationToken).ConfigureAwait(false);
         }
 
         // ==================== Admin - Credential Management Endpoints ====================
@@ -894,24 +791,12 @@ namespace Verbex.Sdk
         /// </summary>
         /// <param name="tenantId">The tenant identifier.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>List of credentials.</returns>
+        /// <returns>List of credential information objects.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<ApiResponse<CredentialsListData>> ListCredentialsAsync(string tenantId, CancellationToken cancellationToken = default)
+        public async Task<List<CredentialInfo>> ListCredentialsAsync(string tenantId, CancellationToken cancellationToken = default)
         {
-            return await MakeRequestAsync<CredentialsListData>(HttpMethod.Get, $"/v1.0/admin/tenants/{tenantId}/credentials", null, true, cancellationToken).ConfigureAwait(false);
-        }
-
-        /// <summary>
-        /// Gets all credentials in a tenant as a list.
-        /// </summary>
-        /// <param name="tenantId">The tenant identifier.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>List of CredentialInfo objects.</returns>
-        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<List<CredentialInfo>> GetCredentialsAsync(string tenantId, CancellationToken cancellationToken = default)
-        {
-            ApiResponse<CredentialsListData> response = await ListCredentialsAsync(tenantId, cancellationToken).ConfigureAwait(false);
-            return response.Data?.Credentials ?? new List<CredentialInfo>();
+            CredentialsListData data = await MakeRequestAsync<CredentialsListData>(HttpMethod.Get, $"/v1.0/admin/tenants/{tenantId}/credentials", null, true, cancellationToken).ConfigureAwait(false);
+            return data.Credentials ?? new List<CredentialInfo>();
         }
 
         /// <summary>
@@ -920,9 +805,9 @@ namespace Verbex.Sdk
         /// <param name="tenantId">The tenant identifier.</param>
         /// <param name="credentialId">The credential identifier.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Credential details.</returns>
+        /// <returns>Credential information.</returns>
         /// <exception cref="VerbexException">Thrown when the credential is not found.</exception>
-        public async Task<ApiResponse<CredentialInfo>> GetCredentialAsync(string tenantId, string credentialId, CancellationToken cancellationToken = default)
+        public async Task<CredentialInfo> GetCredentialAsync(string tenantId, string credentialId, CancellationToken cancellationToken = default)
         {
             return await MakeRequestAsync<CredentialInfo>(HttpMethod.Get, $"/v1.0/admin/tenants/{tenantId}/credentials/{credentialId}", null, true, cancellationToken).ConfigureAwait(false);
         }
@@ -933,15 +818,16 @@ namespace Verbex.Sdk
         /// <param name="tenantId">The tenant identifier.</param>
         /// <param name="description">Optional description.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Created credential response (includes bearer token).</returns>
+        /// <returns>The created credential information (includes bearer token).</returns>
         /// <exception cref="VerbexException">Thrown when creation fails.</exception>
-        public async Task<ApiResponse<CreateCredentialData>> CreateCredentialAsync(
+        public async Task<CredentialInfo> CreateCredentialAsync(
             string tenantId,
             string? description = null,
             CancellationToken cancellationToken = default)
         {
             CreateCredentialRequest request = new CreateCredentialRequest(description);
-            return await MakeRequestAsync<CreateCredentialData>(HttpMethod.Post, $"/v1.0/admin/tenants/{tenantId}/credentials", request, true, cancellationToken).ConfigureAwait(false);
+            CreateCredentialData data = await MakeRequestAsync<CreateCredentialData>(HttpMethod.Post, $"/v1.0/admin/tenants/{tenantId}/credentials", request, true, cancellationToken).ConfigureAwait(false);
+            return data.Credential ?? new CredentialInfo();
         }
 
         /// <summary>
@@ -950,11 +836,10 @@ namespace Verbex.Sdk
         /// <param name="tenantId">The tenant identifier.</param>
         /// <param name="credentialId">The credential identifier.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Deletion confirmation.</returns>
         /// <exception cref="VerbexException">Thrown when the credential is not found.</exception>
-        public async Task<ApiResponse<DeleteData>> DeleteCredentialAsync(string tenantId, string credentialId, CancellationToken cancellationToken = default)
+        public async Task DeleteCredentialAsync(string tenantId, string credentialId, CancellationToken cancellationToken = default)
         {
-            return await MakeRequestAsync<DeleteData>(HttpMethod.Delete, $"/v1.0/admin/tenants/{tenantId}/credentials/{credentialId}", null, true, cancellationToken).ConfigureAwait(false);
+            await MakeRequestAsync<DeleteData>(HttpMethod.Delete, $"/v1.0/admin/tenants/{tenantId}/credentials/{credentialId}", null, true, cancellationToken).ConfigureAwait(false);
         }
 
         // ==================== Tenant Labels and Tags Endpoints ====================
@@ -965,15 +850,14 @@ namespace Verbex.Sdk
         /// <param name="tenantId">The tenant identifier.</param>
         /// <param name="labels">The new labels to set.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Update confirmation.</returns>
         /// <exception cref="VerbexException">Thrown when the tenant is not found.</exception>
-        public async Task<ApiResponse> UpdateTenantLabelsAsync(
+        public async Task UpdateTenantLabelsAsync(
             string tenantId,
             List<string> labels,
             CancellationToken cancellationToken = default)
         {
             object request = new { Labels = labels ?? new List<string>() };
-            return await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/labels", request, true, cancellationToken).ConfigureAwait(false);
+            await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/labels", request, true, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -982,15 +866,14 @@ namespace Verbex.Sdk
         /// <param name="tenantId">The tenant identifier.</param>
         /// <param name="tags">The new tags to set.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Update confirmation.</returns>
         /// <exception cref="VerbexException">Thrown when the tenant is not found.</exception>
-        public async Task<ApiResponse> UpdateTenantTagsAsync(
+        public async Task UpdateTenantTagsAsync(
             string tenantId,
             Dictionary<string, string> tags,
             CancellationToken cancellationToken = default)
         {
             object request = new { Tags = tags ?? new Dictionary<string, string>() };
-            return await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/tags", request, true, cancellationToken).ConfigureAwait(false);
+            await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/tags", request, true, cancellationToken).ConfigureAwait(false);
         }
 
         // ==================== User Labels and Tags Endpoints ====================
@@ -1002,16 +885,15 @@ namespace Verbex.Sdk
         /// <param name="userId">The user identifier.</param>
         /// <param name="labels">The new labels to set.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Update confirmation.</returns>
         /// <exception cref="VerbexException">Thrown when the user is not found.</exception>
-        public async Task<ApiResponse> UpdateUserLabelsAsync(
+        public async Task UpdateUserLabelsAsync(
             string tenantId,
             string userId,
             List<string> labels,
             CancellationToken cancellationToken = default)
         {
             object request = new { Labels = labels ?? new List<string>() };
-            return await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/users/{userId}/labels", request, true, cancellationToken).ConfigureAwait(false);
+            await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/users/{userId}/labels", request, true, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1021,16 +903,15 @@ namespace Verbex.Sdk
         /// <param name="userId">The user identifier.</param>
         /// <param name="tags">The new tags to set.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Update confirmation.</returns>
         /// <exception cref="VerbexException">Thrown when the user is not found.</exception>
-        public async Task<ApiResponse> UpdateUserTagsAsync(
+        public async Task UpdateUserTagsAsync(
             string tenantId,
             string userId,
             Dictionary<string, string> tags,
             CancellationToken cancellationToken = default)
         {
             object request = new { Tags = tags ?? new Dictionary<string, string>() };
-            return await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/users/{userId}/tags", request, true, cancellationToken).ConfigureAwait(false);
+            await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/users/{userId}/tags", request, true, cancellationToken).ConfigureAwait(false);
         }
 
         // ==================== Credential Labels and Tags Endpoints ====================
@@ -1042,16 +923,15 @@ namespace Verbex.Sdk
         /// <param name="credentialId">The credential identifier.</param>
         /// <param name="labels">The new labels to set.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Update confirmation.</returns>
         /// <exception cref="VerbexException">Thrown when the credential is not found.</exception>
-        public async Task<ApiResponse> UpdateCredentialLabelsAsync(
+        public async Task UpdateCredentialLabelsAsync(
             string tenantId,
             string credentialId,
             List<string> labels,
             CancellationToken cancellationToken = default)
         {
             object request = new { Labels = labels ?? new List<string>() };
-            return await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/credentials/{credentialId}/labels", request, true, cancellationToken).ConfigureAwait(false);
+            await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/credentials/{credentialId}/labels", request, true, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1061,16 +941,15 @@ namespace Verbex.Sdk
         /// <param name="credentialId">The credential identifier.</param>
         /// <param name="tags">The new tags to set.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Update confirmation.</returns>
         /// <exception cref="VerbexException">Thrown when the credential is not found.</exception>
-        public async Task<ApiResponse> UpdateCredentialTagsAsync(
+        public async Task UpdateCredentialTagsAsync(
             string tenantId,
             string credentialId,
             Dictionary<string, string> tags,
             CancellationToken cancellationToken = default)
         {
             object request = new { Tags = tags ?? new Dictionary<string, string>() };
-            return await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/credentials/{credentialId}/tags", request, true, cancellationToken).ConfigureAwait(false);
+            await MakeRequestAsync(HttpMethod.Put, $"/v1.0/tenants/{tenantId}/credentials/{credentialId}/tags", request, true, cancellationToken).ConfigureAwait(false);
         }
 
         // ==================== Custom Metadata Endpoints ====================
@@ -1089,8 +968,7 @@ namespace Verbex.Sdk
             CancellationToken cancellationToken = default)
         {
             object request = new { customMetadata };
-            ApiResponse<IndexInfo> response = await MakeRequestAsync<IndexInfo>(HttpMethod.Put, $"/v1.0/indices/{indexId}/customMetadata", request, true, cancellationToken).ConfigureAwait(false);
-            return response.Data ?? new IndexInfo();
+            return await MakeRequestAsync<IndexInfo>(HttpMethod.Put, $"/v1.0/indices/{indexId}/customMetadata", request, true, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1109,8 +987,7 @@ namespace Verbex.Sdk
             CancellationToken cancellationToken = default)
         {
             object request = new { customMetadata };
-            ApiResponse<DocumentInfo> response = await MakeRequestAsync<DocumentInfo>(HttpMethod.Put, $"/v1.0/indices/{indexId}/documents/{documentId}/customMetadata", request, true, cancellationToken).ConfigureAwait(false);
-            return response.Data ?? new DocumentInfo();
+            return await MakeRequestAsync<DocumentInfo>(HttpMethod.Put, $"/v1.0/indices/{indexId}/documents/{documentId}/customMetadata", request, true, cancellationToken).ConfigureAwait(false);
         }
     }
 }

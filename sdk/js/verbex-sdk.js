@@ -1,6 +1,7 @@
 /**
  * Verbex JavaScript SDK
  * A comprehensive SDK for interacting with the Verbex Inverted Index REST API.
+ * All methods return domain objects directly rather than wrapped responses.
  */
 
 /**
@@ -138,30 +139,6 @@ function toCamelCaseKeys(obj) {
 }
 
 /**
- * API Response wrapper class.
- */
-class ApiResponse {
-    /**
-     * Create an ApiResponse.
-     * @param {object} data - Response data
-     */
-    constructor(data) {
-        // Server returns PascalCase properties
-        this.guid = data.Guid || data.guid || null;
-        this.success = data.Success || data.success || false;
-        this.timestampUtc = data.TimestampUtc || data.timestampUtc || null;
-        this.statusCode = data.StatusCode || data.statusCode || 0;
-        this.errorMessage = data.ErrorMessage || data.errorMessage || null;
-        // Convert data object keys to camelCase for convenience
-        const rawData = data.Data || data.data || null;
-        this.data = rawData ? toCamelCaseKeys(rawData) : null;
-        this.totalCount = data.TotalCount || data.totalCount || null;
-        this.processingTimeMs = data.ProcessingTimeMs || data.processingTimeMs || null;
-        this.rawResponse = data;
-    }
-}
-
-/**
  * Index information model.
  */
 class IndexInfo {
@@ -218,6 +195,20 @@ class DocumentInfo {
 }
 
 /**
+ * Add document response data.
+ */
+class AddDocumentData {
+    /**
+     * Create an AddDocumentData.
+     * @param {object} data - Add document response data
+     */
+    constructor(data) {
+        this.documentId = data.documentId || '';
+        this.message = data.message || null;
+    }
+}
+
+/**
  * Search result model.
  */
 class SearchResult {
@@ -238,9 +229,9 @@ class SearchResult {
 /**
  * Search response model.
  */
-class SearchResponse {
+class SearchData {
     /**
-     * Create a SearchResponse.
+     * Create a SearchData.
      * @param {object} data - Search response data (camelCase from toCamelCaseKeys)
      */
     constructor(data) {
@@ -248,6 +239,40 @@ class SearchResponse {
         this.results = (data.results || []).map(r => new SearchResult(r));
         this.totalCount = data.totalCount || 0;
         this.maxResults = data.maxResults || 100;
+        this.searchTime = data.searchTime || 0;
+    }
+}
+
+/**
+ * Health check response data.
+ */
+class HealthData {
+    /**
+     * Create a HealthData.
+     * @param {object} data - Health data
+     */
+    constructor(data) {
+        this.status = data.status || null;
+        this.version = data.version || null;
+        this.timestamp = data.timestamp || null;
+    }
+}
+
+/**
+ * Token validation response data.
+ */
+class ValidationData {
+    /**
+     * Create a ValidationData.
+     * @param {object} data - Validation data
+     */
+    constructor(data) {
+        this.valid = data.valid || false;
+        this.tenantId = data.tenantId || null;
+        this.userId = data.userId || null;
+        this.email = data.email || null;
+        this.isAdmin = data.isAdmin || false;
+        this.isGlobalAdmin = data.isGlobalAdmin || false;
     }
 }
 
@@ -314,6 +339,7 @@ class CredentialInfo {
 /**
  * Verbex SDK Client for JavaScript.
  * Provides methods to interact with all Verbex REST API endpoints.
+ * All methods return domain objects directly rather than wrapped responses.
  */
 class VerbexClient {
     /**
@@ -350,12 +376,12 @@ class VerbexClient {
     }
 
     /**
-     * Make an HTTP request to the API.
+     * Make an HTTP request to the API and return the data directly.
      * @param {string} method - HTTP method
      * @param {string} path - API path
      * @param {object} data - Request body data
      * @param {boolean} requireAuth - Whether to include auth headers
-     * @returns {Promise<ApiResponse>} API response
+     * @returns {Promise<any>} Response data (unwrapped from ApiResponse)
      */
     async _makeRequest(method, path, data = null, requireAuth = true) {
         const url = `${this._endpoint}${path}`;
@@ -384,17 +410,22 @@ class VerbexClient {
                 };
             }
 
-            const apiResponse = new ApiResponse(responseData);
+            // Handle both PascalCase and camelCase from server
+            const success = responseData.Success ?? responseData.success ?? false;
+            const statusCode = responseData.StatusCode ?? responseData.statusCode ?? response.status;
+            const errorMessage = responseData.ErrorMessage ?? responseData.errorMessage;
+            const rawData = responseData.Data ?? responseData.data;
 
-            if (!apiResponse.success && apiResponse.statusCode >= 400) {
+            if (!success && statusCode >= 400) {
                 throw new VerbexError(
-                    apiResponse.errorMessage || `Request failed with status ${apiResponse.statusCode}`,
-                    apiResponse.statusCode,
-                    apiResponse
+                    errorMessage || `Request failed with status ${statusCode}`,
+                    statusCode,
+                    responseData
                 );
             }
 
-            return apiResponse;
+            // Return the data directly, converting keys to camelCase
+            return rawData ? toCamelCaseKeys(rawData) : null;
         } catch (error) {
             if (error instanceof VerbexError) {
                 throw error;
@@ -403,22 +434,42 @@ class VerbexClient {
         }
     }
 
+    /**
+     * Make an HTTP HEAD request to check existence.
+     * @param {string} path - API path
+     * @param {boolean} requireAuth - Whether to include auth headers
+     * @returns {Promise<boolean>} True if resource exists
+     */
+    async _makeHeadRequest(path, requireAuth = true) {
+        const url = `${this._endpoint}${path}`;
+        const headers = requireAuth ? this._getAuthHeaders() : this._getHeaders();
+
+        try {
+            const response = await fetch(url, { method: 'HEAD', headers });
+            return response.ok;
+        } catch (error) {
+            throw new VerbexError(`Request failed: ${error.message}`);
+        }
+    }
+
     // ==================== Health Endpoints ====================
 
     /**
      * Check server health.
-     * @returns {Promise<ApiResponse>} Health status response
+     * @returns {Promise<HealthData>} Health status data
      */
     async healthCheck() {
-        return this._makeRequest('GET', '/v1.0/health', null, false);
+        const data = await this._makeRequest('GET', '/v1.0/health', null, false);
+        return new HealthData(data || {});
     }
 
     /**
      * Check server health via root endpoint.
-     * @returns {Promise<ApiResponse>} Health status response
+     * @returns {Promise<HealthData>} Health status data
      */
     async rootHealthCheck() {
-        return this._makeRequest('GET', '/', null, false);
+        const data = await this._makeRequest('GET', '/', null, false);
+        return new HealthData(data || {});
     }
 
     // ==================== Authentication Endpoints ====================
@@ -436,25 +487,25 @@ class VerbexClient {
         if (!password) throw new Error('password is required');
 
         try {
-            const response = await this._makeRequest('POST', '/v1.0/auth/login', {
+            const data = await this._makeRequest('POST', '/v1.0/auth/login', {
                 TenantId: tenantId,
                 Username: email,
                 Password: password
             }, false);
 
-            if (response.success && response.data) {
-                return LoginResult.successful(response.data.token, {
+            if (data && data.token) {
+                return LoginResult.successful(data.token, {
                     tenantId,
                     email,
-                    isAdmin: response.data.isAdmin || false,
-                    isGlobalAdmin: response.data.isGlobalAdmin || false
+                    isAdmin: data.isAdmin || false,
+                    isGlobalAdmin: data.isGlobalAdmin || false
                 });
             }
 
             return LoginResult.failed(
                 AuthenticationResult.InvalidCredentials,
                 AuthorizationResult.Unauthorized,
-                response.errorMessage || 'Login failed'
+                'Login failed'
             );
         } catch (error) {
             if (error instanceof VerbexError) {
@@ -488,15 +539,15 @@ class VerbexClient {
             // Temporarily use the provided bearer token
             this._accessKey = bearerToken;
 
-            const response = await this._makeRequest('GET', '/v1.0/auth/validate', null, true);
+            const data = await this._makeRequest('GET', '/v1.0/auth/validate', null, true);
 
-            if (response.success && response.data && response.data.valid) {
+            if (data && data.valid) {
                 return LoginResult.successful(bearerToken, {
-                    tenantId: response.data.tenantId || null,
-                    userId: response.data.userId || null,
-                    email: response.data.email || null,
-                    isAdmin: response.data.isAdmin || false,
-                    isGlobalAdmin: response.data.isGlobalAdmin || false
+                    tenantId: data.tenantId || null,
+                    userId: data.userId || null,
+                    email: data.email || null,
+                    isAdmin: data.isAdmin || false,
+                    isGlobalAdmin: data.isGlobalAdmin || false
                 });
             }
 
@@ -524,43 +575,24 @@ class VerbexClient {
     }
 
     /**
-     * Authenticate and receive a bearer token.
-     * @deprecated Use loginWithCredentials(tenantId, email, password) or loginWithToken(bearerToken) instead.
-     * @param {string} username - The username
-     * @param {string} password - The password
-     * @returns {Promise<ApiResponse>} Login response with token
-     */
-    async login(username, password) {
-        console.warn('login() is deprecated. Use loginWithCredentials(tenantId, email, password) or loginWithToken(bearerToken) instead.');
-        return this._makeRequest('POST', '/v1.0/auth/login', { Username: username, Password: password }, false);
-    }
-
-    /**
      * Validate the current bearer token.
-     * @returns {Promise<ApiResponse>} Validation response
+     * @returns {Promise<ValidationData>} Validation data
      */
     async validateToken() {
-        return this._makeRequest('GET', '/v1.0/auth/validate', null, true);
+        const data = await this._makeRequest('GET', '/v1.0/auth/validate', null, true);
+        return new ValidationData(data || {});
     }
 
     // ==================== Index Management Endpoints ====================
 
     /**
      * List all available indices.
-     * @returns {Promise<ApiResponse>} List of indices
-     */
-    async listIndices() {
-        return this._makeRequest('GET', '/v1.0/indices');
-    }
-
-    /**
-     * Get all indices as IndexInfo objects.
      * @returns {Promise<IndexInfo[]>} Array of IndexInfo objects
      */
-    async getIndices() {
-        const response = await this.listIndices();
-        if (response.data?.indices) {
-            return response.data.indices.map(idx => new IndexInfo(idx));
+    async listIndices() {
+        const data = await this._makeRequest('GET', '/v1.0/indices');
+        if (data?.indices) {
+            return data.indices.map(idx => new IndexInfo(idx));
         }
         return [];
     }
@@ -578,10 +610,10 @@ class VerbexClient {
      * @param {string[]} [options.labels] - Labels to associate with the index
      * @param {object} [options.tags] - Key-value tags to associate with the index
      * @param {object} [options.customMetadata] - Custom metadata to associate with the index
-     * @returns {Promise<ApiResponse>} Created index response
+     * @returns {Promise<IndexInfo>} Created index information
      */
     async createIndex(options) {
-        const data = {
+        const requestData = {
             Name: options.name,
             InMemory: options.inMemory || false,
             EnableLemmatizer: options.enableLemmatizer || false,
@@ -590,37 +622,29 @@ class VerbexClient {
             MaxTokenLength: options.maxTokenLength || 0
         };
         if (options.description) {
-            data.Description = options.description;
+            requestData.Description = options.description;
         }
         if (options.labels) {
-            data.Labels = options.labels;
+            requestData.Labels = options.labels;
         }
         if (options.tags) {
-            data.Tags = options.tags;
+            requestData.Tags = options.tags;
         }
         if (options.customMetadata) {
-            data.CustomMetadata = options.customMetadata;
+            requestData.CustomMetadata = options.customMetadata;
         }
-        return this._makeRequest('POST', '/v1.0/indices', data);
+        const data = await this._makeRequest('POST', '/v1.0/indices', requestData);
+        return new IndexInfo(data?.index || {});
     }
 
     /**
      * Get detailed information about a specific index.
      * @param {string} indexId - The index identifier
-     * @returns {Promise<ApiResponse>} Index details
+     * @returns {Promise<IndexInfo>} Index information
      */
     async getIndex(indexId) {
-        return this._makeRequest('GET', `/v1.0/indices/${indexId}`);
-    }
-
-    /**
-     * Get index as IndexInfo object.
-     * @param {string} indexId - The index identifier
-     * @returns {Promise<IndexInfo>} IndexInfo object
-     */
-    async getIndexInfo(indexId) {
-        const response = await this.getIndex(indexId);
-        return response.data ? new IndexInfo(response.data) : null;
+        const data = await this._makeRequest('GET', `/v1.0/indices/${indexId}`);
+        return new IndexInfo(data || {});
     }
 
     /**
@@ -629,54 +653,47 @@ class VerbexClient {
      * @returns {Promise<boolean>} True if index exists, false otherwise
      */
     async indexExists(indexId) {
-        try {
-            await this._makeRequest('HEAD', `/v1.0/indices/${indexId}`);
-            return true;
-        } catch (error) {
-            if (error instanceof VerbexError && error.statusCode === 404) {
-                return false;
-            }
-            throw error;
-        }
+        return await this._makeHeadRequest(`/v1.0/indices/${indexId}`);
     }
 
     /**
      * Delete an index.
      * @param {string} indexId - The index identifier
-     * @returns {Promise<ApiResponse>} Deletion confirmation
+     * @returns {Promise<void>}
      */
     async deleteIndex(indexId) {
-        return this._makeRequest('DELETE', `/v1.0/indices/${indexId}`);
+        await this._makeRequest('DELETE', `/v1.0/indices/${indexId}`);
     }
 
     /**
      * Update labels on an index (full replacement).
      * @param {string} indexId - The index identifier
      * @param {string[]} labels - The new labels to set
-     * @returns {Promise<ApiResponse>} Update confirmation with updated index
+     * @returns {Promise<void>}
      */
     async updateIndexLabels(indexId, labels) {
-        return this._makeRequest('PUT', `/v1.0/indices/${indexId}/labels`, { Labels: labels || [] });
+        await this._makeRequest('PUT', `/v1.0/indices/${indexId}/labels`, { Labels: labels || [] });
     }
 
     /**
      * Update tags on an index (full replacement).
      * @param {string} indexId - The index identifier
      * @param {object} tags - The new tags to set
-     * @returns {Promise<ApiResponse>} Update confirmation with updated index
+     * @returns {Promise<void>}
      */
     async updateIndexTags(indexId, tags) {
-        return this._makeRequest('PUT', `/v1.0/indices/${indexId}/tags`, { Tags: tags || {} });
+        await this._makeRequest('PUT', `/v1.0/indices/${indexId}/tags`, { Tags: tags || {} });
     }
 
     /**
      * Update custom metadata on an index (full replacement).
      * @param {string} indexId - The index identifier
      * @param {object} customMetadata - The new custom metadata to set
-     * @returns {Promise<ApiResponse>} Update confirmation with updated index
+     * @returns {Promise<IndexInfo>} Updated index information
      */
     async updateIndexCustomMetadata(indexId, customMetadata) {
-        return this._makeRequest('PUT', `/v1.0/indices/${indexId}/customMetadata`, { CustomMetadata: customMetadata });
+        const data = await this._makeRequest('PUT', `/v1.0/indices/${indexId}/customMetadata`, { CustomMetadata: customMetadata });
+        return new IndexInfo(data || {});
     }
 
     // ==================== Document Management Endpoints ====================
@@ -684,21 +701,12 @@ class VerbexClient {
     /**
      * List all documents in an index.
      * @param {string} indexId - The index identifier
-     * @returns {Promise<ApiResponse>} List of documents
-     */
-    async listDocuments(indexId) {
-        return this._makeRequest('GET', `/v1.0/indices/${indexId}/documents`);
-    }
-
-    /**
-     * Get all documents as DocumentInfo objects.
-     * @param {string} indexId - The index identifier
      * @returns {Promise<DocumentInfo[]>} Array of DocumentInfo objects
      */
-    async getDocuments(indexId) {
-        const response = await this.listDocuments(indexId);
-        if (response.data?.documents) {
-            return response.data.documents.map(doc => new DocumentInfo(doc));
+    async listDocuments(indexId) {
+        const data = await this._makeRequest('GET', `/v1.0/indices/${indexId}/documents`);
+        if (data?.documents) {
+            return data.documents.map(doc => new DocumentInfo(doc));
         }
         return [];
     }
@@ -711,44 +719,35 @@ class VerbexClient {
      * @param {string[]} [labels] - Optional labels to associate with the document
      * @param {object} [tags] - Optional key-value tags to associate with the document
      * @param {object} [customMetadata] - Optional custom metadata to associate with the document
-     * @returns {Promise<ApiResponse>} Document creation response
+     * @returns {Promise<AddDocumentData>} Created document data including document ID
      */
     async addDocument(indexId, content, documentId = null, labels = null, tags = null, customMetadata = null) {
-        const data = { Content: content };
+        const requestData = { Content: content };
         if (documentId) {
-            data.Id = documentId;
+            requestData.Id = documentId;
         }
         if (labels) {
-            data.Labels = labels;
+            requestData.Labels = labels;
         }
         if (tags) {
-            data.Tags = tags;
+            requestData.Tags = tags;
         }
         if (customMetadata) {
-            data.CustomMetadata = customMetadata;
+            requestData.CustomMetadata = customMetadata;
         }
-        return this._makeRequest('POST', `/v1.0/indices/${indexId}/documents`, data);
+        const data = await this._makeRequest('POST', `/v1.0/indices/${indexId}/documents`, requestData);
+        return new AddDocumentData(data || {});
     }
 
     /**
      * Get a specific document.
      * @param {string} indexId - The index identifier
      * @param {string} documentId - The document identifier
-     * @returns {Promise<ApiResponse>} Document details
+     * @returns {Promise<DocumentInfo>} Document information
      */
     async getDocument(indexId, documentId) {
-        return this._makeRequest('GET', `/v1.0/indices/${indexId}/documents/${documentId}`);
-    }
-
-    /**
-     * Get document as DocumentInfo object.
-     * @param {string} indexId - The index identifier
-     * @param {string} documentId - The document identifier
-     * @returns {Promise<DocumentInfo>} DocumentInfo object
-     */
-    async getDocumentInfo(indexId, documentId) {
-        const response = await this.getDocument(indexId, documentId);
-        return response.data ? new DocumentInfo(response.data) : null;
+        const data = await this._makeRequest('GET', `/v1.0/indices/${indexId}/documents/${documentId}`);
+        return new DocumentInfo(data || {});
     }
 
     /**
@@ -758,25 +757,17 @@ class VerbexClient {
      * @returns {Promise<boolean>} True if document exists, false otherwise
      */
     async documentExists(indexId, documentId) {
-        try {
-            await this._makeRequest('HEAD', `/v1.0/indices/${indexId}/documents/${documentId}`);
-            return true;
-        } catch (error) {
-            if (error instanceof VerbexError && error.statusCode === 404) {
-                return false;
-            }
-            throw error;
-        }
+        return await this._makeHeadRequest(`/v1.0/indices/${indexId}/documents/${documentId}`);
     }
 
     /**
      * Delete a document from an index.
      * @param {string} indexId - The index identifier
      * @param {string} documentId - The document identifier
-     * @returns {Promise<ApiResponse>} Deletion confirmation
+     * @returns {Promise<void>}
      */
     async deleteDocument(indexId, documentId) {
-        return this._makeRequest('DELETE', `/v1.0/indices/${indexId}/documents/${documentId}`);
+        await this._makeRequest('DELETE', `/v1.0/indices/${indexId}/documents/${documentId}`);
     }
 
     /**
@@ -784,10 +775,10 @@ class VerbexClient {
      * @param {string} indexId - The index identifier
      * @param {string} documentId - The document identifier
      * @param {string[]} labels - The new labels to set
-     * @returns {Promise<ApiResponse>} Update confirmation with updated document
+     * @returns {Promise<void>}
      */
     async updateDocumentLabels(indexId, documentId, labels) {
-        return this._makeRequest('PUT', `/v1.0/indices/${indexId}/documents/${documentId}/labels`, { Labels: labels || [] });
+        await this._makeRequest('PUT', `/v1.0/indices/${indexId}/documents/${documentId}/labels`, { Labels: labels || [] });
     }
 
     /**
@@ -795,10 +786,10 @@ class VerbexClient {
      * @param {string} indexId - The index identifier
      * @param {string} documentId - The document identifier
      * @param {object} tags - The new tags to set
-     * @returns {Promise<ApiResponse>} Update confirmation with updated document
+     * @returns {Promise<void>}
      */
     async updateDocumentTags(indexId, documentId, tags) {
-        return this._makeRequest('PUT', `/v1.0/indices/${indexId}/documents/${documentId}/tags`, { Tags: tags || {} });
+        await this._makeRequest('PUT', `/v1.0/indices/${indexId}/documents/${documentId}/tags`, { Tags: tags || {} });
     }
 
     /**
@@ -806,10 +797,11 @@ class VerbexClient {
      * @param {string} indexId - The index identifier
      * @param {string} documentId - The document identifier
      * @param {object} customMetadata - The new custom metadata to set
-     * @returns {Promise<ApiResponse>} Update confirmation with updated document
+     * @returns {Promise<DocumentInfo>} Updated document information
      */
     async updateDocumentCustomMetadata(indexId, documentId, customMetadata) {
-        return this._makeRequest('PUT', `/v1.0/indices/${indexId}/documents/${documentId}/customMetadata`, { CustomMetadata: customMetadata });
+        const data = await this._makeRequest('PUT', `/v1.0/indices/${indexId}/documents/${documentId}/customMetadata`, { CustomMetadata: customMetadata });
+        return new DocumentInfo(data || {});
     }
 
     // ==================== Search Endpoint ====================
@@ -821,51 +813,30 @@ class VerbexClient {
      * @param {number} [maxResults=100] - Maximum results to return
      * @param {string[]} [labels=null] - Optional labels to filter by (AND logic, case-insensitive)
      * @param {Object} [tags=null] - Optional tags to filter by (AND logic, exact match)
-     * @returns {Promise<ApiResponse>} Search results
+     * @returns {Promise<SearchData>} Search results
      */
     async search(indexId, query, maxResults = 100, labels = null, tags = null) {
-        const data = { Query: query, MaxResults: maxResults };
+        const requestData = { Query: query, MaxResults: maxResults };
         if (labels && labels.length > 0) {
-            data.Labels = labels;
+            requestData.Labels = labels;
         }
         if (tags && Object.keys(tags).length > 0) {
-            data.Tags = tags;
+            requestData.Tags = tags;
         }
-        return this._makeRequest('POST', `/v1.0/indices/${indexId}/search`, data);
-    }
-
-    /**
-     * Search documents and return SearchResponse object with optional filters.
-     * @param {string} indexId - The index identifier
-     * @param {string} query - The search query
-     * @param {number} [maxResults=100] - Maximum results to return
-     * @param {string[]} [labels=null] - Optional labels to filter by (AND logic, case-insensitive)
-     * @param {Object} [tags=null] - Optional tags to filter by (AND logic, exact match)
-     * @returns {Promise<SearchResponse>} SearchResponse object
-     */
-    async searchDocuments(indexId, query, maxResults = 100, labels = null, tags = null) {
-        const response = await this.search(indexId, query, maxResults, labels, tags);
-        return response.data ? new SearchResponse(response.data) : null;
+        const data = await this._makeRequest('POST', `/v1.0/indices/${indexId}/search`, requestData);
+        return new SearchData(data || {});
     }
 
     // ==================== Admin - Tenant Management Endpoints ====================
 
     /**
      * List all tenants.
-     * @returns {Promise<ApiResponse>} List of tenants
-     */
-    async listTenants() {
-        return this._makeRequest('GET', '/v1.0/admin/tenants');
-    }
-
-    /**
-     * Get all tenants as TenantInfo objects.
      * @returns {Promise<TenantInfo[]>} Array of TenantInfo objects
      */
-    async getTenants() {
-        const response = await this.listTenants();
-        if (response.data?.tenants) {
-            return response.data.tenants.map(t => new TenantInfo(t));
+    async listTenants() {
+        const data = await this._makeRequest('GET', '/v1.0/admin/tenants');
+        if (data?.tenants) {
+            return data.tenants.map(t => new TenantInfo(t));
         }
         return [];
     }
@@ -873,10 +844,11 @@ class VerbexClient {
     /**
      * Get a specific tenant.
      * @param {string} tenantId - The tenant identifier
-     * @returns {Promise<ApiResponse>} Tenant details
+     * @returns {Promise<TenantInfo>} Tenant information
      */
     async getTenant(tenantId) {
-        return this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}`);
+        const data = await this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}`);
+        return new TenantInfo(data || {});
     }
 
     /**
@@ -884,43 +856,44 @@ class VerbexClient {
      * @param {object} options - Tenant creation options
      * @param {string} options.name - Tenant name
      * @param {string} [options.description] - Optional description
-     * @returns {Promise<ApiResponse>} Created tenant response
+     * @returns {Promise<TenantInfo>} Created tenant information
      */
     async createTenant(options) {
-        const data = { name: options.name };
+        const requestData = { name: options.name };
         if (options.description) {
-            data.description = options.description;
+            requestData.description = options.description;
         }
-        return this._makeRequest('POST', '/v1.0/admin/tenants', data);
+        const data = await this._makeRequest('POST', '/v1.0/admin/tenants', requestData);
+        return new TenantInfo(data?.tenant || {});
     }
 
     /**
      * Delete a tenant.
      * @param {string} tenantId - The tenant identifier
-     * @returns {Promise<ApiResponse>} Deletion confirmation
+     * @returns {Promise<void>}
      */
     async deleteTenant(tenantId) {
-        return this._makeRequest('DELETE', `/v1.0/admin/tenants/${tenantId}`);
+        await this._makeRequest('DELETE', `/v1.0/admin/tenants/${tenantId}`);
     }
 
     /**
      * Update labels on a tenant (full replacement).
      * @param {string} tenantId - The tenant identifier
      * @param {string[]} labels - The new labels to set
-     * @returns {Promise<ApiResponse>} Update confirmation with updated tenant
+     * @returns {Promise<void>}
      */
     async updateTenantLabels(tenantId, labels) {
-        return this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/labels`, { Labels: labels || [] });
+        await this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/labels`, { Labels: labels || [] });
     }
 
     /**
      * Update tags on a tenant (full replacement).
      * @param {string} tenantId - The tenant identifier
      * @param {object} tags - The new tags to set
-     * @returns {Promise<ApiResponse>} Update confirmation with updated tenant
+     * @returns {Promise<void>}
      */
     async updateTenantTags(tenantId, tags) {
-        return this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/tags`, { Tags: tags || {} });
+        await this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/tags`, { Tags: tags || {} });
     }
 
     // ==================== Admin - User Management Endpoints ====================
@@ -928,21 +901,12 @@ class VerbexClient {
     /**
      * List all users in a tenant.
      * @param {string} tenantId - The tenant identifier
-     * @returns {Promise<ApiResponse>} List of users
-     */
-    async listUsers(tenantId) {
-        return this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}/users`);
-    }
-
-    /**
-     * Get all users in a tenant as UserInfo objects.
-     * @param {string} tenantId - The tenant identifier
      * @returns {Promise<UserInfo[]>} Array of UserInfo objects
      */
-    async getUsers(tenantId) {
-        const response = await this.listUsers(tenantId);
-        if (response.data?.users) {
-            return response.data.users.map(u => new UserInfo(u));
+    async listUsers(tenantId) {
+        const data = await this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}/users`);
+        if (data?.users) {
+            return data.users.map(u => new UserInfo(u));
         }
         return [];
     }
@@ -951,10 +915,11 @@ class VerbexClient {
      * Get a specific user.
      * @param {string} tenantId - The tenant identifier
      * @param {string} userId - The user identifier
-     * @returns {Promise<ApiResponse>} User details
+     * @returns {Promise<UserInfo>} User information
      */
     async getUser(tenantId, userId) {
-        return this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}/users/${userId}`);
+        const data = await this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}/users/${userId}`);
+        return new UserInfo(data || {});
     }
 
     /**
@@ -966,33 +931,34 @@ class VerbexClient {
      * @param {string} [options.firstName] - Optional first name
      * @param {string} [options.lastName] - Optional last name
      * @param {boolean} [options.isAdmin=false] - Whether user is tenant admin
-     * @returns {Promise<ApiResponse>} Created user response
+     * @returns {Promise<UserInfo>} Created user information
      */
     async createUser(tenantId, options) {
-        const data = {
+        const requestData = {
             email: options.email,
             password: options.password
         };
         if (options.firstName) {
-            data.firstName = options.firstName;
+            requestData.firstName = options.firstName;
         }
         if (options.lastName) {
-            data.lastName = options.lastName;
+            requestData.lastName = options.lastName;
         }
         if (options.isAdmin !== undefined) {
-            data.isAdmin = options.isAdmin;
+            requestData.isAdmin = options.isAdmin;
         }
-        return this._makeRequest('POST', `/v1.0/admin/tenants/${tenantId}/users`, data);
+        const data = await this._makeRequest('POST', `/v1.0/admin/tenants/${tenantId}/users`, requestData);
+        return new UserInfo(data?.user || {});
     }
 
     /**
      * Delete a user.
      * @param {string} tenantId - The tenant identifier
      * @param {string} userId - The user identifier
-     * @returns {Promise<ApiResponse>} Deletion confirmation
+     * @returns {Promise<void>}
      */
     async deleteUser(tenantId, userId) {
-        return this._makeRequest('DELETE', `/v1.0/admin/tenants/${tenantId}/users/${userId}`);
+        await this._makeRequest('DELETE', `/v1.0/admin/tenants/${tenantId}/users/${userId}`);
     }
 
     /**
@@ -1000,10 +966,10 @@ class VerbexClient {
      * @param {string} tenantId - The tenant identifier
      * @param {string} userId - The user identifier
      * @param {string[]} labels - The new labels to set
-     * @returns {Promise<ApiResponse>} Update confirmation with updated user
+     * @returns {Promise<void>}
      */
     async updateUserLabels(tenantId, userId, labels) {
-        return this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/users/${userId}/labels`, { Labels: labels || [] });
+        await this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/users/${userId}/labels`, { Labels: labels || [] });
     }
 
     /**
@@ -1011,10 +977,10 @@ class VerbexClient {
      * @param {string} tenantId - The tenant identifier
      * @param {string} userId - The user identifier
      * @param {object} tags - The new tags to set
-     * @returns {Promise<ApiResponse>} Update confirmation with updated user
+     * @returns {Promise<void>}
      */
     async updateUserTags(tenantId, userId, tags) {
-        return this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/users/${userId}/tags`, { Tags: tags || {} });
+        await this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/users/${userId}/tags`, { Tags: tags || {} });
     }
 
     // ==================== Admin - Credential Management Endpoints ====================
@@ -1022,21 +988,12 @@ class VerbexClient {
     /**
      * List all credentials in a tenant.
      * @param {string} tenantId - The tenant identifier
-     * @returns {Promise<ApiResponse>} List of credentials
-     */
-    async listCredentials(tenantId) {
-        return this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}/credentials`);
-    }
-
-    /**
-     * Get all credentials in a tenant as CredentialInfo objects.
-     * @param {string} tenantId - The tenant identifier
      * @returns {Promise<CredentialInfo[]>} Array of CredentialInfo objects
      */
-    async getCredentials(tenantId) {
-        const response = await this.listCredentials(tenantId);
-        if (response.data?.credentials) {
-            return response.data.credentials.map(c => new CredentialInfo(c));
+    async listCredentials(tenantId) {
+        const data = await this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}/credentials`);
+        if (data?.credentials) {
+            return data.credentials.map(c => new CredentialInfo(c));
         }
         return [];
     }
@@ -1045,10 +1002,11 @@ class VerbexClient {
      * Get a specific credential.
      * @param {string} tenantId - The tenant identifier
      * @param {string} credentialId - The credential identifier
-     * @returns {Promise<ApiResponse>} Credential details
+     * @returns {Promise<CredentialInfo>} Credential information
      */
     async getCredential(tenantId, credentialId) {
-        return this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}/credentials/${credentialId}`);
+        const data = await this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}/credentials/${credentialId}`);
+        return new CredentialInfo(data || {});
     }
 
     /**
@@ -1056,24 +1014,25 @@ class VerbexClient {
      * @param {string} tenantId - The tenant identifier
      * @param {object} [options] - Credential creation options
      * @param {string} [options.description] - Optional description
-     * @returns {Promise<ApiResponse>} Created credential response (includes bearer token)
+     * @returns {Promise<CredentialInfo>} Created credential information (includes bearer token)
      */
     async createCredential(tenantId, options = {}) {
-        const data = {};
+        const requestData = {};
         if (options.description) {
-            data.description = options.description;
+            requestData.description = options.description;
         }
-        return this._makeRequest('POST', `/v1.0/admin/tenants/${tenantId}/credentials`, data);
+        const data = await this._makeRequest('POST', `/v1.0/admin/tenants/${tenantId}/credentials`, requestData);
+        return new CredentialInfo(data?.credential || {});
     }
 
     /**
      * Delete a credential.
      * @param {string} tenantId - The tenant identifier
      * @param {string} credentialId - The credential identifier
-     * @returns {Promise<ApiResponse>} Deletion confirmation
+     * @returns {Promise<void>}
      */
     async deleteCredential(tenantId, credentialId) {
-        return this._makeRequest('DELETE', `/v1.0/admin/tenants/${tenantId}/credentials/${credentialId}`);
+        await this._makeRequest('DELETE', `/v1.0/admin/tenants/${tenantId}/credentials/${credentialId}`);
     }
 
     /**
@@ -1081,10 +1040,10 @@ class VerbexClient {
      * @param {string} tenantId - The tenant identifier
      * @param {string} credentialId - The credential identifier
      * @param {string[]} labels - The new labels to set
-     * @returns {Promise<ApiResponse>} Update confirmation with updated credential
+     * @returns {Promise<void>}
      */
     async updateCredentialLabels(tenantId, credentialId, labels) {
-        return this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/credentials/${credentialId}/labels`, { Labels: labels || [] });
+        await this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/credentials/${credentialId}/labels`, { Labels: labels || [] });
     }
 
     /**
@@ -1092,10 +1051,10 @@ class VerbexClient {
      * @param {string} tenantId - The tenant identifier
      * @param {string} credentialId - The credential identifier
      * @param {object} tags - The new tags to set
-     * @returns {Promise<ApiResponse>} Update confirmation with updated credential
+     * @returns {Promise<void>}
      */
     async updateCredentialTags(tenantId, credentialId, tags) {
-        return this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/credentials/${credentialId}/tags`, { Tags: tags || {} });
+        await this._makeRequest('PUT', `/v1.0/tenants/${tenantId}/credentials/${credentialId}/tags`, { Tags: tags || {} });
     }
 }
 
@@ -1104,14 +1063,16 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         VerbexClient,
         VerbexError,
-        ApiResponse,
         AuthenticationResult,
         AuthorizationResult,
         LoginResult,
         IndexInfo,
         DocumentInfo,
+        AddDocumentData,
         SearchResult,
-        SearchResponse,
+        SearchData,
+        HealthData,
+        ValidationData,
         TenantInfo,
         UserInfo,
         CredentialInfo
@@ -1122,14 +1083,16 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof exports !== 'undefined') {
     exports.VerbexClient = VerbexClient;
     exports.VerbexError = VerbexError;
-    exports.ApiResponse = ApiResponse;
     exports.AuthenticationResult = AuthenticationResult;
     exports.AuthorizationResult = AuthorizationResult;
     exports.LoginResult = LoginResult;
     exports.IndexInfo = IndexInfo;
     exports.DocumentInfo = DocumentInfo;
+    exports.AddDocumentData = AddDocumentData;
     exports.SearchResult = SearchResult;
-    exports.SearchResponse = SearchResponse;
+    exports.SearchData = SearchData;
+    exports.HealthData = HealthData;
+    exports.ValidationData = ValidationData;
     exports.TenantInfo = TenantInfo;
     exports.UserInfo = UserInfo;
     exports.CredentialInfo = CredentialInfo;

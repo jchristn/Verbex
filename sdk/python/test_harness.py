@@ -17,7 +17,7 @@ import uuid
 import time
 from datetime import datetime
 from typing import Callable, Optional, Any
-from verbex_sdk import VerbexClient, VerbexError, ApiResponse, LoginResult, AuthenticationResult, AuthorizationResult
+from verbex_sdk import VerbexClient, VerbexError, LoginResult, AuthenticationResult, AuthorizationResult
 
 
 class TestResult:
@@ -115,23 +115,19 @@ class TestHarness:
 
     def test_root_health_check(self):
         """Test root health check endpoint."""
-        response = self._client.root_health_check()
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.status_code, 200, "response.status_code")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_equals(response.data.get('status'), 'Healthy', "data.status")
-        self._assert_not_none(response.data.get('version'), "data.version")
-        self._assert_not_none(response.data.get('timestamp'), "data.timestamp")
+        health = self._client.root_health_check()
+        self._assert_not_none(health, "health")
+        self._assert_equals(health.status, 'Healthy', "health.status")
+        self._assert_not_none(health.version, "health.version")
+        self._assert_not_none(health.timestamp, "health.timestamp")
 
     def test_health_endpoint(self):
         """Test /v1.0/health endpoint."""
-        response = self._client.health_check()
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.status_code, 200, "response.status_code")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_equals(response.data.get('status'), 'Healthy', "data.status")
-        self._assert_not_none(response.data.get('version'), "data.version")
-        self._assert_not_none(response.data.get('timestamp'), "data.timestamp")
+        health = self._client.health_check()
+        self._assert_not_none(health, "health")
+        self._assert_equals(health.status, 'Healthy', "health.status")
+        self._assert_not_none(health.version, "health.version")
+        self._assert_not_none(health.timestamp, "health.timestamp")
 
     # ==================== Authentication Tests ====================
 
@@ -173,11 +169,9 @@ class TestHarness:
 
     def test_validate_token(self):
         """Test token validation."""
-        response = self._client.validate_token()
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.status_code, 200, "response.status_code")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_true(response.data.get('valid'), "data.valid")
+        validation = self._client.validate_token()
+        self._assert_not_none(validation, "validation")
+        self._assert_true(validation.valid, "validation.valid")
 
     def test_validate_invalid_token(self):
         """Test validation with invalid token."""
@@ -194,30 +188,21 @@ class TestHarness:
 
     def test_list_indices_initial(self):
         """Test listing indices."""
-        response = self._client.list_indices()
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.status_code, 200, "response.status_code")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_not_none(response.data.get('indices'), "data.indices")
-        self._assert_not_none(response.data.get('count'), "data.count")
+        indices = self._client.list_indices()
+        self._assert_not_none(indices, "indices")
 
     def test_create_index(self):
         """Test creating an index."""
-        response = self._client.create_index(
+        index = self._client.create_index(
             name="Test Index",
             description="A test index for SDK validation",
             in_memory=True
         )
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.status_code, 201, "response.status_code")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_not_none(response.data.get('message'), "data.message")
-        self._assert_not_none(response.data.get('index'), "data.index")
-        index_data = response.data.get('index')
-        self._assert_not_none(index_data.get('identifier'), "index.identifier")
-        self._assert_equals(index_data.get('name'), "Test Index", "index.name")
+        self._assert_not_none(index, "index")
+        self._assert_not_none(index.identifier, "index.identifier")
+        self._assert_equals(index.name, "Test Index", "index.name")
         # Store the returned index ID for subsequent tests
-        self._test_index_id = index_data.get('identifier')
+        self._test_index_id = index.identifier
 
     def test_create_duplicate_index(self):
         """Test creating an index with duplicate name fails."""
@@ -231,13 +216,11 @@ class TestHarness:
 
     def test_get_index(self):
         """Test getting index details."""
-        response = self._client.get_index(self._test_index_id)
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.status_code, 200, "response.status_code")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_equals(response.data.get('identifier'), self._test_index_id, "data.identifier")
-        self._assert_equals(response.data.get('name'), "Test Index", "data.name")
-        self._assert_not_none(response.data.get('createdUtc'), "data.createdUtc")
+        index = self._client.get_index(self._test_index_id)
+        self._assert_not_none(index, "index")
+        self._assert_equals(index.identifier, self._test_index_id, "index.identifier")
+        self._assert_equals(index.name, "Test Index", "index.name")
+        self._assert_not_none(index.created_utc, "index.created_utc")
 
     def test_get_index_not_found(self):
         """Test getting a non-existent index."""
@@ -249,7 +232,7 @@ class TestHarness:
 
     def test_list_indices_after_create(self):
         """Test listing indices includes new index."""
-        indices = self._client.get_indices()
+        indices = self._client.list_indices()
         found = any(idx.identifier == self._test_index_id for idx in indices)
         self._assert_true(found, "test index should be in list")
 
@@ -257,19 +240,16 @@ class TestHarness:
         """Test creating an index with labels and tags."""
         labels = ["test", "labeled"]
         tags = {"environment": "testing", "owner": "sdk-harness"}
-        response = self._client.create_index(
+        index = self._client.create_index(
             name="Labeled Test Index",
             description="An index with labels and tags",
             in_memory=True,
             labels=labels,
             tags=tags
         )
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.status_code, 201, "response.status_code")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_not_none(response.data.get('index'), "data.index")
+        self._assert_not_none(index, "index")
         # Clean up using the returned identifier
-        index_id = response.data.get('index', {}).get('identifier')
+        index_id = index.identifier
         if index_id:
             self._client.delete_index(index_id)
 
@@ -277,21 +257,20 @@ class TestHarness:
         """Test getting an index with labels and tags."""
         labels = ["retrieval", "test"]
         tags = {"purpose": "verification", "version": "1.0"}
-        create_response = self._client.create_index(
+        created_index = self._client.create_index(
             name="Get Labeled Index",
             in_memory=True,
             labels=labels,
             tags=tags
         )
-        index_id = create_response.data.get('index', {}).get('identifier')
+        index_id = created_index.identifier
         self._assert_not_none(index_id, "created index identifier")
-        response = self._client.get_index(index_id)
-        self._assert_true(response.success, "response.success")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_not_none(response.data.get('labels'), "data.labels")
-        self._assert_not_none(response.data.get('tags'), "data.tags")
-        self._assert_equals(len(response.data.get('labels')), 2, "labels count")
-        self._assert_equals(len(response.data.get('tags')), 2, "tags count")
+        index = self._client.get_index(index_id)
+        self._assert_not_none(index, "index")
+        self._assert_not_none(index.labels, "index.labels")
+        self._assert_not_none(index.tags, "index.tags")
+        self._assert_equals(len(index.labels), 2, "labels count")
+        self._assert_equals(len(index.tags), 2, "tags count")
         # Clean up
         self._client.delete_index(index_id)
 
@@ -325,37 +304,31 @@ class TestHarness:
 
     def test_list_documents_empty(self):
         """Test listing documents on empty index."""
-        response = self._client.list_documents(self._test_index_id)
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.status_code, 200, "response.status_code")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_not_none(response.data.get('documents'), "data.documents")
-        self._assert_equals(response.data.get('count'), 0, "data.count")
+        documents = self._client.list_documents(self._test_index_id)
+        self._assert_not_none(documents, "documents")
+        self._assert_equals(len(documents), 0, "documents count")
 
     def test_add_document(self):
         """Test adding a document."""
-        response = self._client.add_document(
+        result = self._client.add_document(
             self._test_index_id,
             "The quick brown fox jumps over the lazy dog."
         )
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.status_code, 201, "response.status_code")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_not_none(response.data.get('documentId'), "data.documentId")
-        self._assert_not_none(response.data.get('message'), "data.message")
-        self._test_documents.append(response.data.get('documentId'))
+        self._assert_not_none(result, "result")
+        self._assert_not_none(result.document_id, "result.document_id")
+        self._assert_not_none(result.message, "result.message")
+        self._test_documents.append(result.document_id)
 
     def test_add_document_with_id(self):
         """Test adding a document with explicit ID."""
         doc_id = str(uuid.uuid4())
-        response = self._client.add_document(
+        result = self._client.add_document(
             self._test_index_id,
             "Python is a versatile programming language used for web development, data science, and automation.",
             document_id=doc_id
         )
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.status_code, 201, "response.status_code")
-        self._assert_equals(response.data.get('documentId'), doc_id, "data.documentId")
+        self._assert_not_none(result, "result")
+        self._assert_equals(result.document_id, doc_id, "result.document_id")
         self._test_documents.append(doc_id)
 
     def test_add_multiple_documents(self):
@@ -367,28 +340,24 @@ class TestHarness:
             "Cloud computing provides scalable infrastructure for modern applications."
         ]
         for content in docs:
-            response = self._client.add_document(self._test_index_id, content)
-            self._assert_true(response.success, "response.success")
-            self._test_documents.append(response.data.get('documentId'))
+            result = self._client.add_document(self._test_index_id, content)
+            self._assert_not_none(result, "result")
+            self._test_documents.append(result.document_id)
 
     def test_list_documents_after_add(self):
         """Test listing documents after adding."""
-        response = self._client.list_documents(self._test_index_id)
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.data.get('count'), len(self._test_documents), "data.count")
-        docs = response.data.get('documents')
-        self._assert_equals(len(docs), len(self._test_documents), "documents length")
-        for doc in docs:
-            self._assert_not_none(doc.get('id'), "document.id")
+        documents = self._client.list_documents(self._test_index_id)
+        self._assert_not_none(documents, "documents")
+        self._assert_equals(len(documents), len(self._test_documents), "documents count")
+        for doc in documents:
+            self._assert_not_none(doc.id, "document.id")
 
     def test_get_document(self):
         """Test getting a specific document."""
         doc_id = self._test_documents[0]
-        response = self._client.get_document(self._test_index_id, doc_id)
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.status_code, 200, "response.status_code")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_equals(response.data.get('id'), doc_id, "data.id")
+        document = self._client.get_document(self._test_index_id, doc_id)
+        self._assert_not_none(document, "document")
+        self._assert_equals(document.id, doc_id, "document.id")
 
     def test_get_document_not_found(self):
         """Test getting a non-existent document."""
@@ -403,17 +372,15 @@ class TestHarness:
         """Test adding a document with labels and tags."""
         labels = ["important", "reviewed"]
         tags = {"author": "test-harness", "category": "technical"}
-        response = self._client.add_document(
+        result = self._client.add_document(
             self._test_index_id,
             "This document has labels and tags for testing metadata support.",
             labels=labels,
             tags=tags
         )
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.status_code, 201, "response.status_code")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_not_none(response.data.get('documentId'), "data.documentId")
-        self._test_documents.append(response.data.get('documentId'))
+        self._assert_not_none(result, "result")
+        self._assert_not_none(result.document_id, "result.document_id")
+        self._test_documents.append(result.document_id)
 
     def test_get_document_with_labels_and_tags(self):
         """Test getting a document with labels and tags."""
@@ -427,64 +394,53 @@ class TestHarness:
             labels=labels,
             tags=tags
         )
-        response = self._client.get_document(self._test_index_id, doc_id)
-        self._assert_true(response.success, "response.success")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_not_none(response.data.get('labels'), "data.labels")
-        self._assert_not_none(response.data.get('tags'), "data.tags")
-        self._assert_equals(len(response.data.get('labels')), 2, "labels count")
-        self._assert_equals(len(response.data.get('tags')), 2, "tags count")
+        document = self._client.get_document(self._test_index_id, doc_id)
+        self._assert_not_none(document, "document")
+        self._assert_not_none(document.labels, "document.labels")
+        self._assert_not_none(document.tags, "document.tags")
+        self._assert_equals(len(document.labels), 2, "labels count")
+        self._assert_equals(len(document.tags), 2, "tags count")
         self._test_documents.append(doc_id)
 
     # ==================== Search Tests ====================
 
     def test_search_basic(self):
         """Test basic search functionality."""
-        response = self._client.search(self._test_index_id, "fox")
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.status_code, 200, "response.status_code")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_equals(response.data.get('query'), 'fox', "data.query")
-        self._assert_not_none(response.data.get('results'), "data.results")
-        self._assert_not_none(response.data.get('totalCount'), "data.totalCount")
-        self._assert_not_none(response.data.get('maxResults'), "data.maxResults")
+        search_result = self._client.search(self._test_index_id, "fox")
+        self._assert_not_none(search_result, "search_result")
+        self._assert_equals(search_result.query, 'fox', "search_result.query")
+        self._assert_not_none(search_result.results, "search_result.results")
+        self._assert_not_none(search_result.total_count, "search_result.total_count")
+        self._assert_not_none(search_result.max_results, "search_result.max_results")
 
     def test_search_with_results(self):
         """Test search returns expected results."""
-        response = self._client.search(self._test_index_id, "learning")
-        self._assert_true(response.success, "response.success")
-        results = response.data.get('results', [])
+        search_result = self._client.search(self._test_index_id, "learning")
+        self._assert_not_none(search_result, "search_result")
+        results = search_result.results or []
         self._assert_greater_than(len(results), 0, "results count")
         for result in results:
-            self._assert_not_none(result.get('documentId'), "result.documentId")
-            self._assert_not_none(result.get('score'), "result.score")
+            self._assert_not_none(result.document_id, "result.document_id")
+            self._assert_not_none(result.score, "result.score")
 
     def test_search_multiple_terms(self):
         """Test search with multiple terms."""
-        response = self._client.search(self._test_index_id, "machine learning")
-        self._assert_true(response.success, "response.success")
-        self._assert_not_none(response.data.get('results'), "data.results")
+        search_result = self._client.search(self._test_index_id, "machine learning")
+        self._assert_not_none(search_result, "search_result")
+        self._assert_not_none(search_result.results, "search_result.results")
 
     def test_search_max_results(self):
         """Test search with max results limit."""
-        response = self._client.search(self._test_index_id, "the", max_results=2)
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.data.get('maxResults'), 2, "data.maxResults")
+        search_result = self._client.search(self._test_index_id, "the", max_results=2)
+        self._assert_not_none(search_result, "search_result")
+        self._assert_equals(search_result.max_results, 2, "search_result.max_results")
 
     def test_search_no_results(self):
         """Test search with no matching results."""
-        response = self._client.search(self._test_index_id, "xyznonexistent12345")
-        self._assert_true(response.success, "response.success")
-        results = response.data.get('results', [])
+        search_result = self._client.search(self._test_index_id, "xyznonexistent12345")
+        self._assert_not_none(search_result, "search_result")
+        results = search_result.results or []
         self._assert_equals(len(results), 0, "results should be empty")
-
-    def test_search_documents_helper(self):
-        """Test search using helper method."""
-        search_response = self._client.search_documents(self._test_index_id, "programming")
-        self._assert_not_none(search_response, "search_response")
-        self._assert_equals(search_response.query, "programming", "query")
-        self._assert_not_none(search_response.results, "results")
-        self._assert_not_none(search_response.total_count, "total_count")
 
     def test_search_with_label_filter(self):
         """Test search with label filter."""
@@ -501,26 +457,26 @@ class TestHarness:
         self._test_documents.append(doc_id)
 
         # Search with matching label filter
-        response = self._client.search(
+        search_result = self._client.search(
             self._test_index_id,
             "searchable",
             100,
             labels=["searchtest"],
             tags=None
         )
-        self._assert_true(response.success, "response.success")
-        self._assert_greater_than(len(response.data.get('results', [])), 0, "should find documents with matching label")
+        self._assert_not_none(search_result, "search_result")
+        self._assert_greater_than(len(search_result.results), 0, "should find documents with matching label")
 
         # Search with non-matching label filter
-        no_match_response = self._client.search(
+        no_match_result = self._client.search(
             self._test_index_id,
             "searchable",
             100,
             labels=["nonexistentlabel99"],
             tags=None
         )
-        self._assert_true(no_match_response.success, "no_match_response.success")
-        self._assert_equals(len(no_match_response.data.get('results', [])), 0, "should find no documents with non-matching label")
+        self._assert_not_none(no_match_result, "no_match_result")
+        self._assert_equals(len(no_match_result.results), 0, "should find no documents with non-matching label")
 
     def test_search_with_tag_filter(self):
         """Test search with tag filter."""
@@ -540,26 +496,26 @@ class TestHarness:
         self._test_documents.append(doc_id)
 
         # Search with matching tag filter
-        response = self._client.search(
+        search_result = self._client.search(
             self._test_index_id,
             "taggable",
             100,
             labels=None,
             tags={"searchcategory": "testfilter"}
         )
-        self._assert_true(response.success, "response.success")
-        self._assert_greater_than(len(response.data.get('results', [])), 0, "should find documents with matching tag")
+        self._assert_not_none(search_result, "search_result")
+        self._assert_greater_than(len(search_result.results), 0, "should find documents with matching tag")
 
         # Search with non-matching tag filter
-        no_match_response = self._client.search(
+        no_match_result = self._client.search(
             self._test_index_id,
             "taggable",
             100,
             labels=None,
             tags={"searchcategory": "wrongvalue"}
         )
-        self._assert_true(no_match_response.success, "no_match_response.success")
-        self._assert_equals(len(no_match_response.data.get('results', [])), 0, "should find no documents with non-matching tag")
+        self._assert_not_none(no_match_result, "no_match_result")
+        self._assert_equals(len(no_match_result.results), 0, "should find no documents with non-matching tag")
 
     def test_search_with_labels_and_tags(self):
         """Test search with both label and tag filters."""
@@ -577,15 +533,15 @@ class TestHarness:
         self._test_documents.append(doc_id)
 
         # Search with both label and tag filters
-        response = self._client.search(
+        search_result = self._client.search(
             self._test_index_id,
             "comprehensive",
             100,
             labels=["combined"],
             tags={"combinedcategory": "both"}
         )
-        self._assert_true(response.success, "response.success")
-        self._assert_greater_than(len(response.data.get('results', [])), 0, "should find documents matching both label and tag")
+        self._assert_not_none(search_result, "search_result")
+        self._assert_greater_than(len(search_result.results), 0, "should find documents matching both label and tag")
 
     # ==================== Document Deletion Tests ====================
 
@@ -594,12 +550,8 @@ class TestHarness:
         if len(self._test_documents) == 0:
             raise AssertionError("No test documents to delete")
         doc_id = self._test_documents.pop()
-        response = self._client.delete_document(self._test_index_id, doc_id)
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.status_code, 200, "response.status_code")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_equals(response.data.get('documentId'), doc_id, "data.documentId")
-        self._assert_not_none(response.data.get('message'), "data.message")
+        self._client.delete_document(self._test_index_id, doc_id)
+        # If we get here without exception, the delete succeeded
 
     def test_delete_document_not_found(self):
         """Test deleting a non-existent document."""
@@ -626,12 +578,8 @@ class TestHarness:
 
     def test_delete_index(self):
         """Test deleting an index."""
-        response = self._client.delete_index(self._test_index_id)
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.status_code, 200, "response.status_code")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_equals(response.data.get('indexId'), self._test_index_id, "data.indexId")
-        self._assert_not_none(response.data.get('message'), "data.message")
+        self._client.delete_index(self._test_index_id)
+        # If we get here without exception, the delete succeeded
 
     def test_delete_index_not_found(self):
         """Test deleting a non-existent index."""
@@ -708,7 +656,6 @@ class TestHarness:
             self._run_test("Search multiple terms", self.test_search_multiple_terms)
             self._run_test("Search with max results", self.test_search_max_results)
             self._run_test("Search with no results", self.test_search_no_results)
-            self._run_test("Search documents helper", self.test_search_documents_helper)
             self._run_test("Search with label filter", self.test_search_with_label_filter)
             self._run_test("Search with tag filter", self.test_search_with_tag_filter)
             self._run_test("Search with labels and tags", self.test_search_with_labels_and_tags)

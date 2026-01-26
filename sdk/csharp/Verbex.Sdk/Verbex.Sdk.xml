@@ -1176,6 +1176,7 @@
             <remarks>
             This client is thread-safe and can be reused for multiple requests.
             Implements IDisposable to properly clean up HTTP resources.
+            All methods return domain objects directly rather than wrapped responses.
             </remarks>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.#ctor(System.String,System.String)">
@@ -1202,7 +1203,7 @@
             Checks server health via the root endpoint.
             </summary>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Health check response.</returns>
+            <returns>Health check data including status and version.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.HealthCheckAsync(System.Threading.CancellationToken)">
@@ -1210,7 +1211,7 @@
             Checks server health via the /v1.0/health endpoint.
             </summary>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Health check response.</returns>
+            <returns>Health check data including status and version.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.LoginAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
@@ -1231,22 +1232,12 @@
             <param name="cancellationToken">Cancellation token.</param>
             <returns>Login result indicating success or failure with context.</returns>
         </member>
-        <member name="M:Verbex.Sdk.VerbexClient.LoginLegacyAsync(System.String,System.String,System.Threading.CancellationToken)">
-            <summary>
-            Authenticates and receives a bearer token.
-            </summary>
-            <param name="username">The username.</param>
-            <param name="password">The password.</param>
-            <param name="cancellationToken">Cancellation token.</param>
-            <returns>Login response with token.</returns>
-            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when authentication fails.</exception>
-        </member>
         <member name="M:Verbex.Sdk.VerbexClient.ValidateTokenAsync(System.Threading.CancellationToken)">
             <summary>
             Validates the current bearer token.
             </summary>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Validation response.</returns>
+            <returns>Validation data including whether the token is valid and user details.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when validation fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.ListIndicesAsync(System.Threading.CancellationToken)">
@@ -1254,15 +1245,7 @@
             Lists all available indices.
             </summary>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>List of indices.</returns>
-            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
-        </member>
-        <member name="M:Verbex.Sdk.VerbexClient.GetIndicesAsync(System.Threading.CancellationToken)">
-            <summary>
-            Gets all indices as a list.
-            </summary>
-            <param name="cancellationToken">Cancellation token.</param>
-            <returns>List of IndexInfo objects.</returns>
+            <returns>List of index information objects.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.CreateIndexAsync(System.String,System.String,System.Boolean,System.Boolean,System.Boolean,System.Int32,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.String,System.Threading.CancellationToken)">
@@ -1280,7 +1263,7 @@
             <param name="tags">Optional key-value tags to associate with the index.</param>
             <param name="tenantId">Tenant ID (required for global admin users, optional for tenant users).</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Created index response.</returns>
+            <returns>The created index information.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when creation fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.GetIndexAsync(System.String,System.Threading.CancellationToken)">
@@ -1289,16 +1272,7 @@
             </summary>
             <param name="indexId">The index identifier.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Index details response.</returns>
-            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the index is not found.</exception>
-        </member>
-        <member name="M:Verbex.Sdk.VerbexClient.GetIndexInfoAsync(System.String,System.Threading.CancellationToken)">
-            <summary>
-            Gets index information.
-            </summary>
-            <param name="indexId">The index identifier.</param>
-            <param name="cancellationToken">Cancellation token.</param>
-            <returns>IndexInfo object.</returns>
+            <returns>Index information including statistics.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the index is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.IndexExistsAsync(System.String,System.Threading.CancellationToken)">
@@ -1315,7 +1289,6 @@
             </summary>
             <param name="indexId">The index identifier.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Deletion confirmation.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the index is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.UpdateIndexLabelsAsync(System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
@@ -1325,7 +1298,6 @@
             <param name="indexId">The index identifier.</param>
             <param name="labels">The new labels to set.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Update confirmation with updated index info.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the index is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.UpdateIndexTagsAsync(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
@@ -1335,7 +1307,6 @@
             <param name="indexId">The index identifier.</param>
             <param name="tags">The new tags to set.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Update confirmation with updated index info.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the index is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.ListDocumentsAsync(System.String,System.Threading.CancellationToken)">
@@ -1344,16 +1315,7 @@
             </summary>
             <param name="indexId">The index identifier.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>List of documents.</returns>
-            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
-        </member>
-        <member name="M:Verbex.Sdk.VerbexClient.GetDocumentsAsync(System.String,System.Threading.CancellationToken)">
-            <summary>
-            Gets all documents in an index.
-            </summary>
-            <param name="indexId">The index identifier.</param>
-            <param name="cancellationToken">Cancellation token.</param>
-            <returns>List of DocumentInfo objects.</returns>
+            <returns>List of document information objects.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.AddDocumentAsync(System.String,System.String,System.String,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
@@ -1366,7 +1328,7 @@
             <param name="labels">Optional list of labels to associate with the document.</param>
             <param name="tags">Optional key-value tags to associate with the document.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Document creation response.</returns>
+            <returns>The created document data including the document ID.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.GetDocumentAsync(System.String,System.String,System.Threading.CancellationToken)">
@@ -1376,17 +1338,7 @@
             <param name="indexId">The index identifier.</param>
             <param name="documentId">The document identifier.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Document details.</returns>
-            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the document is not found.</exception>
-        </member>
-        <member name="M:Verbex.Sdk.VerbexClient.GetDocumentInfoAsync(System.String,System.String,System.Threading.CancellationToken)">
-            <summary>
-            Gets document information.
-            </summary>
-            <param name="indexId">The index identifier.</param>
-            <param name="documentId">The document identifier.</param>
-            <param name="cancellationToken">Cancellation token.</param>
-            <returns>DocumentInfo object.</returns>
+            <returns>Document information.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the document is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.DocumentExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
@@ -1405,7 +1357,6 @@
             <param name="indexId">The index identifier.</param>
             <param name="documentId">The document identifier.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Deletion confirmation.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the document is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.UpdateDocumentLabelsAsync(System.String,System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
@@ -1416,7 +1367,6 @@
             <param name="documentId">The document identifier.</param>
             <param name="labels">The new labels to set.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Update confirmation with updated document.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the document is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.UpdateDocumentTagsAsync(System.String,System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
@@ -1427,7 +1377,6 @@
             <param name="documentId">The document identifier.</param>
             <param name="tags">The new tags to set.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Update confirmation with updated document.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the document is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.SearchAsync(System.String,System.String,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.Object},System.Threading.CancellationToken)">
@@ -1440,20 +1389,7 @@
             <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
             <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Search results.</returns>
-            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
-        </member>
-        <member name="M:Verbex.Sdk.VerbexClient.SearchDocumentsAsync(System.String,System.String,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.Object},System.Threading.CancellationToken)">
-            <summary>
-            Searches documents and returns search data.
-            </summary>
-            <param name="indexId">The index identifier.</param>
-            <param name="query">The search query.</param>
-            <param name="maxResults">Maximum number of results to return.</param>
-            <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
-            <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
-            <param name="cancellationToken">Cancellation token.</param>
-            <returns>SearchData object.</returns>
+            <returns>Search data including results and metadata.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.ListTenantsAsync(System.Threading.CancellationToken)">
@@ -1461,15 +1397,7 @@
             Lists all tenants.
             </summary>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>List of tenants.</returns>
-            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
-        </member>
-        <member name="M:Verbex.Sdk.VerbexClient.GetTenantsAsync(System.Threading.CancellationToken)">
-            <summary>
-            Gets all tenants as a list.
-            </summary>
-            <param name="cancellationToken">Cancellation token.</param>
-            <returns>List of TenantInfo objects.</returns>
+            <returns>List of tenant information objects.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.GetTenantAsync(System.String,System.Threading.CancellationToken)">
@@ -1478,7 +1406,7 @@
             </summary>
             <param name="tenantId">The tenant identifier.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Tenant details.</returns>
+            <returns>Tenant information.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the tenant is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.CreateTenantAsync(System.String,System.String,System.Threading.CancellationToken)">
@@ -1488,7 +1416,7 @@
             <param name="name">Tenant name.</param>
             <param name="description">Optional description.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Created tenant response.</returns>
+            <returns>The created tenant information.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when creation fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.DeleteTenantAsync(System.String,System.Threading.CancellationToken)">
@@ -1497,7 +1425,6 @@
             </summary>
             <param name="tenantId">The tenant identifier.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Deletion confirmation.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the tenant is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.ListUsersAsync(System.String,System.Threading.CancellationToken)">
@@ -1506,16 +1433,7 @@
             </summary>
             <param name="tenantId">The tenant identifier.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>List of users.</returns>
-            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
-        </member>
-        <member name="M:Verbex.Sdk.VerbexClient.GetUsersAsync(System.String,System.Threading.CancellationToken)">
-            <summary>
-            Gets all users in a tenant as a list.
-            </summary>
-            <param name="tenantId">The tenant identifier.</param>
-            <param name="cancellationToken">Cancellation token.</param>
-            <returns>List of UserInfo objects.</returns>
+            <returns>List of user information objects.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.GetUserAsync(System.String,System.String,System.Threading.CancellationToken)">
@@ -1525,7 +1443,7 @@
             <param name="tenantId">The tenant identifier.</param>
             <param name="userId">The user identifier.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>User details.</returns>
+            <returns>User information.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the user is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.CreateUserAsync(System.String,System.String,System.String,System.String,System.String,System.Boolean,System.Threading.CancellationToken)">
@@ -1539,7 +1457,7 @@
             <param name="lastName">Optional last name.</param>
             <param name="isAdmin">Whether user is tenant admin.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Created user response.</returns>
+            <returns>The created user information.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when creation fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.DeleteUserAsync(System.String,System.String,System.Threading.CancellationToken)">
@@ -1549,7 +1467,6 @@
             <param name="tenantId">The tenant identifier.</param>
             <param name="userId">The user identifier.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Deletion confirmation.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the user is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.ListCredentialsAsync(System.String,System.Threading.CancellationToken)">
@@ -1558,16 +1475,7 @@
             </summary>
             <param name="tenantId">The tenant identifier.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>List of credentials.</returns>
-            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
-        </member>
-        <member name="M:Verbex.Sdk.VerbexClient.GetCredentialsAsync(System.String,System.Threading.CancellationToken)">
-            <summary>
-            Gets all credentials in a tenant as a list.
-            </summary>
-            <param name="tenantId">The tenant identifier.</param>
-            <param name="cancellationToken">Cancellation token.</param>
-            <returns>List of CredentialInfo objects.</returns>
+            <returns>List of credential information objects.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.GetCredentialAsync(System.String,System.String,System.Threading.CancellationToken)">
@@ -1577,7 +1485,7 @@
             <param name="tenantId">The tenant identifier.</param>
             <param name="credentialId">The credential identifier.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Credential details.</returns>
+            <returns>Credential information.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the credential is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.CreateCredentialAsync(System.String,System.String,System.Threading.CancellationToken)">
@@ -1587,7 +1495,7 @@
             <param name="tenantId">The tenant identifier.</param>
             <param name="description">Optional description.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Created credential response (includes bearer token).</returns>
+            <returns>The created credential information (includes bearer token).</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when creation fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.DeleteCredentialAsync(System.String,System.String,System.Threading.CancellationToken)">
@@ -1597,7 +1505,6 @@
             <param name="tenantId">The tenant identifier.</param>
             <param name="credentialId">The credential identifier.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Deletion confirmation.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the credential is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.UpdateTenantLabelsAsync(System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
@@ -1607,7 +1514,6 @@
             <param name="tenantId">The tenant identifier.</param>
             <param name="labels">The new labels to set.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Update confirmation.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the tenant is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.UpdateTenantTagsAsync(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
@@ -1617,7 +1523,6 @@
             <param name="tenantId">The tenant identifier.</param>
             <param name="tags">The new tags to set.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Update confirmation.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the tenant is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.UpdateUserLabelsAsync(System.String,System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
@@ -1628,7 +1533,6 @@
             <param name="userId">The user identifier.</param>
             <param name="labels">The new labels to set.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Update confirmation.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the user is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.UpdateUserTagsAsync(System.String,System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
@@ -1639,7 +1543,6 @@
             <param name="userId">The user identifier.</param>
             <param name="tags">The new tags to set.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Update confirmation.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the user is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.UpdateCredentialLabelsAsync(System.String,System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
@@ -1650,7 +1553,6 @@
             <param name="credentialId">The credential identifier.</param>
             <param name="labels">The new labels to set.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Update confirmation.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the credential is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.UpdateCredentialTagsAsync(System.String,System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
@@ -1661,7 +1563,6 @@
             <param name="credentialId">The credential identifier.</param>
             <param name="tags">The new tags to set.</param>
             <param name="cancellationToken">Cancellation token.</param>
-            <returns>Update confirmation.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the credential is not found.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.UpdateIndexCustomMetadataAsync(System.String,System.Object,System.Threading.CancellationToken)">

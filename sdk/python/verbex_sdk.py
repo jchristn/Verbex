@@ -1,14 +1,14 @@
 """
 Verbex Python SDK
+
 A comprehensive SDK for interacting with the Verbex Inverted Index REST API.
+All methods return domain objects directly rather than wrapped responses.
 """
 
 import requests
 import json
-import warnings
 from typing import Optional, List, Dict, Any
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, field
 from enum import Enum
 
 
@@ -34,19 +34,28 @@ class AuthorizationResult(Enum):
     ACCESS_DENIED = "AccessDenied"
 
 
+class VerbexError(Exception):
+    """Exception raised for Verbex API errors."""
+    def __init__(self, message: str, status_code: int = 0, response: Optional[Dict[str, Any]] = None):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+        self.response = response
+
+
 @dataclass
 class LoginResult:
     """Result of a login attempt."""
-    success: bool
-    authentication_result: AuthenticationResult
-    authorization_result: AuthorizationResult
-    error_message: Optional[str]
-    token: Optional[str]
-    tenant_id: Optional[str]
-    user_id: Optional[str]
-    email: Optional[str]
-    is_admin: bool
-    is_global_admin: bool
+    success: bool = False
+    authentication_result: AuthenticationResult = AuthenticationResult.NOT_AUTHENTICATED
+    authorization_result: AuthorizationResult = AuthorizationResult.UNAUTHORIZED
+    error_message: Optional[str] = None
+    token: Optional[str] = None
+    tenant_id: Optional[str] = None
+    user_id: Optional[str] = None
+    email: Optional[str] = None
+    is_admin: bool = False
+    is_global_admin: bool = False
 
     @staticmethod
     def successful(
@@ -62,7 +71,6 @@ class LoginResult:
             success=True,
             authentication_result=AuthenticationResult.SUCCESS,
             authorization_result=AuthorizationResult.AUTHORIZED,
-            error_message=None,
             token=token,
             tenant_id=tenant_id,
             user_id=user_id,
@@ -82,259 +90,166 @@ class LoginResult:
             success=False,
             authentication_result=authentication_result,
             authorization_result=authorization_result,
-            error_message=error_message,
-            token=None,
-            tenant_id=None,
-            user_id=None,
-            email=None,
-            is_admin=False,
-            is_global_admin=False
+            error_message=error_message
         )
 
 
-def _to_camel_case_keys(obj: Any) -> Any:
-    """
-    Convert PascalCase keys to camelCase recursively.
-    Also adds convenience aliases for common fields.
-    """
+def _to_snake_case(name: str) -> str:
+    """Convert PascalCase or camelCase to snake_case."""
+    result = []
+    for i, char in enumerate(name):
+        if char.isupper() and i > 0:
+            result.append('_')
+        result.append(char.lower())
+    return ''.join(result)
+
+
+def _convert_keys_to_snake_case(obj: Any) -> Any:
+    """Recursively convert dictionary keys from PascalCase/camelCase to snake_case."""
     if obj is None:
         return None
     if isinstance(obj, list):
-        return [_to_camel_case_keys(item) for item in obj]
-    if not isinstance(obj, dict):
-        return obj
-
-    result = {}
-    for key, value in obj.items():
-        # Convert first character to lowercase
-        camel_key = key[0].lower() + key[1:] if key else key
-        result[camel_key] = _to_camel_case_keys(value)
-
-    # Add convenience aliases
-    if 'documentId' in result and 'id' not in result:
-        result['id'] = str(result['documentId'])
-
-    return result
+        return [_convert_keys_to_snake_case(item) for item in obj]
+    if isinstance(obj, dict):
+        return {_to_snake_case(k): _convert_keys_to_snake_case(v) for k, v in obj.items()}
+    return obj
 
 
 @dataclass
-class ApiResponse:
-    """Standard API response wrapper."""
-    guid: Optional[str]
-    success: bool
-    timestamp_utc: Optional[str]
-    status_code: int
-    error_message: Optional[str]
-    data: Optional[Any]
-    total_count: Optional[int]
-    processing_time_ms: Optional[float]
-    raw_response: Dict[str, Any]
+class HealthData:
+    """Health check response data."""
+    status: Optional[str] = None
+    version: Optional[str] = None
+    timestamp: Optional[str] = None
 
-    @staticmethod
-    def from_dict(d: Dict[str, Any]) -> 'ApiResponse':
-        """Create ApiResponse from dictionary."""
-        # Server returns PascalCase - support both
-        raw_data = d.get('Data') or d.get('data')
-        converted_data = _to_camel_case_keys(raw_data) if raw_data else None
-        return ApiResponse(
-            guid=d.get('Guid') or d.get('guid'),
-            success=d.get('Success') or d.get('success', False),
-            timestamp_utc=d.get('TimestampUtc') or d.get('timestampUtc'),
-            status_code=d.get('StatusCode') or d.get('statusCode', 0),
-            error_message=d.get('ErrorMessage') or d.get('errorMessage'),
-            data=converted_data,
-            total_count=d.get('TotalCount') or d.get('totalCount'),
-            processing_time_ms=d.get('ProcessingTimeMs') or d.get('processingTimeMs'),
-            raw_response=d
-        )
+
+@dataclass
+class ValidationData:
+    """Token validation response data."""
+    valid: bool = False
+    tenant_id: Optional[str] = None
+    user_id: Optional[str] = None
+    email: Optional[str] = None
+    is_admin: bool = False
+    is_global_admin: bool = False
+
+
+@dataclass
+class IndexStatistics:
+    """Index statistics."""
+    document_count: int = 0
+    term_count: int = 0
+    total_term_frequency: int = 0
 
 
 @dataclass
 class IndexInfo:
     """Index information model."""
-    identifier: str
-    tenant_id: Optional[str]
-    name: Optional[str]
-    description: Optional[str]
-    enabled: Optional[bool]
-    in_memory: Optional[bool]
-    created_utc: Optional[str]
-    statistics: Optional[Dict[str, Any]]
-    labels: Optional[List[str]]
-    tags: Optional[Dict[str, str]]
+    identifier: str = ""
+    tenant_id: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    enabled: Optional[bool] = None
+    in_memory: Optional[bool] = None
+    created_utc: Optional[str] = None
+    statistics: Optional[IndexStatistics] = None
     custom_metadata: Optional[Any] = None
+    labels: Optional[List[str]] = None
+    tags: Optional[Dict[str, str]] = None
 
     @property
     def id(self) -> str:
-        """Alias for identifier for convenience."""
+        """Alias for identifier."""
         return self.identifier
-
-    @staticmethod
-    def from_dict(d: Dict[str, Any]) -> 'IndexInfo':
-        """Create IndexInfo from dictionary."""
-        return IndexInfo(
-            identifier=d.get('identifier', ''),
-            tenant_id=d.get('tenantId'),
-            name=d.get('name'),
-            description=d.get('description'),
-            enabled=d.get('enabled'),
-            in_memory=d.get('inMemory'),
-            created_utc=d.get('createdUtc'),
-            statistics=d.get('statistics'),
-            labels=d.get('labels'),
-            tags=d.get('tags'),
-            custom_metadata=d.get('customMetadata')
-        )
 
 
 @dataclass
 class DocumentInfo:
     """Document information model."""
-    id: str
-    name: Optional[str]
-    created_utc: Optional[str]
-    labels: Optional[List[str]]
-    tags: Optional[Dict[str, str]]
+    document_id: str = ""
+    document_path: Optional[str] = None
+    original_file_name: Optional[str] = None
+    document_length: int = 0
+    indexed_date: Optional[str] = None
+    last_modified: Optional[str] = None
+    content_sha256: Optional[str] = None
+    terms: Optional[List[str]] = None
+    is_deleted: bool = False
     custom_metadata: Optional[Any] = None
+    labels: Optional[List[str]] = None
+    tags: Optional[Dict[str, Any]] = None
 
-    @staticmethod
-    def from_dict(d: Dict[str, Any]) -> 'DocumentInfo':
-        """Create DocumentInfo from dictionary."""
-        return DocumentInfo(
-            id=d.get('id', ''),
-            name=d.get('name'),
-            created_utc=d.get('createdUtc'),
-            labels=d.get('labels'),
-            tags=d.get('tags'),
-            custom_metadata=d.get('customMetadata')
-        )
+    @property
+    def id(self) -> str:
+        """Alias for document_id."""
+        return self.document_id
+
+
+@dataclass
+class AddDocumentData:
+    """Add document response data."""
+    document_id: str = ""
+    message: Optional[str] = None
 
 
 @dataclass
 class SearchResult:
     """Search result model."""
-    document_id: str
-    score: float
-    content: Optional[str]
-
-    @staticmethod
-    def from_dict(d: Dict[str, Any]) -> 'SearchResult':
-        """Create SearchResult from dictionary."""
-        return SearchResult(
-            document_id=d.get('documentId', ''),
-            score=d.get('score', 0.0),
-            content=d.get('content')
-        )
+    document_id: str = ""
+    score: float = 0.0
+    content: Optional[str] = None
+    total_term_matches: int = 0
+    term_scores: Optional[Dict[str, float]] = None
+    term_frequencies: Optional[Dict[str, int]] = None
 
 
 @dataclass
-class SearchResponse:
+class SearchData:
     """Search response model."""
-    query: str
-    results: List[SearchResult]
-    total_count: int
-    max_results: int
-
-    @staticmethod
-    def from_dict(d: Dict[str, Any]) -> 'SearchResponse':
-        """Create SearchResponse from dictionary."""
-        results = [SearchResult.from_dict(r) for r in d.get('results', [])]
-        return SearchResponse(
-            query=d.get('query', ''),
-            results=results,
-            total_count=d.get('totalCount', 0),
-            max_results=d.get('maxResults', 100)
-        )
+    query: str = ""
+    results: List[SearchResult] = field(default_factory=list)
+    total_count: int = 0
+    max_results: int = 100
+    search_time: float = 0.0
 
 
 @dataclass
 class TenantInfo:
     """Tenant information model."""
-    identifier: str
-    name: Optional[str]
-    active: bool
-    created_utc: Optional[str]
-    labels: Optional[List[str]]
-    tags: Optional[Dict[str, str]]
-
-    @staticmethod
-    def from_dict(d: Dict[str, Any]) -> 'TenantInfo':
-        """Create TenantInfo from dictionary."""
-        return TenantInfo(
-            identifier=d.get('identifier', ''),
-            name=d.get('name'),
-            active=d.get('active', False),
-            created_utc=d.get('createdUtc'),
-            labels=d.get('labels'),
-            tags=d.get('tags')
-        )
+    identifier: str = ""
+    name: Optional[str] = None
+    active: bool = False
+    created_utc: Optional[str] = None
+    labels: Optional[List[str]] = None
+    tags: Optional[Dict[str, str]] = None
 
 
 @dataclass
 class UserInfo:
     """User information model."""
-    identifier: str
-    tenant_id: str
-    email: str
-    first_name: Optional[str]
-    last_name: Optional[str]
-    is_admin: bool
-    active: bool
-    created_utc: Optional[str]
-    labels: Optional[List[str]]
-    tags: Optional[Dict[str, str]]
-
-    @staticmethod
-    def from_dict(d: Dict[str, Any]) -> 'UserInfo':
-        """Create UserInfo from dictionary."""
-        return UserInfo(
-            identifier=d.get('identifier', ''),
-            tenant_id=d.get('tenantId', ''),
-            email=d.get('email', ''),
-            first_name=d.get('firstName'),
-            last_name=d.get('lastName'),
-            is_admin=d.get('isAdmin', False),
-            active=d.get('active', False),
-            created_utc=d.get('createdUtc'),
-            labels=d.get('labels'),
-            tags=d.get('tags')
-        )
+    identifier: str = ""
+    tenant_id: str = ""
+    email: str = ""
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    is_admin: bool = False
+    active: bool = False
+    created_utc: Optional[str] = None
+    labels: Optional[List[str]] = None
+    tags: Optional[Dict[str, str]] = None
 
 
 @dataclass
 class CredentialInfo:
     """Credential information model."""
-    identifier: str
-    tenant_id: str
-    name: Optional[str]
-    bearer_token: Optional[str]
-    active: bool
-    created_utc: Optional[str]
-    labels: Optional[List[str]]
-    tags: Optional[Dict[str, str]]
-
-    @staticmethod
-    def from_dict(d: Dict[str, Any]) -> 'CredentialInfo':
-        """Create CredentialInfo from dictionary."""
-        return CredentialInfo(
-            identifier=d.get('identifier', ''),
-            tenant_id=d.get('tenantId', ''),
-            name=d.get('name'),
-            bearer_token=d.get('bearerToken'),
-            active=d.get('active', False),
-            created_utc=d.get('createdUtc'),
-            labels=d.get('labels'),
-            tags=d.get('tags')
-        )
-
-
-class VerbexError(Exception):
-    """Exception raised for Verbex API errors."""
-    def __init__(self, message: str, status_code: int = 0, response: Optional[ApiResponse] = None):
-        super().__init__(message)
-        self.message = message
-        self.status_code = status_code
-        self.response = response
+    identifier: str = ""
+    tenant_id: str = ""
+    name: Optional[str] = None
+    bearer_token: Optional[str] = None
+    active: bool = False
+    created_utc: Optional[str] = None
+    labels: Optional[List[str]] = None
+    tags: Optional[Dict[str, str]] = None
 
 
 class VerbexClient:
@@ -342,6 +257,7 @@ class VerbexClient:
     Verbex SDK Client for Python.
 
     Provides methods to interact with all Verbex REST API endpoints.
+    All methods return domain objects directly rather than wrapped responses.
     """
 
     def __init__(self, endpoint: str, access_key: str):
@@ -370,18 +286,18 @@ class VerbexClient:
         path: str,
         data: Optional[Dict[str, Any]] = None,
         require_auth: bool = True
-    ) -> ApiResponse:
+    ) -> Any:
         """
-        Make an HTTP request to the API.
+        Make an HTTP request to the API and return the data directly.
 
         Args:
-            method: HTTP method (GET, POST, DELETE)
+            method: HTTP method (GET, POST, PUT, DELETE)
             path: API path (will be appended to endpoint)
-            data: Request body data (for POST requests)
+            data: Request body data (for POST/PUT requests)
             require_auth: Whether to include authentication headers
 
         Returns:
-            ApiResponse object with the response data
+            Response data (unwrapped from ApiResponse), converted to snake_case keys
 
         Raises:
             VerbexError: If the request fails or returns an error
@@ -407,44 +323,79 @@ class VerbexClient:
                 response_data = response.json()
             except json.JSONDecodeError:
                 response_data = {
-                    'success': response.ok,
-                    'statusCode': response.status_code,
-                    'data': response.text if response.text else None
+                    'Success': response.ok,
+                    'StatusCode': response.status_code,
+                    'Data': None
                 }
 
-            api_response = ApiResponse.from_dict(response_data)
+            # Handle both PascalCase and camelCase from server
+            success = response_data.get('Success') or response_data.get('success', False)
+            status_code = response_data.get('StatusCode') or response_data.get('statusCode', response.status_code)
+            error_message = response_data.get('ErrorMessage') or response_data.get('errorMessage')
+            raw_data = response_data.get('Data') or response_data.get('data')
 
-            if not api_response.success and api_response.status_code >= 400:
+            if not success and status_code >= 400:
                 raise VerbexError(
-                    api_response.error_message or f"Request failed with status {api_response.status_code}",
-                    api_response.status_code,
-                    api_response
+                    error_message or f"Request failed with status {status_code}",
+                    status_code,
+                    response_data
                 )
 
-            return api_response
+            # Return the data directly, converting keys to snake_case
+            return _convert_keys_to_snake_case(raw_data)
 
+        except requests.RequestException as e:
+            raise VerbexError(f"Request failed: {str(e)}")
+
+    def _make_head_request(self, path: str, require_auth: bool = True) -> bool:
+        """
+        Make an HTTP HEAD request to check existence.
+
+        Args:
+            path: API path
+            require_auth: Whether to include auth headers
+
+        Returns:
+            True if resource exists, False otherwise
+        """
+        url = f"{self._endpoint}{path}"
+        headers = self._get_auth_headers() if require_auth else {}
+
+        try:
+            response = self._session.head(url, headers=headers)
+            return response.ok
         except requests.RequestException as e:
             raise VerbexError(f"Request failed: {str(e)}")
 
     # ==================== Health Endpoints ====================
 
-    def health_check(self) -> ApiResponse:
+    def health_check(self) -> HealthData:
         """
         Check server health.
 
         Returns:
-            ApiResponse containing health status, version, and timestamp
+            HealthData with status information
         """
-        return self._make_request('GET', '/v1.0/health', require_auth=False)
+        data = self._make_request('GET', '/v1.0/health', require_auth=False)
+        return HealthData(
+            status=data.get('status') if data else None,
+            version=data.get('version') if data else None,
+            timestamp=data.get('timestamp') if data else None
+        )
 
-    def root_health_check(self) -> ApiResponse:
+    def root_health_check(self) -> HealthData:
         """
         Check server health via root endpoint.
 
         Returns:
-            ApiResponse containing health status
+            HealthData with status information
         """
-        return self._make_request('GET', '/', require_auth=False)
+        data = self._make_request('GET', '/', require_auth=False)
+        return HealthData(
+            status=data.get('status') if data else None,
+            version=data.get('version') if data else None,
+            timestamp=data.get('timestamp') if data else None
+        )
 
     # ==================== Authentication Endpoints ====================
 
@@ -468,26 +419,26 @@ class VerbexClient:
             raise ValueError("password is required")
 
         try:
-            response = self._make_request(
+            data = self._make_request(
                 'POST',
                 '/v1.0/auth/login',
                 data={'TenantId': tenant_id, 'Username': email, 'Password': password},
                 require_auth=False
             )
 
-            if response.success and response.data:
+            if data and data.get('token'):
                 return LoginResult.successful(
-                    token=response.data.get('token', ''),
+                    token=data['token'],
                     tenant_id=tenant_id,
                     email=email,
-                    is_admin=response.data.get('isAdmin', False),
-                    is_global_admin=response.data.get('isGlobalAdmin', False)
+                    is_admin=data.get('is_admin', False),
+                    is_global_admin=data.get('is_global_admin', False)
                 )
 
             return LoginResult.failed(
                 AuthenticationResult.INVALID_CREDENTIALS,
                 AuthorizationResult.UNAUTHORIZED,
-                response.error_message or "Login failed"
+                "Login failed"
             )
         except VerbexError as e:
             if e.status_code == 401:
@@ -521,31 +472,26 @@ class VerbexClient:
         original_access_key = self._access_key
 
         try:
-            # Temporarily use the provided bearer token
             self._access_key = bearer_token
+            data = self._make_request('GET', '/v1.0/auth/validate', require_auth=True)
 
-            response = self._make_request('GET', '/v1.0/auth/validate', require_auth=True)
-
-            if response.success and response.data and response.data.get('valid'):
+            if data and data.get('valid'):
                 return LoginResult.successful(
                     token=bearer_token,
-                    tenant_id=response.data.get('tenantId'),
-                    user_id=response.data.get('userId'),
-                    email=response.data.get('email'),
-                    is_admin=response.data.get('isAdmin', False),
-                    is_global_admin=response.data.get('isGlobalAdmin', False)
+                    tenant_id=data.get('tenant_id'),
+                    user_id=data.get('user_id'),
+                    email=data.get('email'),
+                    is_admin=data.get('is_admin', False),
+                    is_global_admin=data.get('is_global_admin', False)
                 )
 
-            # Restore original access key on failure
             self._access_key = original_access_key
-
             return LoginResult.failed(
                 AuthenticationResult.INVALID_CREDENTIALS,
                 AuthorizationResult.UNAUTHORIZED,
                 "Bearer token validation failed"
             )
         except VerbexError as e:
-            # Restore original access key on exception
             self._access_key = original_access_key
 
             if e.status_code == 401:
@@ -557,62 +503,35 @@ class VerbexClient:
 
             return LoginResult.failed(auth_result, AuthorizationResult.UNAUTHORIZED, str(e))
 
-    def login(self, username: str, password: str) -> ApiResponse:
-        """
-        Authenticate and receive a bearer token.
-
-        .. deprecated::
-            Use login_with_credentials(tenant_id, email, password) or login_with_token(bearer_token) instead.
-
-        Args:
-            username: The username
-            password: The password
-
-        Returns:
-            ApiResponse containing the token and username on success
-        """
-        warnings.warn(
-            "login() is deprecated. Use login_with_credentials(tenant_id, email, password) or login_with_token(bearer_token) instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        return self._make_request(
-            'POST',
-            '/v1.0/auth/login',
-            data={'Username': username, 'Password': password},
-            require_auth=False
-        )
-
-    def validate_token(self) -> ApiResponse:
+    def validate_token(self) -> ValidationData:
         """
         Validate the current bearer token.
 
         Returns:
-            ApiResponse containing validation result
+            ValidationData with validation result
         """
-        return self._make_request('GET', '/v1.0/auth/validate', require_auth=True)
+        data = self._make_request('GET', '/v1.0/auth/validate', require_auth=True)
+        return ValidationData(
+            valid=data.get('valid', False) if data else False,
+            tenant_id=data.get('tenant_id') if data else None,
+            user_id=data.get('user_id') if data else None,
+            email=data.get('email') if data else None,
+            is_admin=data.get('is_admin', False) if data else False,
+            is_global_admin=data.get('is_global_admin', False) if data else False
+        )
 
     # ==================== Index Management Endpoints ====================
 
-    def list_indices(self) -> ApiResponse:
+    def list_indices(self) -> List[IndexInfo]:
         """
         List all available indices.
 
         Returns:
-            ApiResponse containing list of indices and count
-        """
-        return self._make_request('GET', '/v1.0/indices')
-
-    def get_indices(self) -> List[IndexInfo]:
-        """
-        Get all indices as IndexInfo objects.
-
-        Returns:
             List of IndexInfo objects
         """
-        response = self.list_indices()
-        if response.data and 'indices' in response.data:
-            return [IndexInfo.from_dict(idx) for idx in response.data['indices']]
+        data = self._make_request('GET', '/v1.0/indices')
+        if data and data.get('indices'):
+            return [self._parse_index_info(idx) for idx in data['indices']]
         return []
 
     def create_index(
@@ -627,7 +546,7 @@ class VerbexClient:
         labels: Optional[List[str]] = None,
         tags: Optional[Dict[str, str]] = None,
         custom_metadata: Optional[Any] = None
-    ) -> ApiResponse:
+    ) -> IndexInfo:
         """
         Create a new index.
 
@@ -644,9 +563,9 @@ class VerbexClient:
             custom_metadata: Optional custom metadata to associate with the index
 
         Returns:
-            ApiResponse containing the created index information
+            Created IndexInfo
         """
-        data: Dict[str, Any] = {
+        request_data: Dict[str, Any] = {
             'Name': name,
             'InMemory': in_memory,
             'EnableLemmatizer': enable_lemmatizer,
@@ -655,16 +574,18 @@ class VerbexClient:
             'MaxTokenLength': max_token_length
         }
         if description:
-            data['Description'] = description
+            request_data['Description'] = description
         if labels:
-            data['Labels'] = labels
+            request_data['Labels'] = labels
         if tags:
-            data['Tags'] = tags
+            request_data['Tags'] = tags
         if custom_metadata is not None:
-            data['CustomMetadata'] = custom_metadata
-        return self._make_request('POST', '/v1.0/indices', data=data)
+            request_data['CustomMetadata'] = custom_metadata
 
-    def get_index(self, index_id: str) -> ApiResponse:
+        data = self._make_request('POST', '/v1.0/indices', data=request_data)
+        return self._parse_index_info(data.get('index', {}) if data else {})
+
+    def get_index(self, index_id: str) -> IndexInfo:
         """
         Get detailed information about a specific index.
 
@@ -672,22 +593,10 @@ class VerbexClient:
             index_id: The index identifier
 
         Returns:
-            ApiResponse containing index details and statistics
+            IndexInfo
         """
-        return self._make_request('GET', f'/v1.0/indices/{index_id}')
-
-    def get_index_info(self, index_id: str) -> IndexInfo:
-        """
-        Get index information as IndexInfo object.
-
-        Args:
-            index_id: The index identifier
-
-        Returns:
-            IndexInfo object with index details
-        """
-        response = self.get_index(index_id)
-        return IndexInfo.from_dict(response.data) if response.data else None
+        data = self._make_request('GET', f'/v1.0/indices/{index_id}')
+        return self._parse_index_info(data or {})
 
     def index_exists(self, index_id: str) -> bool:
         """
@@ -699,69 +608,80 @@ class VerbexClient:
         Returns:
             True if the index exists, False otherwise
         """
-        try:
-            self._make_request('HEAD', f'/v1.0/indices/{index_id}')
-            return True
-        except VerbexError as e:
-            if e.status_code == 404:
-                return False
-            raise
+        return self._make_head_request(f'/v1.0/indices/{index_id}')
 
-    def delete_index(self, index_id: str) -> ApiResponse:
+    def delete_index(self, index_id: str) -> None:
         """
         Delete an index.
 
         Args:
             index_id: The index identifier
-
-        Returns:
-            ApiResponse confirming deletion
         """
-        return self._make_request('DELETE', f'/v1.0/indices/{index_id}')
+        self._make_request('DELETE', f'/v1.0/indices/{index_id}')
 
-    def update_index_labels(self, index_id: str, labels: List[str]) -> ApiResponse:
+    def update_index_labels(self, index_id: str, labels: List[str]) -> None:
         """
         Update labels on an index (full replacement).
 
         Args:
             index_id: The index identifier
             labels: The new labels to set
-
-        Returns:
-            ApiResponse with update confirmation and updated index
         """
-        return self._make_request('PUT', f'/v1.0/indices/{index_id}/labels', data={'Labels': labels or []})
+        self._make_request('PUT', f'/v1.0/indices/{index_id}/labels', data={'Labels': labels or []})
 
-    def update_index_tags(self, index_id: str, tags: Dict[str, str]) -> ApiResponse:
+    def update_index_tags(self, index_id: str, tags: Dict[str, str]) -> None:
         """
         Update tags on an index (full replacement).
 
         Args:
             index_id: The index identifier
             tags: The new tags to set
-
-        Returns:
-            ApiResponse with update confirmation and updated index
         """
-        return self._make_request('PUT', f'/v1.0/indices/{index_id}/tags', data={'Tags': tags or {}})
+        self._make_request('PUT', f'/v1.0/indices/{index_id}/tags', data={'Tags': tags or {}})
 
     def update_index_custom_metadata(self, index_id: str, custom_metadata: Any) -> IndexInfo:
         """
-        Update custom metadata for an index.
+        Update custom metadata on an index (full replacement).
 
         Args:
             index_id: The index identifier
-            custom_metadata: The custom metadata to set
+            custom_metadata: The new custom metadata to set
 
         Returns:
-            IndexInfo with updated index details
+            Updated IndexInfo
         """
-        response = self._make_request('PUT', f'/v1.0/indices/{index_id}/customMetadata', data={'customMetadata': custom_metadata})
-        return IndexInfo.from_dict(response.data) if response.data else None
+        data = self._make_request('PUT', f'/v1.0/indices/{index_id}/customMetadata',
+                                  data={'customMetadata': custom_metadata})
+        return self._parse_index_info(data or {})
+
+    def _parse_index_info(self, data: Dict) -> IndexInfo:
+        """Parse dictionary into IndexInfo."""
+        statistics = None
+        if data.get('statistics'):
+            stats = data['statistics']
+            statistics = IndexStatistics(
+                document_count=stats.get('document_count', 0),
+                term_count=stats.get('term_count', 0),
+                total_term_frequency=stats.get('total_term_frequency', 0)
+            )
+
+        return IndexInfo(
+            identifier=data.get('identifier', ''),
+            tenant_id=data.get('tenant_id'),
+            name=data.get('name'),
+            description=data.get('description'),
+            enabled=data.get('enabled'),
+            in_memory=data.get('in_memory'),
+            created_utc=data.get('created_utc'),
+            statistics=statistics,
+            custom_metadata=data.get('custom_metadata'),
+            labels=data.get('labels'),
+            tags=data.get('tags')
+        )
 
     # ==================== Document Management Endpoints ====================
 
-    def list_documents(self, index_id: str) -> ApiResponse:
+    def list_documents(self, index_id: str) -> List[DocumentInfo]:
         """
         List all documents in an index.
 
@@ -769,23 +689,11 @@ class VerbexClient:
             index_id: The index identifier
 
         Returns:
-            ApiResponse containing list of documents and count
-        """
-        return self._make_request('GET', f'/v1.0/indices/{index_id}/documents')
-
-    def get_documents(self, index_id: str) -> List[DocumentInfo]:
-        """
-        Get all documents as DocumentInfo objects.
-
-        Args:
-            index_id: The index identifier
-
-        Returns:
             List of DocumentInfo objects
         """
-        response = self.list_documents(index_id)
-        if response.data and 'documents' in response.data:
-            return [DocumentInfo.from_dict(doc) for doc in response.data['documents']]
+        data = self._make_request('GET', f'/v1.0/indices/{index_id}/documents')
+        if data and data.get('documents'):
+            return [self._parse_document_info(doc) for doc in data['documents']]
         return []
 
     def add_document(
@@ -796,7 +704,7 @@ class VerbexClient:
         labels: Optional[List[str]] = None,
         tags: Optional[Dict[str, str]] = None,
         custom_metadata: Optional[Any] = None
-    ) -> ApiResponse:
+    ) -> AddDocumentData:
         """
         Add a document to an index.
 
@@ -809,20 +717,25 @@ class VerbexClient:
             custom_metadata: Optional custom metadata to associate with the document
 
         Returns:
-            ApiResponse containing the document ID and confirmation
+            AddDocumentData containing the document ID and confirmation
         """
-        data: Dict[str, Any] = {'Content': content}
+        request_data: Dict[str, Any] = {'Content': content}
         if document_id:
-            data['Id'] = document_id
+            request_data['Id'] = document_id
         if labels:
-            data['Labels'] = labels
+            request_data['Labels'] = labels
         if tags:
-            data['Tags'] = tags
+            request_data['Tags'] = tags
         if custom_metadata is not None:
-            data['CustomMetadata'] = custom_metadata
-        return self._make_request('POST', f'/v1.0/indices/{index_id}/documents', data=data)
+            request_data['CustomMetadata'] = custom_metadata
 
-    def get_document(self, index_id: str, document_id: str) -> ApiResponse:
+        data = self._make_request('POST', f'/v1.0/indices/{index_id}/documents', data=request_data)
+        return AddDocumentData(
+            document_id=data.get('document_id', '') if data else '',
+            message=data.get('message') if data else None
+        )
+
+    def get_document(self, index_id: str, document_id: str) -> DocumentInfo:
         """
         Get a specific document.
 
@@ -831,23 +744,10 @@ class VerbexClient:
             document_id: The document identifier
 
         Returns:
-            ApiResponse containing document details
+            DocumentInfo
         """
-        return self._make_request('GET', f'/v1.0/indices/{index_id}/documents/{document_id}')
-
-    def get_document_info(self, index_id: str, document_id: str) -> DocumentInfo:
-        """
-        Get document as DocumentInfo object.
-
-        Args:
-            index_id: The index identifier
-            document_id: The document identifier
-
-        Returns:
-            DocumentInfo object with document details
-        """
-        response = self.get_document(index_id, document_id)
-        return DocumentInfo.from_dict(response.data) if response.data else None
+        data = self._make_request('GET', f'/v1.0/indices/{index_id}/documents/{document_id}')
+        return self._parse_document_info(data or {})
 
     def document_exists(self, index_id: str, document_id: str) -> bool:
         """
@@ -860,28 +760,19 @@ class VerbexClient:
         Returns:
             True if the document exists, False otherwise
         """
-        try:
-            self._make_request('HEAD', f'/v1.0/indices/{index_id}/documents/{document_id}')
-            return True
-        except VerbexError as e:
-            if e.status_code == 404:
-                return False
-            raise
+        return self._make_head_request(f'/v1.0/indices/{index_id}/documents/{document_id}')
 
-    def delete_document(self, index_id: str, document_id: str) -> ApiResponse:
+    def delete_document(self, index_id: str, document_id: str) -> None:
         """
         Delete a document from an index.
 
         Args:
             index_id: The index identifier
             document_id: The document identifier
-
-        Returns:
-            ApiResponse confirming deletion
         """
-        return self._make_request('DELETE', f'/v1.0/indices/{index_id}/documents/{document_id}')
+        self._make_request('DELETE', f'/v1.0/indices/{index_id}/documents/{document_id}')
 
-    def update_document_labels(self, index_id: str, document_id: str, labels: List[str]) -> ApiResponse:
+    def update_document_labels(self, index_id: str, document_id: str, labels: List[str]) -> None:
         """
         Update labels on a document (full replacement).
 
@@ -889,13 +780,11 @@ class VerbexClient:
             index_id: The index identifier
             document_id: The document identifier
             labels: The new labels to set
-
-        Returns:
-            ApiResponse with update confirmation and updated document
         """
-        return self._make_request('PUT', f'/v1.0/indices/{index_id}/documents/{document_id}/labels', data={'Labels': labels or []})
+        self._make_request('PUT', f'/v1.0/indices/{index_id}/documents/{document_id}/labels',
+                          data={'Labels': labels or []})
 
-    def update_document_tags(self, index_id: str, document_id: str, tags: Dict[str, str]) -> ApiResponse:
+    def update_document_tags(self, index_id: str, document_id: str, tags: Dict[str, str]) -> None:
         """
         Update tags on a document (full replacement).
 
@@ -903,26 +792,43 @@ class VerbexClient:
             index_id: The index identifier
             document_id: The document identifier
             tags: The new tags to set
-
-        Returns:
-            ApiResponse with update confirmation and updated document
         """
-        return self._make_request('PUT', f'/v1.0/indices/{index_id}/documents/{document_id}/tags', data={'Tags': tags or {}})
+        self._make_request('PUT', f'/v1.0/indices/{index_id}/documents/{document_id}/tags',
+                          data={'Tags': tags or {}})
 
-    def update_document_custom_metadata(self, index_id: str, document_id: str, custom_metadata: Any) -> DocumentInfo:
+    def update_document_custom_metadata(self, index_id: str, document_id: str,
+                                        custom_metadata: Any) -> DocumentInfo:
         """
-        Update custom metadata for a document.
+        Update custom metadata on a document (full replacement).
 
         Args:
             index_id: The index identifier
             document_id: The document identifier
-            custom_metadata: The custom metadata to set
+            custom_metadata: The new custom metadata to set
 
         Returns:
-            DocumentInfo with updated document details
+            Updated DocumentInfo
         """
-        response = self._make_request('PUT', f'/v1.0/indices/{index_id}/documents/{document_id}/customMetadata', data={'customMetadata': custom_metadata})
-        return DocumentInfo.from_dict(response.data) if response.data else None
+        data = self._make_request('PUT', f'/v1.0/indices/{index_id}/documents/{document_id}/customMetadata',
+                                  data={'customMetadata': custom_metadata})
+        return self._parse_document_info(data or {})
+
+    def _parse_document_info(self, data: Dict) -> DocumentInfo:
+        """Parse dictionary into DocumentInfo."""
+        return DocumentInfo(
+            document_id=data.get('document_id', ''),
+            document_path=data.get('document_path'),
+            original_file_name=data.get('original_file_name'),
+            document_length=data.get('document_length', 0),
+            indexed_date=data.get('indexed_date'),
+            last_modified=data.get('last_modified'),
+            content_sha256=data.get('content_sha256'),
+            terms=data.get('terms'),
+            is_deleted=data.get('is_deleted', False),
+            custom_metadata=data.get('custom_metadata'),
+            labels=data.get('labels'),
+            tags=data.get('tags')
+        )
 
     # ==================== Search Endpoint ====================
 
@@ -933,7 +839,7 @@ class VerbexClient:
         max_results: int = 100,
         labels: Optional[List[str]] = None,
         tags: Optional[Dict[str, Any]] = None
-    ) -> ApiResponse:
+    ) -> SearchData:
         """
         Search documents in an index with optional label and tag filters.
 
@@ -945,66 +851,54 @@ class VerbexClient:
             tags: Optional dict of tags to filter by (AND logic, exact match)
 
         Returns:
-            ApiResponse containing search results
+            SearchData containing search results
         """
-        data = {
+        request_data = {
             'Query': query,
             'MaxResults': max_results
         }
         if labels and len(labels) > 0:
-            data['Labels'] = labels
+            request_data['Labels'] = labels
         if tags and len(tags) > 0:
-            data['Tags'] = tags
-        return self._make_request('POST', f'/v1.0/indices/{index_id}/search', data=data)
+            request_data['Tags'] = tags
 
-    def search_documents(
-        self,
-        index_id: str,
-        query: str,
-        max_results: int = 100,
-        labels: Optional[List[str]] = None,
-        tags: Optional[Dict[str, Any]] = None
-    ) -> SearchResponse:
-        """
-        Search documents and return SearchResponse object with optional filters.
+        data = self._make_request('POST', f'/v1.0/indices/{index_id}/search', data=request_data)
 
-        Args:
-            index_id: The index identifier
-            query: The search query
-            max_results: Maximum number of results to return
-            labels: Optional list of labels to filter by (AND logic, case-insensitive)
-            tags: Optional dict of tags to filter by (AND logic, exact match)
+        results = []
+        if data and data.get('results'):
+            for r in data['results']:
+                results.append(SearchResult(
+                    document_id=r.get('document_id', ''),
+                    score=r.get('score', 0.0),
+                    content=r.get('content'),
+                    total_term_matches=r.get('total_term_matches', 0),
+                    term_scores=r.get('term_scores'),
+                    term_frequencies=r.get('term_frequencies')
+                ))
 
-        Returns:
-            SearchResponse object with search results
-        """
-        response = self.search(index_id, query, max_results, labels, tags)
-        return SearchResponse.from_dict(response.data) if response.data else None
+        return SearchData(
+            query=data.get('query', '') if data else '',
+            results=results,
+            total_count=data.get('total_count', 0) if data else 0,
+            max_results=data.get('max_results', 100) if data else 100,
+            search_time=data.get('search_time', 0.0) if data else 0.0
+        )
 
     # ==================== Admin - Tenant Management Endpoints ====================
 
-    def list_tenants(self) -> ApiResponse:
+    def list_tenants(self) -> List[TenantInfo]:
         """
         List all tenants.
 
         Returns:
-            ApiResponse containing list of tenants
-        """
-        return self._make_request('GET', '/v1.0/admin/tenants')
-
-    def get_tenants(self) -> List[TenantInfo]:
-        """
-        Get all tenants as TenantInfo objects.
-
-        Returns:
             List of TenantInfo objects
         """
-        response = self.list_tenants()
-        if response.data and 'tenants' in response.data:
-            return [TenantInfo.from_dict(t) for t in response.data['tenants']]
+        data = self._make_request('GET', '/v1.0/admin/tenants')
+        if data and data.get('tenants'):
+            return [self._parse_tenant_info(t) for t in data['tenants']]
         return []
 
-    def get_tenant(self, tenant_id: str) -> ApiResponse:
+    def get_tenant(self, tenant_id: str) -> TenantInfo:
         """
         Get a specific tenant.
 
@@ -1012,15 +906,12 @@ class VerbexClient:
             tenant_id: The tenant identifier
 
         Returns:
-            ApiResponse containing tenant details
+            TenantInfo
         """
-        return self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}')
+        data = self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}')
+        return self._parse_tenant_info(data or {})
 
-    def create_tenant(
-        self,
-        name: str,
-        description: Optional[str] = None
-    ) -> ApiResponse:
+    def create_tenant(self, name: str, description: Optional[str] = None) -> TenantInfo:
         """
         Create a new tenant.
 
@@ -1029,54 +920,58 @@ class VerbexClient:
             description: Optional description
 
         Returns:
-            ApiResponse containing created tenant
+            Created TenantInfo
         """
-        data: Dict[str, Any] = {'name': name}
+        request_data: Dict[str, Any] = {'name': name}
         if description:
-            data['description'] = description
-        return self._make_request('POST', '/v1.0/admin/tenants', data=data)
+            request_data['description'] = description
 
-    def delete_tenant(self, tenant_id: str) -> ApiResponse:
+        data = self._make_request('POST', '/v1.0/admin/tenants', data=request_data)
+        return self._parse_tenant_info(data.get('tenant', {}) if data else {})
+
+    def delete_tenant(self, tenant_id: str) -> None:
         """
         Delete a tenant.
 
         Args:
             tenant_id: The tenant identifier
-
-        Returns:
-            ApiResponse confirming deletion
         """
-        return self._make_request('DELETE', f'/v1.0/admin/tenants/{tenant_id}')
+        self._make_request('DELETE', f'/v1.0/admin/tenants/{tenant_id}')
 
-    def update_tenant_labels(self, tenant_id: str, labels: List[str]) -> ApiResponse:
+    def update_tenant_labels(self, tenant_id: str, labels: List[str]) -> None:
         """
         Update labels on a tenant (full replacement).
 
         Args:
             tenant_id: The tenant identifier
             labels: The new labels to set
-
-        Returns:
-            ApiResponse with update confirmation and updated tenant
         """
-        return self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/labels', data={'Labels': labels or []})
+        self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/labels', data={'Labels': labels or []})
 
-    def update_tenant_tags(self, tenant_id: str, tags: Dict[str, str]) -> ApiResponse:
+    def update_tenant_tags(self, tenant_id: str, tags: Dict[str, str]) -> None:
         """
         Update tags on a tenant (full replacement).
 
         Args:
             tenant_id: The tenant identifier
             tags: The new tags to set
-
-        Returns:
-            ApiResponse with update confirmation and updated tenant
         """
-        return self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/tags', data={'Tags': tags or {}})
+        self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/tags', data={'Tags': tags or {}})
+
+    def _parse_tenant_info(self, data: Dict) -> TenantInfo:
+        """Parse dictionary into TenantInfo."""
+        return TenantInfo(
+            identifier=data.get('identifier', ''),
+            name=data.get('name'),
+            active=data.get('active', False),
+            created_utc=data.get('created_utc'),
+            labels=data.get('labels'),
+            tags=data.get('tags')
+        )
 
     # ==================== Admin - User Management Endpoints ====================
 
-    def list_users(self, tenant_id: str) -> ApiResponse:
+    def list_users(self, tenant_id: str) -> List[UserInfo]:
         """
         List all users in a tenant.
 
@@ -1084,26 +979,14 @@ class VerbexClient:
             tenant_id: The tenant identifier
 
         Returns:
-            ApiResponse containing list of users
-        """
-        return self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}/users')
-
-    def get_users(self, tenant_id: str) -> List[UserInfo]:
-        """
-        Get all users in a tenant as UserInfo objects.
-
-        Args:
-            tenant_id: The tenant identifier
-
-        Returns:
             List of UserInfo objects
         """
-        response = self.list_users(tenant_id)
-        if response.data and 'users' in response.data:
-            return [UserInfo.from_dict(u) for u in response.data['users']]
+        data = self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}/users')
+        if data and data.get('users'):
+            return [self._parse_user_info(u) for u in data['users']]
         return []
 
-    def get_user(self, tenant_id: str, user_id: str) -> ApiResponse:
+    def get_user(self, tenant_id: str, user_id: str) -> UserInfo:
         """
         Get a specific user.
 
@@ -1112,9 +995,10 @@ class VerbexClient:
             user_id: The user identifier
 
         Returns:
-            ApiResponse containing user details
+            UserInfo
         """
-        return self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}/users/{user_id}')
+        data = self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}/users/{user_id}')
+        return self._parse_user_info(data or {})
 
     def create_user(
         self,
@@ -1124,7 +1008,7 @@ class VerbexClient:
         first_name: Optional[str] = None,
         last_name: Optional[str] = None,
         is_admin: bool = False
-    ) -> ApiResponse:
+    ) -> UserInfo:
         """
         Create a new user in a tenant.
 
@@ -1137,34 +1021,33 @@ class VerbexClient:
             is_admin: Whether user is tenant admin
 
         Returns:
-            ApiResponse containing created user
+            Created UserInfo
         """
-        data: Dict[str, Any] = {
+        request_data: Dict[str, Any] = {
             'email': email,
             'password': password
         }
         if first_name:
-            data['firstName'] = first_name
+            request_data['firstName'] = first_name
         if last_name:
-            data['lastName'] = last_name
+            request_data['lastName'] = last_name
         if is_admin:
-            data['isAdmin'] = is_admin
-        return self._make_request('POST', f'/v1.0/admin/tenants/{tenant_id}/users', data=data)
+            request_data['isAdmin'] = is_admin
 
-    def delete_user(self, tenant_id: str, user_id: str) -> ApiResponse:
+        data = self._make_request('POST', f'/v1.0/admin/tenants/{tenant_id}/users', data=request_data)
+        return self._parse_user_info(data.get('user', {}) if data else {})
+
+    def delete_user(self, tenant_id: str, user_id: str) -> None:
         """
         Delete a user.
 
         Args:
             tenant_id: The tenant identifier
             user_id: The user identifier
-
-        Returns:
-            ApiResponse confirming deletion
         """
-        return self._make_request('DELETE', f'/v1.0/admin/tenants/{tenant_id}/users/{user_id}')
+        self._make_request('DELETE', f'/v1.0/admin/tenants/{tenant_id}/users/{user_id}')
 
-    def update_user_labels(self, tenant_id: str, user_id: str, labels: List[str]) -> ApiResponse:
+    def update_user_labels(self, tenant_id: str, user_id: str, labels: List[str]) -> None:
         """
         Update labels on a user (full replacement).
 
@@ -1172,13 +1055,11 @@ class VerbexClient:
             tenant_id: The tenant identifier
             user_id: The user identifier
             labels: The new labels to set
-
-        Returns:
-            ApiResponse with update confirmation and updated user
         """
-        return self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/users/{user_id}/labels', data={'Labels': labels or []})
+        self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/users/{user_id}/labels',
+                          data={'Labels': labels or []})
 
-    def update_user_tags(self, tenant_id: str, user_id: str, tags: Dict[str, str]) -> ApiResponse:
+    def update_user_tags(self, tenant_id: str, user_id: str, tags: Dict[str, str]) -> None:
         """
         Update tags on a user (full replacement).
 
@@ -1186,15 +1067,28 @@ class VerbexClient:
             tenant_id: The tenant identifier
             user_id: The user identifier
             tags: The new tags to set
-
-        Returns:
-            ApiResponse with update confirmation and updated user
         """
-        return self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/users/{user_id}/tags', data={'Tags': tags or {}})
+        self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/users/{user_id}/tags',
+                          data={'Tags': tags or {}})
+
+    def _parse_user_info(self, data: Dict) -> UserInfo:
+        """Parse dictionary into UserInfo."""
+        return UserInfo(
+            identifier=data.get('identifier', ''),
+            tenant_id=data.get('tenant_id', ''),
+            email=data.get('email', ''),
+            first_name=data.get('first_name'),
+            last_name=data.get('last_name'),
+            is_admin=data.get('is_admin', False),
+            active=data.get('active', False),
+            created_utc=data.get('created_utc'),
+            labels=data.get('labels'),
+            tags=data.get('tags')
+        )
 
     # ==================== Admin - Credential Management Endpoints ====================
 
-    def list_credentials(self, tenant_id: str) -> ApiResponse:
+    def list_credentials(self, tenant_id: str) -> List[CredentialInfo]:
         """
         List all credentials in a tenant.
 
@@ -1202,26 +1096,14 @@ class VerbexClient:
             tenant_id: The tenant identifier
 
         Returns:
-            ApiResponse containing list of credentials
-        """
-        return self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}/credentials')
-
-    def get_credentials(self, tenant_id: str) -> List[CredentialInfo]:
-        """
-        Get all credentials in a tenant as CredentialInfo objects.
-
-        Args:
-            tenant_id: The tenant identifier
-
-        Returns:
             List of CredentialInfo objects
         """
-        response = self.list_credentials(tenant_id)
-        if response.data and 'credentials' in response.data:
-            return [CredentialInfo.from_dict(c) for c in response.data['credentials']]
+        data = self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}/credentials')
+        if data and data.get('credentials'):
+            return [self._parse_credential_info(c) for c in data['credentials']]
         return []
 
-    def get_credential(self, tenant_id: str, credential_id: str) -> ApiResponse:
+    def get_credential(self, tenant_id: str, credential_id: str) -> CredentialInfo:
         """
         Get a specific credential.
 
@@ -1230,15 +1112,12 @@ class VerbexClient:
             credential_id: The credential identifier
 
         Returns:
-            ApiResponse containing credential details
+            CredentialInfo
         """
-        return self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}/credentials/{credential_id}')
+        data = self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}/credentials/{credential_id}')
+        return self._parse_credential_info(data or {})
 
-    def create_credential(
-        self,
-        tenant_id: str,
-        description: Optional[str] = None
-    ) -> ApiResponse:
+    def create_credential(self, tenant_id: str, description: Optional[str] = None) -> CredentialInfo:
         """
         Create a new credential (API key) in a tenant.
 
@@ -1247,27 +1126,26 @@ class VerbexClient:
             description: Optional description
 
         Returns:
-            ApiResponse containing created credential (includes bearer token)
+            Created CredentialInfo (includes bearer token)
         """
-        data: Dict[str, Any] = {}
+        request_data: Dict[str, Any] = {}
         if description:
-            data['description'] = description
-        return self._make_request('POST', f'/v1.0/admin/tenants/{tenant_id}/credentials', data=data)
+            request_data['description'] = description
 
-    def delete_credential(self, tenant_id: str, credential_id: str) -> ApiResponse:
+        data = self._make_request('POST', f'/v1.0/admin/tenants/{tenant_id}/credentials', data=request_data)
+        return self._parse_credential_info(data.get('credential', {}) if data else {})
+
+    def delete_credential(self, tenant_id: str, credential_id: str) -> None:
         """
         Delete a credential.
 
         Args:
             tenant_id: The tenant identifier
             credential_id: The credential identifier
-
-        Returns:
-            ApiResponse confirming deletion
         """
-        return self._make_request('DELETE', f'/v1.0/admin/tenants/{tenant_id}/credentials/{credential_id}')
+        self._make_request('DELETE', f'/v1.0/admin/tenants/{tenant_id}/credentials/{credential_id}')
 
-    def update_credential_labels(self, tenant_id: str, credential_id: str, labels: List[str]) -> ApiResponse:
+    def update_credential_labels(self, tenant_id: str, credential_id: str, labels: List[str]) -> None:
         """
         Update labels on a credential (full replacement).
 
@@ -1275,13 +1153,11 @@ class VerbexClient:
             tenant_id: The tenant identifier
             credential_id: The credential identifier
             labels: The new labels to set
-
-        Returns:
-            ApiResponse with update confirmation and updated credential
         """
-        return self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/credentials/{credential_id}/labels', data={'Labels': labels or []})
+        self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/credentials/{credential_id}/labels',
+                          data={'Labels': labels or []})
 
-    def update_credential_tags(self, tenant_id: str, credential_id: str, tags: Dict[str, str]) -> ApiResponse:
+    def update_credential_tags(self, tenant_id: str, credential_id: str, tags: Dict[str, str]) -> None:
         """
         Update tags on a credential (full replacement).
 
@@ -1289,11 +1165,22 @@ class VerbexClient:
             tenant_id: The tenant identifier
             credential_id: The credential identifier
             tags: The new tags to set
-
-        Returns:
-            ApiResponse with update confirmation and updated credential
         """
-        return self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/credentials/{credential_id}/tags', data={'Tags': tags or {}})
+        self._make_request('PUT', f'/v1.0/tenants/{tenant_id}/credentials/{credential_id}/tags',
+                          data={'Tags': tags or {}})
+
+    def _parse_credential_info(self, data: Dict) -> CredentialInfo:
+        """Parse dictionary into CredentialInfo."""
+        return CredentialInfo(
+            identifier=data.get('identifier', ''),
+            tenant_id=data.get('tenant_id', ''),
+            name=data.get('name'),
+            bearer_token=data.get('bearer_token'),
+            active=data.get('active', False),
+            created_utc=data.get('created_utc'),
+            labels=data.get('labels'),
+            tags=data.get('tags')
+        )
 
     def close(self):
         """Close the HTTP session."""

@@ -2,6 +2,8 @@
 
 A comprehensive JavaScript SDK for interacting with the Verbex Inverted Index REST API.
 
+All methods return domain objects directly rather than wrapped responses.
+
 ## Requirements
 
 - Node.js 18.0.0 or higher (uses native fetch)
@@ -15,30 +17,30 @@ async function main() {
     // Create client
     const client = new VerbexClient('http://localhost:8080', 'verbexadmin');
 
-    // Health check
+    // Health check - returns HealthData directly
     const health = await client.healthCheck();
-    console.log(`Server status: ${health.data.status}`);
+    console.log(`Server status: ${health.status}`);
 
-    // Create an index
-    await client.createIndex({
-        id: 'my-index',
+    // Create an index - returns IndexInfo directly
+    const index = await client.createIndex({
         name: 'My Index',
         description: 'A test index',
         inMemory: true
     });
+    console.log(`Created index: ${index.identifier}`);
 
-    // Add documents
-    await client.addDocument('my-index', 'The quick brown fox jumps over the lazy dog.');
-    await client.addDocument('my-index', 'Machine learning is transforming industries.');
+    // Add documents - returns AddDocumentData directly
+    const doc1 = await client.addDocument(index.identifier, 'The quick brown fox jumps over the lazy dog.');
+    const doc2 = await client.addDocument(index.identifier, 'Machine learning is transforming industries.');
 
-    // Search
-    const results = await client.searchDocuments('my-index', 'fox');
+    // Search - returns SearchData directly
+    const results = await client.search(index.identifier, 'fox');
     for (const result of results.results) {
         console.log(`Document: ${result.documentId}, Score: ${result.score}`);
     }
 
     // Cleanup
-    await client.deleteIndex('my-index');
+    await client.deleteIndex(index.identifier);
 }
 
 main().catch(console.error);
@@ -61,37 +63,66 @@ node test-harness.js http://localhost:8080 verbexadmin
 - `new VerbexClient(endpoint, accessKey)` - Create a new client
 
 #### Health Endpoints
-- `healthCheck()` - Check server health via /v1.0/health
-- `rootHealthCheck()` - Check server health via root endpoint
+- `healthCheck()` - Returns `HealthData`
+- `rootHealthCheck()` - Returns `HealthData`
 
 #### Authentication
-- `login(username, password)` - Authenticate and get token
-- `validateToken()` - Validate current token
+- `loginWithCredentials(tenantId, email, password)` - Returns `LoginResult`
+- `loginWithToken(bearerToken)` - Returns `LoginResult`
+- `validateToken()` - Returns `ValidationData`
 
 #### Index Management
-- `listIndices()` - List all indices
-- `getIndices()` - Get all indices as IndexInfo objects
-- `createIndex(options)` - Create a new index
-- `getIndex(indexId)` - Get index details
-- `getIndexInfo(indexId)` - Get index as IndexInfo object
-- `deleteIndex(indexId)` - Delete an index
+- `listIndices()` - Returns `IndexInfo[]`
+- `createIndex(options)` - Returns `IndexInfo`
+- `getIndex(indexId)` - Returns `IndexInfo`
+- `indexExists(indexId)` - Returns `boolean`
+- `deleteIndex(indexId)` - Returns `void`
+- `updateIndexLabels(indexId, labels)` - Returns `void`
+- `updateIndexTags(indexId, tags)` - Returns `void`
+- `updateIndexCustomMetadata(indexId, customMetadata)` - Returns `IndexInfo`
 
 #### Document Management
-- `listDocuments(indexId)` - List all documents
-- `getDocuments(indexId)` - Get all documents as DocumentInfo objects
-- `addDocument(indexId, content, documentId)` - Add document
-- `getDocument(indexId, documentId)` - Get document details
-- `deleteDocument(indexId, documentId)` - Delete document
+- `listDocuments(indexId)` - Returns `DocumentInfo[]`
+- `addDocument(indexId, content, documentId?, labels?, tags?, customMetadata?)` - Returns `AddDocumentData`
+- `getDocument(indexId, documentId)` - Returns `DocumentInfo`
+- `documentExists(indexId, documentId)` - Returns `boolean`
+- `deleteDocument(indexId, documentId)` - Returns `void`
+- `updateDocumentLabels(indexId, documentId, labels)` - Returns `void`
+- `updateDocumentTags(indexId, documentId, tags)` - Returns `void`
+- `updateDocumentCustomMetadata(indexId, documentId, customMetadata)` - Returns `DocumentInfo`
 
 #### Search
-- `search(indexId, query, maxResults)` - Search documents
-- `searchDocuments(indexId, query, maxResults)` - Search and return SearchResponse object
+- `search(indexId, query, maxResults?, labels?, tags?)` - Returns `SearchData`
+
+#### Admin - Tenant Management
+- `listTenants()` - Returns `TenantInfo[]`
+- `getTenant(tenantId)` - Returns `TenantInfo`
+- `createTenant(options)` - Returns `TenantInfo`
+- `deleteTenant(tenantId)` - Returns `void`
+
+#### Admin - User Management
+- `listUsers(tenantId)` - Returns `UserInfo[]`
+- `getUser(tenantId, userId)` - Returns `UserInfo`
+- `createUser(tenantId, options)` - Returns `UserInfo`
+- `deleteUser(tenantId, userId)` - Returns `void`
+
+#### Admin - Credential Management
+- `listCredentials(tenantId)` - Returns `CredentialInfo[]`
+- `getCredential(tenantId, credentialId)` - Returns `CredentialInfo`
+- `createCredential(tenantId, options?)` - Returns `CredentialInfo`
+- `deleteCredential(tenantId, credentialId)` - Returns `void`
 
 ## Model Classes
 
-- `ApiResponse` - Standard API response wrapper
-- `IndexInfo` - Index information
+- `HealthData` - Health check response (status, version, timestamp)
+- `ValidationData` - Token validation result
+- `LoginResult` - Login attempt result
+- `IndexInfo` - Index information with statistics
 - `DocumentInfo` - Document information
+- `AddDocumentData` - Add document response (documentId, message)
+- `SearchData` - Search response with results
 - `SearchResult` - Individual search result
-- `SearchResponse` - Search response with results
+- `TenantInfo` - Tenant information
+- `UserInfo` - User information
+- `CredentialInfo` - Credential/API key information
 - `VerbexError` - Error thrown for API errors

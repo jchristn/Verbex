@@ -130,24 +130,18 @@ namespace Verbex.Sdk.TestHarness
 
         private async Task TestRootHealthCheckAsync()
         {
-            ApiResponse<HealthData> response = await _Client!.RootHealthCheckAsync().ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 200, "response.StatusCode");
-            AssertNotNull(response.Data, "response.Data");
-            AssertEquals(response.Data!.Status, "Healthy", "data.Status");
-            AssertNotNull(response.Data.Version, "data.Version");
-            AssertNotNull(response.Data.Timestamp, "data.Timestamp");
+            HealthData health = await _Client!.RootHealthCheckAsync().ConfigureAwait(false);
+            AssertEquals(health.Status, "Healthy", "health.Status");
+            AssertNotNull(health.Version, "health.Version");
+            AssertNotNull(health.Timestamp, "health.Timestamp");
         }
 
         private async Task TestHealthEndpointAsync()
         {
-            ApiResponse<HealthData> response = await _Client!.HealthCheckAsync().ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 200, "response.StatusCode");
-            AssertNotNull(response.Data, "response.Data");
-            AssertEquals(response.Data!.Status, "Healthy", "data.Status");
-            AssertNotNull(response.Data.Version, "data.Version");
-            AssertNotNull(response.Data.Timestamp, "data.Timestamp");
+            HealthData health = await _Client!.HealthCheckAsync().ConfigureAwait(false);
+            AssertEquals(health.Status, "Healthy", "health.Status");
+            AssertNotNull(health.Version, "health.Version");
+            AssertNotNull(health.Timestamp, "health.Timestamp");
         }
 
         // ==================== Authentication Tests ====================
@@ -194,11 +188,8 @@ namespace Verbex.Sdk.TestHarness
 
         private async Task TestValidateTokenAsync()
         {
-            ApiResponse<ValidationData> response = await _Client!.ValidateTokenAsync().ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 200, "response.StatusCode");
-            AssertNotNull(response.Data, "response.Data");
-            AssertTrue(response.Data!.Valid, "data.Valid");
+            ValidationData validation = await _Client!.ValidateTokenAsync().ConfigureAwait(false);
+            AssertTrue(validation.Valid, "validation.Valid");
         }
 
         private async Task TestValidateInvalidTokenAsync()
@@ -219,29 +210,22 @@ namespace Verbex.Sdk.TestHarness
 
         private async Task TestListIndicesInitialAsync()
         {
-            ApiResponse<IndicesListData> response = await _Client!.ListIndicesAsync().ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 200, "response.StatusCode");
-            AssertNotNull(response.Data, "response.Data");
-            AssertNotNull(response.Data!.Indices, "data.Indices");
+            List<IndexInfo> indices = await _Client!.ListIndicesAsync().ConfigureAwait(false);
+            AssertNotNull(indices, "indices");
         }
 
         private async Task TestCreateIndexAsync()
         {
-            ApiResponse<CreateIndexData> response = await _Client!.CreateIndexAsync(
+            IndexInfo index = await _Client!.CreateIndexAsync(
                 name: "Test Index",
                 description: "A test index for SDK validation",
                 inMemory: true,
                 tenantId: "default"
             ).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 201, "response.StatusCode");
-            AssertNotNull(response.Data, "response.Data");
-            AssertNotNull(response.Data!.Message, "data.Message");
-            AssertNotNull(response.Data.Index, "data.Index");
-            AssertNotNull(response.Data.Index!.Identifier, "index.Identifier");
-            AssertEquals(response.Data.Index.Name, "Test Index", "index.Name");
-            _TestIndexId = response.Data.Index.Identifier;
+            AssertNotNull(index, "index");
+            AssertNotNull(index.Identifier, "index.Identifier");
+            AssertEquals(index.Name, "Test Index", "index.Name");
+            _TestIndexId = index.Identifier;
         }
 
         private async Task TestCreateDuplicateNameIndexAsync()
@@ -266,13 +250,11 @@ namespace Verbex.Sdk.TestHarness
 
         private async Task TestGetIndexAsync()
         {
-            ApiResponse<IndexInfo> response = await _Client!.GetIndexAsync(_TestIndexId).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 200, "response.StatusCode");
-            AssertNotNull(response.Data, "response.Data");
-            AssertEquals(response.Data!.Identifier, _TestIndexId, "data.Identifier");
-            AssertEquals(response.Data.Name, "Test Index", "data.Name");
-            AssertNotNull(response.Data.CreatedUtc, "data.CreatedUtc");
+            IndexInfo index = await _Client!.GetIndexAsync(_TestIndexId).ConfigureAwait(false);
+            AssertNotNull(index, "index");
+            AssertEquals(index.Identifier, _TestIndexId, "index.Identifier");
+            AssertEquals(index.Name, "Test Index", "index.Name");
+            AssertNotNull(index.CreatedUtc, "index.CreatedUtc");
         }
 
         private async Task TestGetIndexNotFoundAsync()
@@ -290,7 +272,7 @@ namespace Verbex.Sdk.TestHarness
 
         private async Task TestListIndicesAfterCreateAsync()
         {
-            List<IndexInfo> indices = await _Client!.GetIndicesAsync().ConfigureAwait(false);
+            List<IndexInfo> indices = await _Client!.ListIndicesAsync().ConfigureAwait(false);
             bool found = indices.Exists(idx => idx.Identifier == _TestIndexId);
             AssertTrue(found, "test index should be in list");
         }
@@ -303,7 +285,7 @@ namespace Verbex.Sdk.TestHarness
                 { "environment", "testing" },
                 { "owner", "sdk-harness" }
             };
-            ApiResponse<CreateIndexData> response = await _Client!.CreateIndexAsync(
+            IndexInfo index = await _Client!.CreateIndexAsync(
                 name: "Labeled Test Index",
                 description: "An index with labels and tags",
                 inMemory: true,
@@ -311,12 +293,9 @@ namespace Verbex.Sdk.TestHarness
                 tags: tags,
                 tenantId: "default"
             ).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 201, "response.StatusCode");
-            AssertNotNull(response.Data, "response.Data");
-            AssertNotNull(response.Data!.Index, "data.Index");
+            AssertNotNull(index, "index");
             // Clean up
-            await _Client!.DeleteIndexAsync(response.Data.Index!.Identifier).ConfigureAwait(false);
+            await _Client!.DeleteIndexAsync(index.Identifier).ConfigureAwait(false);
         }
 
         private async Task TestGetIndexWithLabelsAndTagsAsync()
@@ -327,21 +306,20 @@ namespace Verbex.Sdk.TestHarness
                 { "purpose", "verification" },
                 { "version", "1.0" }
             };
-            ApiResponse<CreateIndexData> createResponse = await _Client!.CreateIndexAsync(
+            IndexInfo createdIndex = await _Client!.CreateIndexAsync(
                 name: "Get Labeled Index",
                 inMemory: true,
                 labels: labels,
                 tags: tags,
                 tenantId: "default"
             ).ConfigureAwait(false);
-            string indexId = createResponse.Data!.Index!.Identifier;
-            ApiResponse<IndexInfo> response = await _Client!.GetIndexAsync(indexId).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertNotNull(response.Data, "response.Data");
-            AssertNotNull(response.Data!.Labels, "data.Labels");
-            AssertNotNull(response.Data.Tags, "data.Tags");
-            AssertEquals(response.Data.Labels!.Count, 2, "labels count");
-            AssertEquals(response.Data.Tags!.Count, 2, "tags count");
+            string indexId = createdIndex.Identifier;
+            IndexInfo index = await _Client!.GetIndexAsync(indexId).ConfigureAwait(false);
+            AssertNotNull(index, "index");
+            AssertNotNull(index.Labels, "index.Labels");
+            AssertNotNull(index.Tags, "index.Tags");
+            AssertEquals(index.Labels!.Count, 2, "labels count");
+            AssertEquals(index.Tags!.Count, 2, "tags count");
             // Clean up
             await _Client!.DeleteIndexAsync(indexId).ConfigureAwait(false);
         }
@@ -382,39 +360,33 @@ namespace Verbex.Sdk.TestHarness
 
         private async Task TestListDocumentsEmptyAsync()
         {
-            ApiResponse<DocumentsListData> response = await _Client!.ListDocumentsAsync(_TestIndexId).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 200, "response.StatusCode");
-            AssertNotNull(response.Data, "response.Data");
-            AssertNotNull(response.Data!.Documents, "data.Documents");
-            AssertEquals(response.Data.Count, 0, "data.Count");
+            List<DocumentInfo> documents = await _Client!.ListDocumentsAsync(_TestIndexId).ConfigureAwait(false);
+            AssertNotNull(documents, "documents");
+            AssertEquals(documents.Count, 0, "documents.Count");
         }
 
         private async Task TestAddDocumentAsync()
         {
-            ApiResponse<AddDocumentData> response = await _Client!.AddDocumentAsync(
+            AddDocumentData result = await _Client!.AddDocumentAsync(
                 _TestIndexId,
                 "The quick brown fox jumps over the lazy dog."
             ).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 201, "response.StatusCode");
-            AssertNotNull(response.Data, "response.Data");
-            AssertNotNull(response.Data!.DocumentId, "data.DocumentId");
-            AssertNotNull(response.Data.Message, "data.Message");
-            _TestDocuments.Add(response.Data.DocumentId!);
+            AssertNotNull(result, "result");
+            AssertNotNull(result.DocumentId, "result.DocumentId");
+            AssertNotNull(result.Message, "result.Message");
+            _TestDocuments.Add(result.DocumentId!);
         }
 
         private async Task TestAddDocumentWithIdAsync()
         {
             string docId = Guid.NewGuid().ToString();
-            ApiResponse<AddDocumentData> response = await _Client!.AddDocumentAsync(
+            AddDocumentData result = await _Client!.AddDocumentAsync(
                 _TestIndexId,
                 "C# is a versatile programming language used for enterprise applications and game development.",
                 docId
             ).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 201, "response.StatusCode");
-            AssertEquals(response.Data!.DocumentId, docId, "data.DocumentId");
+            AssertNotNull(result, "result");
+            AssertEquals(result.DocumentId, docId, "result.DocumentId");
             _TestDocuments.Add(docId);
         }
 
@@ -429,19 +401,18 @@ namespace Verbex.Sdk.TestHarness
             };
             foreach (string content in docs)
             {
-                ApiResponse<AddDocumentData> response = await _Client!.AddDocumentAsync(_TestIndexId, content).ConfigureAwait(false);
-                AssertTrue(response.Success, "response.Success");
-                _TestDocuments.Add(response.Data!.DocumentId!);
+                AddDocumentData result = await _Client!.AddDocumentAsync(_TestIndexId, content).ConfigureAwait(false);
+                AssertNotNull(result, "result");
+                _TestDocuments.Add(result.DocumentId!);
             }
         }
 
         private async Task TestListDocumentsAfterAddAsync()
         {
-            ApiResponse<DocumentsListData> response = await _Client!.ListDocumentsAsync(_TestIndexId).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.Data!.Count, _TestDocuments.Count, "data.Count");
-            AssertEquals(response.Data.Documents.Count, _TestDocuments.Count, "documents length");
-            foreach (DocumentInfo doc in response.Data.Documents)
+            List<DocumentInfo> documents = await _Client!.ListDocumentsAsync(_TestIndexId).ConfigureAwait(false);
+            AssertNotNull(documents, "documents");
+            AssertEquals(documents.Count, _TestDocuments.Count, "documents.Count");
+            foreach (DocumentInfo doc in documents)
             {
                 AssertNotNull(doc.Id, "document.Id");
             }
@@ -450,11 +421,9 @@ namespace Verbex.Sdk.TestHarness
         private async Task TestGetDocumentAsync()
         {
             string docId = _TestDocuments[0];
-            ApiResponse<DocumentInfo> response = await _Client!.GetDocumentAsync(_TestIndexId, docId).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 200, "response.StatusCode");
-            AssertNotNull(response.Data, "response.Data");
-            AssertEquals(response.Data!.Id, docId, "data.Id");
+            DocumentInfo document = await _Client!.GetDocumentAsync(_TestIndexId, docId).ConfigureAwait(false);
+            AssertNotNull(document, "document");
+            AssertEquals(document.Id, docId, "document.Id");
         }
 
         private async Task TestGetDocumentNotFoundAsync()
@@ -479,18 +448,16 @@ namespace Verbex.Sdk.TestHarness
                 { "author", "test-harness" },
                 { "category", "technical" }
             };
-            ApiResponse<AddDocumentData> response = await _Client!.AddDocumentAsync(
+            AddDocumentData result = await _Client!.AddDocumentAsync(
                 _TestIndexId,
                 "This document has labels and tags for testing metadata support.",
                 null,
                 labels,
                 tags
             ).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 201, "response.StatusCode");
-            AssertNotNull(response.Data, "response.Data");
-            AssertNotNull(response.Data!.DocumentId, "data.DocumentId");
-            _TestDocuments.Add(response.Data.DocumentId!);
+            AssertNotNull(result, "result");
+            AssertNotNull(result.DocumentId, "result.DocumentId");
+            _TestDocuments.Add(result.DocumentId!);
         }
 
         private async Task TestGetDocumentWithLabelsAndTagsAsync()
@@ -501,22 +468,21 @@ namespace Verbex.Sdk.TestHarness
                 { "source", "sdk-test" },
                 { "priority", "high" }
             };
-            ApiResponse<AddDocumentData> addResponse = await _Client!.AddDocumentAsync(
+            AddDocumentData addResult = await _Client!.AddDocumentAsync(
                 _TestIndexId,
                 "Document for verifying labels and tags retrieval.",
                 null,
                 labels,
                 tags
             ).ConfigureAwait(false);
-            AssertTrue(addResponse.Success, "addResponse.Success");
-            string docId = addResponse.Data!.DocumentId!;
-            ApiResponse<DocumentInfo> response = await _Client!.GetDocumentAsync(_TestIndexId, docId).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertNotNull(response.Data, "response.Data");
-            AssertNotNull(response.Data!.Labels, "data.Labels");
-            AssertNotNull(response.Data.Tags, "data.Tags");
-            AssertEquals(response.Data.Labels!.Count, 2, "labels count");
-            AssertEquals(response.Data.Tags!.Count, 2, "tags count");
+            AssertNotNull(addResult, "addResult");
+            string docId = addResult.DocumentId!;
+            DocumentInfo document = await _Client!.GetDocumentAsync(_TestIndexId, docId).ConfigureAwait(false);
+            AssertNotNull(document, "document");
+            AssertNotNull(document.Labels, "document.Labels");
+            AssertNotNull(document.Tags, "document.Tags");
+            AssertEquals(document.Labels!.Count, 2, "labels count");
+            AssertEquals(document.Tags!.Count, 2, "tags count");
             _TestDocuments.Add(docId);
         }
 
@@ -524,19 +490,17 @@ namespace Verbex.Sdk.TestHarness
 
         private async Task TestSearchBasicAsync()
         {
-            ApiResponse<SearchData> response = await _Client!.SearchAsync(_TestIndexId, "fox").ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 200, "response.StatusCode");
-            AssertNotNull(response.Data, "response.Data");
-            AssertEquals(response.Data!.Query, "fox", "data.Query");
-            AssertNotNull(response.Data.Results, "data.Results");
+            SearchData searchResult = await _Client!.SearchAsync(_TestIndexId, "fox").ConfigureAwait(false);
+            AssertNotNull(searchResult, "searchResult");
+            AssertEquals(searchResult.Query, "fox", "searchResult.Query");
+            AssertNotNull(searchResult.Results, "searchResult.Results");
         }
 
         private async Task TestSearchWithResultsAsync()
         {
-            ApiResponse<SearchData> response = await _Client!.SearchAsync(_TestIndexId, "learning").ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            List<SearchResult> results = response.Data!.Results;
+            SearchData searchResult = await _Client!.SearchAsync(_TestIndexId, "learning").ConfigureAwait(false);
+            AssertNotNull(searchResult, "searchResult");
+            List<SearchResult> results = searchResult.Results;
             AssertGreaterThan(results.Count, 0, "results count");
             foreach (SearchResult result in results)
             {
@@ -546,31 +510,23 @@ namespace Verbex.Sdk.TestHarness
 
         private async Task TestSearchMultipleTermsAsync()
         {
-            ApiResponse<SearchData> response = await _Client!.SearchAsync(_TestIndexId, "machine learning").ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertNotNull(response.Data!.Results, "data.Results");
+            SearchData searchResult = await _Client!.SearchAsync(_TestIndexId, "machine learning").ConfigureAwait(false);
+            AssertNotNull(searchResult, "searchResult");
+            AssertNotNull(searchResult.Results, "searchResult.Results");
         }
 
         private async Task TestSearchMaxResultsAsync()
         {
-            ApiResponse<SearchData> response = await _Client!.SearchAsync(_TestIndexId, "the", 2).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.Data!.MaxResults, 2, "data.MaxResults");
+            SearchData searchResult = await _Client!.SearchAsync(_TestIndexId, "the", 2).ConfigureAwait(false);
+            AssertNotNull(searchResult, "searchResult");
+            AssertEquals(searchResult.MaxResults, 2, "searchResult.MaxResults");
         }
 
         private async Task TestSearchNoResultsAsync()
         {
-            ApiResponse<SearchData> response = await _Client!.SearchAsync(_TestIndexId, "xyznonexistent12345").ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.Data!.Results.Count, 0, "results should be empty");
-        }
-
-        private async Task TestSearchDocumentsHelperAsync()
-        {
-            SearchData? searchResponse = await _Client!.SearchDocumentsAsync(_TestIndexId, "programming").ConfigureAwait(false);
-            AssertNotNull(searchResponse, "searchResponse");
-            AssertEquals(searchResponse!.Query, "programming", "Query");
-            AssertNotNull(searchResponse.Results, "Results");
+            SearchData searchResult = await _Client!.SearchAsync(_TestIndexId, "xyznonexistent12345").ConfigureAwait(false);
+            AssertNotNull(searchResult, "searchResult");
+            AssertEquals(searchResult.Results.Count, 0, "results should be empty");
         }
 
         private async Task TestSearchWithLabelFilterAsync()
@@ -588,26 +544,26 @@ namespace Verbex.Sdk.TestHarness
             _TestDocuments.Add(docId);
 
             // Search with matching label filter
-            ApiResponse<SearchData> response = await _Client!.SearchAsync(
+            SearchData searchResult = await _Client!.SearchAsync(
                 _TestIndexId,
                 "searchable",
                 100,
                 new List<string> { "searchtest" },
                 null
             ).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertGreaterThan(response.Data!.Results.Count, 0, "should find documents with matching label");
+            AssertNotNull(searchResult, "searchResult");
+            AssertGreaterThan(searchResult.Results.Count, 0, "should find documents with matching label");
 
             // Search with non-matching label filter
-            ApiResponse<SearchData> noMatchResponse = await _Client!.SearchAsync(
+            SearchData noMatchResult = await _Client!.SearchAsync(
                 _TestIndexId,
                 "searchable",
                 100,
                 new List<string> { "nonexistentlabel99" },
                 null
             ).ConfigureAwait(false);
-            AssertTrue(noMatchResponse.Success, "noMatchResponse.Success");
-            AssertEquals(noMatchResponse.Data!.Results.Count, 0, "should find no documents with non-matching label");
+            AssertNotNull(noMatchResult, "noMatchResult");
+            AssertEquals(noMatchResult.Results.Count, 0, "should find no documents with non-matching label");
         }
 
         private async Task TestSearchWithTagFilterAsync()
@@ -629,26 +585,26 @@ namespace Verbex.Sdk.TestHarness
             _TestDocuments.Add(docId);
 
             // Search with matching tag filter
-            ApiResponse<SearchData> response = await _Client!.SearchAsync(
+            SearchData searchResult = await _Client!.SearchAsync(
                 _TestIndexId,
                 "taggable",
                 100,
                 null,
                 new Dictionary<string, object> { { "searchcategory", "testfilter" } }
             ).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertGreaterThan(response.Data!.Results.Count, 0, "should find documents with matching tag");
+            AssertNotNull(searchResult, "searchResult");
+            AssertGreaterThan(searchResult.Results.Count, 0, "should find documents with matching tag");
 
             // Search with non-matching tag filter
-            ApiResponse<SearchData> noMatchResponse = await _Client!.SearchAsync(
+            SearchData noMatchResult = await _Client!.SearchAsync(
                 _TestIndexId,
                 "taggable",
                 100,
                 null,
                 new Dictionary<string, object> { { "searchcategory", "wrongvalue" } }
             ).ConfigureAwait(false);
-            AssertTrue(noMatchResponse.Success, "noMatchResponse.Success");
-            AssertEquals(noMatchResponse.Data!.Results.Count, 0, "should find no documents with non-matching tag");
+            AssertNotNull(noMatchResult, "noMatchResult");
+            AssertEquals(noMatchResult.Results.Count, 0, "should find no documents with non-matching tag");
         }
 
         private async Task TestSearchWithLabelsAndTagsAsync()
@@ -670,15 +626,15 @@ namespace Verbex.Sdk.TestHarness
             _TestDocuments.Add(docId);
 
             // Search with both label and tag filters
-            ApiResponse<SearchData> response = await _Client!.SearchAsync(
+            SearchData searchResult = await _Client!.SearchAsync(
                 _TestIndexId,
                 "comprehensive",
                 100,
                 new List<string> { "combined" },
                 new Dictionary<string, object> { { "combinedcategory", "both" } }
             ).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertGreaterThan(response.Data!.Results.Count, 0, "should find documents matching both label and tag");
+            AssertNotNull(searchResult, "searchResult");
+            AssertGreaterThan(searchResult.Results.Count, 0, "should find documents matching both label and tag");
         }
 
         // ==================== Document Deletion Tests ====================
@@ -691,12 +647,8 @@ namespace Verbex.Sdk.TestHarness
             }
             string docId = _TestDocuments[^1];
             _TestDocuments.RemoveAt(_TestDocuments.Count - 1);
-            ApiResponse<DeleteDocumentData> response = await _Client!.DeleteDocumentAsync(_TestIndexId, docId).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 200, "response.StatusCode");
-            AssertNotNull(response.Data, "response.Data");
-            AssertEquals(response.Data!.DocumentId, docId, "data.DocumentId");
-            AssertNotNull(response.Data.Message, "data.Message");
+            await _Client!.DeleteDocumentAsync(_TestIndexId, docId).ConfigureAwait(false);
+            // If we get here without exception, the delete succeeded
         }
 
         private async Task TestDeleteDocumentNotFoundAsync()
@@ -737,12 +689,8 @@ namespace Verbex.Sdk.TestHarness
 
         private async Task TestDeleteIndexAsync()
         {
-            ApiResponse<DeleteIndexData> response = await _Client!.DeleteIndexAsync(_TestIndexId).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 200, "response.StatusCode");
-            AssertNotNull(response.Data, "response.Data");
-            AssertEquals(response.Data!.IndexId, _TestIndexId, "data.IndexId");
-            AssertNotNull(response.Data.Message, "data.Message");
+            await _Client!.DeleteIndexAsync(_TestIndexId).ConfigureAwait(false);
+            // If we get here without exception, the delete succeeded
         }
 
         private async Task TestDeleteIndexNotFoundAsync()
@@ -831,7 +779,6 @@ namespace Verbex.Sdk.TestHarness
                 await RunTestAsync("Search multiple terms", TestSearchMultipleTermsAsync).ConfigureAwait(false);
                 await RunTestAsync("Search with max results", TestSearchMaxResultsAsync).ConfigureAwait(false);
                 await RunTestAsync("Search with no results", TestSearchNoResultsAsync).ConfigureAwait(false);
-                await RunTestAsync("Search documents helper", TestSearchDocumentsHelperAsync).ConfigureAwait(false);
                 await RunTestAsync("Search with label filter", TestSearchWithLabelFilterAsync).ConfigureAwait(false);
                 await RunTestAsync("Search with tag filter", TestSearchWithTagFilterAsync).ConfigureAwait(false);
                 await RunTestAsync("Search with labels and tags", TestSearchWithLabelsAndTagsAsync).ConfigureAwait(false);

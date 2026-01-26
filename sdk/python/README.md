@@ -2,6 +2,8 @@
 
 A comprehensive Python SDK for interacting with the Verbex Inverted Index REST API.
 
+All methods return domain objects directly rather than wrapped responses.
+
 ## Installation
 
 ```bash
@@ -16,29 +18,29 @@ from verbex_sdk import VerbexClient
 # Create client
 client = VerbexClient("http://localhost:8080", "verbexadmin")
 
-# Health check
+# Health check - returns HealthData directly
 health = client.health_check()
-print(f"Server status: {health.data['status']}")
+print(f"Server status: {health.status}")
 
-# Create an index
-client.create_index(
-    id="my-index",
+# Create an index - returns IndexInfo directly
+index = client.create_index(
     name="My Index",
     description="A test index",
     in_memory=True
 )
+print(f"Created index: {index.identifier}")
 
-# Add documents
-client.add_document("my-index", "The quick brown fox jumps over the lazy dog.")
-client.add_document("my-index", "Machine learning is transforming industries.")
+# Add documents - returns AddDocumentData directly
+doc1 = client.add_document(index.identifier, "The quick brown fox jumps over the lazy dog.")
+doc2 = client.add_document(index.identifier, "Machine learning is transforming industries.")
 
-# Search
-results = client.search_documents("my-index", "fox")
+# Search - returns SearchData directly
+results = client.search(index.identifier, "fox")
 for result in results.results:
     print(f"Document: {result.document_id}, Score: {result.score}")
 
 # Cleanup
-client.delete_index("my-index")
+client.delete_index(index.identifier)
 client.close()
 ```
 
@@ -59,28 +61,67 @@ python test_harness.py http://localhost:8080 verbexadmin
 - `VerbexClient(endpoint: str, access_key: str)` - Create a new client
 
 #### Health Endpoints
-- `health_check()` - Check server health via /v1.0/health
-- `root_health_check()` - Check server health via root endpoint
+- `health_check()` - Returns `HealthData`
+- `root_health_check()` - Returns `HealthData`
 
 #### Authentication
-- `login(username: str, password: str)` - Authenticate and get token
-- `validate_token()` - Validate current token
+- `login_with_credentials(tenant_id, email, password)` - Returns `LoginResult`
+- `login_with_token(bearer_token)` - Returns `LoginResult`
+- `validate_token()` - Returns `ValidationData`
 
 #### Index Management
-- `list_indices()` - List all indices
-- `get_indices()` - Get all indices as IndexInfo objects
-- `create_index(...)` - Create a new index
-- `get_index(index_id: str)` - Get index details
-- `get_index_info(index_id: str)` - Get index as IndexInfo object
-- `delete_index(index_id: str)` - Delete an index
+- `list_indices()` - Returns `List[IndexInfo]`
+- `create_index(...)` - Returns `IndexInfo`
+- `get_index(index_id)` - Returns `IndexInfo`
+- `index_exists(index_id)` - Returns `bool`
+- `delete_index(index_id)` - Returns `None`
+- `update_index_labels(index_id, labels)` - Returns `None`
+- `update_index_tags(index_id, tags)` - Returns `None`
+- `update_index_custom_metadata(index_id, custom_metadata)` - Returns `IndexInfo`
 
 #### Document Management
-- `list_documents(index_id: str)` - List all documents
-- `get_documents(index_id: str)` - Get all documents as DocumentInfo objects
-- `add_document(index_id: str, content: str, document_id: str = None)` - Add document
-- `get_document(index_id: str, document_id: str)` - Get document details
-- `delete_document(index_id: str, document_id: str)` - Delete document
+- `list_documents(index_id)` - Returns `List[DocumentInfo]`
+- `add_document(index_id, content, document_id?, labels?, tags?, custom_metadata?)` - Returns `AddDocumentData`
+- `get_document(index_id, document_id)` - Returns `DocumentInfo`
+- `document_exists(index_id, document_id)` - Returns `bool`
+- `delete_document(index_id, document_id)` - Returns `None`
+- `update_document_labels(index_id, document_id, labels)` - Returns `None`
+- `update_document_tags(index_id, document_id, tags)` - Returns `None`
+- `update_document_custom_metadata(index_id, document_id, custom_metadata)` - Returns `DocumentInfo`
 
 #### Search
-- `search(index_id: str, query: str, max_results: int = 100)` - Search documents
-- `search_documents(...)` - Search and return SearchResponse object
+- `search(index_id, query, max_results?, labels?, tags?)` - Returns `SearchData`
+
+#### Admin - Tenant Management
+- `list_tenants()` - Returns `List[TenantInfo]`
+- `get_tenant(tenant_id)` - Returns `TenantInfo`
+- `create_tenant(name, description?)` - Returns `TenantInfo`
+- `delete_tenant(tenant_id)` - Returns `None`
+
+#### Admin - User Management
+- `list_users(tenant_id)` - Returns `List[UserInfo]`
+- `get_user(tenant_id, user_id)` - Returns `UserInfo`
+- `create_user(tenant_id, email, password, ...)` - Returns `UserInfo`
+- `delete_user(tenant_id, user_id)` - Returns `None`
+
+#### Admin - Credential Management
+- `list_credentials(tenant_id)` - Returns `List[CredentialInfo]`
+- `get_credential(tenant_id, credential_id)` - Returns `CredentialInfo`
+- `create_credential(tenant_id, description?)` - Returns `CredentialInfo`
+- `delete_credential(tenant_id, credential_id)` - Returns `None`
+
+## Model Classes
+
+- `HealthData` - Health check response (status, version, timestamp)
+- `ValidationData` - Token validation result
+- `LoginResult` - Login attempt result
+- `IndexInfo` - Index information with statistics
+- `IndexStatistics` - Index statistics (document_count, term_count, etc.)
+- `DocumentInfo` - Document information
+- `AddDocumentData` - Add document response (document_id, message)
+- `SearchData` - Search response with results
+- `SearchResult` - Individual search result
+- `TenantInfo` - Tenant information
+- `UserInfo` - User information
+- `CredentialInfo` - Credential/API key information
+- `VerbexError` - Exception raised for API errors
