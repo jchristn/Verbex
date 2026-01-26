@@ -95,7 +95,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"Username\": \"admin\",\n    \"Password\": \"password\"\n}"
+							"raw": "{\n    \"TenantId\": null,\n    \"Username\": \"admin\",\n    \"Password\": \"password\"\n}"
 						},
 						"url": {
 							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/auth/login",
@@ -110,7 +110,7 @@
 								"login"
 							]
 						},
-						"description": "Authenticate with username and password. Returns a token on successful authentication. Default credentials: admin/password"
+						"description": "Authenticate with username and password. TenantId is optional - set to a tenant identifier for tenant-scoped authentication, or null/omit for global admin authentication. Default credentials: admin/password"
 					},
 					"response": []
 				},

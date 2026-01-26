@@ -475,6 +475,86 @@
             Request processing time in milliseconds.
             </summary>
         </member>
+        <member name="T:Verbex.Sdk.AuthenticationResultEnum">
+            <summary>
+            Specifies the result of an authentication attempt.
+            </summary>
+        </member>
+        <member name="F:Verbex.Sdk.AuthenticationResultEnum.Success">
+            <summary>
+            Authentication was successful.
+            </summary>
+        </member>
+        <member name="F:Verbex.Sdk.AuthenticationResultEnum.NotAuthenticated">
+            <summary>
+            No authentication was attempted (no credentials provided).
+            </summary>
+        </member>
+        <member name="F:Verbex.Sdk.AuthenticationResultEnum.MissingCredentials">
+            <summary>
+            Required credentials were missing from the request.
+            </summary>
+        </member>
+        <member name="F:Verbex.Sdk.AuthenticationResultEnum.NotFound">
+            <summary>
+            The specified user, tenant, or administrator was not found.
+            </summary>
+        </member>
+        <member name="F:Verbex.Sdk.AuthenticationResultEnum.Inactive">
+            <summary>
+            The account exists but is inactive (disabled).
+            </summary>
+        </member>
+        <member name="F:Verbex.Sdk.AuthenticationResultEnum.InvalidCredentials">
+            <summary>
+            The provided credentials (password or bearer token) were invalid.
+            </summary>
+        </member>
+        <member name="F:Verbex.Sdk.AuthenticationResultEnum.TenantNotFound">
+            <summary>
+            The specified tenant was not found.
+            </summary>
+        </member>
+        <member name="F:Verbex.Sdk.AuthenticationResultEnum.TenantInactive">
+            <summary>
+            The tenant exists but is inactive (disabled).
+            </summary>
+        </member>
+        <member name="F:Verbex.Sdk.AuthenticationResultEnum.TenantAccessDenied">
+            <summary>
+            The user does not have permission to access the requested tenant.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.AuthorizationResultEnum">
+            <summary>
+            Specifies the result of an authorization check.
+            </summary>
+        </member>
+        <member name="F:Verbex.Sdk.AuthorizationResultEnum.Authorized">
+            <summary>
+            Authorization was successful; the user has access to the requested resource.
+            </summary>
+        </member>
+        <member name="F:Verbex.Sdk.AuthorizationResultEnum.Unauthorized">
+            <summary>
+            Authorization failed; the user is not authorized.
+            </summary>
+        </member>
+        <member name="F:Verbex.Sdk.AuthorizationResultEnum.InsufficientPrivileges">
+            <summary>
+            The user is authenticated but lacks sufficient privileges for this operation.
+            </summary>
+        </member>
+        <member name="F:Verbex.Sdk.AuthorizationResultEnum.ResourceNotFound">
+            <summary>
+            The requested resource was not found.
+            </summary>
+        </member>
+        <member name="F:Verbex.Sdk.AuthorizationResultEnum.AccessDenied">
+            <summary>
+            Access to the requested resource is denied.
+            </summary>
+        </member>
         <member name="T:Verbex.Sdk.CreateIndexData">
             <summary>
             Create index response data.
@@ -493,6 +573,12 @@
         <member name="T:Verbex.Sdk.CreateIndexRequest">
             <summary>
             Request body for creating a new index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateIndexRequest.TenantId">
+            <summary>
+            Tenant ID for the index.
+            Required for global admin users, ignored for tenant users.
             </summary>
         </member>
         <member name="P:Verbex.Sdk.CreateIndexRequest.Name">
@@ -812,7 +898,22 @@
         </member>
         <member name="P:Verbex.Sdk.LoginData.Username">
             <summary>
-            Authenticated username.
+            Authenticated username or email.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginData.Email">
+            <summary>
+            The email address of the authenticated user.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginData.IsAdmin">
+            <summary>
+            Indicates whether the user is a tenant administrator.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginData.IsGlobalAdmin">
+            <summary>
+            Indicates whether the user is a global administrator.
             </summary>
         </member>
         <member name="T:Verbex.Sdk.LoginRequest">
@@ -830,6 +931,11 @@
             Password for authentication.
             </summary>
         </member>
+        <member name="P:Verbex.Sdk.LoginRequest.TenantId">
+            <summary>
+            Tenant ID for tenant-scoped authentication.
+            </summary>
+        </member>
         <member name="M:Verbex.Sdk.LoginRequest.#ctor">
             <summary>
             Instantiate an empty LoginRequest.
@@ -841,6 +947,95 @@
             </summary>
             <param name="username">Username for authentication.</param>
             <param name="password">Password for authentication.</param>
+        </member>
+        <member name="M:Verbex.Sdk.LoginRequest.#ctor(System.String,System.String,System.String)">
+            <summary>
+            Instantiate a LoginRequest with credentials and tenant ID.
+            </summary>
+            <param name="tenantId">Tenant ID for tenant-scoped authentication.</param>
+            <param name="username">Username for authentication.</param>
+            <param name="password">Password for authentication.</param>
+        </member>
+        <member name="T:Verbex.Sdk.LoginResult">
+            <summary>
+            Result of a login attempt, containing authentication and authorization status along with session context.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginResult.Success">
+            <summary>
+            Indicates whether the login was successful.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginResult.AuthenticationResult">
+            <summary>
+            The result of the authentication attempt.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginResult.AuthorizationResult">
+            <summary>
+            The result of the authorization check.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginResult.ErrorMessage">
+            <summary>
+            Error message if the login failed.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginResult.Token">
+            <summary>
+            Bearer token for authenticated requests. Only populated on successful login.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginResult.TenantId">
+            <summary>
+            The tenant identifier for the authenticated session.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginResult.UserId">
+            <summary>
+            The user identifier for the authenticated session.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginResult.Email">
+            <summary>
+            The email address of the authenticated user.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginResult.IsAdmin">
+            <summary>
+            Indicates whether the authenticated user is a tenant administrator.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.LoginResult.IsGlobalAdmin">
+            <summary>
+            Indicates whether the authenticated user is a global administrator.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.LoginResult.#ctor">
+            <summary>
+            Instantiate an empty LoginResult.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.LoginResult.Successful(System.String,System.String,System.String,System.String,System.Boolean,System.Boolean)">
+            <summary>
+            Create a successful login result.
+            </summary>
+            <param name="token">The bearer token.</param>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="userId">The user identifier.</param>
+            <param name="email">The user's email address.</param>
+            <param name="isAdmin">Whether the user is a tenant admin.</param>
+            <param name="isGlobalAdmin">Whether the user is a global admin.</param>
+            <returns>A successful LoginResult.</returns>
+        </member>
+        <member name="M:Verbex.Sdk.LoginResult.Failed(Verbex.Sdk.AuthenticationResultEnum,Verbex.Sdk.AuthorizationResultEnum,System.String)">
+            <summary>
+            Create a failed login result.
+            </summary>
+            <param name="authenticationResult">The authentication result.</param>
+            <param name="authorizationResult">The authorization result.</param>
+            <param name="errorMessage">The error message.</param>
+            <returns>A failed LoginResult.</returns>
         </member>
         <member name="T:Verbex.Sdk.SearchData">
             <summary>
@@ -948,6 +1143,31 @@
             Indicates whether the token is valid.
             </summary>
         </member>
+        <member name="P:Verbex.Sdk.ValidationData.TenantId">
+            <summary>
+            The tenant identifier associated with the token.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ValidationData.UserId">
+            <summary>
+            The user identifier associated with the token.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ValidationData.Email">
+            <summary>
+            The email address associated with the token.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ValidationData.IsAdmin">
+            <summary>
+            Indicates whether the user is a tenant administrator.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.ValidationData.IsGlobalAdmin">
+            <summary>
+            Indicates whether the user is a global administrator.
+            </summary>
+        </member>
         <member name="T:Verbex.Sdk.VerbexClient">
             <summary>
             Verbex SDK Client for .NET.
@@ -993,7 +1213,25 @@
             <returns>Health check response.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
-        <member name="M:Verbex.Sdk.VerbexClient.LoginAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Sdk.VerbexClient.LoginAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Authenticates with tenant ID, email, and password.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="email">The user's email address.</param>
+            <param name="password">The user's password.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Login result indicating success or failure with context.</returns>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.LoginAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Authenticates with an existing bearer token by validating it against the server.
+            </summary>
+            <param name="bearerToken">The bearer token to validate and use.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Login result indicating success or failure with context.</returns>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.LoginLegacyAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Authenticates and receives a bearer token.
             </summary>
@@ -1027,7 +1265,7 @@
             <returns>List of IndexInfo objects.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
-        <member name="M:Verbex.Sdk.VerbexClient.CreateIndexAsync(System.String,System.String,System.Boolean,System.Boolean,System.Boolean,System.Int32,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Sdk.VerbexClient.CreateIndexAsync(System.String,System.String,System.Boolean,System.Boolean,System.Boolean,System.Int32,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.String,System.Threading.CancellationToken)">
             <summary>
             Creates a new index.
             </summary>
@@ -1040,6 +1278,7 @@
             <param name="maxTokenLength">Maximum token length (0 to disable).</param>
             <param name="labels">Optional list of labels to associate with the index.</param>
             <param name="tags">Optional key-value tags to associate with the index.</param>
+            <param name="tenantId">Tenant ID (required for global admin users, optional for tenant users).</param>
             <param name="cancellationToken">Cancellation token.</param>
             <returns>Created index response.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when creation fails.</exception>

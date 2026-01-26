@@ -177,10 +177,17 @@ All API responses are wrapped in a standard format:
 **Request Body:**
 ```json
 {
+  "TenantId": "string (optional - for tenant-scoped authentication)",
   "Username": "admin",
   "Password": "password"
 }
 ```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| TenantId | string | No | Tenant identifier for tenant-scoped authentication. If omitted, authenticates as global admin. |
+| Username | string | Yes | User's email or username |
+| Password | string | Yes | User's password |
 
 **Response:**
 ```json
@@ -192,7 +199,11 @@ All API responses are wrapped in a standard format:
   "ErrorMessage": null,
   "Data": {
     "Token": "base64-encoded-token-here",
-    "Username": "admin"
+    "Username": "admin",
+    "Email": "admin@example.com",
+    "TenantId": "tenant-id-if-applicable",
+    "IsAdmin": true,
+    "IsGlobalAdmin": true
   },
   "Headers": {},
   "TotalCount": null,

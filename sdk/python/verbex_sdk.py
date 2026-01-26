@@ -5,9 +5,91 @@ A comprehensive SDK for interacting with the Verbex Inverted Index REST API.
 
 import requests
 import json
+import warnings
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
+
+
+class AuthenticationResult(Enum):
+    """Enumeration of authentication result values."""
+    SUCCESS = "Success"
+    NOT_AUTHENTICATED = "NotAuthenticated"
+    MISSING_CREDENTIALS = "MissingCredentials"
+    NOT_FOUND = "NotFound"
+    INACTIVE = "Inactive"
+    INVALID_CREDENTIALS = "InvalidCredentials"
+    TENANT_NOT_FOUND = "TenantNotFound"
+    TENANT_INACTIVE = "TenantInactive"
+    TENANT_ACCESS_DENIED = "TenantAccessDenied"
+
+
+class AuthorizationResult(Enum):
+    """Enumeration of authorization result values."""
+    AUTHORIZED = "Authorized"
+    UNAUTHORIZED = "Unauthorized"
+    INSUFFICIENT_PRIVILEGES = "InsufficientPrivileges"
+    RESOURCE_NOT_FOUND = "ResourceNotFound"
+    ACCESS_DENIED = "AccessDenied"
+
+
+@dataclass
+class LoginResult:
+    """Result of a login attempt."""
+    success: bool
+    authentication_result: AuthenticationResult
+    authorization_result: AuthorizationResult
+    error_message: Optional[str]
+    token: Optional[str]
+    tenant_id: Optional[str]
+    user_id: Optional[str]
+    email: Optional[str]
+    is_admin: bool
+    is_global_admin: bool
+
+    @staticmethod
+    def successful(
+        token: str,
+        tenant_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        email: Optional[str] = None,
+        is_admin: bool = False,
+        is_global_admin: bool = False
+    ) -> 'LoginResult':
+        """Create a successful login result."""
+        return LoginResult(
+            success=True,
+            authentication_result=AuthenticationResult.SUCCESS,
+            authorization_result=AuthorizationResult.AUTHORIZED,
+            error_message=None,
+            token=token,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            email=email,
+            is_admin=is_admin,
+            is_global_admin=is_global_admin
+        )
+
+    @staticmethod
+    def failed(
+        authentication_result: AuthenticationResult,
+        authorization_result: AuthorizationResult,
+        error_message: Optional[str] = None
+    ) -> 'LoginResult':
+        """Create a failed login result."""
+        return LoginResult(
+            success=False,
+            authentication_result=authentication_result,
+            authorization_result=authorization_result,
+            error_message=error_message,
+            token=None,
+            tenant_id=None,
+            user_id=None,
+            email=None,
+            is_admin=False,
+            is_global_admin=False
+        )
 
 
 def _to_camel_case_keys(obj: Any) -> Any:
@@ -81,6 +163,11 @@ class IndexInfo:
     labels: Optional[List[str]]
     tags: Optional[Dict[str, str]]
     custom_metadata: Optional[Any] = None
+
+    @property
+    def id(self) -> str:
+        """Alias for identifier for convenience."""
+        return self.identifier
 
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> 'IndexInfo':
@@ -361,9 +448,121 @@ class VerbexClient:
 
     # ==================== Authentication Endpoints ====================
 
+    def login_with_credentials(self, tenant_id: str, email: str, password: str) -> LoginResult:
+        """
+        Authenticate with tenant ID, email, and password.
+
+        Args:
+            tenant_id: The tenant identifier
+            email: The user's email address
+            password: The user's password
+
+        Returns:
+            LoginResult indicating success or failure with context
+        """
+        if not tenant_id:
+            raise ValueError("tenant_id is required")
+        if not email:
+            raise ValueError("email is required")
+        if not password:
+            raise ValueError("password is required")
+
+        try:
+            response = self._make_request(
+                'POST',
+                '/v1.0/auth/login',
+                data={'TenantId': tenant_id, 'Username': email, 'Password': password},
+                require_auth=False
+            )
+
+            if response.success and response.data:
+                return LoginResult.successful(
+                    token=response.data.get('token', ''),
+                    tenant_id=tenant_id,
+                    email=email,
+                    is_admin=response.data.get('isAdmin', False),
+                    is_global_admin=response.data.get('isGlobalAdmin', False)
+                )
+
+            return LoginResult.failed(
+                AuthenticationResult.INVALID_CREDENTIALS,
+                AuthorizationResult.UNAUTHORIZED,
+                response.error_message or "Login failed"
+            )
+        except VerbexError as e:
+            if e.status_code == 401:
+                auth_result = AuthenticationResult.INVALID_CREDENTIALS
+                authz_result = AuthorizationResult.UNAUTHORIZED
+            elif e.status_code == 403:
+                auth_result = AuthenticationResult.TENANT_ACCESS_DENIED
+                authz_result = AuthorizationResult.ACCESS_DENIED
+            elif e.status_code == 404:
+                auth_result = AuthenticationResult.NOT_FOUND
+                authz_result = AuthorizationResult.RESOURCE_NOT_FOUND
+            else:
+                auth_result = AuthenticationResult.NOT_AUTHENTICATED
+                authz_result = AuthorizationResult.UNAUTHORIZED
+
+            return LoginResult.failed(auth_result, authz_result, str(e))
+
+    def login_with_token(self, bearer_token: str) -> LoginResult:
+        """
+        Authenticate with an existing bearer token by validating it against the server.
+
+        Args:
+            bearer_token: The bearer token to validate and use
+
+        Returns:
+            LoginResult indicating success or failure with context
+        """
+        if not bearer_token:
+            raise ValueError("bearer_token is required")
+
+        original_access_key = self._access_key
+
+        try:
+            # Temporarily use the provided bearer token
+            self._access_key = bearer_token
+
+            response = self._make_request('GET', '/v1.0/auth/validate', require_auth=True)
+
+            if response.success and response.data and response.data.get('valid'):
+                return LoginResult.successful(
+                    token=bearer_token,
+                    tenant_id=response.data.get('tenantId'),
+                    user_id=response.data.get('userId'),
+                    email=response.data.get('email'),
+                    is_admin=response.data.get('isAdmin', False),
+                    is_global_admin=response.data.get('isGlobalAdmin', False)
+                )
+
+            # Restore original access key on failure
+            self._access_key = original_access_key
+
+            return LoginResult.failed(
+                AuthenticationResult.INVALID_CREDENTIALS,
+                AuthorizationResult.UNAUTHORIZED,
+                "Bearer token validation failed"
+            )
+        except VerbexError as e:
+            # Restore original access key on exception
+            self._access_key = original_access_key
+
+            if e.status_code == 401:
+                auth_result = AuthenticationResult.INVALID_CREDENTIALS
+            elif e.status_code == 403:
+                auth_result = AuthenticationResult.TENANT_ACCESS_DENIED
+            else:
+                auth_result = AuthenticationResult.NOT_AUTHENTICATED
+
+            return LoginResult.failed(auth_result, AuthorizationResult.UNAUTHORIZED, str(e))
+
     def login(self, username: str, password: str) -> ApiResponse:
         """
         Authenticate and receive a bearer token.
+
+        .. deprecated::
+            Use login_with_credentials(tenant_id, email, password) or login_with_token(bearer_token) instead.
 
         Args:
             username: The username
@@ -372,6 +571,11 @@ class VerbexClient:
         Returns:
             ApiResponse containing the token and username on success
         """
+        warnings.warn(
+            "login() is deprecated. Use login_with_credentials(tenant_id, email, password) or login_with_token(bearer_token) instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         return self._make_request(
             'POST',
             '/v1.0/auth/login',

@@ -1577,11 +1577,21 @@ namespace Verbex.Server.API.REST
 
                 try
                 {
-                    // Add the document
-                    string documentPath = documentRequest.Id ?? IdGenerator.GenerateDocumentId();
-                    string documentId = await index.AddDocumentAsync(
-                        documentPath,
-                        documentRequest.Content).ConfigureAwait(false);
+                    // Add the document - use the correct overload based on whether ID is provided
+                    string documentId;
+                    if (!String.IsNullOrEmpty(documentRequest.Id))
+                    {
+                        // Use provided ID
+                        documentId = documentRequest.Id;
+                        await index.AddDocumentAsync(documentId, documentId, documentRequest.Content).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        // Let the index generate an ID
+                        documentId = await index.AddDocumentAsync(
+                            IdGenerator.GenerateDocumentId(),
+                            documentRequest.Content).ConfigureAwait(false);
+                    }
 
                     // Add labels if provided (batch operation)
                     if (documentRequest.Labels != null && documentRequest.Labels.Count > 0)
@@ -1828,6 +1838,7 @@ namespace Verbex.Server.API.REST
                             Query = searchRequest.Query,
                             Results = searchResults.Results,
                             TotalCount = searchResults.TotalCount,
+                            MaxResults = searchRequest.MaxResults,
                             SearchTime = searchResults.SearchTime.TotalMilliseconds
                         }
                     };

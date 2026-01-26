@@ -39,12 +39,28 @@ namespace Verbex.Sdk
             }
         }
 
+        /// <summary>
+        /// Tenant ID for tenant-scoped authentication.
+        /// </summary>
+        public string? TenantId
+        {
+            get
+            {
+                return _TenantId;
+            }
+            set
+            {
+                _TenantId = value;
+            }
+        }
+
         #endregion
 
         #region Private-Members
 
         private string _Username = "";
         private string _Password = "";
+        private string? _TenantId = null;
 
         #endregion
 
@@ -64,6 +80,19 @@ namespace Verbex.Sdk
         /// <param name="password">Password for authentication.</param>
         public LoginRequest(string username, string password)
         {
+            Username = username;
+            Password = password;
+        }
+
+        /// <summary>
+        /// Instantiate a LoginRequest with credentials and tenant ID.
+        /// </summary>
+        /// <param name="tenantId">Tenant ID for tenant-scoped authentication.</param>
+        /// <param name="username">Username for authentication.</param>
+        /// <param name="password">Password for authentication.</param>
+        public LoginRequest(string tenantId, string username, string password)
+        {
+            TenantId = tenantId;
             Username = username;
             Password = password;
         }

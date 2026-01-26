@@ -12,7 +12,7 @@
  *     node test-harness.js http://localhost:8080 verbexadmin
  */
 
-const { VerbexClient, VerbexError } = require('./verbex-sdk.js');
+const { VerbexClient, VerbexError, LoginResult, AuthenticationResult, AuthorizationResult } = require('./verbex-sdk.js');
 const crypto = require('crypto');
 
 /**
@@ -35,7 +35,7 @@ class TestHarness {
         this._endpoint = endpoint;
         this._accessKey = accessKey;
         this._client = null;
-        this._testIndexId = `test-index-${crypto.randomBytes(4).toString('hex')}`;
+        this._testIndexId = '';  // Will be set after index creation
         this._testDocuments = [];
         this._results = [];
         this._passed = 0;
@@ -131,24 +131,40 @@ class TestHarness {
 
     // ==================== Authentication Tests ====================
 
-    async testLoginSuccess() {
-        const response = await this._client.login('admin', 'password');
-        this._assertTrue(response.success, 'response.success');
-        this._assertEquals(response.statusCode, 200, 'response.statusCode');
-        this._assertNotNull(response.data, 'response.data');
-        this._assertNotNull(response.data.token, 'data.token');
-        this._assertEquals(response.data.username, 'admin', 'data.username');
+    async testLoginWithCredentialsSuccess() {
+        // Test login with tenant ID, email, and password
+        // Using "default" tenant with the seeded default user credentials
+        const result = await this._client.loginWithCredentials('default', 'default@user.com', 'password');
+        this._assertTrue(result.success, 'result.success');
+        this._assertEquals(result.authenticationResult, AuthenticationResult.Success, 'result.authenticationResult');
+        this._assertEquals(result.authorizationResult, AuthorizationResult.Authorized, 'result.authorizationResult');
+        this._assertNotNull(result.token, 'result.token');
     }
 
-    async testLoginInvalidCredentials() {
-        try {
-            await this._client.login('invalid', 'invalid');
-            this._assert(false, 'Should have thrown VerbexError');
-        } catch (error) {
-            if (!(error instanceof VerbexError)) throw error;
-            this._assertEquals(error.statusCode, 401, 'error.statusCode');
-            this._assertNotNull(error.message, 'error.message');
-        }
+    async testLoginWithCredentialsInvalid() {
+        // Test login with invalid credentials - should not throw, just return failure
+        const result = await this._client.loginWithCredentials('default', 'invalid@example.com', 'wrongpassword');
+        this._assertFalse(result.success, 'result.success should be false');
+        this._assert(result.authenticationResult !== AuthenticationResult.Success, 'authenticationResult should not be Success');
+        this._assertNotNull(result.errorMessage, 'result.errorMessage');
+    }
+
+    async testLoginWithTokenSuccess() {
+        // Test login with a valid bearer token
+        const result = await this._client.loginWithToken(this._accessKey);
+        this._assertTrue(result.success, 'result.success');
+        this._assertEquals(result.authenticationResult, AuthenticationResult.Success, 'result.authenticationResult');
+        this._assertEquals(result.authorizationResult, AuthorizationResult.Authorized, 'result.authorizationResult');
+        this._assertNotNull(result.token, 'result.token');
+        this._assertEquals(result.token, this._accessKey, 'result.token should match input');
+    }
+
+    async testLoginWithTokenInvalid() {
+        // Test login with an invalid bearer token - should not throw, just return failure
+        const result = await this._client.loginWithToken('invalid-bearer-token-12345');
+        this._assertFalse(result.success, 'result.success should be false');
+        this._assert(result.authenticationResult !== AuthenticationResult.Success, 'authenticationResult should not be Success');
+        this._assertNotNull(result.errorMessage, 'result.errorMessage');
     }
 
     async testValidateToken() {
@@ -183,25 +199,27 @@ class TestHarness {
 
     async testCreateIndex() {
         const response = await this._client.createIndex({
-            id: this._testIndexId,
             name: 'Test Index',
             description: 'A test index for SDK validation',
-            inMemory: true,
-            storageMode: 'MemoryOnly'
+            inMemory: true
         });
         this._assertTrue(response.success, 'response.success');
         this._assertEquals(response.statusCode, 201, 'response.statusCode');
         this._assertNotNull(response.data, 'response.data');
         this._assertNotNull(response.data.message, 'data.message');
         this._assertNotNull(response.data.index, 'data.index');
-        this._assertEquals(response.data.index.id, this._testIndexId, 'index.id');
+        this._assertNotNull(response.data.index.identifier, 'index.identifier');
         this._assertEquals(response.data.index.name, 'Test Index', 'index.name');
+        // Store the returned index ID for subsequent tests
+        this._testIndexId = response.data.index.identifier;
     }
 
     async testCreateDuplicateIndex() {
+        // Creating an index with the same name should fail with 409 Conflict
+        // The server enforces unique index names within a tenant
         try {
-            await this._client.createIndex({ id: this._testIndexId, name: 'Duplicate' });
-            this._assert(false, 'Should have thrown VerbexError for duplicate');
+            await this._client.createIndex({ name: 'Test Index', description: 'Duplicate name index', inMemory: true });
+            this._assert(false, 'Should have thrown VerbexError for duplicate name');
         } catch (error) {
             if (!(error instanceof VerbexError)) throw error;
             this._assertEquals(error.statusCode, 409, 'error.statusCode');
@@ -213,7 +231,7 @@ class TestHarness {
         this._assertTrue(response.success, 'response.success');
         this._assertEquals(response.statusCode, 200, 'response.statusCode');
         this._assertNotNull(response.data, 'response.data');
-        this._assertEquals(response.data.id, this._testIndexId, 'data.id');
+        this._assertEquals(response.data.identifier, this._testIndexId, 'data.identifier');
         this._assertEquals(response.data.name, 'Test Index', 'data.name');
         this._assertNotNull(response.data.createdUtc, 'data.createdUtc');
     }
@@ -230,20 +248,17 @@ class TestHarness {
 
     async testListIndicesAfterCreate() {
         const indices = await this._client.getIndices();
-        const found = indices.some(idx => idx.id === this._testIndexId);
+        const found = indices.some(idx => idx.identifier === this._testIndexId);
         this._assertTrue(found, 'test index should be in list');
     }
 
     async testCreateIndexWithLabelsAndTags() {
-        const indexId = `test-labeled-${crypto.randomBytes(4).toString('hex')}`;
         const labels = ['test', 'labeled'];
         const tags = { environment: 'testing', owner: 'sdk-harness' };
         const response = await this._client.createIndex({
-            id: indexId,
             name: 'Labeled Test Index',
             description: 'An index with labels and tags',
             inMemory: true,
-            storageMode: 'MemoryOnly',
             labels: labels,
             tags: tags
         });
@@ -251,21 +266,24 @@ class TestHarness {
         this._assertEquals(response.statusCode, 201, 'response.statusCode');
         this._assertNotNull(response.data, 'response.data');
         this._assertNotNull(response.data.index, 'data.index');
-        // Clean up
-        await this._client.deleteIndex(indexId);
+        // Clean up using the returned identifier
+        const indexId = response.data.index.identifier;
+        if (indexId) {
+            await this._client.deleteIndex(indexId);
+        }
     }
 
     async testGetIndexWithLabelsAndTags() {
-        const indexId = `test-labeled-get-${crypto.randomBytes(4).toString('hex')}`;
         const labels = ['retrieval', 'test'];
         const tags = { purpose: 'verification', version: '1.0' };
-        await this._client.createIndex({
-            id: indexId,
+        const createResponse = await this._client.createIndex({
             name: 'Get Labeled Index',
             inMemory: true,
             labels: labels,
             tags: tags
         });
+        const indexId = createResponse.data.index.identifier;
+        this._assertNotNull(indexId, 'created index identifier');
         const response = await this._client.getIndex(indexId);
         this._assertTrue(response.success, 'response.success');
         this._assertNotNull(response.data, 'response.data');
@@ -653,7 +671,6 @@ class TestHarness {
 
         this._printHeader('Verbex SDK Test Harness - JavaScript');
         console.log(`  Endpoint: ${this._endpoint}`);
-        console.log(`  Test Index: ${this._testIndexId}`);
         console.log(`  Started: ${new Date().toISOString()}`);
 
         this._client = new VerbexClient(this._endpoint, this._accessKey);
@@ -666,8 +683,10 @@ class TestHarness {
 
             // Authentication Tests
             this._printSubheader('Authentication');
-            await this._runTest('Login with valid credentials', () => this.testLoginSuccess());
-            await this._runTest('Login with invalid credentials', () => this.testLoginInvalidCredentials());
+            await this._runTest('Login with credentials (success)', () => this.testLoginWithCredentialsSuccess());
+            await this._runTest('Login with credentials (invalid)', () => this.testLoginWithCredentialsInvalid());
+            await this._runTest('Login with bearer token (success)', () => this.testLoginWithTokenSuccess());
+            await this._runTest('Login with bearer token (invalid)', () => this.testLoginWithTokenInvalid());
             await this._runTest('Validate token', () => this.testValidateToken());
             await this._runTest('Validate invalid token', () => this.testValidateInvalidToken());
 
@@ -732,7 +751,18 @@ class TestHarness {
         console.log(`  Failed: ${this._failed}`);
         console.log(`  Duration: ${duration.toFixed(2)}s`);
         console.log(`  Result: ${this._failed === 0 ? 'SUCCESS' : 'FAILURE'}`);
-        console.log();
+
+        // Failed tests detail
+        const failedTests = this._results.filter(r => !r.passed);
+        if (failedTests.length > 0) {
+            this._printHeader('Failed Tests');
+            failedTests.forEach((failed, index) => {
+                console.log(`  ${index + 1}. ${failed.name}`);
+                console.log(`     Error: ${failed.message}`);
+                console.log(`     Duration: ${failed.durationMs.toFixed(2)}ms`);
+                console.log();
+            });
+        }
 
         return this._failed === 0 ? 0 : 1;
     }

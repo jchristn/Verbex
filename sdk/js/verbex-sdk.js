@@ -4,6 +4,94 @@
  */
 
 /**
+ * Authentication result enumeration values.
+ * @readonly
+ * @enum {string}
+ */
+const AuthenticationResult = Object.freeze({
+    Success: 'Success',
+    NotAuthenticated: 'NotAuthenticated',
+    MissingCredentials: 'MissingCredentials',
+    NotFound: 'NotFound',
+    Inactive: 'Inactive',
+    InvalidCredentials: 'InvalidCredentials',
+    TenantNotFound: 'TenantNotFound',
+    TenantInactive: 'TenantInactive',
+    TenantAccessDenied: 'TenantAccessDenied'
+});
+
+/**
+ * Authorization result enumeration values.
+ * @readonly
+ * @enum {string}
+ */
+const AuthorizationResult = Object.freeze({
+    Authorized: 'Authorized',
+    Unauthorized: 'Unauthorized',
+    InsufficientPrivileges: 'InsufficientPrivileges',
+    ResourceNotFound: 'ResourceNotFound',
+    AccessDenied: 'AccessDenied'
+});
+
+/**
+ * Result of a login attempt.
+ */
+class LoginResult {
+    /**
+     * Create a LoginResult.
+     * @param {object} data - Login result data
+     */
+    constructor(data = {}) {
+        this.success = data.success || false;
+        this.authenticationResult = data.authenticationResult || AuthenticationResult.NotAuthenticated;
+        this.authorizationResult = data.authorizationResult || AuthorizationResult.Unauthorized;
+        this.errorMessage = data.errorMessage || null;
+        this.token = data.token || null;
+        this.tenantId = data.tenantId || null;
+        this.userId = data.userId || null;
+        this.email = data.email || null;
+        this.isAdmin = data.isAdmin || false;
+        this.isGlobalAdmin = data.isGlobalAdmin || false;
+    }
+
+    /**
+     * Create a successful login result.
+     * @param {string} token - The bearer token
+     * @param {object} [options] - Additional options
+     * @returns {LoginResult} Successful login result
+     */
+    static successful(token, options = {}) {
+        return new LoginResult({
+            success: true,
+            authenticationResult: AuthenticationResult.Success,
+            authorizationResult: AuthorizationResult.Authorized,
+            token,
+            tenantId: options.tenantId || null,
+            userId: options.userId || null,
+            email: options.email || null,
+            isAdmin: options.isAdmin || false,
+            isGlobalAdmin: options.isGlobalAdmin || false
+        });
+    }
+
+    /**
+     * Create a failed login result.
+     * @param {string} authenticationResult - The authentication result
+     * @param {string} authorizationResult - The authorization result
+     * @param {string} [errorMessage] - Optional error message
+     * @returns {LoginResult} Failed login result
+     */
+    static failed(authenticationResult, authorizationResult, errorMessage = null) {
+        return new LoginResult({
+            success: false,
+            authenticationResult,
+            authorizationResult,
+            errorMessage
+        });
+    }
+}
+
+/**
  * Error thrown for Verbex API errors.
  */
 class VerbexError extends Error {
@@ -93,6 +181,14 @@ class IndexInfo {
         this.customMetadata = data.customMetadata || null;
         this.labels = data.labels || null;
         this.tags = data.tags || null;
+    }
+
+    /**
+     * Alias for identifier for convenience.
+     * @returns {string} The index identifier
+     */
+    get id() {
+        return this.identifier;
     }
 }
 
@@ -328,12 +424,114 @@ class VerbexClient {
     // ==================== Authentication Endpoints ====================
 
     /**
+     * Authenticate with tenant ID, email, and password.
+     * @param {string} tenantId - The tenant identifier
+     * @param {string} email - The user's email address
+     * @param {string} password - The user's password
+     * @returns {Promise<LoginResult>} Login result indicating success or failure
+     */
+    async loginWithCredentials(tenantId, email, password) {
+        if (!tenantId) throw new Error('tenantId is required');
+        if (!email) throw new Error('email is required');
+        if (!password) throw new Error('password is required');
+
+        try {
+            const response = await this._makeRequest('POST', '/v1.0/auth/login', {
+                TenantId: tenantId,
+                Username: email,
+                Password: password
+            }, false);
+
+            if (response.success && response.data) {
+                return LoginResult.successful(response.data.token, {
+                    tenantId,
+                    email,
+                    isAdmin: response.data.isAdmin || false,
+                    isGlobalAdmin: response.data.isGlobalAdmin || false
+                });
+            }
+
+            return LoginResult.failed(
+                AuthenticationResult.InvalidCredentials,
+                AuthorizationResult.Unauthorized,
+                response.errorMessage || 'Login failed'
+            );
+        } catch (error) {
+            if (error instanceof VerbexError) {
+                const authResult = error.statusCode === 401 ? AuthenticationResult.InvalidCredentials :
+                    error.statusCode === 403 ? AuthenticationResult.TenantAccessDenied :
+                    error.statusCode === 404 ? AuthenticationResult.NotFound :
+                    AuthenticationResult.NotAuthenticated;
+
+                const authzResult = error.statusCode === 401 ? AuthorizationResult.Unauthorized :
+                    error.statusCode === 403 ? AuthorizationResult.AccessDenied :
+                    error.statusCode === 404 ? AuthorizationResult.ResourceNotFound :
+                    AuthorizationResult.Unauthorized;
+
+                return LoginResult.failed(authResult, authzResult, error.message);
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Authenticate with an existing bearer token by validating it against the server.
+     * @param {string} bearerToken - The bearer token to validate and use
+     * @returns {Promise<LoginResult>} Login result indicating success or failure
+     */
+    async loginWithToken(bearerToken) {
+        if (!bearerToken) throw new Error('bearerToken is required');
+
+        const originalAccessKey = this._accessKey;
+
+        try {
+            // Temporarily use the provided bearer token
+            this._accessKey = bearerToken;
+
+            const response = await this._makeRequest('GET', '/v1.0/auth/validate', null, true);
+
+            if (response.success && response.data && response.data.valid) {
+                return LoginResult.successful(bearerToken, {
+                    tenantId: response.data.tenantId || null,
+                    userId: response.data.userId || null,
+                    email: response.data.email || null,
+                    isAdmin: response.data.isAdmin || false,
+                    isGlobalAdmin: response.data.isGlobalAdmin || false
+                });
+            }
+
+            // Restore original access key on failure
+            this._accessKey = originalAccessKey;
+
+            return LoginResult.failed(
+                AuthenticationResult.InvalidCredentials,
+                AuthorizationResult.Unauthorized,
+                'Bearer token validation failed'
+            );
+        } catch (error) {
+            // Restore original access key on exception
+            this._accessKey = originalAccessKey;
+
+            if (error instanceof VerbexError) {
+                const authResult = error.statusCode === 401 ? AuthenticationResult.InvalidCredentials :
+                    error.statusCode === 403 ? AuthenticationResult.TenantAccessDenied :
+                    AuthenticationResult.NotAuthenticated;
+
+                return LoginResult.failed(authResult, AuthorizationResult.Unauthorized, error.message);
+            }
+            throw error;
+        }
+    }
+
+    /**
      * Authenticate and receive a bearer token.
+     * @deprecated Use loginWithCredentials(tenantId, email, password) or loginWithToken(bearerToken) instead.
      * @param {string} username - The username
      * @param {string} password - The password
      * @returns {Promise<ApiResponse>} Login response with token
      */
     async login(username, password) {
+        console.warn('login() is deprecated. Use loginWithCredentials(tenantId, email, password) or loginWithToken(bearerToken) instead.');
         return this._makeRequest('POST', '/v1.0/auth/login', { Username: username, Password: password }, false);
     }
 
@@ -907,6 +1105,9 @@ if (typeof module !== 'undefined' && module.exports) {
         VerbexClient,
         VerbexError,
         ApiResponse,
+        AuthenticationResult,
+        AuthorizationResult,
+        LoginResult,
         IndexInfo,
         DocumentInfo,
         SearchResult,
@@ -922,6 +1123,9 @@ if (typeof exports !== 'undefined') {
     exports.VerbexClient = VerbexClient;
     exports.VerbexError = VerbexError;
     exports.ApiResponse = ApiResponse;
+    exports.AuthenticationResult = AuthenticationResult;
+    exports.AuthorizationResult = AuthorizationResult;
+    exports.LoginResult = LoginResult;
     exports.IndexInfo = IndexInfo;
     exports.DocumentInfo = DocumentInfo;
     exports.SearchResult = SearchResult;

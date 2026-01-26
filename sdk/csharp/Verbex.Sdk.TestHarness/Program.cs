@@ -152,28 +152,44 @@ namespace Verbex.Sdk.TestHarness
 
         // ==================== Authentication Tests ====================
 
-        private async Task TestLoginSuccessAsync()
+        private async Task TestLoginWithCredentialsSuccessAsync()
         {
-            ApiResponse<LoginData> response = await _Client!.LoginAsync("admin", "password").ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 200, "response.StatusCode");
-            AssertNotNull(response.Data, "response.Data");
-            AssertNotNull(response.Data!.Token, "data.Token");
-            AssertEquals(response.Data.Username, "admin", "data.Username");
+            // Test login with tenant ID, email, and password
+            // Using "default" tenant with the seeded default user credentials
+            LoginResult result = await _Client!.LoginAsync("default", "default@user.com", "password").ConfigureAwait(false);
+            AssertTrue(result.Success, "result.Success");
+            AssertEquals(result.AuthenticationResult, AuthenticationResultEnum.Success, "result.AuthenticationResult");
+            AssertEquals(result.AuthorizationResult, AuthorizationResultEnum.Authorized, "result.AuthorizationResult");
+            AssertNotNull(result.Token, "result.Token");
         }
 
-        private async Task TestLoginInvalidCredentialsAsync()
+        private async Task TestLoginWithCredentialsInvalidAsync()
         {
-            try
-            {
-                await _Client!.LoginAsync("invalid", "invalid").ConfigureAwait(false);
-                Assert(false, "Should have thrown VerbexException");
-            }
-            catch (VerbexException ex)
-            {
-                AssertEquals(ex.StatusCode, 401, "error.StatusCode");
-                AssertNotNull(ex.Message, "error.Message");
-            }
+            // Test login with invalid credentials - should not throw, just return failure
+            LoginResult result = await _Client!.LoginAsync("default", "invalid@example.com", "wrongpassword").ConfigureAwait(false);
+            AssertTrue(!result.Success, "result.Success should be false");
+            Assert(result.AuthenticationResult != AuthenticationResultEnum.Success, "AuthenticationResult should not be Success");
+            AssertNotNull(result.ErrorMessage, "result.ErrorMessage");
+        }
+
+        private async Task TestLoginWithBearerTokenSuccessAsync()
+        {
+            // Test login with a valid bearer token
+            LoginResult result = await _Client!.LoginAsync(_AccessKey).ConfigureAwait(false);
+            AssertTrue(result.Success, "result.Success");
+            AssertEquals(result.AuthenticationResult, AuthenticationResultEnum.Success, "result.AuthenticationResult");
+            AssertEquals(result.AuthorizationResult, AuthorizationResultEnum.Authorized, "result.AuthorizationResult");
+            AssertNotNull(result.Token, "result.Token");
+            AssertEquals(result.Token, _AccessKey, "result.Token should match input");
+        }
+
+        private async Task TestLoginWithBearerTokenInvalidAsync()
+        {
+            // Test login with an invalid bearer token - should not throw, just return failure
+            LoginResult result = await _Client!.LoginAsync("invalid-bearer-token-12345").ConfigureAwait(false);
+            AssertTrue(!result.Success, "result.Success should be false");
+            Assert(result.AuthenticationResult != AuthenticationResultEnum.Success, "AuthenticationResult should not be Success");
+            AssertNotNull(result.ErrorMessage, "result.ErrorMessage");
         }
 
         private async Task TestValidateTokenAsync()
@@ -215,7 +231,8 @@ namespace Verbex.Sdk.TestHarness
             ApiResponse<CreateIndexData> response = await _Client!.CreateIndexAsync(
                 name: "Test Index",
                 description: "A test index for SDK validation",
-                inMemory: true
+                inMemory: true,
+                tenantId: "default"
             ).ConfigureAwait(false);
             AssertTrue(response.Success, "response.Success");
             AssertEquals(response.StatusCode, 201, "response.StatusCode");
@@ -229,19 +246,22 @@ namespace Verbex.Sdk.TestHarness
 
         private async Task TestCreateDuplicateNameIndexAsync()
         {
-            // Creating an index with the same name is allowed since IDs are auto-generated
-            ApiResponse<CreateIndexData> response = await _Client!.CreateIndexAsync(
-                name: "Test Index",
-                description: "Duplicate name index",
-                inMemory: true
-            ).ConfigureAwait(false);
-            AssertTrue(response.Success, "response.Success");
-            AssertEquals(response.StatusCode, 201, "response.StatusCode");
-            // Verify it got a different ID
-            AssertNotNull(response.Data!.Index, "data.Index");
-            Assert(response.Data.Index!.Identifier != _TestIndexId, "Should have different ID");
-            // Clean up the duplicate
-            await _Client!.DeleteIndexAsync(response.Data.Index.Identifier).ConfigureAwait(false);
+            // Creating an index with the same name should fail with 409 Conflict
+            // The server enforces unique index names within a tenant
+            try
+            {
+                await _Client!.CreateIndexAsync(
+                    name: "Test Index",
+                    description: "Duplicate name index",
+                    inMemory: true,
+                    tenantId: "default"
+                ).ConfigureAwait(false);
+                Assert(false, "Should have thrown VerbexException for duplicate name");
+            }
+            catch (VerbexException ex)
+            {
+                AssertEquals(ex.StatusCode, 409, "error.StatusCode");
+            }
         }
 
         private async Task TestGetIndexAsync()
@@ -288,7 +308,8 @@ namespace Verbex.Sdk.TestHarness
                 description: "An index with labels and tags",
                 inMemory: true,
                 labels: labels,
-                tags: tags
+                tags: tags,
+                tenantId: "default"
             ).ConfigureAwait(false);
             AssertTrue(response.Success, "response.Success");
             AssertEquals(response.StatusCode, 201, "response.StatusCode");
@@ -310,7 +331,8 @@ namespace Verbex.Sdk.TestHarness
                 name: "Get Labeled Index",
                 inMemory: true,
                 labels: labels,
-                tags: tags
+                tags: tags,
+                tenantId: "default"
             ).ConfigureAwait(false);
             string indexId = createResponse.Data!.Index!.Identifier;
             ApiResponse<IndexInfo> response = await _Client!.GetIndexAsync(indexId).ConfigureAwait(false);
@@ -473,20 +495,21 @@ namespace Verbex.Sdk.TestHarness
 
         private async Task TestGetDocumentWithLabelsAndTagsAsync()
         {
-            string docId = Guid.NewGuid().ToString();
             List<string> labels = new List<string> { "verification", "metadata" };
             Dictionary<string, string> tags = new Dictionary<string, string>
             {
                 { "source", "sdk-test" },
                 { "priority", "high" }
             };
-            await _Client!.AddDocumentAsync(
+            ApiResponse<AddDocumentData> addResponse = await _Client!.AddDocumentAsync(
                 _TestIndexId,
                 "Document for verifying labels and tags retrieval.",
-                docId,
+                null,
                 labels,
                 tags
             ).ConfigureAwait(false);
+            AssertTrue(addResponse.Success, "addResponse.Success");
+            string docId = addResponse.Data!.DocumentId!;
             ApiResponse<DocumentInfo> response = await _Client!.GetDocumentAsync(_TestIndexId, docId).ConfigureAwait(false);
             AssertTrue(response.Success, "response.Success");
             AssertNotNull(response.Data, "response.Data");
@@ -754,7 +777,6 @@ namespace Verbex.Sdk.TestHarness
 
             PrintHeader("Verbex SDK Test Harness - C#");
             Console.WriteLine($"  Endpoint: {_Endpoint}");
-            Console.WriteLine($"  Test Index: {_TestIndexId}");
             Console.WriteLine($"  Started: {DateTime.UtcNow:O}");
 
             _Client = new VerbexClient(_Endpoint, _AccessKey);
@@ -768,8 +790,10 @@ namespace Verbex.Sdk.TestHarness
 
                 // Authentication Tests
                 PrintSubheader("Authentication");
-                await RunTestAsync("Login with valid credentials", TestLoginSuccessAsync).ConfigureAwait(false);
-                await RunTestAsync("Login with invalid credentials", TestLoginInvalidCredentialsAsync).ConfigureAwait(false);
+                await RunTestAsync("Login with credentials (success)", TestLoginWithCredentialsSuccessAsync).ConfigureAwait(false);
+                await RunTestAsync("Login with credentials (invalid)", TestLoginWithCredentialsInvalidAsync).ConfigureAwait(false);
+                await RunTestAsync("Login with bearer token (success)", TestLoginWithBearerTokenSuccessAsync).ConfigureAwait(false);
+                await RunTestAsync("Login with bearer token (invalid)", TestLoginWithBearerTokenInvalidAsync).ConfigureAwait(false);
                 await RunTestAsync("Validate token", TestValidateTokenAsync).ConfigureAwait(false);
                 await RunTestAsync("Validate invalid token", TestValidateInvalidTokenAsync).ConfigureAwait(false);
 
@@ -777,7 +801,7 @@ namespace Verbex.Sdk.TestHarness
                 PrintSubheader("Index Management");
                 await RunTestAsync("List indices (initial)", TestListIndicesInitialAsync).ConfigureAwait(false);
                 await RunTestAsync("Create index", TestCreateIndexAsync).ConfigureAwait(false);
-                await RunTestAsync("Create duplicate name index succeeds", TestCreateDuplicateNameIndexAsync).ConfigureAwait(false);
+                await RunTestAsync("Create duplicate name index fails", TestCreateDuplicateNameIndexAsync).ConfigureAwait(false);
                 await RunTestAsync("Get index", TestGetIndexAsync).ConfigureAwait(false);
                 await RunTestAsync("Get index not found", TestGetIndexNotFoundAsync).ConfigureAwait(false);
                 await RunTestAsync("List indices (after create)", TestListIndicesAfterCreateAsync).ConfigureAwait(false);
@@ -840,7 +864,21 @@ namespace Verbex.Sdk.TestHarness
             Console.WriteLine($"  Failed: {_Failed}");
             Console.WriteLine($"  Duration: {totalSeconds:F2}s");
             Console.WriteLine($"  Result: {(_Failed == 0 ? "SUCCESS" : "FAILURE")}");
-            Console.WriteLine();
+
+            // Failed tests detail
+            List<TestResult> failedTests = _Results.FindAll(r => !r.Passed);
+            if (failedTests.Count > 0)
+            {
+                PrintHeader("Failed Tests");
+                for (int i = 0; i < failedTests.Count; i++)
+                {
+                    TestResult failed = failedTests[i];
+                    Console.WriteLine($"  {i + 1}. {failed.Name}");
+                    Console.WriteLine($"     Error: {failed.Message}");
+                    Console.WriteLine($"     Duration: {failed.DurationMs:F2}ms");
+                    Console.WriteLine();
+                }
+            }
 
             return _Failed == 0 ? 0 : 1;
         }

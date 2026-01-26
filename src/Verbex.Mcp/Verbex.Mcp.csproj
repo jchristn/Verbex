@@ -1,20 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <RootNamespace>Verbex.Mcp</RootNamespace>
-    <AssemblyName>verbex-mcp</AssemblyName>
-  </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<RootNamespace>Verbex.Mcp</RootNamespace>
+		<AssemblyName>verbex-mcp</AssemblyName>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Voltaic" Version="0.1.5" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Voltaic" Version="0.1.5" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Verbex\Verbex.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\Verbex\Verbex.csproj" />
+	</ItemGroup>
 
 </Project>

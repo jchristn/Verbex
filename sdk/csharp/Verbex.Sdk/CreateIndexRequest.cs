@@ -11,6 +11,23 @@ namespace Verbex.Sdk
         #region Public-Members
 
         /// <summary>
+        /// Tenant ID for the index.
+        /// Required for global admin users, ignored for tenant users.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? TenantId
+        {
+            get
+            {
+                return _TenantId;
+            }
+            set
+            {
+                _TenantId = value;
+            }
+        }
+
+        /// <summary>
         /// Display name for the index.
         /// </summary>
         public string Name
@@ -150,6 +167,7 @@ namespace Verbex.Sdk
 
         #region Private-Members
 
+        private string? _TenantId = null;
         private string _Name = "";
         private string? _Description = null;
         private bool _InMemory = false;

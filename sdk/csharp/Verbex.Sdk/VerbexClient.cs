@@ -41,7 +41,10 @@ namespace Verbex.Sdk
             _HttpClient = new HttpClient();
             _HttpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-            _JsonOptions = new JsonSerializerOptions();
+            _JsonOptions = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
         }
 
         /// <summary>
@@ -247,6 +250,119 @@ namespace Verbex.Sdk
         // ==================== Authentication Endpoints ====================
 
         /// <summary>
+        /// Authenticates with tenant ID, email, and password.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="email">The user's email address.</param>
+        /// <param name="password">The user's password.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Login result indicating success or failure with context.</returns>
+        public async Task<LoginResult> LoginAsync(string tenantId, string email, string password, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(tenantId);
+            ArgumentNullException.ThrowIfNull(email);
+            ArgumentNullException.ThrowIfNull(password);
+
+            LoginRequest request = new LoginRequest(tenantId, email, password);
+
+            try
+            {
+                ApiResponse<LoginData> response = await MakeRequestAsync<LoginData>(HttpMethod.Post, "/v1.0/auth/login", request, false, cancellationToken).ConfigureAwait(false);
+
+                if (response.Success && response.Data != null)
+                {
+                    return LoginResult.Successful(
+                        token: response.Data.Token ?? string.Empty,
+                        tenantId: tenantId,
+                        email: email,
+                        isAdmin: response.Data.IsAdmin,
+                        isGlobalAdmin: response.Data.IsGlobalAdmin);
+                }
+
+                return LoginResult.Failed(
+                    AuthenticationResultEnum.InvalidCredentials,
+                    AuthorizationResultEnum.Unauthorized,
+                    response.ErrorMessage ?? "Login failed");
+            }
+            catch (VerbexException ex)
+            {
+                AuthenticationResultEnum authResult = ex.StatusCode switch
+                {
+                    401 => AuthenticationResultEnum.InvalidCredentials,
+                    403 => AuthenticationResultEnum.TenantAccessDenied,
+                    404 => AuthenticationResultEnum.NotFound,
+                    _ => AuthenticationResultEnum.NotAuthenticated
+                };
+
+                AuthorizationResultEnum authzResult = ex.StatusCode switch
+                {
+                    401 => AuthorizationResultEnum.Unauthorized,
+                    403 => AuthorizationResultEnum.AccessDenied,
+                    404 => AuthorizationResultEnum.ResourceNotFound,
+                    _ => AuthorizationResultEnum.Unauthorized
+                };
+
+                return LoginResult.Failed(authResult, authzResult, ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Authenticates with an existing bearer token by validating it against the server.
+        /// </summary>
+        /// <param name="bearerToken">The bearer token to validate and use.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Login result indicating success or failure with context.</returns>
+        public async Task<LoginResult> LoginAsync(string bearerToken, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(bearerToken);
+
+            string originalAccessKey = _AccessKey;
+
+            try
+            {
+                // Temporarily use the provided bearer token
+                System.Reflection.FieldInfo? field = typeof(VerbexClient).GetField("_AccessKey", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                field?.SetValue(this, bearerToken);
+
+                ApiResponse<ValidationData> response = await MakeRequestAsync<ValidationData>(HttpMethod.Get, "/v1.0/auth/validate", null, true, cancellationToken).ConfigureAwait(false);
+
+                if (response.Success && response.Data != null && response.Data.Valid)
+                {
+                    return LoginResult.Successful(
+                        token: bearerToken,
+                        tenantId: response.Data.TenantId,
+                        userId: response.Data.UserId,
+                        email: response.Data.Email,
+                        isAdmin: response.Data.IsAdmin,
+                        isGlobalAdmin: response.Data.IsGlobalAdmin);
+                }
+
+                // Restore original access key on failure
+                field?.SetValue(this, originalAccessKey);
+
+                return LoginResult.Failed(
+                    AuthenticationResultEnum.InvalidCredentials,
+                    AuthorizationResultEnum.Unauthorized,
+                    "Bearer token validation failed");
+            }
+            catch (VerbexException ex)
+            {
+                // Restore original access key on exception
+                System.Reflection.FieldInfo? field = typeof(VerbexClient).GetField("_AccessKey", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                field?.SetValue(this, originalAccessKey);
+
+                AuthenticationResultEnum authResult = ex.StatusCode switch
+                {
+                    401 => AuthenticationResultEnum.InvalidCredentials,
+                    403 => AuthenticationResultEnum.TenantAccessDenied,
+                    _ => AuthenticationResultEnum.NotAuthenticated
+                };
+
+                return LoginResult.Failed(authResult, AuthorizationResultEnum.Unauthorized, ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Authenticates and receives a bearer token.
         /// </summary>
         /// <param name="username">The username.</param>
@@ -254,7 +370,8 @@ namespace Verbex.Sdk
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Login response with token.</returns>
         /// <exception cref="VerbexException">Thrown when authentication fails.</exception>
-        public async Task<ApiResponse<LoginData>> LoginAsync(string username, string password, CancellationToken cancellationToken = default)
+        [Obsolete("Use LoginAsync(tenantId, email, password) or LoginAsync(bearerToken) instead.")]
+        public async Task<ApiResponse<LoginData>> LoginLegacyAsync(string username, string password, CancellationToken cancellationToken = default)
         {
             LoginRequest request = new LoginRequest(username, password);
             return await MakeRequestAsync<LoginData>(HttpMethod.Post, "/v1.0/auth/login", request, false, cancellationToken).ConfigureAwait(false);
@@ -308,6 +425,7 @@ namespace Verbex.Sdk
         /// <param name="maxTokenLength">Maximum token length (0 to disable).</param>
         /// <param name="labels">Optional list of labels to associate with the index.</param>
         /// <param name="tags">Optional key-value tags to associate with the index.</param>
+        /// <param name="tenantId">Tenant ID (required for global admin users, optional for tenant users).</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Created index response.</returns>
         /// <exception cref="VerbexException">Thrown when creation fails.</exception>
@@ -321,10 +439,12 @@ namespace Verbex.Sdk
             int maxTokenLength = 0,
             List<string>? labels = null,
             Dictionary<string, string>? tags = null,
+            string? tenantId = null,
             CancellationToken cancellationToken = default)
         {
             CreateIndexRequest request = new CreateIndexRequest(name)
             {
+                TenantId = tenantId,
                 Description = description ?? string.Empty,
                 InMemory = inMemory,
                 EnableLemmatizer = enableLemmatizer,

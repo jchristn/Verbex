@@ -17,7 +17,7 @@ import uuid
 import time
 from datetime import datetime
 from typing import Callable, Optional, Any
-from verbex_sdk import VerbexClient, VerbexError, ApiResponse
+from verbex_sdk import VerbexClient, VerbexError, ApiResponse, LoginResult, AuthenticationResult, AuthorizationResult
 
 
 class TestResult:
@@ -36,7 +36,7 @@ class TestHarness:
         self._endpoint = endpoint
         self._access_key = access_key
         self._client: Optional[VerbexClient] = None
-        self._test_index_id = f"test-index-{uuid.uuid4().hex[:8]}"
+        self._test_index_id = ""  # Will be set after index creation
         self._test_documents: list = []
         self._results: list = []
         self._passed = 0
@@ -135,23 +135,41 @@ class TestHarness:
 
     # ==================== Authentication Tests ====================
 
-    def test_login_success(self):
-        """Test successful login."""
-        response = self._client.login("admin", "password")
-        self._assert_true(response.success, "response.success")
-        self._assert_equals(response.status_code, 200, "response.status_code")
-        self._assert_not_none(response.data, "response.data")
-        self._assert_not_none(response.data.get('token'), "data.token")
-        self._assert_equals(response.data.get('username'), 'admin', "data.username")
+    def test_login_with_credentials_success(self):
+        """Test successful login with credentials."""
+        # Test login with tenant ID, email, and password
+        # Using "default" tenant with the seeded default user credentials
+        result = self._client.login_with_credentials("default", "default@user.com", "password")
+        self._assert_true(result.success, "result.success")
+        self._assert_equals(result.authentication_result, AuthenticationResult.SUCCESS, "result.authentication_result")
+        self._assert_equals(result.authorization_result, AuthorizationResult.AUTHORIZED, "result.authorization_result")
+        self._assert_not_none(result.token, "result.token")
 
-    def test_login_invalid_credentials(self):
+    def test_login_with_credentials_invalid(self):
         """Test login with invalid credentials."""
-        try:
-            self._client.login("invalid", "invalid")
-            self._assert(False, "Should have thrown VerbexError")
-        except VerbexError as e:
-            self._assert_equals(e.status_code, 401, "error.status_code")
-            self._assert_not_none(e.message, "error.message")
+        # Should not throw, just return failure
+        result = self._client.login_with_credentials("default", "invalid@example.com", "wrongpassword")
+        self._assert_false(result.success, "result.success should be False")
+        self._assert(result.authentication_result != AuthenticationResult.SUCCESS, "authentication_result should not be Success")
+        self._assert_not_none(result.error_message, "result.error_message")
+
+    def test_login_with_token_success(self):
+        """Test successful login with bearer token."""
+        # Test login with a valid bearer token
+        result = self._client.login_with_token(self._access_key)
+        self._assert_true(result.success, "result.success")
+        self._assert_equals(result.authentication_result, AuthenticationResult.SUCCESS, "result.authentication_result")
+        self._assert_equals(result.authorization_result, AuthorizationResult.AUTHORIZED, "result.authorization_result")
+        self._assert_not_none(result.token, "result.token")
+        self._assert_equals(result.token, self._access_key, "result.token should match input")
+
+    def test_login_with_token_invalid(self):
+        """Test login with invalid bearer token."""
+        # Should not throw, just return failure
+        result = self._client.login_with_token("invalid-bearer-token-12345")
+        self._assert_false(result.success, "result.success should be False")
+        self._assert(result.authentication_result != AuthenticationResult.SUCCESS, "authentication_result should not be Success")
+        self._assert_not_none(result.error_message, "result.error_message")
 
     def test_validate_token(self):
         """Test token validation."""
@@ -186,11 +204,9 @@ class TestHarness:
     def test_create_index(self):
         """Test creating an index."""
         response = self._client.create_index(
-            id=self._test_index_id,
             name="Test Index",
             description="A test index for SDK validation",
-            in_memory=True,
-            storage_mode="MemoryOnly"
+            in_memory=True
         )
         self._assert_true(response.success, "response.success")
         self._assert_equals(response.status_code, 201, "response.status_code")
@@ -198,14 +214,18 @@ class TestHarness:
         self._assert_not_none(response.data.get('message'), "data.message")
         self._assert_not_none(response.data.get('index'), "data.index")
         index_data = response.data.get('index')
-        self._assert_equals(index_data.get('id'), self._test_index_id, "index.id")
+        self._assert_not_none(index_data.get('identifier'), "index.identifier")
         self._assert_equals(index_data.get('name'), "Test Index", "index.name")
+        # Store the returned index ID for subsequent tests
+        self._test_index_id = index_data.get('identifier')
 
     def test_create_duplicate_index(self):
-        """Test creating a duplicate index fails."""
+        """Test creating an index with duplicate name fails."""
+        # Creating an index with the same name should fail with 409 Conflict
+        # The server enforces unique index names within a tenant
         try:
-            self._client.create_index(id=self._test_index_id, name="Duplicate")
-            self._assert(False, "Should have thrown VerbexError for duplicate")
+            self._client.create_index(name="Test Index", description="Duplicate name index", in_memory=True)
+            self._assert(False, "Should have thrown VerbexError for duplicate name")
         except VerbexError as e:
             self._assert_equals(e.status_code, 409, "error.status_code")
 
@@ -215,7 +235,7 @@ class TestHarness:
         self._assert_true(response.success, "response.success")
         self._assert_equals(response.status_code, 200, "response.status_code")
         self._assert_not_none(response.data, "response.data")
-        self._assert_equals(response.data.get('id'), self._test_index_id, "data.id")
+        self._assert_equals(response.data.get('identifier'), self._test_index_id, "data.identifier")
         self._assert_equals(response.data.get('name'), "Test Index", "data.name")
         self._assert_not_none(response.data.get('createdUtc'), "data.createdUtc")
 
@@ -230,20 +250,17 @@ class TestHarness:
     def test_list_indices_after_create(self):
         """Test listing indices includes new index."""
         indices = self._client.get_indices()
-        found = any(idx.id == self._test_index_id for idx in indices)
+        found = any(idx.identifier == self._test_index_id for idx in indices)
         self._assert_true(found, "test index should be in list")
 
     def test_create_index_with_labels_and_tags(self):
         """Test creating an index with labels and tags."""
-        index_id = f"test-labeled-{uuid.uuid4().hex[:8]}"
         labels = ["test", "labeled"]
         tags = {"environment": "testing", "owner": "sdk-harness"}
         response = self._client.create_index(
-            id=index_id,
             name="Labeled Test Index",
             description="An index with labels and tags",
             in_memory=True,
-            storage_mode="MemoryOnly",
             labels=labels,
             tags=tags
         )
@@ -251,21 +268,23 @@ class TestHarness:
         self._assert_equals(response.status_code, 201, "response.status_code")
         self._assert_not_none(response.data, "response.data")
         self._assert_not_none(response.data.get('index'), "data.index")
-        # Clean up
-        self._client.delete_index(index_id)
+        # Clean up using the returned identifier
+        index_id = response.data.get('index', {}).get('identifier')
+        if index_id:
+            self._client.delete_index(index_id)
 
     def test_get_index_with_labels_and_tags(self):
         """Test getting an index with labels and tags."""
-        index_id = f"test-labeled-get-{uuid.uuid4().hex[:8]}"
         labels = ["retrieval", "test"]
         tags = {"purpose": "verification", "version": "1.0"}
-        self._client.create_index(
-            id=index_id,
+        create_response = self._client.create_index(
             name="Get Labeled Index",
             in_memory=True,
             labels=labels,
             tags=tags
         )
+        index_id = create_response.data.get('index', {}).get('identifier')
+        self._assert_not_none(index_id, "created index identifier")
         response = self._client.get_index(index_id)
         self._assert_true(response.success, "response.success")
         self._assert_not_none(response.data, "response.data")
@@ -636,7 +655,6 @@ class TestHarness:
 
         self._print_header("Verbex SDK Test Harness - Python")
         print(f"  Endpoint: {self._endpoint}")
-        print(f"  Test Index: {self._test_index_id}")
         print(f"  Started: {datetime.now().isoformat()}")
 
         self._client = VerbexClient(self._endpoint, self._access_key)
@@ -649,8 +667,10 @@ class TestHarness:
 
             # Authentication Tests
             self._print_subheader("Authentication")
-            self._run_test("Login with valid credentials", self.test_login_success)
-            self._run_test("Login with invalid credentials", self.test_login_invalid_credentials)
+            self._run_test("Login with credentials (success)", self.test_login_with_credentials_success)
+            self._run_test("Login with credentials (invalid)", self.test_login_with_credentials_invalid)
+            self._run_test("Login with bearer token (success)", self.test_login_with_token_success)
+            self._run_test("Login with bearer token (invalid)", self.test_login_with_token_invalid)
             self._run_test("Validate token", self.test_validate_token)
             self._run_test("Validate invalid token", self.test_validate_invalid_token)
 
@@ -716,7 +736,16 @@ class TestHarness:
         print(f"  Failed: {self._failed}")
         print(f"  Duration: {duration:.2f}s")
         print(f"  Result: {'SUCCESS' if self._failed == 0 else 'FAILURE'}")
-        print()
+
+        # Failed tests detail
+        failed_tests = [r for r in self._results if not r.passed]
+        if failed_tests:
+            self._print_header("Failed Tests")
+            for i, failed in enumerate(failed_tests, 1):
+                print(f"  {i}. {failed.name}")
+                print(f"     Error: {failed.message}")
+                print(f"     Duration: {failed.duration_ms:.2f}ms")
+                print()
 
         return 0 if self._failed == 0 else 1
 

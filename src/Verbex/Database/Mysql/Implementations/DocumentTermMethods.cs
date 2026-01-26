@@ -85,6 +85,33 @@ WHERE dt.term_id IN ({inClause});";
 
             string inClause = string.Join(",", termIdList.Select(id => $"'{Sanitizer.Sanitize(id)}'"));
 
+            // Build label filter subquery if labels are provided
+            List<string>? labelList = labels?.ToList();
+            string labelFilter = "";
+            if (labelList != null && labelList.Count > 0)
+            {
+                // Documents must have ALL specified labels (AND logic, case-insensitive)
+                List<string> labelConditions = new List<string>();
+                foreach (string label in labelList)
+                {
+                    labelConditions.Add($@"EXISTS (SELECT 1 FROM labels l WHERE l.document_id = d.id AND LOWER(l.label) = LOWER('{Sanitizer.Sanitize(label)}'))");
+                }
+                labelFilter = " AND " + string.Join(" AND ", labelConditions);
+            }
+
+            // Build tag filter subquery if tags are provided
+            string tagFilter = "";
+            if (tags != null && tags.Count > 0)
+            {
+                // Documents must have ALL specified tags with matching values (AND logic, exact match)
+                List<string> tagConditions = new List<string>();
+                foreach (KeyValuePair<string, string> tag in tags)
+                {
+                    tagConditions.Add($@"EXISTS (SELECT 1 FROM tags t WHERE t.document_id = d.id AND t.`key` = '{Sanitizer.Sanitize(tag.Key)}' AND t.value = '{Sanitizer.Sanitize(tag.Value)}')");
+                }
+                tagFilter = " AND " + string.Join(" AND ", tagConditions);
+            }
+
             string query;
             if (useAndLogic)
             {
@@ -92,7 +119,7 @@ WHERE dt.term_id IN ({inClause});";
 SELECT dt.document_id, SUM(dt.term_frequency) as total_frequency, COUNT(DISTINCT dt.term_id) as term_count
 FROM document_terms dt
 JOIN documents d ON dt.document_id = d.id
-WHERE dt.term_id IN ({inClause}) AND d.tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND d.index_id = '{Sanitizer.Sanitize(indexId)}'
+WHERE dt.term_id IN ({inClause}) AND d.tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND d.index_id = '{Sanitizer.Sanitize(indexId)}'{labelFilter}{tagFilter}
 GROUP BY dt.document_id
 HAVING COUNT(DISTINCT dt.term_id) = {termIdList.Count}
 ORDER BY total_frequency DESC
@@ -104,7 +131,7 @@ LIMIT {limit};";
 SELECT dt.document_id, SUM(dt.term_frequency) as total_frequency, COUNT(DISTINCT dt.term_id) as term_count
 FROM document_terms dt
 JOIN documents d ON dt.document_id = d.id
-WHERE dt.term_id IN ({inClause}) AND d.tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND d.index_id = '{Sanitizer.Sanitize(indexId)}'
+WHERE dt.term_id IN ({inClause}) AND d.tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND d.index_id = '{Sanitizer.Sanitize(indexId)}'{labelFilter}{tagFilter}
 GROUP BY dt.document_id
 ORDER BY total_frequency DESC
 LIMIT {limit};";

@@ -1,61 +1,61 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-        <Version>0.1.3</Version>
-        <ApplicationIcon>logo.ico</ApplicationIcon>
-        <GenerateDocumentationFile>True</GenerateDocumentationFile>
-        <DocumentationFile>Verbex.xml</DocumentationFile>
-        <Title>Verbex</Title>
-        <Authors>jchristn</Authors>
-        <Description>Verbex is a comprehensive inverted index library that enables fast, scalable full-text search capabilities.</Description>
-        <Copyright>(c)2025 Joel Christner</Copyright>
-        <PackageProjectUrl>https://github.com/jchristn/verbex</PackageProjectUrl>
-        <PackageIcon>logo.png</PackageIcon>
-        <PackageReadmeFile>README.md</PackageReadmeFile>
-        <RepositoryUrl>https://github.com/jchristn/verbex</RepositoryUrl>
-        <RepositoryType>git</RepositoryType>
-        <PackageReleaseNotes>Verbex is in ALPHA.</PackageReleaseNotes>
-        <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
-        <PackageTags>search;fulltext;full-text-search;text-search;inverted-index;index;indexing;tf-idf;lucene;elasticsearch;solr;sqlite;tokenization;lemmatization;document-search;search-engine;information-retrieval;stopwords</PackageTags>
-        <IncludeSymbols>True</IncludeSymbols>
-        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-        <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    </PropertyGroup>
+	<PropertyGroup>
+		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<Version>0.1.4</Version>
+		<ApplicationIcon>logo.ico</ApplicationIcon>
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
+		<DocumentationFile>Verbex.xml</DocumentationFile>
+		<Title>Verbex</Title>
+		<Authors>jchristn</Authors>
+		<Description>Verbex is a comprehensive inverted index library that enables fast, scalable full-text search capabilities.</Description>
+		<Copyright>(c)2026 Joel Christner</Copyright>
+		<PackageProjectUrl>https://github.com/jchristn/verbex</PackageProjectUrl>
+		<PackageIcon>logo.png</PackageIcon>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<RepositoryUrl>https://github.com/jchristn/verbex</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<PackageReleaseNotes>Verbex is in ALPHA.</PackageReleaseNotes>
+		<PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+		<PackageTags>search;fulltext;full-text-search;text-search;inverted-index;index;indexing;tf-idf;lucene;elasticsearch;solr;sqlite;tokenization;lemmatization;document-search;search-engine;information-retrieval;stopwords</PackageTags>
+		<IncludeSymbols>True</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	</PropertyGroup>
 
-    <ItemGroup>
-      <Content Include="logo.ico" />
-    </ItemGroup>
+	<ItemGroup>
+		<Content Include="logo.ico" />
+	</ItemGroup>
 
-    <ItemGroup>
-      <None Include="..\..\assets\logo.png">
-        <Pack>True</Pack>
-        <PackagePath>\</PackagePath>
-      </None>
-      <None Include="..\..\LICENSE.md">
-        <Pack>True</Pack>
-        <PackagePath>\</PackagePath>
-      </None>
-      <None Include="..\..\README.md">
-        <Pack>True</Pack>
-        <PackagePath>\</PackagePath>
-      </None>
-    </ItemGroup>
+	<ItemGroup>
+		<None Include="..\..\assets\logo.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\..\LICENSE.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\..\README.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
 
-    <ItemGroup>
-      <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.1" />
-      <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.1" />
-      <PackageReference Include="MySqlConnector" Version="2.4.0" />
-      <PackageReference Include="Npgsql" Version="9.0.3" />
-      <PackageReference Include="PrettyId" Version="2.0.0" />
-    </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.1" />
+		<PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.1" />
+		<PackageReference Include="MySqlConnector" Version="2.4.0" />
+		<PackageReference Include="Npgsql" Version="9.0.3" />
+		<PackageReference Include="PrettyId" Version="2.0.0" />
+	</ItemGroup>
 
-    <ItemGroup>
-      <None Update="Verbex.xml">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-    </ItemGroup>
+	<ItemGroup>
+		<None Update="Verbex.xml">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
 
 </Project>
