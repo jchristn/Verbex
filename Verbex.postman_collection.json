@@ -357,6 +357,41 @@
 					"response": []
 				},
 				{
+					"name": "Get Documents (Batch)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/documents?ids=doc1,doc2,doc3",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"documents"
+							],
+							"query": [
+								{
+									"key": "ids",
+									"value": "doc1,doc2,doc3",
+									"description": "Comma-separated list of document IDs to retrieve"
+								}
+							]
+						},
+						"description": "Retrieve multiple documents by ID in a single request. This is more efficient than making multiple individual document requests.\n\nQuery parameters:\n- ids: Comma-separated list of document IDs to retrieve\n\nResponse includes:\n- Documents: Array of found documents with full metadata\n- NotFound: Array of document IDs that were not found\n- Count: Number of documents returned\n- RequestedCount: Total number of document IDs that were requested"
+					},
+					"response": []
+				},
+				{
 					"name": "Add Document",
 					"request": {
 						"method": "POST",

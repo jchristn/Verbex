@@ -90,6 +90,7 @@ dotnet run -- http://localhost:8080 verbexadmin
 - `ListDocumentsAsync(string indexId, CancellationToken)` - Returns `List<DocumentInfo>`
 - `AddDocumentAsync(string indexId, string content, ...)` - Returns `AddDocumentData`
 - `GetDocumentAsync(string indexId, string documentId, CancellationToken)` - Returns `DocumentInfo`
+- `GetDocumentsBatchAsync(string indexId, IEnumerable<string> documentIds, CancellationToken)` - Returns `BatchDocumentsResult`
 - `DocumentExistsAsync(string indexId, string documentId, CancellationToken)` - Returns `bool`
 - `DeleteDocumentAsync(string indexId, string documentId, CancellationToken)` - Returns `void`
 - `UpdateDocumentLabelsAsync(...)` - Returns `void`
@@ -127,6 +128,7 @@ dotnet run -- http://localhost:8080 verbexadmin
 - `AddDocumentData` - Add document response (DocumentId, Message)
 - `SearchData` - Search response with results
 - `SearchResultItem` - Individual search result
+- `BatchDocumentsResult` - Batch document retrieval result (Documents, NotFound, Count, RequestedCount)
 - `TenantInfo` - Tenant information
 - `UserInfo` - User information
 - `CredentialInfo` - Credential/API key information

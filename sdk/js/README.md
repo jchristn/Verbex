@@ -85,6 +85,7 @@ node test-harness.js http://localhost:8080 verbexadmin
 - `listDocuments(indexId)` - Returns `DocumentInfo[]`
 - `addDocument(indexId, content, documentId?, labels?, tags?, customMetadata?)` - Returns `AddDocumentData`
 - `getDocument(indexId, documentId)` - Returns `DocumentInfo`
+- `getDocumentsBatch(indexId, documentIds)` - Returns `BatchDocumentsResult`
 - `documentExists(indexId, documentId)` - Returns `boolean`
 - `deleteDocument(indexId, documentId)` - Returns `void`
 - `updateDocumentLabels(indexId, documentId, labels)` - Returns `void`
@@ -122,6 +123,7 @@ node test-harness.js http://localhost:8080 verbexadmin
 - `AddDocumentData` - Add document response (documentId, message)
 - `SearchData` - Search response with results
 - `SearchResult` - Individual search result
+- `BatchDocumentsResult` - Batch document retrieval result (documents, notFound, count, requestedCount)
 - `TenantInfo` - Tenant information
 - `UserInfo` - User information
 - `CredentialInfo` - Credential/API key information

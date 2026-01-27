@@ -83,6 +83,7 @@ python test_harness.py http://localhost:8080 verbexadmin
 - `list_documents(index_id)` - Returns `List[DocumentInfo]`
 - `add_document(index_id, content, document_id?, labels?, tags?, custom_metadata?)` - Returns `AddDocumentData`
 - `get_document(index_id, document_id)` - Returns `DocumentInfo`
+- `get_documents_batch(index_id, document_ids)` - Returns `BatchDocumentsResult`
 - `document_exists(index_id, document_id)` - Returns `bool`
 - `delete_document(index_id, document_id)` - Returns `None`
 - `update_document_labels(index_id, document_id, labels)` - Returns `None`
@@ -121,6 +122,7 @@ python test_harness.py http://localhost:8080 verbexadmin
 - `AddDocumentData` - Add document response (document_id, message)
 - `SearchData` - Search response with results
 - `SearchResult` - Individual search result
+- `BatchDocumentsResult` - Batch document retrieval result (documents, not_found, count, requested_count)
 - `TenantInfo` - Tenant information
 - `UserInfo` - User information
 - `CredentialInfo` - Credential/API key information

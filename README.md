@@ -79,6 +79,7 @@ foreach (var result in results)
 - **TF-IDF Scoring**: Relevance-ranked search results
 - **Text Processing**: Lemmatization, stop word removal, token filtering
 - **Metadata Filtering**: Labels and tags for document organization
+- **Batch Operations**: Retrieve multiple documents in a single request
 - **Thread-Safe**: Optimized for concurrent read-heavy workloads
 - **REST API**: Production-ready HTTP server with authentication
 - **CLI Tool**: Professional command-line interface (`vbx`)
@@ -138,6 +139,10 @@ curl -X POST http://localhost:8080/v1.0/auth/login \
 curl -X POST http://localhost:8080/v1.0/indices/myindex/search \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -d '{"Query": "machine learning"}'
+
+# Batch retrieve documents
+curl -X GET "http://localhost:8080/v1.0/indices/myindex/documents?ids=doc1,doc2,doc3" \
+  -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 ## Documentation
