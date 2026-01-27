@@ -4390,6 +4390,16 @@
             <param name="token">Cancellation token.</param>
             <returns>List of documents.</returns>
         </member>
+        <member name="M:Verbex.InvertedIndex.GetDocumentsWithMetadataAsync(System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Gets multiple documents by their IDs with full metadata (labels, tags, custom metadata) populated.
+            Documents that are not found are silently omitted from the result.
+            </summary>
+            <param name="documentIds">Collection of document IDs to retrieve.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of documents that were found with all metadata populated.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when documentIds is null.</exception>
+        </member>
         <member name="M:Verbex.InvertedIndex.DocumentExistsAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Checks if a document exists by ID.

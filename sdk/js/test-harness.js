@@ -409,6 +409,46 @@ class TestHarness {
         this._testDocuments.push(docId);
     }
 
+    async testGetDocumentsBatch() {
+        // Need at least 2 documents
+        this._assert(this._testDocuments.length >= 2, 'Need at least 2 test documents for batch retrieval test');
+
+        // Request some existing document IDs plus some fake ones
+        const requestedIds = [
+            this._testDocuments[0],
+            this._testDocuments[1],
+            'non-existent-doc-id-12345',
+            'another-fake-doc-id-67890'
+        ];
+
+        const result = await this._client.getDocumentsBatch(this._testIndexId, requestedIds);
+
+        this._assertNotNull(result, 'result');
+        this._assertNotNull(result.documents, 'result.documents');
+        this._assertNotNull(result.notFound, 'result.notFound');
+        this._assertEquals(result.count, 2, 'result.count');
+        this._assertEquals(result.requestedCount, 4, 'result.requestedCount');
+        this._assertEquals(result.documents.length, 2, 'result.documents.length');
+        this._assertEquals(result.notFound.length, 2, 'result.notFound.length');
+
+        // Verify the found documents have expected IDs
+        const foundIds = new Set(result.documents.map(d => d.documentId));
+        this._assert(foundIds.has(this._testDocuments[0]), 'first test document should be found');
+        this._assert(foundIds.has(this._testDocuments[1]), 'second test document should be found');
+
+        // Verify the not found IDs
+        this._assert(result.notFound.includes('non-existent-doc-id-12345'), 'fake ID should be in notFound');
+        this._assert(result.notFound.includes('another-fake-doc-id-67890'), 'another fake ID should be in notFound');
+    }
+
+    async testGetDocumentsBatchEmpty() {
+        // Test with empty array
+        const result = await this._client.getDocumentsBatch(this._testIndexId, []);
+        this._assertNotNull(result, 'result');
+        this._assertEquals(result.count, 0, 'result.count');
+        this._assertEquals(result.documents.length, 0, 'result.documents.length');
+    }
+
     // ==================== Search Tests ====================
 
     async testSearchBasic() {
@@ -663,6 +703,8 @@ class TestHarness {
             await this._runTest('Get document not found', () => this.testGetDocumentNotFound());
             await this._runTest('Add document with labels and tags', () => this.testAddDocumentWithLabelsAndTags());
             await this._runTest('Get document with labels and tags', () => this.testGetDocumentWithLabelsAndTags());
+            await this._runTest('Get documents batch', () => this.testGetDocumentsBatch());
+            await this._runTest('Get documents batch (empty)', () => this.testGetDocumentsBatchEmpty());
             await this._runTest('Document exists (HEAD)', () => this.testDocumentExists());
             await this._runTest('Document exists not found (HEAD)', () => this.testDocumentExistsNotFound());
 

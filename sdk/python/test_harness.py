@@ -402,6 +402,45 @@ class TestHarness:
         self._assert_equals(len(document.tags), 2, "tags count")
         self._test_documents.append(doc_id)
 
+    def test_get_documents_batch(self):
+        """Test getting multiple documents by IDs in a single request."""
+        # Need at least 2 documents
+        self._assert(len(self._test_documents) >= 2, "Need at least 2 test documents for batch retrieval test")
+
+        # Request some existing document IDs plus some fake ones
+        requested_ids = [
+            self._test_documents[0],
+            self._test_documents[1],
+            "non-existent-doc-id-12345",
+            "another-fake-doc-id-67890"
+        ]
+
+        result = self._client.get_documents_batch(self._test_index_id, requested_ids)
+
+        self._assert_not_none(result, "result")
+        self._assert_not_none(result.documents, "result.documents")
+        self._assert_not_none(result.not_found, "result.not_found")
+        self._assert_equals(result.count, 2, "result.count")
+        self._assert_equals(result.requested_count, 4, "result.requested_count")
+        self._assert_equals(len(result.documents), 2, "len(result.documents)")
+        self._assert_equals(len(result.not_found), 2, "len(result.not_found)")
+
+        # Verify the found documents have expected IDs
+        found_ids = {doc.document_id for doc in result.documents}
+        self._assert(self._test_documents[0] in found_ids, "first test document should be found")
+        self._assert(self._test_documents[1] in found_ids, "second test document should be found")
+
+        # Verify the not found IDs
+        self._assert("non-existent-doc-id-12345" in result.not_found, "fake ID should be in not_found")
+        self._assert("another-fake-doc-id-67890" in result.not_found, "another fake ID should be in not_found")
+
+    def test_get_documents_batch_empty(self):
+        """Test getting documents with empty list."""
+        result = self._client.get_documents_batch(self._test_index_id, [])
+        self._assert_not_none(result, "result")
+        self._assert_equals(result.count, 0, "result.count")
+        self._assert_equals(len(result.documents), 0, "len(result.documents)")
+
     # ==================== Search Tests ====================
 
     def test_search_basic(self):
@@ -646,6 +685,8 @@ class TestHarness:
             self._run_test("Get document not found", self.test_get_document_not_found)
             self._run_test("Add document with labels and tags", self.test_add_document_with_labels_and_tags)
             self._run_test("Get document with labels and tags", self.test_get_document_with_labels_and_tags)
+            self._run_test("Get documents batch", self.test_get_documents_batch)
+            self._run_test("Get documents batch (empty)", self.test_get_documents_batch_empty)
             self._run_test("Document exists (HEAD)", self.test_document_exists)
             self._run_test("Document exists not found (HEAD)", self.test_document_exists_not_found)
 

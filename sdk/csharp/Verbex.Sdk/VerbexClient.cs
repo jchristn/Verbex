@@ -2,6 +2,7 @@ namespace Verbex.Sdk
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Net.Http;
     using System.Net.Http.Headers;
     using System.Text;
@@ -576,6 +577,40 @@ namespace Verbex.Sdk
         public async Task<DocumentInfo> GetDocumentAsync(string indexId, string documentId, CancellationToken cancellationToken = default)
         {
             return await MakeRequestAsync<DocumentInfo>(HttpMethod.Get, $"/v1.0/indices/{indexId}/documents/{documentId}", null, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Gets multiple documents by IDs from an index in a single request.
+        /// </summary>
+        /// <param name="indexId">The index identifier.</param>
+        /// <param name="documentIds">Collection of document IDs to retrieve.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Batch result containing found documents and list of not found IDs.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when indexId or documentIds is null.</exception>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<BatchDocumentsResult> GetDocumentsBatchAsync(
+            string indexId,
+            IEnumerable<string> documentIds,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(indexId);
+            ArgumentNullException.ThrowIfNull(documentIds);
+
+            List<string> idList = new List<string>(documentIds);
+            if (idList.Count == 0)
+            {
+                return new BatchDocumentsResult();
+            }
+
+            // Join IDs with commas - don't URL-encode the entire string as commas are valid in query strings
+            // Only escape individual IDs that might contain special characters
+            string idsParam = string.Join(",", idList.Select(id => Uri.EscapeDataString(id)));
+            return await MakeRequestAsync<BatchDocumentsResult>(
+                HttpMethod.Get,
+                $"/v1.0/indices/{indexId}/documents?ids={idsParam}",
+                null,
+                true,
+                cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>

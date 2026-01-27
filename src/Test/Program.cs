@@ -136,6 +136,9 @@ namespace Test
                 Console.WriteLine($"--- Search Filter Tests ({modeName}) ---");
                 await SearchFilterTests.RunAllAsync(runner).ConfigureAwait(false);
 
+                Console.WriteLine($"--- Batch Document Retrieval Tests ({modeName}) ---");
+                await BatchDocumentRetrievalTests.RunAllAsync(runner).ConfigureAwait(false);
+
                 Console.WriteLine();
             }
             finally

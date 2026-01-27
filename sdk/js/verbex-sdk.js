@@ -209,6 +209,22 @@ class AddDocumentData {
 }
 
 /**
+ * Batch document retrieval result.
+ */
+class BatchDocumentsResult {
+    /**
+     * Create a BatchDocumentsResult.
+     * @param {object} data - Batch documents response data
+     */
+    constructor(data) {
+        this.documents = (data?.documents || []).map(doc => new DocumentInfo(doc));
+        this.notFound = data?.notFound || [];
+        this.count = data?.count || 0;
+        this.requestedCount = data?.requestedCount || 0;
+    }
+}
+
+/**
  * Search result model.
  */
 class SearchResult {
@@ -751,6 +767,22 @@ class VerbexClient {
     }
 
     /**
+     * Get multiple documents by IDs from an index in a single request.
+     * @param {string} indexId - The index identifier
+     * @param {string[]} documentIds - Array of document IDs to retrieve
+     * @returns {Promise<BatchDocumentsResult>} Batch result containing found documents and list of not found IDs
+     */
+    async getDocumentsBatch(indexId, documentIds) {
+        if (!documentIds || documentIds.length === 0) {
+            return new BatchDocumentsResult({});
+        }
+        // Join IDs with commas - encode individual IDs but not the commas
+        const idsParam = documentIds.map(id => encodeURIComponent(id)).join(',');
+        const data = await this._makeRequest('GET', `/v1.0/indices/${indexId}/documents?ids=${idsParam}`);
+        return new BatchDocumentsResult(data || {});
+    }
+
+    /**
      * Check if a document exists in an index.
      * @param {string} indexId - The index identifier
      * @param {string} documentId - The document identifier
@@ -1069,6 +1101,7 @@ if (typeof module !== 'undefined' && module.exports) {
         IndexInfo,
         DocumentInfo,
         AddDocumentData,
+        BatchDocumentsResult,
         SearchResult,
         SearchData,
         HealthData,
@@ -1089,6 +1122,7 @@ if (typeof exports !== 'undefined') {
     exports.IndexInfo = IndexInfo;
     exports.DocumentInfo = DocumentInfo;
     exports.AddDocumentData = AddDocumentData;
+    exports.BatchDocumentsResult = BatchDocumentsResult;
     exports.SearchResult = SearchResult;
     exports.SearchData = SearchData;
     exports.HealthData = HealthData;

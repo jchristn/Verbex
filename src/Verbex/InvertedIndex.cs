@@ -308,6 +308,37 @@ namespace Verbex
         }
 
         /// <summary>
+        /// Gets multiple documents by their IDs with full metadata (labels, tags, custom metadata) populated.
+        /// Documents that are not found are silently omitted from the result.
+        /// </summary>
+        /// <param name="documentIds">Collection of document IDs to retrieve.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>List of documents that were found with all metadata populated.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when documentIds is null.</exception>
+        public async Task<List<DocumentMetadata>> GetDocumentsWithMetadataAsync(IEnumerable<string> documentIds, CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotOpen();
+            ArgumentNullException.ThrowIfNull(documentIds);
+
+            List<DocumentMetadata> results = new List<DocumentMetadata>();
+            foreach (string docId in documentIds.Distinct())
+            {
+                if (string.IsNullOrWhiteSpace(docId))
+                {
+                    continue;
+                }
+
+                DocumentMetadata? doc = await GetDocumentWithMetadataAsync(docId, token).ConfigureAwait(false);
+                if (doc != null)
+                {
+                    results.Add(doc);
+                }
+            }
+            return results;
+        }
+
+        /// <summary>
         /// Checks if a document exists by ID.
         /// </summary>
         /// <param name="documentId">Document ID.</param>

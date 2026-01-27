@@ -34,6 +34,7 @@ Use the `/v1.0/auth/login` endpoint to obtain a token by providing valid credent
 ### CreateIndexRequest
 ```json
 {
+  "TenantId": "string (required for global admin, ignored for tenant users)",
   "Name": "string (required)",
   "Description": "string (optional)",
   "InMemory": "boolean (optional, default: false)",
@@ -42,7 +43,8 @@ Use the `/v1.0/auth/login` endpoint to obtain a token by providing valid credent
   "MinTokenLength": "integer (optional, default: 0)",
   "MaxTokenLength": "integer (optional, default: 0)",
   "Labels": ["string (optional)"],
-  "Tags": {"key": "value (optional)"}
+  "Tags": {"key": "value (optional)"},
+  "CustomMetadata": "any JSON value (optional)"
 }
 ```
 
@@ -57,27 +59,90 @@ Use the `/v1.0/auth/login` endpoint to obtain a token by providing valid credent
   "InMemory": "boolean",
   "CreatedUtc": "datetime",
   "Labels": ["string"],
-  "Tags": {"key": "value"}
+  "Tags": {"key": "value"},
+  "CustomMetadata": "any JSON value"
 }
 ```
 
 ### SearchRequest
 ```json
 {
-  "Query": "string",
-  "MaxResults": "integer",
+  "Query": "string (required)",
+  "MaxResults": "integer (optional, default: 100)",
+  "UseAndLogic": "boolean (optional, default: false)",
   "Labels": ["string (optional)"],
   "Tags": {"key": "value (optional)"}
 }
 ```
 
-### DocumentRequest (AddDocumentRequest)
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| Query | string | Yes | Search query text |
+| MaxResults | integer | No | Maximum number of results (default: 100) |
+| UseAndLogic | boolean | No | If true, documents must contain ALL terms (AND). If false, documents can contain ANY term (OR). Default: false |
+| Labels | string[] | No | Filter documents by labels (AND logic, case-insensitive) |
+| Tags | object | No | Filter documents by tags (AND logic, exact match) |
+
+### AddDocumentRequest
 ```json
 {
-  "Id": "string (optional)",
-  "Content": "string",
+  "Id": "string (optional, auto-generated if not provided)",
+  "Content": "string (required)",
+  "Labels": ["string (optional)"],
+  "Tags": {"key": "value (optional)"},
+  "CustomMetadata": "any JSON value (optional)"
+}
+```
+
+### DocumentMetadata (Response)
+```json
+{
+  "DocumentId": "string",
+  "DocumentPath": "string",
+  "OriginalFileName": "string (nullable)",
+  "DocumentLength": "integer",
+  "IndexedDate": "datetime",
+  "LastModified": "datetime",
+  "ContentSha256": "string",
+  "Terms": ["string"],
+  "IsDeleted": "boolean",
   "Labels": ["string"],
+  "Tags": {"key": "value"},
+  "CustomMetadata": "any JSON value (nullable)"
+}
+```
+
+### SearchResult
+```json
+{
+  "DocumentId": "string",
+  "Document": "DocumentMetadata (includes Labels and Tags)",
+  "Score": "number",
+  "MatchedTermCount": "integer",
+  "TermScores": {"term": "score"},
+  "TermFrequencies": {"term": "count"},
+  "TotalTermMatches": "integer"
+}
+```
+
+### UpdateLabelsRequest
+```json
+{
+  "Labels": ["string"]
+}
+```
+
+### UpdateTagsRequest
+```json
+{
   "Tags": {"key": "value"}
+}
+```
+
+### UpdateCustomMetadataRequest
+```json
+{
+  "CustomMetadata": "any JSON value"
 }
 ```
 
@@ -103,25 +168,32 @@ All API responses are wrapped in a standard format:
 | Category | Method | Endpoint | Description | Auth Required |
 |----------|--------|----------|-------------|---------------|
 | Health | GET | `/` | Health check | No |
+| Health | HEAD | `/` | Health check (no body) | No |
 | Health | GET | `/v1.0/health` | Detailed health status | No |
 | Auth | POST | `/v1.0/auth/login` | Login and get token | No |
 | Auth | GET | `/v1.0/auth/validate` | Validate token | No |
 | Index | GET | `/v1.0/indices` | List all indices | Yes |
 | Index | POST | `/v1.0/indices` | Create new index | Yes |
-| Index | GET | `/v1.0/indices/{id}` | Get index details | Yes |
+| Index | GET | `/v1.0/indices/{id}` | Get index statistics | Yes |
 | Index | HEAD | `/v1.0/indices/{id}` | Check if index exists | Yes |
 | Index | DELETE | `/v1.0/indices/{id}` | Delete index | Yes |
-| Document | GET | `/v1.0/indices/{id}/documents` | List documents | Yes |
+| Index | PUT | `/v1.0/indices/{id}/labels` | Update index labels | Yes |
+| Index | PUT | `/v1.0/indices/{id}/tags` | Update index tags | Yes |
+| Index | PUT | `/v1.0/indices/{id}/customMetadata` | Update index custom metadata | Yes |
+| Document | GET | `/v1.0/indices/{id}/documents` | List documents (max 1000) or batch retrieve by IDs | Yes |
 | Document | POST | `/v1.0/indices/{id}/documents` | Add document | Yes |
-| Document | GET | `/v1.0/indices/{id}/documents/{docId}` | Get document | Yes |
+| Document | GET | `/v1.0/indices/{id}/documents/{docId}` | Get document with metadata | Yes |
 | Document | HEAD | `/v1.0/indices/{id}/documents/{docId}` | Check if document exists | Yes |
 | Document | DELETE | `/v1.0/indices/{id}/documents/{docId}` | Delete document | Yes |
+| Document | PUT | `/v1.0/indices/{id}/documents/{docId}/labels` | Update document labels | Yes |
+| Document | PUT | `/v1.0/indices/{id}/documents/{docId}/tags` | Update document tags | Yes |
+| Document | PUT | `/v1.0/indices/{id}/documents/{docId}/customMetadata` | Update document custom metadata | Yes |
 | Search | POST | `/v1.0/indices/{id}/search` | Search documents | Yes |
 | Tenant | GET | `/v1.0/tenants` | List tenants | Yes (Admin) |
-| Tenant | POST | `/v1.0/tenants` | Create tenant | Yes (Admin) |
-| Tenant | GET | `/v1.0/tenants/{id}` | Get tenant | Yes (Admin) |
-| Tenant | PUT | `/v1.0/tenants/{id}` | Update tenant | Yes (Admin) |
-| Tenant | DELETE | `/v1.0/tenants/{id}` | Delete tenant | Yes (Admin) |
+| Tenant | POST | `/v1.0/tenants` | Create tenant | Yes (Global Admin) |
+| Tenant | GET | `/v1.0/tenants/{id}` | Get tenant with statistics | Yes (Admin) |
+| Tenant | PUT | `/v1.0/tenants/{id}` | Update tenant | Yes (Global Admin) |
+| Tenant | DELETE | `/v1.0/tenants/{id}` | Delete tenant | Yes (Global Admin) |
 | Tenant | PUT | `/v1.0/tenants/{id}/labels` | Update tenant labels | Yes (Admin) |
 | Tenant | PUT | `/v1.0/tenants/{id}/tags` | Update tenant tags | Yes (Admin) |
 | User | GET | `/v1.0/tenants/{id}/users` | List users | Yes (Admin) |
@@ -133,7 +205,6 @@ All API responses are wrapped in a standard format:
 | User | PUT | `/v1.0/tenants/{id}/users/{userId}/tags` | Update user tags | Yes (Admin) |
 | Credential | GET | `/v1.0/tenants/{id}/credentials` | List credentials | Yes (Admin) |
 | Credential | POST | `/v1.0/tenants/{id}/credentials` | Create credential | Yes (Admin) |
-| Credential | GET | `/v1.0/tenants/{id}/credentials/{credId}` | Get credential | Yes (Admin) |
 | Credential | PUT | `/v1.0/tenants/{id}/credentials/{credId}` | Update credential | Yes (Admin) |
 | Credential | DELETE | `/v1.0/tenants/{id}/credentials/{credId}` | Delete credential | Yes (Admin) |
 | Credential | PUT | `/v1.0/tenants/{id}/credentials/{credId}/labels` | Update credential labels | Yes (Admin) |
@@ -164,10 +235,13 @@ All API responses are wrapped in a standard format:
 }
 ```
 
+### HEAD `/`
+**Description:** Health check endpoint (returns 200 with no body)
+
 ### GET `/v1.0/health`
 **Description:** Detailed health status
 
-**Response:** Same as above
+**Response:** Same as GET `/`
 
 ## Authentication APIs
 
@@ -199,8 +273,9 @@ All API responses are wrapped in a standard format:
   "ErrorMessage": null,
   "Data": {
     "Token": "base64-encoded-token-here",
-    "Username": "admin",
     "Email": "admin@example.com",
+    "FirstName": "string (for tenant users)",
+    "LastName": "string (for tenant users)",
     "TenantId": "tenant-id-if-applicable",
     "IsAdmin": true,
     "IsGlobalAdmin": true
@@ -229,7 +304,13 @@ Authorization: Bearer <token>
   "StatusCode": 200,
   "ErrorMessage": null,
   "Data": {
-    "Valid": true
+    "Valid": true,
+    "IsGlobalAdmin": false,
+    "IsTenantAdmin": true,
+    "TenantId": "tenant-123",
+    "UserId": "user-456",
+    "CredentialId": "cred-789",
+    "Email": "user@example.com"
   },
   "Headers": {},
   "TotalCount": null,
@@ -241,7 +322,7 @@ Authorization: Bearer <token>
 ## Index Management APIs
 
 ### GET `/v1.0/indices`
-**Description:** Retrieve list of all indices
+**Description:** Retrieve list of all indices for the authenticated tenant
 
 **Headers:**
 ```
@@ -291,6 +372,7 @@ Content-Type: application/json
 **Request Body:**
 ```json
 {
+  "TenantId": "tenant-id (required for global admin)",
   "Name": "My Index",
   "Description": "My custom index for documents",
   "InMemory": false,
@@ -299,11 +381,12 @@ Content-Type: application/json
   "MinTokenLength": 2,
   "MaxTokenLength": 50,
   "Labels": ["production", "search"],
-  "Tags": {"environment": "prod", "team": "engineering"}
+  "Tags": {"environment": "prod", "team": "engineering"},
+  "CustomMetadata": {"any": "json value"}
 }
 ```
 
-Note: The `Identifier` is auto-generated by the server. The index is associated with the tenant from your authentication context.
+Note: The `Identifier` is auto-generated by the server. For tenant users, the index is associated with the tenant from your authentication context. Global admins must specify `TenantId`.
 
 **Response:**
 ```json
@@ -323,7 +406,8 @@ Note: The `Identifier` is auto-generated by the server. The index is associated 
       "InMemory": false,
       "CreatedUtc": "2025-01-01T12:00:00Z",
       "Labels": ["production", "search"],
-      "Tags": {"environment": "prod", "team": "engineering"}
+      "Tags": {"environment": "prod", "team": "engineering"},
+      "CustomMetadata": {"any": "json value"}
     }
   },
   "Headers": {},
@@ -334,7 +418,7 @@ Note: The `Identifier` is auto-generated by the server. The index is associated 
 ```
 
 ### GET `/v1.0/indices/{id}`
-**Description:** Get detailed information about a specific index
+**Description:** Get statistics for a specific index
 
 **Headers:**
 ```
@@ -409,7 +493,7 @@ Authorization: Bearer <token>
   "ErrorMessage": null,
   "Data": {
     "Message": "Index deleted successfully",
-    "IndexId": "my-index"
+    "IndexId": "idx_01JFXA1234567890ABCDEF"
   },
   "Headers": {},
   "TotalCount": null,
@@ -418,10 +502,138 @@ Authorization: Bearer <token>
 }
 ```
 
+### PUT `/v1.0/indices/{id}/labels`
+**Description:** Replace all labels on an index (full replacement, not additive)
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Path Parameters:**
+- `id` (string): Index identifier
+
+**Request Body:**
+```json
+{
+  "Labels": ["production", "active"]
+}
+```
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Message": "Labels updated successfully",
+    "Index": {
+      "Identifier": "idx_01JFXA1234567890ABCDEF",
+      "Name": "My Index",
+      "Labels": ["production", "active"],
+      "Tags": {"environment": "prod"}
+    }
+  },
+  "ProcessingTimeMs": 3.45
+}
+```
+
+### PUT `/v1.0/indices/{id}/tags`
+**Description:** Replace all tags on an index (full replacement, not additive)
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Path Parameters:**
+- `id` (string): Index identifier
+
+**Request Body:**
+```json
+{
+  "Tags": {"environment": "production", "region": "us-west"}
+}
+```
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Message": "Tags updated successfully",
+    "Index": {
+      "Identifier": "idx_01JFXA1234567890ABCDEF",
+      "Name": "My Index",
+      "Labels": ["production"],
+      "Tags": {"environment": "production", "region": "us-west"}
+    }
+  },
+  "ProcessingTimeMs": 3.45
+}
+```
+
+### PUT `/v1.0/indices/{id}/customMetadata`
+**Description:** Replace custom metadata on an index
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Path Parameters:**
+- `id` (string): Index identifier
+
+**Request Body:**
+```json
+{
+  "CustomMetadata": {"any": "json value", "nested": {"objects": "allowed"}}
+}
+```
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Message": "Custom metadata updated successfully",
+    "Index": {
+      "Identifier": "idx_01JFXA1234567890ABCDEF",
+      "Name": "My Index",
+      "Labels": ["production"],
+      "Tags": {"environment": "prod"},
+      "CustomMetadata": {"any": "json value", "nested": {"objects": "allowed"}}
+    }
+  },
+  "ProcessingTimeMs": 3.45
+}
+```
+
 ## Document Management APIs
 
 ### GET `/v1.0/indices/{id}/documents`
-**Description:** List all documents in an index
+**Description:** List all documents in an index (limited to 1000 documents), or retrieve specific documents by IDs using the `ids` query parameter.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| ids | string | No | Comma-separated list of document IDs to retrieve. When provided, returns only the specified documents with full metadata. |
+
+#### List All Documents (Default Behavior)
 
 **Headers:**
 ```
@@ -440,8 +652,19 @@ Authorization: Bearer <token>
   "StatusCode": 200,
   "ErrorMessage": null,
   "Data": {
-    "Documents": [],
-    "Count": 0
+    "Documents": [
+      {
+        "DocumentId": "doc_01JFXA1234567890ABCDEF",
+        "DocumentPath": "doc_01JFXA1234567890ABCDEF",
+        "DocumentLength": 1234,
+        "IndexedDate": "2025-01-01T12:00:00Z",
+        "LastModified": "2025-01-01T12:00:00Z",
+        "ContentSha256": "abc123...",
+        "Labels": ["important"],
+        "Tags": {"category": "tech"}
+      }
+    ],
+    "Count": 1
   },
   "Headers": {},
   "TotalCount": null,
@@ -449,6 +672,71 @@ Authorization: Bearer <token>
   "ProcessingTimeMs": 3.45
 }
 ```
+
+#### Batch Document Retrieval
+
+**Request:** `GET /v1.0/indices/{id}/documents?ids=doc1,doc2,doc3`
+
+Retrieve multiple documents by ID in a single request. This is more efficient than making multiple individual document requests.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Query Parameters:**
+- `ids` (string): Comma-separated list of document IDs to retrieve
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Documents": [
+      {
+        "DocumentId": "doc1",
+        "DocumentPath": "doc1",
+        "DocumentLength": 1234,
+        "IndexedDate": "2025-01-01T12:00:00Z",
+        "LastModified": "2025-01-01T12:00:00Z",
+        "ContentSha256": "abc123...",
+        "Labels": ["important"],
+        "Tags": {"category": "tech"},
+        "CustomMetadata": null
+      },
+      {
+        "DocumentId": "doc2",
+        "DocumentPath": "doc2",
+        "DocumentLength": 5678,
+        "IndexedDate": "2025-01-01T12:00:00Z",
+        "LastModified": "2025-01-01T12:00:00Z",
+        "ContentSha256": "def456...",
+        "Labels": [],
+        "Tags": {},
+        "CustomMetadata": null
+      }
+    ],
+    "NotFound": ["doc3"],
+    "Count": 2,
+    "RequestedCount": 3
+  },
+  "Headers": {},
+  "TotalCount": null,
+  "Skip": null,
+  "ProcessingTimeMs": 5.67
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| Documents | array | List of documents that were found, with full metadata |
+| NotFound | array | List of document IDs that were not found |
+| Count | integer | Number of documents returned |
+| RequestedCount | integer | Total number of document IDs that were requested |
 
 ### POST `/v1.0/indices/{id}/documents`
 **Description:** Add a new document to an index
@@ -468,7 +756,8 @@ Content-Type: application/json
   "Id": "my-document-id",
   "Content": "This is the content of my document that will be indexed for search.",
   "Labels": ["important", "review"],
-  "Tags": {"category": "tech", "author": "Alice"}
+  "Tags": {"category": "tech", "author": "Alice"},
+  "CustomMetadata": {"source": "api", "version": 1}
 }
 ```
 
@@ -494,7 +783,7 @@ Note: `Id` is optional. If omitted, a k-sortable unique ID will be auto-generate
 ```
 
 ### GET `/v1.0/indices/{id}/documents/{docId}`
-**Description:** Retrieve a specific document from an index
+**Description:** Retrieve a specific document from an index, including labels and tags
 
 **Headers:**
 ```
@@ -515,13 +804,15 @@ Authorization: Bearer <token>
   "ErrorMessage": null,
   "Data": {
     "DocumentId": "doc_01JFXA1234567890ABCDEF",
-    "Name": "my-document",
-    "ContentHash": "abc123...",
+    "DocumentPath": "doc_01JFXA1234567890ABCDEF",
+    "OriginalFileName": "my-document",
     "DocumentLength": 1234,
-    "TermCount": 45,
-    "IndexedUtc": "2025-01-01T12:00:00Z",
+    "IndexedDate": "2025-01-01T12:00:00Z",
+    "LastModified": "2025-01-01T12:00:00Z",
+    "ContentSha256": "abc123...",
     "Labels": ["important", "review"],
-    "Tags": {"category": "tech", "author": "Alice"}
+    "Tags": {"category": "tech", "author": "Alice"},
+    "CustomMetadata": {"source": "api", "version": 1}
   },
   "Headers": {},
   "TotalCount": null,
@@ -577,10 +868,131 @@ Authorization: Bearer <token>
 }
 ```
 
+### PUT `/v1.0/indices/{id}/documents/{docId}/labels`
+**Description:** Replace all labels on a document (full replacement, not additive)
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Path Parameters:**
+- `id` (string): Index identifier
+- `docId` (string): Document identifier
+
+**Request Body:**
+```json
+{
+  "Labels": ["reviewed", "approved"]
+}
+```
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Message": "Labels updated successfully",
+    "Document": {
+      "DocumentId": "doc_01JFXA1234567890ABCDEF",
+      "Labels": ["reviewed", "approved"],
+      "Tags": {"category": "tech"}
+    }
+  },
+  "ProcessingTimeMs": 3.45
+}
+```
+
+### PUT `/v1.0/indices/{id}/documents/{docId}/tags`
+**Description:** Replace all tags on a document (full replacement, not additive)
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Path Parameters:**
+- `id` (string): Index identifier
+- `docId` (string): Document identifier
+
+**Request Body:**
+```json
+{
+  "Tags": {"category": "finance", "priority": "high"}
+}
+```
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Message": "Tags updated successfully",
+    "Document": {
+      "DocumentId": "doc_01JFXA1234567890ABCDEF",
+      "Labels": ["important"],
+      "Tags": {"category": "finance", "priority": "high"}
+    }
+  },
+  "ProcessingTimeMs": 3.45
+}
+```
+
+### PUT `/v1.0/indices/{id}/documents/{docId}/customMetadata`
+**Description:** Replace custom metadata on a document
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Path Parameters:**
+- `id` (string): Index identifier
+- `docId` (string): Document identifier
+
+**Request Body:**
+```json
+{
+  "CustomMetadata": {"source": "manual", "reviewed_by": "admin", "score": 95}
+}
+```
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Message": "Custom metadata updated successfully",
+    "Document": {
+      "DocumentId": "doc_01JFXA1234567890ABCDEF",
+      "Labels": ["important"],
+      "Tags": {"category": "tech"},
+      "CustomMetadata": {"source": "manual", "reviewed_by": "admin", "score": 95}
+    }
+  },
+  "ProcessingTimeMs": 3.45
+}
+```
+
 ## Search APIs
 
 ### POST `/v1.0/indices/{id}/search`
-**Description:** Search for documents within an index
+**Description:** Search for documents within an index. Each search result includes the full document metadata with labels and tags.
 
 **Headers:**
 ```
@@ -596,12 +1008,13 @@ Content-Type: application/json
 {
   "Query": "machine learning algorithms",
   "MaxResults": 10,
+  "UseAndLogic": false,
   "Labels": ["important"],
   "Tags": {"category": "tech"}
 }
 ```
 
-Note: `Labels` and `Tags` are optional. When provided, documents must match ALL specified labels (AND logic, case-insensitive) and ALL specified tags (AND logic, exact match). Filtering is performed via SQL JOINs during document retrieval for optimal performance.
+Note: `Labels` and `Tags` are optional filters. When provided, documents must match ALL specified labels (AND logic, case-insensitive) and ALL specified tags (AND logic, exact match). Filtering is performed via SQL JOINs during document retrieval for optimal performance.
 
 **Response:**
 ```json
@@ -618,11 +1031,12 @@ Note: `Labels` and `Tags` are optional. When provided, documents must match ALL 
         "DocumentId": "doc_01JFXA1234567890ABCDEF",
         "Document": {
           "DocumentId": "doc_01JFXA1234567890ABCDEF",
-          "Name": "ml-paper",
+          "DocumentPath": "doc_01JFXA1234567890ABCDEF",
           "DocumentLength": 5000,
-          "TermCount": 150,
+          "IndexedDate": "2025-01-01T12:00:00Z",
           "Labels": ["important"],
-          "Tags": {"category": "tech"}
+          "Tags": {"category": "tech"},
+          "CustomMetadata": null
         },
         "Score": 0.85,
         "MatchedTermCount": 2,
@@ -638,6 +1052,7 @@ Note: `Labels` and `Tags` are optional. When provided, documents must match ALL 
       }
     ],
     "TotalCount": 1,
+    "MaxResults": 10,
     "SearchTime": 12.34
   },
   "Headers": {},
@@ -649,8 +1064,32 @@ Note: `Labels` and `Tags` are optional. When provided, documents must match ALL 
 
 ## Admin - Tenant APIs
 
-### PUT `/v1.0/tenants/{id}/labels`
-**Description:** Update labels on a tenant (full replacement)
+### GET `/v1.0/tenants`
+**Description:** List all tenants. Global admins see all tenants; tenant admins see only their own.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Tenants": [...],
+    "Count": 1
+  },
+  "ProcessingTimeMs": 3.45
+}
+```
+
+### POST `/v1.0/tenants`
+**Description:** Create a new tenant (requires global admin)
 
 **Headers:**
 ```
@@ -658,8 +1097,65 @@ Authorization: Bearer <token>
 Content-Type: application/json
 ```
 
+**Request Body:**
+```json
+{
+  "Name": "My Tenant",
+  "Description": "Description of the tenant"
+}
+```
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 201,
+  "ErrorMessage": null,
+  "Data": {
+    "Message": "Tenant created successfully",
+    "Tenant": {...}
+  },
+  "ProcessingTimeMs": 3.45
+}
+```
+
+### GET `/v1.0/tenants/{id}`
+**Description:** Get a specific tenant with statistics
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
 **Path Parameters:**
 - `id` (string): Tenant identifier
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Tenant": {...},
+    "Statistics": {...}
+  },
+  "ProcessingTimeMs": 3.45
+}
+```
+
+### PUT `/v1.0/tenants/{id}`
+**Description:** Update a tenant (requires global admin)
+
+### DELETE `/v1.0/tenants/{id}`
+**Description:** Delete a tenant and all its data (requires global admin)
+
+### PUT `/v1.0/tenants/{id}/labels`
+**Description:** Update labels on a tenant (full replacement)
 
 **Request Body:**
 ```json
@@ -668,32 +1164,8 @@ Content-Type: application/json
 }
 ```
 
-**Response:**
-```json
-{
-  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "Success": true,
-  "TimestampUtc": "2025-01-01T12:00:00Z",
-  "StatusCode": 200,
-  "ErrorMessage": null,
-  "Data": {
-    "Message": "Labels updated successfully"
-  },
-  "ProcessingTimeMs": 3.45
-}
-```
-
 ### PUT `/v1.0/tenants/{id}/tags`
 **Description:** Update tags on a tenant (full replacement)
-
-**Headers:**
-```
-Authorization: Bearer <token>
-Content-Type: application/json
-```
-
-**Path Parameters:**
-- `id` (string): Tenant identifier
 
 **Request Body:**
 ```json
@@ -702,35 +1174,25 @@ Content-Type: application/json
 }
 ```
 
-**Response:**
-```json
-{
-  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "Success": true,
-  "TimestampUtc": "2025-01-01T12:00:00Z",
-  "StatusCode": 200,
-  "ErrorMessage": null,
-  "Data": {
-    "Message": "Tags updated successfully"
-  },
-  "ProcessingTimeMs": 3.45
-}
-```
-
 ## Admin - User APIs
+
+### GET `/v1.0/tenants/{id}/users`
+**Description:** List all users for a tenant
+
+### POST `/v1.0/tenants/{id}/users`
+**Description:** Create a new user for a tenant
+
+### GET `/v1.0/tenants/{id}/users/{userId}`
+**Description:** Get a specific user by ID
+
+### PUT `/v1.0/tenants/{id}/users/{userId}`
+**Description:** Update a user
+
+### DELETE `/v1.0/tenants/{id}/users/{userId}`
+**Description:** Delete a user
 
 ### PUT `/v1.0/tenants/{id}/users/{userId}/labels`
 **Description:** Update labels on a user (full replacement)
-
-**Headers:**
-```
-Authorization: Bearer <token>
-Content-Type: application/json
-```
-
-**Path Parameters:**
-- `id` (string): Tenant identifier
-- `userId` (string): User identifier
 
 **Request Body:**
 ```json
@@ -739,33 +1201,8 @@ Content-Type: application/json
 }
 ```
 
-**Response:**
-```json
-{
-  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "Success": true,
-  "TimestampUtc": "2025-01-01T12:00:00Z",
-  "StatusCode": 200,
-  "ErrorMessage": null,
-  "Data": {
-    "Message": "Labels updated successfully"
-  },
-  "ProcessingTimeMs": 3.45
-}
-```
-
 ### PUT `/v1.0/tenants/{id}/users/{userId}/tags`
 **Description:** Update tags on a user (full replacement)
-
-**Headers:**
-```
-Authorization: Bearer <token>
-Content-Type: application/json
-```
-
-**Path Parameters:**
-- `id` (string): Tenant identifier
-- `userId` (string): User identifier
 
 **Request Body:**
 ```json
@@ -774,35 +1211,22 @@ Content-Type: application/json
 }
 ```
 
-**Response:**
-```json
-{
-  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "Success": true,
-  "TimestampUtc": "2025-01-01T12:00:00Z",
-  "StatusCode": 200,
-  "ErrorMessage": null,
-  "Data": {
-    "Message": "Tags updated successfully"
-  },
-  "ProcessingTimeMs": 3.45
-}
-```
-
 ## Admin - Credential APIs
+
+### GET `/v1.0/tenants/{id}/credentials`
+**Description:** List all API credentials for a tenant
+
+### POST `/v1.0/tenants/{id}/credentials`
+**Description:** Create a new API credential for a tenant
+
+### PUT `/v1.0/tenants/{id}/credentials/{credId}`
+**Description:** Update an API credential (activate/deactivate)
+
+### DELETE `/v1.0/tenants/{id}/credentials/{credId}`
+**Description:** Revoke an API credential
 
 ### PUT `/v1.0/tenants/{id}/credentials/{credId}/labels`
 **Description:** Update labels on a credential (full replacement)
-
-**Headers:**
-```
-Authorization: Bearer <token>
-Content-Type: application/json
-```
-
-**Path Parameters:**
-- `id` (string): Tenant identifier
-- `credId` (string): Credential identifier
 
 **Request Body:**
 ```json
@@ -811,53 +1235,13 @@ Content-Type: application/json
 }
 ```
 
-**Response:**
-```json
-{
-  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "Success": true,
-  "TimestampUtc": "2025-01-01T12:00:00Z",
-  "StatusCode": 200,
-  "ErrorMessage": null,
-  "Data": {
-    "Message": "Labels updated successfully"
-  },
-  "ProcessingTimeMs": 3.45
-}
-```
-
 ### PUT `/v1.0/tenants/{id}/credentials/{credId}/tags`
 **Description:** Update tags on a credential (full replacement)
-
-**Headers:**
-```
-Authorization: Bearer <token>
-Content-Type: application/json
-```
-
-**Path Parameters:**
-- `id` (string): Tenant identifier
-- `credId` (string): Credential identifier
 
 **Request Body:**
 ```json
 {
   "Tags": {"environment": "production", "service": "backend"}
-}
-```
-
-**Response:**
-```json
-{
-  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "Success": true,
-  "TimestampUtc": "2025-01-01T12:00:00Z",
-  "StatusCode": 200,
-  "ErrorMessage": null,
-  "Data": {
-    "Message": "Tags updated successfully"
-  },
-  "ProcessingTimeMs": 3.45
 }
 ```
 
@@ -889,6 +1273,7 @@ All API endpoints return errors in a consistent format:
 | 201 | Created |
 | 400 | Bad Request - Invalid input |
 | 401 | Unauthorized - Authentication required |
+| 403 | Forbidden - Insufficient permissions |
 | 404 | Not Found - Resource doesn't exist |
 | 409 | Conflict - Resource already exists |
 | 500 | Internal Server Error |
@@ -924,6 +1309,22 @@ All API endpoints return errors in a consistent format:
   "TotalCount": null,
   "Skip": null,
   "ProcessingTimeMs": 1.5
+}
+```
+
+**403 Forbidden:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": false,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 403,
+  "ErrorMessage": "Admin access required",
+  "Data": null,
+  "Headers": {},
+  "TotalCount": null,
+  "Skip": null,
+  "ProcessingTimeMs": 1.0
 }
 ```
 
@@ -982,14 +1383,15 @@ All API endpoints return errors in a consistent format:
 - **InMemory: false** (default): Index stored in a file-based SQLite database (persistent)
 
 ### Text Processing Options
-- **enableLemmatizer**: Reduces words to their base forms (e.g., "running" → "run")
-- **enableStopWordRemover**: Filters out common words (e.g., "the", "and", "of")
-- **minTokenLength**: Minimum token length (0 = disabled)
-- **maxTokenLength**: Maximum token length (0 = disabled)
+- **EnableLemmatizer**: Reduces words to their base forms (e.g., "running" -> "run")
+- **EnableStopWordRemover**: Filters out common words (e.g., "the", "and", "of")
+- **MinTokenLength**: Minimum token length (0 = disabled)
+- **MaxTokenLength**: Maximum token length (0 = disabled)
 
 ### Metadata Features
-- **labels**: String array for categorizing documents or indices (e.g., ["important", "review"])
-- **tags**: Key-value pairs for custom metadata (e.g., {"category": "tech", "author": "Alice"})
+- **Labels**: String array for categorizing documents or indices (e.g., ["important", "review"])
+- **Tags**: Key-value pairs for custom metadata (e.g., {"category": "tech", "author": "Alice"})
+- **CustomMetadata**: Any JSON-serializable value for arbitrary custom data
 - Searches can filter by labels (AND logic, case-insensitive) and tags (AND logic, exact match)
 
 ---

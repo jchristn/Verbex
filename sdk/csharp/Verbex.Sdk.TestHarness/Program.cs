@@ -3,6 +3,7 @@ namespace Verbex.Sdk.TestHarness
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
+    using System.Linq;
     using System.Threading.Tasks;
     using Verbex.Sdk;
 
@@ -486,6 +487,49 @@ namespace Verbex.Sdk.TestHarness
             _TestDocuments.Add(docId);
         }
 
+        private async Task TestGetDocumentsBatchAsync()
+        {
+            // Need at least 2 documents in _TestDocuments
+            Assert(_TestDocuments.Count >= 2, "Need at least 2 test documents for batch retrieval test");
+
+            // Request some existing document IDs plus some fake ones
+            List<string> requestedIds = new List<string>
+            {
+                _TestDocuments[0],
+                _TestDocuments[1],
+                "non-existent-doc-id-12345",
+                "another-fake-doc-id-67890"
+            };
+
+            BatchDocumentsResult result = await _Client!.GetDocumentsBatchAsync(_TestIndexId, requestedIds).ConfigureAwait(false);
+
+            AssertNotNull(result, "result");
+            AssertNotNull(result.Documents, "result.Documents");
+            AssertNotNull(result.NotFound, "result.NotFound");
+            AssertEquals(result.Count, 2, "result.Count");
+            AssertEquals(result.RequestedCount, 4, "result.RequestedCount");
+            AssertEquals(result.Documents.Count, 2, "result.Documents.Count");
+            AssertEquals(result.NotFound.Count, 2, "result.NotFound.Count");
+
+            // Verify the found documents have expected IDs
+            HashSet<string> foundIds = new HashSet<string>(result.Documents.Select(d => d.DocumentId));
+            Assert(foundIds.Contains(_TestDocuments[0]), "first test document should be found");
+            Assert(foundIds.Contains(_TestDocuments[1]), "second test document should be found");
+
+            // Verify the not found IDs
+            Assert(result.NotFound.Contains("non-existent-doc-id-12345"), "fake ID should be in NotFound");
+            Assert(result.NotFound.Contains("another-fake-doc-id-67890"), "another fake ID should be in NotFound");
+        }
+
+        private async Task TestGetDocumentsBatchEmptyAsync()
+        {
+            // Test with empty list
+            BatchDocumentsResult result = await _Client!.GetDocumentsBatchAsync(_TestIndexId, new List<string>()).ConfigureAwait(false);
+            AssertNotNull(result, "result");
+            AssertEquals(result.Count, 0, "result.Count");
+            AssertEquals(result.Documents.Count, 0, "result.Documents.Count");
+        }
+
         // ==================== Search Tests ====================
 
         private async Task TestSearchBasicAsync()
@@ -769,6 +813,8 @@ namespace Verbex.Sdk.TestHarness
                 await RunTestAsync("Get document not found", TestGetDocumentNotFoundAsync).ConfigureAwait(false);
                 await RunTestAsync("Add document with labels and tags", TestAddDocumentWithLabelsAndTagsAsync).ConfigureAwait(false);
                 await RunTestAsync("Get document with labels and tags", TestGetDocumentWithLabelsAndTagsAsync).ConfigureAwait(false);
+                await RunTestAsync("Get documents batch", TestGetDocumentsBatchAsync).ConfigureAwait(false);
+                await RunTestAsync("Get documents batch (empty)", TestGetDocumentsBatchEmptyAsync).ConfigureAwait(false);
                 await RunTestAsync("Document exists (HEAD)", TestDocumentExistsAsync).ConfigureAwait(false);
                 await RunTestAsync("Document exists not found (HEAD)", TestDocumentExistsNotFoundAsync).ConfigureAwait(false);
 

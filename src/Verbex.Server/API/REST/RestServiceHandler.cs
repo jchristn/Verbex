@@ -1522,13 +1522,51 @@ namespace Verbex.Server.API.REST
 
                 try
                 {
-                    List<DocumentMetadata> documentList = await index.GetDocumentsAsync(limit: 1000).ConfigureAwait(false);
-                    return new ResponseContext
+                    // Check for batch retrieval via ?ids= query parameter
+                    string? idsParam = ctx.Request.Query?.Elements?["ids"];
+
+                    if (!String.IsNullOrEmpty(idsParam))
                     {
-                        Success = true,
-                        StatusCode = 200,
-                        Data = new { Documents = documentList, Count = documentList.Count }
-                    };
+                        // Batch retrieval mode
+                        List<string> requestedIds = idsParam
+                            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(id => id.Trim())
+                            .Distinct()
+                            .ToList();
+
+                        if (requestedIds.Count == 0)
+                        {
+                            return new ResponseContext(false, 400, "No valid document IDs provided");
+                        }
+
+                        List<DocumentMetadata> documents = await index.GetDocumentsWithMetadataAsync(requestedIds).ConfigureAwait(false);
+                        HashSet<string> foundIds = documents.Select(d => d.DocumentId).ToHashSet();
+                        List<string> notFoundIds = requestedIds.Where(id => !foundIds.Contains(id)).ToList();
+
+                        return new ResponseContext
+                        {
+                            Success = true,
+                            StatusCode = 200,
+                            Data = new
+                            {
+                                Documents = documents,
+                                NotFound = notFoundIds,
+                                Count = documents.Count,
+                                RequestedCount = requestedIds.Count
+                            }
+                        };
+                    }
+                    else
+                    {
+                        // Original list-all behavior
+                        List<DocumentMetadata> documentList = await index.GetDocumentsAsync(limit: 1000).ConfigureAwait(false);
+                        return new ResponseContext
+                        {
+                            Success = true,
+                            StatusCode = 200,
+                            Data = new { Documents = documentList, Count = documentList.Count }
+                        };
+                    }
                 }
                 catch (Exception ex)
                 {

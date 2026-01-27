@@ -555,6 +555,31 @@
             Access to the requested resource is denied.
             </summary>
         </member>
+        <member name="T:Verbex.Sdk.BatchDocumentsResult">
+            <summary>
+            Result of a batch document retrieval operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.BatchDocumentsResult.Documents">
+            <summary>
+            List of documents that were found.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.BatchDocumentsResult.NotFound">
+            <summary>
+            List of document IDs that were not found.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.BatchDocumentsResult.Count">
+            <summary>
+            Number of documents returned.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.BatchDocumentsResult.RequestedCount">
+            <summary>
+            Total number of document IDs that were requested.
+            </summary>
+        </member>
         <member name="T:Verbex.Sdk.CreateIndexData">
             <summary>
             Create index response data.
@@ -1340,6 +1365,17 @@
             <param name="cancellationToken">Cancellation token.</param>
             <returns>Document information.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the document is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.GetDocumentsBatchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Gets multiple documents by IDs from an index in a single request.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="documentIds">Collection of document IDs to retrieve.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Batch result containing found documents and list of not found IDs.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when indexId or documentIds is null.</exception>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.DocumentExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>

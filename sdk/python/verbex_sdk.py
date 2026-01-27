@@ -193,6 +193,15 @@ class AddDocumentData:
 
 
 @dataclass
+class BatchDocumentsResult:
+    """Result of batch document retrieval operation."""
+    documents: List[DocumentInfo] = field(default_factory=list)
+    not_found: List[str] = field(default_factory=list)
+    count: int = 0
+    requested_count: int = 0
+
+
+@dataclass
 class SearchResult:
     """Search result model."""
     document_id: str = ""
@@ -748,6 +757,36 @@ class VerbexClient:
         """
         data = self._make_request('GET', f'/v1.0/indices/{index_id}/documents/{document_id}')
         return self._parse_document_info(data or {})
+
+    def get_documents_batch(self, index_id: str, document_ids: List[str]) -> BatchDocumentsResult:
+        """
+        Get multiple documents by IDs from an index in a single request.
+
+        Args:
+            index_id: The index identifier
+            document_ids: List of document IDs to retrieve
+
+        Returns:
+            BatchDocumentsResult containing found documents and list of not found IDs
+        """
+        if not document_ids:
+            return BatchDocumentsResult()
+
+        # Join IDs with commas - encode individual IDs but not the commas
+        from urllib.parse import quote
+        ids_param = ','.join(quote(doc_id, safe='') for doc_id in document_ids)
+        data = self._make_request('GET', f'/v1.0/indices/{index_id}/documents?ids={ids_param}')
+
+        documents = []
+        if data and data.get('documents'):
+            documents = [self._parse_document_info(doc) for doc in data['documents']]
+
+        return BatchDocumentsResult(
+            documents=documents,
+            not_found=data.get('not_found', []) if data else [],
+            count=data.get('count', 0) if data else 0,
+            requested_count=data.get('requested_count', 0) if data else 0
+        )
 
     def document_exists(self, index_id: str, document_id: str) -> bool:
         """
