@@ -449,6 +449,48 @@ class TestHarness {
         this._assertEquals(result.documents.length, 0, 'result.documents.length');
     }
 
+    async testDeleteDocumentsBatch() {
+        // Add some documents specifically for batch delete test
+        const docId1 = crypto.randomUUID();
+        const docId2 = crypto.randomUUID();
+        const fakeDocId = 'non-existent-doc-for-batch-delete';
+
+        await this._client.addDocument(this._testIndexId, 'Document for batch delete test 1.', docId1);
+        await this._client.addDocument(this._testIndexId, 'Document for batch delete test 2.', docId2);
+
+        // Request deletion of existing docs plus a fake one
+        const idsToDelete = [docId1, docId2, fakeDocId];
+        const result = await this._client.deleteDocumentsBatch(this._testIndexId, idsToDelete);
+
+        this._assertNotNull(result, 'result');
+        this._assertNotNull(result.deleted, 'result.deleted');
+        this._assertNotNull(result.notFound, 'result.notFound');
+        this._assertEquals(result.deletedCount, 2, 'result.deletedCount');
+        this._assertEquals(result.notFoundCount, 1, 'result.notFoundCount');
+        this._assertEquals(result.requestedCount, 3, 'result.requestedCount');
+        this._assertEquals(result.deleted.length, 2, 'result.deleted.length');
+        this._assertEquals(result.notFound.length, 1, 'result.notFound.length');
+
+        // Verify the deleted IDs
+        this._assert(result.deleted.includes(docId1), 'docId1 should be in deleted');
+        this._assert(result.deleted.includes(docId2), 'docId2 should be in deleted');
+        this._assert(result.notFound.includes(fakeDocId), 'fakeDocId should be in notFound');
+
+        // Verify documents are actually deleted
+        const doc1Exists = await this._client.documentExists(this._testIndexId, docId1);
+        const doc2Exists = await this._client.documentExists(this._testIndexId, docId2);
+        this._assertFalse(doc1Exists, 'docId1 should no longer exist');
+        this._assertFalse(doc2Exists, 'docId2 should no longer exist');
+    }
+
+    async testDeleteDocumentsBatchEmpty() {
+        // Test with empty array
+        const result = await this._client.deleteDocumentsBatch(this._testIndexId, []);
+        this._assertNotNull(result, 'result');
+        this._assertEquals(result.deletedCount, 0, 'result.deletedCount');
+        this._assertEquals(result.requestedCount, 0, 'result.requestedCount');
+    }
+
     // ==================== Search Tests ====================
 
     async testSearchBasic() {
@@ -705,6 +747,8 @@ class TestHarness {
             await this._runTest('Get document with labels and tags', () => this.testGetDocumentWithLabelsAndTags());
             await this._runTest('Get documents batch', () => this.testGetDocumentsBatch());
             await this._runTest('Get documents batch (empty)', () => this.testGetDocumentsBatchEmpty());
+            await this._runTest('Delete documents batch', () => this.testDeleteDocumentsBatch());
+            await this._runTest('Delete documents batch (empty)', () => this.testDeleteDocumentsBatchEmpty());
             await this._runTest('Document exists (HEAD)', () => this.testDocumentExists());
             await this._runTest('Document exists not found (HEAD)', () => this.testDocumentExistsNotFound());
 

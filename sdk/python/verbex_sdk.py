@@ -202,6 +202,16 @@ class BatchDocumentsResult:
 
 
 @dataclass
+class BatchDeleteResult:
+    """Result of batch document deletion operation."""
+    deleted: List[str] = field(default_factory=list)
+    not_found: List[str] = field(default_factory=list)
+    deleted_count: int = 0
+    not_found_count: int = 0
+    requested_count: int = 0
+
+
+@dataclass
 class SearchResult:
     """Search result model."""
     document_id: str = ""
@@ -810,6 +820,33 @@ class VerbexClient:
             document_id: The document identifier
         """
         self._make_request('DELETE', f'/v1.0/indices/{index_id}/documents/{document_id}')
+
+    def delete_documents_batch(self, index_id: str, document_ids: List[str]) -> BatchDeleteResult:
+        """
+        Delete multiple documents from an index by IDs in a single request.
+
+        Args:
+            index_id: The index identifier
+            document_ids: List of document IDs to delete
+
+        Returns:
+            BatchDeleteResult containing lists of deleted and not found IDs
+        """
+        if not document_ids:
+            return BatchDeleteResult()
+
+        # Join IDs with commas - encode individual IDs but not the commas
+        from urllib.parse import quote
+        ids_param = ','.join(quote(doc_id, safe='') for doc_id in document_ids)
+        data = self._make_request('DELETE', f'/v1.0/indices/{index_id}/documents?ids={ids_param}')
+
+        return BatchDeleteResult(
+            deleted=data.get('deleted', []) if data else [],
+            not_found=data.get('not_found', []) if data else [],
+            deleted_count=data.get('deleted_count', 0) if data else 0,
+            not_found_count=data.get('not_found_count', 0) if data else 0,
+            requested_count=data.get('requested_count', 0) if data else 0
+        )
 
     def update_document_labels(self, index_id: str, document_id: str, labels: List[str]) -> None:
         """

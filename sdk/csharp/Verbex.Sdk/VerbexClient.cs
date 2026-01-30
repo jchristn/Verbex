@@ -638,6 +638,39 @@ namespace Verbex.Sdk
         }
 
         /// <summary>
+        /// Deletes multiple documents from an index by IDs in a single request.
+        /// </summary>
+        /// <param name="indexId">The index identifier.</param>
+        /// <param name="documentIds">Collection of document IDs to delete.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Batch result containing lists of deleted and not found IDs.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when indexId or documentIds is null.</exception>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<BatchDeleteResult> DeleteDocumentsBatchAsync(
+            string indexId,
+            IEnumerable<string> documentIds,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(indexId);
+            ArgumentNullException.ThrowIfNull(documentIds);
+
+            List<string> idList = new List<string>(documentIds);
+            if (idList.Count == 0)
+            {
+                return new BatchDeleteResult();
+            }
+
+            // Join IDs with commas - escape individual IDs that might contain special characters
+            string idsParam = string.Join(",", idList.Select(id => Uri.EscapeDataString(id)));
+            return await MakeRequestAsync<BatchDeleteResult>(
+                HttpMethod.Delete,
+                $"/v1.0/indices/{indexId}/documents?ids={idsParam}",
+                null,
+                true,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
         /// Updates labels on a document (full replacement).
         /// </summary>
         /// <param name="indexId">The index identifier.</param>

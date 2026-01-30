@@ -56,6 +56,10 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
   // Delete confirmation modal state
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, docId: null, isDeleting: false });
 
+  // Bulk selection state
+  const [selectedDocIds, setSelectedDocIds] = useState(new Set());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState({ isOpen: false, isDeleting: false });
+
   // Sorting state
   const [sortColumn, setSortColumn] = useState('indexedDate');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -93,6 +97,70 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
   const handleFilterChange = (column, value) => {
     if (column === 'documentId') {
       setFilterDocId(value);
+    }
+  };
+
+  // Selection handlers
+  const handleToggleSelect = (docId) => {
+    setSelectedDocIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(docId)) {
+        newSet.delete(docId);
+      } else {
+        newSet.add(docId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    const currentPageIds = paginatedDocuments.map(doc => doc.documentId);
+    const allSelected = currentPageIds.every(id => selectedDocIds.has(id));
+
+    if (allSelected) {
+      // Deselect all on current page
+      setSelectedDocIds(prev => {
+        const newSet = new Set(prev);
+        currentPageIds.forEach(id => newSet.delete(id));
+        return newSet;
+      });
+    } else {
+      // Select all on current page
+      setSelectedDocIds(prev => {
+        const newSet = new Set(prev);
+        currentPageIds.forEach(id => newSet.add(id));
+        return newSet;
+      });
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedDocIds(new Set());
+  };
+
+  const handleBulkDelete = () => {
+    setBulkDeleteConfirm({ isOpen: true, isDeleting: false });
+  };
+
+  const confirmBulkDelete = async () => {
+    setBulkDeleteConfirm(prev => ({ ...prev, isDeleting: true }));
+
+    try {
+      const idsToDelete = Array.from(selectedDocIds);
+      const response = await apiClient.deleteDocumentsBatch(selectedIndex, idsToDelete);
+      const deletedCount = response.data?.deletedCount || 0;
+      const notFoundCount = response.data?.notFoundCount || 0;
+
+      setBulkDeleteConfirm({ isOpen: false, isDeleting: false });
+      setSelectedDocIds(new Set());
+      loadDocuments();
+
+      if (notFoundCount > 0) {
+        showAlert('Bulk Delete', `Deleted ${deletedCount} document(s). ${notFoundCount} document(s) were not found.`, 'warning');
+      }
+    } catch (err) {
+      setBulkDeleteConfirm({ isOpen: false, isDeleting: false });
+      showAlert('Error', `Failed to delete documents: ${err.message}`);
     }
   };
 
@@ -185,10 +253,12 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
   useEffect(() => {
     if (selectedIndex) {
       const abortController = new AbortController();
+      setSelectedDocIds(new Set()); // Clear selection when index changes
       loadDocuments(abortController.signal);
       return () => abortController.abort();
     } else {
       setDocuments([]);
+      setSelectedDocIds(new Set());
     }
   }, [loadDocuments]);
 
@@ -471,9 +541,30 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
         </div>
       ) : (
         <div className="workspace-card">
+          {selectedDocIds.size > 0 && (
+            <div className="bulk-action-bar">
+              <span className="bulk-selection-count">{selectedDocIds.size} document(s) selected</span>
+              <div className="bulk-actions">
+                <button className="btn btn-secondary btn-sm" onClick={handleClearSelection}>
+                  Clear Selection
+                </button>
+                <button className="btn btn-danger btn-sm" onClick={handleBulkDelete}>
+                  Delete Selected
+                </button>
+              </div>
+            </div>
+          )}
           <table className="data-table documents-table">
             <thead>
               <tr>
+                <th className="checkbox-column">
+                  <input
+                    type="checkbox"
+                    checked={paginatedDocuments.length > 0 && paginatedDocuments.every(doc => selectedDocIds.has(doc.documentId))}
+                    onChange={handleSelectAll}
+                    title="Select all on this page"
+                  />
+                </th>
                 <SortableHeader
                   label="Document ID"
                   sortKey="documentId"
@@ -514,7 +605,14 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
             </thead>
             <tbody>
               {paginatedDocuments.map((doc) => (
-                <tr key={doc.documentId}>
+                <tr key={doc.documentId} className={selectedDocIds.has(doc.documentId) ? 'selected' : ''}>
+                  <td className="checkbox-column">
+                    <input
+                      type="checkbox"
+                      checked={selectedDocIds.has(doc.documentId)}
+                      onChange={() => handleToggleSelect(doc.documentId)}
+                    />
+                  </td>
                   <td><CopyableId value={doc.documentId} /></td>
                   <td>{doc.documentLength?.toLocaleString() || 'N/A'}</td>
                   <td>{formatDate(doc.indexedDate)}</td>
@@ -919,6 +1017,19 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
         warningMessage="This action cannot be undone."
         variant="danger"
         isLoading={deleteConfirm.isDeleting}
+      />
+
+      {/* Bulk Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={bulkDeleteConfirm.isOpen}
+        onClose={() => setBulkDeleteConfirm({ isOpen: false, isDeleting: false })}
+        onConfirm={confirmBulkDelete}
+        title="Delete Multiple Documents"
+        message={`Are you sure you want to delete ${selectedDocIds.size} document(s)?`}
+        confirmLabel="Delete All"
+        warningMessage="This action cannot be undone."
+        variant="danger"
+        isLoading={bulkDeleteConfirm.isDeleting}
       />
     </div>
   );

@@ -441,6 +441,47 @@ class TestHarness:
         self._assert_equals(result.count, 0, "result.count")
         self._assert_equals(len(result.documents), 0, "len(result.documents)")
 
+    def test_delete_documents_batch(self):
+        """Test deleting multiple documents by IDs in a single request."""
+        # Add some documents specifically for batch delete test
+        doc_id1 = str(uuid.uuid4())
+        doc_id2 = str(uuid.uuid4())
+        fake_doc_id = "non-existent-doc-for-batch-delete"
+
+        self._client.add_document(self._test_index_id, "Document for batch delete test 1.", doc_id1)
+        self._client.add_document(self._test_index_id, "Document for batch delete test 2.", doc_id2)
+
+        # Request deletion of existing docs plus a fake one
+        ids_to_delete = [doc_id1, doc_id2, fake_doc_id]
+        result = self._client.delete_documents_batch(self._test_index_id, ids_to_delete)
+
+        self._assert_not_none(result, "result")
+        self._assert_not_none(result.deleted, "result.deleted")
+        self._assert_not_none(result.not_found, "result.not_found")
+        self._assert_equals(result.deleted_count, 2, "result.deleted_count")
+        self._assert_equals(result.not_found_count, 1, "result.not_found_count")
+        self._assert_equals(result.requested_count, 3, "result.requested_count")
+        self._assert_equals(len(result.deleted), 2, "len(result.deleted)")
+        self._assert_equals(len(result.not_found), 1, "len(result.not_found)")
+
+        # Verify the deleted IDs
+        self._assert(doc_id1 in result.deleted, "doc_id1 should be in deleted")
+        self._assert(doc_id2 in result.deleted, "doc_id2 should be in deleted")
+        self._assert(fake_doc_id in result.not_found, "fake_doc_id should be in not_found")
+
+        # Verify documents are actually deleted
+        doc1_exists = self._client.document_exists(self._test_index_id, doc_id1)
+        doc2_exists = self._client.document_exists(self._test_index_id, doc_id2)
+        self._assert_false(doc1_exists, "doc_id1 should no longer exist")
+        self._assert_false(doc2_exists, "doc_id2 should no longer exist")
+
+    def test_delete_documents_batch_empty(self):
+        """Test deleting documents with empty list."""
+        result = self._client.delete_documents_batch(self._test_index_id, [])
+        self._assert_not_none(result, "result")
+        self._assert_equals(result.deleted_count, 0, "result.deleted_count")
+        self._assert_equals(result.requested_count, 0, "result.requested_count")
+
     # ==================== Search Tests ====================
 
     def test_search_basic(self):
@@ -689,6 +730,8 @@ class TestHarness:
             self._run_test("Get documents batch (empty)", self.test_get_documents_batch_empty)
             self._run_test("Document exists (HEAD)", self.test_document_exists)
             self._run_test("Document exists not found (HEAD)", self.test_document_exists_not_found)
+            self._run_test("Delete documents batch", self.test_delete_documents_batch)
+            self._run_test("Delete documents batch (empty)", self.test_delete_documents_batch_empty)
 
             # Search Tests
             self._print_subheader("Search")

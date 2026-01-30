@@ -274,8 +274,8 @@ CREATE INDEX IF NOT EXISTS idx_tags_credential_key ON tags(credential_id, key);
         public static string GetPragmas()
         {
             return @"
-PRAGMA journal_mode = WAL;
-PRAGMA synchronous = NORMAL;
+PRAGMA journal_mode = DELETE;
+PRAGMA synchronous = FULL;
 PRAGMA foreign_keys = ON;
 PRAGMA cache_size = -64000;
 PRAGMA temp_store = MEMORY;

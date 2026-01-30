@@ -530,6 +530,50 @@ namespace Verbex.Sdk.TestHarness
             AssertEquals(result.Documents.Count, 0, "result.Documents.Count");
         }
 
+        private async Task TestDeleteDocumentsBatchAsync()
+        {
+            // Add some documents specifically for batch delete test
+            string docId1 = Guid.NewGuid().ToString();
+            string docId2 = Guid.NewGuid().ToString();
+            string fakeDocId = "non-existent-doc-for-batch-delete";
+
+            await _Client!.AddDocumentAsync(_TestIndexId, "Document for batch delete test 1.", docId1).ConfigureAwait(false);
+            await _Client!.AddDocumentAsync(_TestIndexId, "Document for batch delete test 2.", docId2).ConfigureAwait(false);
+
+            // Request deletion of existing docs plus a fake one
+            List<string> idsToDelete = new List<string> { docId1, docId2, fakeDocId };
+            BatchDeleteResult result = await _Client!.DeleteDocumentsBatchAsync(_TestIndexId, idsToDelete).ConfigureAwait(false);
+
+            AssertNotNull(result, "result");
+            AssertNotNull(result.Deleted, "result.Deleted");
+            AssertNotNull(result.NotFound, "result.NotFound");
+            AssertEquals(result.DeletedCount, 2, "result.DeletedCount");
+            AssertEquals(result.NotFoundCount, 1, "result.NotFoundCount");
+            AssertEquals(result.RequestedCount, 3, "result.RequestedCount");
+            AssertEquals(result.Deleted.Count, 2, "result.Deleted.Count");
+            AssertEquals(result.NotFound.Count, 1, "result.NotFound.Count");
+
+            // Verify the deleted IDs
+            Assert(result.Deleted.Contains(docId1), "docId1 should be in Deleted");
+            Assert(result.Deleted.Contains(docId2), "docId2 should be in Deleted");
+            Assert(result.NotFound.Contains(fakeDocId), "fakeDocId should be in NotFound");
+
+            // Verify documents are actually deleted
+            bool doc1Exists = await _Client!.DocumentExistsAsync(_TestIndexId, docId1).ConfigureAwait(false);
+            bool doc2Exists = await _Client!.DocumentExistsAsync(_TestIndexId, docId2).ConfigureAwait(false);
+            AssertTrue(!doc1Exists, "docId1 should no longer exist");
+            AssertTrue(!doc2Exists, "docId2 should no longer exist");
+        }
+
+        private async Task TestDeleteDocumentsBatchEmptyAsync()
+        {
+            // Test with empty list
+            BatchDeleteResult result = await _Client!.DeleteDocumentsBatchAsync(_TestIndexId, new List<string>()).ConfigureAwait(false);
+            AssertNotNull(result, "result");
+            AssertEquals(result.DeletedCount, 0, "result.DeletedCount");
+            AssertEquals(result.RequestedCount, 0, "result.RequestedCount");
+        }
+
         // ==================== Search Tests ====================
 
         private async Task TestSearchBasicAsync()
@@ -815,6 +859,8 @@ namespace Verbex.Sdk.TestHarness
                 await RunTestAsync("Get document with labels and tags", TestGetDocumentWithLabelsAndTagsAsync).ConfigureAwait(false);
                 await RunTestAsync("Get documents batch", TestGetDocumentsBatchAsync).ConfigureAwait(false);
                 await RunTestAsync("Get documents batch (empty)", TestGetDocumentsBatchEmptyAsync).ConfigureAwait(false);
+                await RunTestAsync("Delete documents batch", TestDeleteDocumentsBatchAsync).ConfigureAwait(false);
+                await RunTestAsync("Delete documents batch (empty)", TestDeleteDocumentsBatchEmptyAsync).ConfigureAwait(false);
                 await RunTestAsync("Document exists (HEAD)", TestDocumentExistsAsync).ConfigureAwait(false);
                 await RunTestAsync("Document exists not found (HEAD)", TestDocumentExistsNotFoundAsync).ConfigureAwait(false);
 

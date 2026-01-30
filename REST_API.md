@@ -181,6 +181,7 @@ All API responses are wrapped in a standard format:
 | Index | PUT | `/v1.0/indices/{id}/tags` | Update index tags | Yes |
 | Index | PUT | `/v1.0/indices/{id}/customMetadata` | Update index custom metadata | Yes |
 | Document | GET | `/v1.0/indices/{id}/documents` | List documents (max 1000) or batch retrieve by IDs | Yes |
+| Document | DELETE | `/v1.0/indices/{id}/documents` | Batch delete documents by IDs | Yes |
 | Document | POST | `/v1.0/indices/{id}/documents` | Add document | Yes |
 | Document | GET | `/v1.0/indices/{id}/documents/{docId}` | Get document with metadata | Yes |
 | Document | HEAD | `/v1.0/indices/{id}/documents/{docId}` | Check if document exists | Yes |
@@ -737,6 +738,60 @@ Authorization: Bearer <token>
 | NotFound | array | List of document IDs that were not found |
 | Count | integer | Number of documents returned |
 | RequestedCount | integer | Total number of document IDs that were requested |
+
+#### Batch Document Deletion
+
+**Request:** `DELETE /v1.0/indices/{id}/documents?ids=doc1,doc2,doc3`
+
+Delete multiple documents by ID in a single request. This is more efficient than making multiple individual delete requests.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Path Parameters:**
+- `id` (string): Index identifier
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| ids | string | Yes | Comma-separated list of document IDs to delete |
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Deleted": ["doc1", "doc3"],
+    "NotFound": ["doc2"],
+    "DeletedCount": 2,
+    "NotFoundCount": 1,
+    "RequestedCount": 3
+  },
+  "Headers": {},
+  "TotalCount": null,
+  "Skip": null,
+  "ProcessingTimeMs": 15.67
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| Deleted | array | List of document IDs that were successfully deleted |
+| NotFound | array | List of document IDs that were not found in the index |
+| DeletedCount | integer | Number of documents that were deleted |
+| NotFoundCount | integer | Number of document IDs that were not found |
+| RequestedCount | integer | Total number of document IDs that were requested for deletion |
+
+**Notes:**
+- The operation is partially successful if some documents exist and some don't
+- Successfully deleted documents are listed in `Deleted`, missing ones in `NotFound`
+- Returns 400 Bad Request if the `ids` parameter is missing or empty
 
 ### POST `/v1.0/indices/{id}/documents`
 **Description:** Add a new document to an index

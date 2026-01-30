@@ -433,6 +433,19 @@ namespace Verbex.Server.API.REST
                 ExceptionRoute);
 
             _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.DELETE, "/v1.0/indices/{id}/documents", BatchDeleteIndexDocumentsRoute,
+                metadata => metadata
+                    .WithTag("Documents")
+                    .WithDescription("Delete multiple documents from an index by IDs. Returns which documents were deleted and which were not found.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithParameter(OpenApiParameterMetadata.Query("ids", "Comma-separated list of document IDs to delete", required: true))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Batch delete result", CreateBatchDeleteResultSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
                 HttpMethod.PUT, "/v1.0/indices/{id}/documents/{docId}/labels", PutDocumentLabelsRoute,
                 metadata => metadata
                     .WithTag("Documents")
@@ -1910,6 +1923,84 @@ namespace Verbex.Server.API.REST
         }
 
         /// <summary>
+        /// Batch delete documents from index route.
+        /// Deletes multiple documents specified via the ids query parameter.
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <returns>Task.</returns>
+        private async Task BatchDeleteIndexDocumentsRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.Document, async (reqCtx) =>
+            {
+                string? indexId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(indexId))
+                {
+                    return new ResponseContext(false, 400, "Index ID is required");
+                }
+
+                var index = _IndexManager!.GetIndex(indexId);
+                if (index == null)
+                {
+                    return new ResponseContext(false, 404, "Index not found");
+                }
+
+                string? idsParam = ctx.Request.Query?.Elements?["ids"];
+                if (String.IsNullOrEmpty(idsParam))
+                {
+                    return new ResponseContext(false, 400, "The 'ids' query parameter is required");
+                }
+
+                List<string> requestedIds = idsParam
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(id => id.Trim())
+                    .Distinct()
+                    .ToList();
+
+                if (requestedIds.Count == 0)
+                {
+                    return new ResponseContext(false, 400, "No valid document IDs provided");
+                }
+
+                try
+                {
+                    List<string> deletedIds = new List<string>();
+                    List<string> notFoundIds = new List<string>();
+
+                    foreach (string docId in requestedIds)
+                    {
+                        bool removed = await index.RemoveDocumentAsync(docId).ConfigureAwait(false);
+                        if (removed)
+                        {
+                            deletedIds.Add(docId);
+                        }
+                        else
+                        {
+                            notFoundIds.Add(docId);
+                        }
+                    }
+
+                    return new ResponseContext
+                    {
+                        Success = true,
+                        StatusCode = 200,
+                        Data = new
+                        {
+                            Deleted = deletedIds,
+                            NotFound = notFoundIds,
+                            DeletedCount = deletedIds.Count,
+                            NotFoundCount = notFoundIds.Count,
+                            RequestedCount = requestedIds.Count
+                        }
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return new ResponseContext(false, 500, $"Error deleting documents: {ex.Message}");
+                }
+            });
+        }
+
+        /// <summary>
         /// Search documents in specific index route.
         /// </summary>
         /// <param name="ctx">HTTP context.</param>
@@ -3128,6 +3219,27 @@ namespace Verbex.Server.API.REST
                 Properties = new Dictionary<string, OpenApiSchemaMetadata>
                 {
                     ["Message"] = OpenApiSchemaMetadata.String()
+                }
+            };
+            return response;
+        }
+
+        /// <summary>
+        /// Create batch delete result schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateBatchDeleteResultSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Deleted"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String()),
+                    ["NotFound"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String()),
+                    ["DeletedCount"] = OpenApiSchemaMetadata.Integer(),
+                    ["NotFoundCount"] = OpenApiSchemaMetadata.Integer(),
+                    ["RequestedCount"] = OpenApiSchemaMetadata.Integer()
                 }
             };
             return response;

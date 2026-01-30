@@ -225,6 +225,23 @@ class BatchDocumentsResult {
 }
 
 /**
+ * Batch document deletion result.
+ */
+class BatchDeleteResult {
+    /**
+     * Create a BatchDeleteResult.
+     * @param {object} data - Batch delete response data
+     */
+    constructor(data) {
+        this.deleted = data?.deleted || [];
+        this.notFound = data?.notFound || [];
+        this.deletedCount = data?.deletedCount || 0;
+        this.notFoundCount = data?.notFoundCount || 0;
+        this.requestedCount = data?.requestedCount || 0;
+    }
+}
+
+/**
  * Search result model.
  */
 class SearchResult {
@@ -803,6 +820,22 @@ class VerbexClient {
     }
 
     /**
+     * Delete multiple documents from an index by IDs in a single request.
+     * @param {string} indexId - The index identifier
+     * @param {string[]} documentIds - Array of document IDs to delete
+     * @returns {Promise<BatchDeleteResult>} Batch result containing lists of deleted and not found IDs
+     */
+    async deleteDocumentsBatch(indexId, documentIds) {
+        if (!documentIds || documentIds.length === 0) {
+            return new BatchDeleteResult({});
+        }
+        // Join IDs with commas - encode individual IDs but not the commas
+        const idsParam = documentIds.map(id => encodeURIComponent(id)).join(',');
+        const data = await this._makeRequest('DELETE', `/v1.0/indices/${indexId}/documents?ids=${idsParam}`);
+        return new BatchDeleteResult(data || {});
+    }
+
+    /**
      * Update labels on a document (full replacement).
      * @param {string} indexId - The index identifier
      * @param {string} documentId - The document identifier
@@ -1102,6 +1135,7 @@ if (typeof module !== 'undefined' && module.exports) {
         DocumentInfo,
         AddDocumentData,
         BatchDocumentsResult,
+        BatchDeleteResult,
         SearchResult,
         SearchData,
         HealthData,
@@ -1123,6 +1157,7 @@ if (typeof exports !== 'undefined') {
     exports.DocumentInfo = DocumentInfo;
     exports.AddDocumentData = AddDocumentData;
     exports.BatchDocumentsResult = BatchDocumentsResult;
+    exports.BatchDeleteResult = BatchDeleteResult;
     exports.SearchResult = SearchResult;
     exports.SearchData = SearchData;
     exports.HealthData = HealthData;
