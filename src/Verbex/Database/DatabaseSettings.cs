@@ -26,6 +26,7 @@ namespace Verbex.Database
         private int _MaxPoolSize = 100;
         private int _CommandTimeout = 30;
         private int _ConnectionTimeout = 30;
+        private int _AutoFlushInterval = 100;
 
         /// <summary>
         /// Gets or sets the database type.
@@ -207,6 +208,54 @@ namespace Verbex.Database
         }
 
         /// <summary>
+        /// Gets or sets the automatic flush interval for WAL checkpointing.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// During sustained write operations (e.g., bulk document ingestion), SQLite's Write-Ahead Log (WAL)
+        /// can grow significantly. A large WAL file degrades read performance because SQLite must scan the
+        /// WAL for each read operation to check for newer page versions.
+        /// </para>
+        /// <para>
+        /// This setting controls how often an automatic WAL checkpoint (TRUNCATE mode) is performed during
+        /// document ingestion. After the specified number of documents are added, a checkpoint is triggered
+        /// to flush WAL data to the main database file and reset the WAL.
+        /// </para>
+        /// <para>
+        /// This setting is only used for file-based SQLite databases. It is ignored when:
+        /// <list type="bullet">
+        /// <item><description><see cref="InMemory"/> is true (in-memory databases have no WAL file)</description></item>
+        /// <item><description><see cref="Type"/> is not <see cref="DatabaseTypeEnum.Sqlite"/></description></item>
+        /// </list>
+        /// </para>
+        /// </remarks>
+        /// <value>
+        /// The number of documents to add before triggering an automatic flush.
+        /// Default is 100. Minimum is 1. Maximum is 10000.
+        /// A lower value reduces WAL growth but increases I/O overhead.
+        /// A higher value improves write throughput but may degrade read performance during bulk operations.
+        /// </value>
+        public int AutoFlushInterval
+        {
+            get => _AutoFlushInterval;
+            set
+            {
+                if (value < 1)
+                {
+                    _AutoFlushInterval = 1;
+                }
+                else if (value > 10000)
+                {
+                    _AutoFlushInterval = 10000;
+                }
+                else
+                {
+                    _AutoFlushInterval = value;
+                }
+            }
+        }
+
+        /// <summary>
         /// Gets the default port number for the specified database type.
         /// </summary>
         /// <returns>
@@ -288,7 +337,8 @@ namespace Verbex.Database
                 MinPoolSize = MinPoolSize,
                 MaxPoolSize = MaxPoolSize,
                 CommandTimeout = CommandTimeout,
-                ConnectionTimeout = ConnectionTimeout
+                ConnectionTimeout = ConnectionTimeout,
+                AutoFlushInterval = AutoFlushInterval
             };
         }
 

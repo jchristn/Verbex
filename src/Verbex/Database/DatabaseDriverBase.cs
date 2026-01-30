@@ -31,7 +31,7 @@ namespace Verbex.Database
         /// <summary>
         /// Gets the database settings used to configure this driver.
         /// </summary>
-        protected DatabaseSettings Settings { get; }
+        public DatabaseSettings Settings { get; }
 
         /// <summary>
         /// Gets whether the database connection is currently open.

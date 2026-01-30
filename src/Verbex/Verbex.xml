@@ -471,6 +471,36 @@
             A value of 0 indicates no timeout.
             </value>
         </member>
+        <member name="P:Verbex.Database.DatabaseSettings.AutoFlushInterval">
+            <summary>
+            Gets or sets the automatic flush interval for WAL checkpointing.
+            </summary>
+            <remarks>
+            <para>
+            During sustained write operations (e.g., bulk document ingestion), SQLite's Write-Ahead Log (WAL)
+            can grow significantly. A large WAL file degrades read performance because SQLite must scan the
+            WAL for each read operation to check for newer page versions.
+            </para>
+            <para>
+            This setting controls how often an automatic WAL checkpoint (TRUNCATE mode) is performed during
+            document ingestion. After the specified number of documents are added, a checkpoint is triggered
+            to flush WAL data to the main database file and reset the WAL.
+            </para>
+            <para>
+            This setting is only used for file-based SQLite databases. It is ignored when:
+            <list type="bullet">
+            <item><description><see cref="P:Verbex.Database.DatabaseSettings.InMemory"/> is true (in-memory databases have no WAL file)</description></item>
+            <item><description><see cref="P:Verbex.Database.DatabaseSettings.Type"/> is not <see cref="F:Verbex.Database.DatabaseTypeEnum.Sqlite"/></description></item>
+            </list>
+            </para>
+            </remarks>
+            <value>
+            The number of documents to add before triggering an automatic flush.
+            Default is 100. Minimum is 1. Maximum is 10000.
+            A lower value reduces WAL growth but increases I/O overhead.
+            A higher value improves write throughput but may degrade read performance during bulk operations.
+            </value>
+        </member>
         <member name="M:Verbex.Database.DatabaseSettings.GetDefaultPort">
             <summary>
             Gets the default port number for the specified database type.
@@ -4531,6 +4561,16 @@
             <returns>The document ID.</returns>
             <exception cref="T:System.ArgumentNullException">Thrown when documentName or content is null.</exception>
         </member>
+        <member name="M:Verbex.InvertedIndex.AddDocumentWithMetricsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Adds a document to the index and returns detailed ingestion metrics.
+            </summary>
+            <param name="documentName">Name/path of the document.</param>
+            <param name="content">Document content to index.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Result containing the document ID and ingestion metrics.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when documentName or content is null.</exception>
+        </member>
         <member name="M:Verbex.InvertedIndex.AddDocumentAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Adds a document to the index with a specific ID.
@@ -4541,6 +4581,18 @@
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
             <exception cref="T:System.ArgumentNullException">Thrown when documentName or content is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when documentId is empty.</exception>
+        </member>
+        <member name="M:Verbex.InvertedIndex.AddDocumentWithMetricsAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Adds a document to the index with a specific ID and returns detailed ingestion metrics.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="documentName">Name/path of the document.</param>
+            <param name="content">Document content to index.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Result containing the document ID and ingestion metrics.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when documentId, documentName, or content is null.</exception>
             <exception cref="T:System.ArgumentException">Thrown when documentId is empty.</exception>
         </member>
         <member name="M:Verbex.InvertedIndex.GetDocumentAsync(System.String,System.Threading.CancellationToken)">
@@ -5176,6 +5228,34 @@
             <param name="filters">Dictionary of metadata key-value pairs to filter on, or null</param>
             <param name="labels">Collection of labels to filter on (case-insensitive), or null</param>
             <returns>A new MetadataFilter instance</returns>
+        </member>
+        <member name="T:Verbex.Models.AddDocumentResult">
+            <summary>
+            Result of adding a document to the index.
+            Contains the document ID and ingestion metrics.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.AddDocumentResult.DocumentId">
+            <summary>
+            The document identifier.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.AddDocumentResult.Metrics">
+            <summary>
+            Ingestion metrics containing timing and count information.
+            </summary>
+        </member>
+        <member name="M:Verbex.Models.AddDocumentResult.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:Verbex.Models.AddDocumentResult"/> class.
+            </summary>
+        </member>
+        <member name="M:Verbex.Models.AddDocumentResult.#ctor(System.String,Verbex.Models.IngestionMetrics)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Verbex.Models.AddDocumentResult"/> class.
+            </summary>
+            <param name="documentId">The document identifier.</param>
+            <param name="metrics">The ingestion metrics.</param>
         </member>
         <member name="T:Verbex.Models.Administrator">
             <summary>
@@ -6011,6 +6091,102 @@
             <param name="name">The display name for the index.</param>
             <param name="description">The description for the index.</param>
             <exception cref="T:System.ArgumentNullException">Thrown when tenantId or name is null or whitespace.</exception>
+        </member>
+        <member name="T:Verbex.Models.IngestionMetrics">
+            <summary>
+            Metrics captured during document ingestion.
+            Provides detailed timing and count information for performance analysis.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionMetrics.TotalMs">
+            <summary>
+            Total time for the entire ingestion process in milliseconds.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionMetrics.Steps">
+            <summary>
+            Detailed timing for each step of the ingestion process.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionMetrics.Counts">
+            <summary>
+            Count metrics for the ingested document.
+            </summary>
+        </member>
+        <member name="M:Verbex.Models.IngestionMetrics.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:Verbex.Models.IngestionMetrics"/> class.
+            </summary>
+        </member>
+        <member name="T:Verbex.Models.IngestionStepTimings">
+            <summary>
+            Timing information for each step of the ingestion process.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionStepTimings.TokenizationMs">
+            <summary>
+            Time spent tokenizing the document content in milliseconds.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionStepTimings.PositionCalculationMs">
+            <summary>
+            Time spent calculating character and term positions in milliseconds.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionStepTimings.TermLookupMs">
+            <summary>
+            Time spent looking up or adding terms to the vocabulary in milliseconds.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionStepTimings.DocumentTermInsertMs">
+            <summary>
+            Time spent inserting document-term mappings in milliseconds.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionStepTimings.FrequencyUpdateMs">
+            <summary>
+            Time spent updating term frequencies in milliseconds.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionStepTimings.DocumentUpdateMs">
+            <summary>
+            Time spent updating document metadata in milliseconds.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionStepTimings.TransactionCommitMs">
+            <summary>
+            Time spent committing the transaction in milliseconds.
+            </summary>
+        </member>
+        <member name="M:Verbex.Models.IngestionStepTimings.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:Verbex.Models.IngestionStepTimings"/> class.
+            </summary>
+        </member>
+        <member name="T:Verbex.Models.IngestionCounts">
+            <summary>
+            Count metrics for document ingestion.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionCounts.TotalTokens">
+            <summary>
+            Total number of tokens in the document (including duplicates).
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionCounts.UniqueTerms">
+            <summary>
+            Number of unique terms in the document.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionCounts.NewTerms">
+            <summary>
+            Number of new terms added to the vocabulary.
+            </summary>
+        </member>
+        <member name="M:Verbex.Models.IngestionCounts.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:Verbex.Models.IngestionCounts"/> class.
+            </summary>
         </member>
         <member name="T:Verbex.Models.Label">
             <summary>

@@ -1773,20 +1773,21 @@ namespace Verbex.Server.API.REST
                 try
                 {
                     // Add the document - use the correct overload based on whether ID is provided
-                    string documentId;
+                    AddDocumentResult result;
                     if (!String.IsNullOrEmpty(documentRequest.Id))
                     {
                         // Use provided ID
-                        documentId = documentRequest.Id;
-                        await index.AddDocumentAsync(documentId, documentId, documentRequest.Content).ConfigureAwait(false);
+                        result = await index.AddDocumentWithMetricsAsync(documentRequest.Id, documentRequest.Id, documentRequest.Content).ConfigureAwait(false);
                     }
                     else
                     {
                         // Let the index generate an ID
-                        documentId = await index.AddDocumentAsync(
+                        result = await index.AddDocumentWithMetricsAsync(
                             IdGenerator.GenerateDocumentId(),
                             documentRequest.Content).ConfigureAwait(false);
                     }
+
+                    string documentId = result.DocumentId;
 
                     // Add labels if provided (batch operation)
                     if (documentRequest.Labels != null && documentRequest.Labels.Count > 0)
@@ -1810,7 +1811,12 @@ namespace Verbex.Server.API.REST
                     {
                         Success = true,
                         StatusCode = 201,
-                        Data = new { DocumentId = documentId, Message = "Document added successfully" }
+                        Data = new
+                        {
+                            DocumentId = documentId,
+                            Message = "Document added successfully",
+                            Metrics = result.Metrics
+                        }
                     };
                 }
                 catch (Exception ex)

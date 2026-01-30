@@ -34,6 +34,7 @@ namespace Verbex
         private string _TenantId = string.Empty;
         private string _IndexId = string.Empty;
         private bool _IsDisposed;
+        private int _DocumentsSinceLastFlush = 0;
 
         /// <summary>
         /// Gets the configuration used by this index.
@@ -203,6 +204,20 @@ namespace Verbex
         /// <exception cref="ArgumentNullException">Thrown when documentName or content is null.</exception>
         public async Task<string> AddDocumentAsync(string documentName, string content, CancellationToken token = default)
         {
+            AddDocumentResult result = await AddDocumentWithMetricsAsync(documentName, content, token).ConfigureAwait(false);
+            return result.DocumentId;
+        }
+
+        /// <summary>
+        /// Adds a document to the index and returns detailed ingestion metrics.
+        /// </summary>
+        /// <param name="documentName">Name/path of the document.</param>
+        /// <param name="content">Document content to index.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Result containing the document ID and ingestion metrics.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when documentName or content is null.</exception>
+        public async Task<AddDocumentResult> AddDocumentWithMetricsAsync(string documentName, string content, CancellationToken token = default)
+        {
             ThrowIfDisposed();
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentName);
@@ -218,9 +233,12 @@ namespace Verbex
 
                 await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
 
-                await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
+                IngestionMetrics metrics = await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
 
-                return documentId;
+                // Check for automatic flush (file-based SQLite only)
+                await CheckAutoFlushAsync(token).ConfigureAwait(false);
+
+                return new AddDocumentResult(documentId, metrics);
             }
             finally
             {
@@ -239,6 +257,21 @@ namespace Verbex
         /// <exception cref="ArgumentNullException">Thrown when documentName or content is null.</exception>
         /// <exception cref="ArgumentException">Thrown when documentId is empty.</exception>
         public async Task AddDocumentAsync(string documentId, string documentName, string content, CancellationToken token = default)
+        {
+            await AddDocumentWithMetricsAsync(documentId, documentName, content, token).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Adds a document to the index with a specific ID and returns detailed ingestion metrics.
+        /// </summary>
+        /// <param name="documentId">Document ID.</param>
+        /// <param name="documentName">Name/path of the document.</param>
+        /// <param name="content">Document content to index.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Result containing the document ID and ingestion metrics.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when documentId, documentName, or content is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when documentId is empty.</exception>
+        public async Task<AddDocumentResult> AddDocumentWithMetricsAsync(string documentId, string documentName, string content, CancellationToken token = default)
         {
             ThrowIfDisposed();
             ThrowIfNotOpen();
@@ -261,7 +294,12 @@ namespace Verbex
 
                 await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
 
-                await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
+                IngestionMetrics metrics = await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
+
+                // Check for automatic flush (file-based SQLite only)
+                await CheckAutoFlushAsync(token).ConfigureAwait(false);
+
+                return new AddDocumentResult(documentId, metrics);
             }
             finally
             {
@@ -1246,12 +1284,39 @@ namespace Verbex
             }
         }
 
-        private async Task IndexDocumentContentAsync(string documentId, string documentPath, string content, Stopwatch stopwatch, CancellationToken token)
+        private async Task CheckAutoFlushAsync(CancellationToken token)
         {
+            // Only applicable for file-based SQLite databases
+            if (_Driver.Settings.Type != DatabaseTypeEnum.Sqlite || _Driver.Settings.InMemory)
+            {
+                return;
+            }
+
+            _DocumentsSinceLastFlush++;
+
+            if (_DocumentsSinceLastFlush >= _Driver.Settings.AutoFlushInterval)
+            {
+                await _Driver.FlushAsync(token).ConfigureAwait(false);
+                _DocumentsSinceLastFlush = 0;
+            }
+        }
+
+        private async Task<IngestionMetrics> IndexDocumentContentAsync(string documentId, string documentPath, string content, Stopwatch totalStopwatch, CancellationToken token)
+        {
+            IngestionMetrics metrics = new IngestionMetrics();
+            Stopwatch stepStopwatch = new Stopwatch();
+
+            // Step 1: Tokenization
+            stepStopwatch.Restart();
             List<string> tokens = TokenizeAndProcess(content);
+            stepStopwatch.Stop();
+            metrics.Steps.TokenizationMs = stepStopwatch.Elapsed.TotalMilliseconds;
+            metrics.Counts.TotalTokens = tokens.Count;
+
             if (tokens.Count == 0)
             {
-                stopwatch.Stop();
+                totalStopwatch.Stop();
+                metrics.TotalMs = totalStopwatch.Elapsed.TotalMilliseconds;
                 await _Driver.Documents.UpdateAsync(
                     _TenantId,
                     _IndexId,
@@ -1261,11 +1326,13 @@ namespace Verbex
                     content.Length,
                     0,
                     null,
-                    (decimal)stopwatch.Elapsed.TotalMilliseconds,
+                    (decimal)totalStopwatch.Elapsed.TotalMilliseconds,
                     token).ConfigureAwait(false);
-                return;
+                return metrics;
             }
 
+            // Step 2: Position calculation
+            stepStopwatch.Restart();
             Dictionary<string, (List<int> CharacterPositions, List<int> TermPositions)> termPositions = new Dictionary<string, (List<int>, List<int>)>();
             int absoluteOffset = 0;
             int relativePosition = 0;
@@ -1298,14 +1365,18 @@ namespace Verbex
                 absoluteOffset += word.Length + 1;
                 relativePosition++;
             }
+            stepStopwatch.Stop();
+            metrics.Steps.PositionCalculationMs = stepStopwatch.Elapsed.TotalMilliseconds;
 
             int distinctTermCount = termPositions.Count;
+            metrics.Counts.UniqueTerms = distinctTermCount;
 
             // Wrap all database operations in a single transaction for performance
             await _Driver.BeginTransactionAsync(token).ConfigureAwait(false);
             try
             {
-                // Step 1: Batch add/get all terms (single INSERT + single SELECT)
+                // Step 3: Batch add/get all terms (single INSERT + single SELECT)
+                stepStopwatch.Restart();
                 List<string> termList = new List<string>(termPositions.Keys);
                 Dictionary<string, string> termIdsToGenerate = new Dictionary<string, string>();
                 foreach (string term in termList)
@@ -1313,8 +1384,23 @@ namespace Verbex
                     termIdsToGenerate[IdGenerator.GenerateTermId()] = term;
                 }
                 Dictionary<string, string> termIds = await _Driver.Terms.AddOrGetBatchAsync(_TenantId, _IndexId, termIdsToGenerate, token).ConfigureAwait(false);
+                stepStopwatch.Stop();
+                metrics.Steps.TermLookupMs = stepStopwatch.Elapsed.TotalMilliseconds;
 
-                // Step 2: Prepare document-term mappings for batch insert
+                // Calculate new terms added (terms where we generated the ID that got used)
+                int newTermsCount = 0;
+                foreach (KeyValuePair<string, string> kvp in termIdsToGenerate)
+                {
+                    string generatedId = kvp.Key;
+                    string term = kvp.Value;
+                    if (termIds.TryGetValue(term, out string? actualId) && actualId == generatedId)
+                    {
+                        newTermsCount++;
+                    }
+                }
+                metrics.Counts.NewTerms = newTermsCount;
+
+                // Step 4: Prepare document-term mappings for batch insert
                 List<DocumentTermRecord> docTermRecords = new List<DocumentTermRecord>();
                 Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> frequencyUpdates =
                     new Dictionary<string, (int, int)>();
@@ -1341,14 +1427,21 @@ namespace Verbex
                     }
                 }
 
-                // Step 3: Batch insert document-term mappings (single INSERT)
+                // Step 5: Batch insert document-term mappings (single INSERT)
+                stepStopwatch.Restart();
                 await _Driver.DocumentTerms.AddBatchAsync(_TenantId, _IndexId, docTermRecords, token).ConfigureAwait(false);
+                stepStopwatch.Stop();
+                metrics.Steps.DocumentTermInsertMs = stepStopwatch.Elapsed.TotalMilliseconds;
 
-                // Step 4: Batch update term frequencies (single UPDATE)
+                // Step 6: Batch update term frequencies (single UPDATE)
+                stepStopwatch.Restart();
                 await _Driver.Terms.IncrementFrequenciesBatchAsync(_TenantId, _IndexId, frequencyUpdates, token).ConfigureAwait(false);
+                stepStopwatch.Stop();
+                metrics.Steps.FrequencyUpdateMs = stepStopwatch.Elapsed.TotalMilliseconds;
 
-                // Step 5: Stop timing and update document metadata
-                stopwatch.Stop();
+                // Step 7: Update document metadata
+                stepStopwatch.Restart();
+                totalStopwatch.Stop();
                 await _Driver.Documents.UpdateAsync(
                     _TenantId,
                     _IndexId,
@@ -1358,10 +1451,19 @@ namespace Verbex
                     content.Length,
                     distinctTermCount,
                     null,
-                    (decimal)stopwatch.Elapsed.TotalMilliseconds,
+                    (decimal)totalStopwatch.Elapsed.TotalMilliseconds,
                     token).ConfigureAwait(false);
+                stepStopwatch.Stop();
+                metrics.Steps.DocumentUpdateMs = stepStopwatch.Elapsed.TotalMilliseconds;
 
+                // Step 8: Commit transaction
+                stepStopwatch.Restart();
                 await _Driver.CommitTransactionAsync(token).ConfigureAwait(false);
+                stepStopwatch.Stop();
+                metrics.Steps.TransactionCommitMs = stepStopwatch.Elapsed.TotalMilliseconds;
+
+                metrics.TotalMs = totalStopwatch.Elapsed.TotalMilliseconds;
+                return metrics;
             }
             catch
             {
