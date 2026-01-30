@@ -100,7 +100,7 @@ namespace Verbex.Server
         private static void Welcome()
         {
             Console.WriteLine(Constants.Logo);
-            Console.WriteLine("(c) 2025 Joel Christner");
+            Console.WriteLine("(c)2026 Joel Christner");
             Console.WriteLine("");
         }
 
@@ -160,7 +160,7 @@ namespace Verbex.Server
                 foreach (SyslogServer server in _Settings.Logging.SyslogServers)
                 {
                     syslogServers.Add(new SyslogServer(server.Hostname, server.Port));
-                    Console.WriteLine("| | Syslog: " + server.Hostname + ":" + server.Port);
+                    Console.WriteLine("Adding syslog server: " + server.Hostname + ":" + server.Port);
                 }
             }
 
@@ -173,8 +173,12 @@ namespace Verbex.Server
             _Logging.Settings.EnableColors = _Settings.Logging.EnableColors;
             _Logging.Settings.MinimumSeverity = (Severity)_Settings.Logging.MinimumSeverity;
 
-            if (_Settings.Logging.FileLogging)
+            if (_Settings.Logging.FileLogging
+                && !String.IsNullOrEmpty(_Settings.Logging.LogDirectory)
+                && !String.IsNullOrEmpty(_Settings.Logging.LogFilename))
             {
+                _Logging.Settings.LogFilename = Path.Combine(_Settings.Logging.LogDirectory, _Settings.Logging.LogFilename);
+
                 if (_Settings.Logging.IncludeDateInFilename)
                 {
                     _Logging.Settings.FileLogging = SyslogLogging.FileLoggingMode.FileWithDate;
@@ -184,6 +188,8 @@ namespace Verbex.Server
                     _Logging.Settings.FileLogging = SyslogLogging.FileLoggingMode.SingleLogFile;
                 }
             }
+
+            _Logging.Debug(_Header + "initialized logging");
         }
 
         /// <summary>

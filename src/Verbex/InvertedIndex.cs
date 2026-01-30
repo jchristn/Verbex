@@ -30,6 +30,7 @@ namespace Verbex
         private readonly ITokenizer _Tokenizer;
         private readonly string _IndexName;
         private readonly bool _OwnsDriver;
+        private readonly SemaphoreSlim _WriteLock = new SemaphoreSlim(1, 1);
         private string _TenantId = string.Empty;
         private string _IndexId = string.Empty;
         private bool _IsDisposed;
@@ -207,16 +208,24 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(documentName);
             ArgumentNullException.ThrowIfNull(content);
 
-            Stopwatch stopwatch = Stopwatch.StartNew();
+            await _WriteLock.WaitAsync(token).ConfigureAwait(false);
+            try
+            {
+                Stopwatch stopwatch = Stopwatch.StartNew();
 
-            string documentId = IdGenerator.GenerateDocumentId();
-            string contentSha256 = ComputeContentHash(content);
+                string documentId = IdGenerator.GenerateDocumentId();
+                string contentSha256 = ComputeContentHash(content);
 
-            await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
+                await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
 
-            await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
+                await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
 
-            return documentId;
+                return documentId;
+            }
+            finally
+            {
+                _WriteLock.Release();
+            }
         }
 
         /// <summary>
@@ -243,13 +252,21 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(documentName);
             ArgumentNullException.ThrowIfNull(content);
 
-            Stopwatch stopwatch = Stopwatch.StartNew();
+            await _WriteLock.WaitAsync(token).ConfigureAwait(false);
+            try
+            {
+                Stopwatch stopwatch = Stopwatch.StartNew();
 
-            string contentSha256 = ComputeContentHash(content);
+                string contentSha256 = ComputeContentHash(content);
 
-            await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
+                await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
 
-            await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
+                await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
+            }
+            finally
+            {
+                _WriteLock.Release();
+            }
         }
 
         /// <summary>
@@ -385,27 +402,35 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentId);
 
-            List<DocumentTermRecord> docTerms = await _Driver.DocumentTerms.GetByDocumentAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
-
-            // Batch decrement term frequencies (single UPDATE instead of N)
-            if (docTerms.Count > 0)
+            await _WriteLock.WaitAsync(token).ConfigureAwait(false);
+            try
             {
-                Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> decrements =
-                    new Dictionary<string, (int, int)>();
-                foreach (DocumentTermRecord docTerm in docTerms)
+                List<DocumentTermRecord> docTerms = await _Driver.DocumentTerms.GetByDocumentAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
+
+                // Batch decrement term frequencies (single UPDATE instead of N)
+                if (docTerms.Count > 0)
                 {
-                    decrements[docTerm.TermId] = (1, docTerm.TermFrequency);
+                    Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> decrements =
+                        new Dictionary<string, (int, int)>();
+                    foreach (DocumentTermRecord docTerm in docTerms)
+                    {
+                        decrements[docTerm.TermId] = (1, docTerm.TermFrequency);
+                    }
+                    await _Driver.Terms.DecrementFrequenciesBatchAsync(_TenantId, _IndexId, decrements, token).ConfigureAwait(false);
                 }
-                await _Driver.Terms.DecrementFrequenciesBatchAsync(_TenantId, _IndexId, decrements, token).ConfigureAwait(false);
+
+                await _Driver.DocumentTerms.DeleteByDocumentAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
+
+                bool deleted = await _Driver.Documents.DeleteAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
+
+                await _Driver.Terms.DeleteOrphanedAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
+
+                return deleted;
             }
-
-            await _Driver.DocumentTerms.DeleteByDocumentAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
-
-            bool deleted = await _Driver.Documents.DeleteAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
-
-            await _Driver.Terms.DeleteOrphanedAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
-
-            return deleted;
+            finally
+            {
+                _WriteLock.Release();
+            }
         }
 
         /// <summary>
@@ -428,43 +453,51 @@ namespace Verbex
                 return (new List<string>(), new List<string>());
             }
 
-            // Step 1: Get all document-terms for all requested documents in a single query
-            List<DocumentTermRecord> allDocTerms = await _Driver.DocumentTerms.GetByDocumentsAsync(_TenantId, _IndexId, requestedIds, token).ConfigureAwait(false);
-
-            // Step 2: Aggregate term frequency decrements across all documents
-            if (allDocTerms.Count > 0)
+            await _WriteLock.WaitAsync(token).ConfigureAwait(false);
+            try
             {
-                Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> decrements = new Dictionary<string, (int, int)>();
-                foreach (DocumentTermRecord docTerm in allDocTerms)
+                // Step 1: Get all document-terms for all requested documents in a single query
+                List<DocumentTermRecord> allDocTerms = await _Driver.DocumentTerms.GetByDocumentsAsync(_TenantId, _IndexId, requestedIds, token).ConfigureAwait(false);
+
+                // Step 2: Aggregate term frequency decrements across all documents
+                if (allDocTerms.Count > 0)
                 {
-                    if (decrements.TryGetValue(docTerm.TermId, out (int DocFreqDelta, int TotalFreqDelta) existing))
+                    Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> decrements = new Dictionary<string, (int, int)>();
+                    foreach (DocumentTermRecord docTerm in allDocTerms)
                     {
-                        decrements[docTerm.TermId] = (existing.DocFreqDelta + 1, existing.TotalFreqDelta + docTerm.TermFrequency);
+                        if (decrements.TryGetValue(docTerm.TermId, out (int DocFreqDelta, int TotalFreqDelta) existing))
+                        {
+                            decrements[docTerm.TermId] = (existing.DocFreqDelta + 1, existing.TotalFreqDelta + docTerm.TermFrequency);
+                        }
+                        else
+                        {
+                            decrements[docTerm.TermId] = (1, docTerm.TermFrequency);
+                        }
                     }
-                    else
-                    {
-                        decrements[docTerm.TermId] = (1, docTerm.TermFrequency);
-                    }
+
+                    // Step 3: Single batch decrement for all term frequencies
+                    await _Driver.Terms.DecrementFrequenciesBatchAsync(_TenantId, _IndexId, decrements, token).ConfigureAwait(false);
                 }
 
-                // Step 3: Single batch decrement for all term frequencies
-                await _Driver.Terms.DecrementFrequenciesBatchAsync(_TenantId, _IndexId, decrements, token).ConfigureAwait(false);
+                // Step 4: Delete all document-terms in one statement
+                await _Driver.DocumentTerms.DeleteByDocumentsAsync(_TenantId, _IndexId, requestedIds, token).ConfigureAwait(false);
+
+                // Step 5: Delete all documents in one statement and get back which ones existed
+                List<string> deletedIds = await _Driver.Documents.DeleteBatchAsync(_TenantId, _IndexId, requestedIds, token).ConfigureAwait(false);
+
+                // Step 6: Run orphan cleanup once at the end
+                await _Driver.Terms.DeleteOrphanedAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
+
+                // Step 7: Calculate not-found IDs
+                HashSet<string> deletedSet = new HashSet<string>(deletedIds);
+                List<string> notFoundIds = requestedIds.Where(id => !deletedSet.Contains(id)).ToList();
+
+                return (deletedIds, notFoundIds);
             }
-
-            // Step 4: Delete all document-terms in one statement
-            await _Driver.DocumentTerms.DeleteByDocumentsAsync(_TenantId, _IndexId, requestedIds, token).ConfigureAwait(false);
-
-            // Step 5: Delete all documents in one statement and get back which ones existed
-            List<string> deletedIds = await _Driver.Documents.DeleteBatchAsync(_TenantId, _IndexId, requestedIds, token).ConfigureAwait(false);
-
-            // Step 6: Run orphan cleanup once at the end
-            await _Driver.Terms.DeleteOrphanedAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
-
-            // Step 7: Calculate not-found IDs
-            HashSet<string> deletedSet = new HashSet<string>(deletedIds);
-            List<string> notFoundIds = requestedIds.Where(id => !deletedSet.Contains(id)).ToList();
-
-            return (deletedIds, notFoundIds);
+            finally
+            {
+                _WriteLock.Release();
+            }
         }
 
         /// <summary>
@@ -478,11 +511,19 @@ namespace Verbex
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            long documentCount = await _Driver.Documents.DeleteAllAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
+            await _WriteLock.WaitAsync(token).ConfigureAwait(false);
+            try
+            {
+                long documentCount = await _Driver.Documents.DeleteAllAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
 
-            await _Driver.Terms.DeleteAllAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
+                await _Driver.Terms.DeleteAllAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
 
-            return documentCount;
+                return documentCount;
+            }
+            finally
+            {
+                _WriteLock.Release();
+            }
         }
 
         #endregion
@@ -1162,9 +1203,13 @@ namespace Verbex
                 return;
             }
 
-            if (disposing && _OwnsDriver)
+            if (disposing)
             {
-                _Driver.Dispose();
+                _WriteLock.Dispose();
+                if (_OwnsDriver)
+                {
+                    _Driver.Dispose();
+                }
             }
 
             _IsDisposed = true;
