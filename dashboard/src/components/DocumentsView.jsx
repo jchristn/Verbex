@@ -16,6 +16,7 @@ import './DocumentsView.css';
 function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
   const { apiClient } = useAuth();
   const [documents, setDocuments] = useState([]);
+  const [totalDocumentCount, setTotalDocumentCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -214,7 +215,10 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
   }, [documents, filterDocId, sortColumn, sortDirection]);
 
   // Pagination calculations
-  const totalItems = filteredAndSortedDocuments.length;
+  // When not filtering, use server's total count for accurate display
+  // When filtering, use filtered list length (client-side filtering)
+  const isFiltering = filterDocId.trim() !== '';
+  const totalItems = isFiltering ? filteredAndSortedDocuments.length : totalDocumentCount;
   const totalPages = Math.ceil(totalItems / pageSize);
   const paginatedDocuments = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
@@ -243,8 +247,9 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
     setError('');
 
     try {
-      const response = await apiClient.getDocuments(selectedIndex, signal ? { signal } : {});
+      const response = await apiClient.getDocuments(selectedIndex, { limit: 0, signal });
       setDocuments(response.data?.documents || []);
+      setTotalDocumentCount(response.data?.totalCount ?? response.data?.documents?.length ?? 0);
     } catch (err) {
       if (err.name === 'AbortError') return;
       setError(err.message || 'Failed to load documents');

@@ -373,8 +373,10 @@ namespace Verbex.Server.API.REST
                 HttpMethod.GET, "/v1.0/indices/{id}/documents", GetIndexDocumentsRoute,
                 metadata => metadata
                     .WithTag("Documents")
-                    .WithDescription("List all documents in an index. Limited to 1000 documents maximum.")
+                    .WithDescription("List documents in an index with pagination. Returns TotalCount for proper pagination support. Use limit=0 to return all documents.")
                     .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithParameter(OpenApiParameterMetadata.Query("limit", "Maximum number of documents to return (default: 100, use 0 for no limit)", required: false))
+                    .WithParameter(OpenApiParameterMetadata.Query("offset", "Number of documents to skip (default: 0)", required: false))
                     .WithResponse(200, OpenApiResponseMetadata.Json("List of documents", CreateDocumentsListSchema()))
                     .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
                     .WithResponse(404, OpenApiResponseMetadata.NotFound()),
@@ -1015,6 +1017,12 @@ namespace Verbex.Server.API.REST
                 if (_IndexManager!.IndexExistsByName(tenantId, createRequest.Name))
                 {
                     return new ResponseContext(false, 409, "Index with this name already exists in the tenant");
+                }
+
+                // Check if custom identifier already exists
+                if (!String.IsNullOrEmpty(createRequest.Identifier) && _IndexManager!.IndexExists(createRequest.Identifier))
+                {
+                    return new ResponseContext(false, 409, "Index with identifier '" + createRequest.Identifier + "' already exists");
                 }
 
                 IndexMetadata metadata = createRequest.ToIndexMetadata(tenantId);
@@ -1671,13 +1679,39 @@ namespace Verbex.Server.API.REST
                     }
                     else
                     {
-                        // Original list-all behavior
-                        List<DocumentMetadata> documentList = await index.GetDocumentsAsync(limit: 1000).ConfigureAwait(false);
+                        // Paginated list behavior
+                        int limit = 100;
+                        int offset = 0;
+
+                        string? limitParam = ctx.Request.Query?.Elements?["limit"];
+                        string? offsetParam = ctx.Request.Query?.Elements?["offset"];
+
+                        if (!String.IsNullOrEmpty(limitParam) && Int32.TryParse(limitParam, out int parsedLimit))
+                        {
+                            // limit=0 means no limit (return all documents)
+                            limit = parsedLimit <= 0 ? Int32.MaxValue : parsedLimit;
+                        }
+
+                        if (!String.IsNullOrEmpty(offsetParam) && Int32.TryParse(offsetParam, out int parsedOffset))
+                        {
+                            offset = Math.Max(0, parsedOffset);
+                        }
+
+                        long totalCount = await index.GetDocumentCountAsync().ConfigureAwait(false);
+                        List<DocumentMetadata> documentList = await index.GetDocumentsAsync(limit: limit, offset: offset).ConfigureAwait(false);
+
                         return new ResponseContext
                         {
                             Success = true,
                             StatusCode = 200,
-                            Data = new { Documents = documentList, Count = documentList.Count }
+                            Data = new
+                            {
+                                Documents = documentList,
+                                Count = documentList.Count,
+                                TotalCount = totalCount,
+                                Limit = limit,
+                                Offset = offset
+                            }
                         };
                     }
                 }
@@ -1724,6 +1758,16 @@ namespace Verbex.Server.API.REST
                 if (!documentRequest.Validate(out string errorMessage))
                 {
                     return new ResponseContext(false, 400, errorMessage);
+                }
+
+                // Check if custom document ID already exists
+                if (!String.IsNullOrEmpty(documentRequest.Id))
+                {
+                    bool docExists = await index.DocumentExistsAsync(documentRequest.Id).ConfigureAwait(false);
+                    if (docExists)
+                    {
+                        return new ResponseContext(false, 409, "Document with ID '" + documentRequest.Id + "' already exists");
+                    }
                 }
 
                 try

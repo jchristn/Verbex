@@ -210,6 +210,10 @@ namespace Verbex.Server.Services
         {
             if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(indexId)) return false;
 
+            // Get metadata before deletion to know if it's on-disk
+            _Metadata.TryGetValue(indexId, out IndexMetadata? metadata);
+            bool isOnDisk = metadata != null && !metadata.InMemory;
+
             // Delete from database
             bool deleted = await _Database.Indexes.DeleteByIdentifierAsync(tenantId, indexId, token).ConfigureAwait(false);
 
@@ -222,6 +226,24 @@ namespace Verbex.Server.Services
                 if (removedIndex && index != null)
                 {
                     await index.DisposeAsync().ConfigureAwait(false);
+                }
+
+                // Delete on-disk storage directory if applicable
+                if (isOnDisk)
+                {
+                    string indexDirectory = Path.Combine(_DataDirectory, tenantId, indexId);
+                    if (Directory.Exists(indexDirectory))
+                    {
+                        try
+                        {
+                            Directory.Delete(indexDirectory, true);
+                            _Logging?.Info(_Header + "deleted storage directory for index '" + indexId + "'");
+                        }
+                        catch (Exception ex)
+                        {
+                            _Logging?.Warn(_Header + "failed to delete storage directory for index '" + indexId + "': " + ex.Message);
+                        }
+                    }
                 }
 
                 _Logging?.Info(_Header + "deleted index '" + indexId + "'");

@@ -12,6 +12,16 @@ namespace Verbex.Server.Classes
         #region Public-Members
 
         /// <summary>
+        /// Optional custom identifier for the index.
+        /// If not provided, a unique identifier will be auto-generated.
+        /// </summary>
+        public string Identifier
+        {
+            get => _Identifier;
+            set => _Identifier = value ?? "";
+        }
+
+        /// <summary>
         /// Tenant ID for the index (required for global admins, ignored for tenant users).
         /// </summary>
         public string TenantId
@@ -108,6 +118,7 @@ namespace Verbex.Server.Classes
 
         #region Private-Members
 
+        private string _Identifier = "";
         private string _TenantId = "";
         private string _Name = "";
         private string _Description = "";
@@ -163,7 +174,7 @@ namespace Verbex.Server.Classes
                 throw new ArgumentNullException(nameof(tenantId), "Tenant ID is required");
             }
 
-            return new IndexMetadata(tenantId, _Name, _Description)
+            IndexMetadata metadata = new IndexMetadata(tenantId, _Name, _Description)
             {
                 InMemory = _InMemory,
                 EnableLemmatizer = EnableLemmatizer,
@@ -174,6 +185,14 @@ namespace Verbex.Server.Classes
                 Tags = _Tags,
                 CustomMetadata = _CustomMetadata
             };
+
+            // Use provided identifier if specified
+            if (!String.IsNullOrEmpty(_Identifier))
+            {
+                metadata.Identifier = _Identifier;
+            }
+
+            return metadata;
         }
 
         #endregion

@@ -151,6 +151,9 @@ class ApiClient {
       Name: indexConfig.name
     };
 
+    if (indexConfig.identifier) {
+      apiConfig.Identifier = indexConfig.identifier;
+    }
     if (indexConfig.tenantId) {
       apiConfig.TenantId = indexConfig.tenantId;
     }
@@ -210,8 +213,13 @@ class ApiClient {
   }
 
   // Document endpoints
-  async getDocuments(indexId, options = {}) {
-    return this.get(`/v1.0/indices/${encodeURIComponent(indexId)}/documents`, options);
+  async getDocuments(indexId, { limit, offset, ...options } = {}) {
+    let endpoint = `/v1.0/indices/${encodeURIComponent(indexId)}/documents`;
+    const params = [];
+    if (limit !== undefined) params.push(`limit=${limit}`);
+    if (offset !== undefined) params.push(`offset=${offset}`);
+    if (params.length > 0) endpoint += '?' + params.join('&');
+    return this.get(endpoint, options);
   }
 
   async getDocument(indexId, docId, options = {}) {

@@ -25,6 +25,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
   }, [isGlobalAdmin, tenants, selectedTenantId]);
 
   const [formData, setFormData] = useState({
+    identifier: '',
     name: '',
     description: '',
     inMemory: false,
@@ -65,6 +66,11 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
         minTokenLength: formData.minTokenLength,
         maxTokenLength: formData.maxTokenLength
       };
+
+      // Include custom identifier if provided
+      if (formData.identifier && formData.identifier.trim()) {
+        indexConfig.identifier = formData.identifier.trim();
+      }
 
       // For global admins, include the selected tenant ID
       if (isGlobalAdmin) {
@@ -127,6 +133,19 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
         ) : null}
 
         <div className="form-group">
+          <label htmlFor="identifier">Identifier</label>
+          <input
+            type="text"
+            id="identifier"
+            name="identifier"
+            value={formData.identifier}
+            onChange={handleChange}
+            placeholder="my-custom-index-id"
+          />
+          <span className="form-hint">Optional. Leave blank to auto-generate a unique identifier</span>
+        </div>
+
+        <div className="form-group">
           <label htmlFor="name">Display Name *</label>
           <input
             type="text"
@@ -137,7 +156,6 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
             placeholder="My Index"
             required
           />
-          <span className="form-hint">A unique identifier will be generated automatically</span>
         </div>
 
         <div className="form-group">

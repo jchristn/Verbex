@@ -21,8 +21,8 @@ COPY --from=build /app/publish .
 # Create data and logs directories
 RUN mkdir -p /app/data /app/logs
 
-# Install diagnostic tools
-RUN apt-get update && apt-get install -y iputils-ping traceroute net-tools curl wget dnsutils iproute2 vim file && rm -rf /var/lib/apt/lists/*
+# Install diagnostic tools and sqlite3
+RUN apt-get update && apt-get install -y iputils-ping traceroute net-tools curl wget dnsutils iproute2 vim file sqlite3 && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "Verbex.Server.dll"]

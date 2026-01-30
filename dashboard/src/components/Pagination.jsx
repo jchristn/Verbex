@@ -7,7 +7,7 @@ function Pagination({
   totalItems,
   onPageChange,
   onPageSizeChange,
-  pageSizeOptions = [10, 25, 50, 100]
+  pageSizeOptions = [10, 25, 50, 100, 250, 500, 1000]
 }) {
   const handlePageInput = (e) => {
     if (e.key === 'Enter') {
