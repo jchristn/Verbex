@@ -285,6 +285,23 @@ namespace Verbex.Server.API.REST
                 ExceptionRoute);
 
             _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.PUT, "/v1.0/indices/{id}", PutIndexRoute,
+                metadata => metadata
+                    .WithTag("Indices")
+                    .WithDescription("Update an index's core properties (name, description, enabled status).")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
+                        CreateUpdateIndexRequestSchema(),
+                        "Index properties to update",
+                        required: true))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Index updated successfully", CreateIndexUpdateSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound())
+                    .WithResponse(409, OpenApiResponseMetadata.Create("Index with this name already exists")),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
                 HttpMethod.PUT, "/v1.0/indices/{id}/labels", PutIndexLabelsRoute,
                 metadata => metadata
                     .WithTag("Indices")
@@ -1115,6 +1132,89 @@ namespace Verbex.Server.API.REST
                 else
                 {
                     return new ResponseContext(false, 500, "Failed to delete index");
+                }
+            });
+        }
+
+        /// <summary>
+        /// Update index core properties route.
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <returns>Task.</returns>
+        private async Task PutIndexRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                // Get tenant from auth context
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                string tenantId = !String.IsNullOrEmpty(auth?.TenantId) ? auth.TenantId : "default";
+
+                string? indexId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(indexId))
+                {
+                    return new ResponseContext(false, 400, "Index ID is required");
+                }
+
+                if (!_IndexManager!.IndexExists(indexId))
+                {
+                    return new ResponseContext(false, 404, "Index not found");
+                }
+
+                string body = await GetRequestBody(ctx).ConfigureAwait(false);
+                if (String.IsNullOrEmpty(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                UpdateIndexRequest? request = JsonSerializer.Deserialize<UpdateIndexRequest>(body, _JsonOptions);
+                if (request == null)
+                {
+                    return new ResponseContext(false, 400, "Invalid JSON in request body");
+                }
+
+                if (!request.Validate(out string errorMessage))
+                {
+                    return new ResponseContext(false, 400, errorMessage);
+                }
+
+                try
+                {
+                    IndexMetadata? updated = await _IndexManager.UpdateIndexAsync(
+                        tenantId,
+                        indexId,
+                        request.Name,
+                        request.Description,
+                        request.Enabled).ConfigureAwait(false);
+
+                    if (updated != null)
+                    {
+                        return new ResponseContext
+                        {
+                            Success = true,
+                            StatusCode = 200,
+                            Data = new
+                            {
+                                Message = "Index updated successfully",
+                                Index = new
+                                {
+                                    Identifier = updated.Identifier,
+                                    Name = updated.Name,
+                                    Description = updated.Description,
+                                    Enabled = updated.Enabled,
+                                    Labels = updated.Labels,
+                                    Tags = updated.Tags
+                                }
+                            }
+                        };
+                    }
+                    else
+                    {
+                        return new ResponseContext(false, 500, "Failed to update index");
+                    }
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return new ResponseContext(false, 409, ex.Message);
                 }
             });
         }
@@ -3223,6 +3323,35 @@ namespace Verbex.Server.API.REST
                     ["customMetadata"] = new OpenApiSchemaMetadata
                     {
                         Description = "Custom metadata value (can be any JSON-serializable value: object, array, string, number, boolean, or null)"
+                    }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Create update index request schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateUpdateIndexRequestSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Name"] = new OpenApiSchemaMetadata
+                    {
+                        Type = "string",
+                        Description = "New name for the index (optional)"
+                    },
+                    ["Description"] = new OpenApiSchemaMetadata
+                    {
+                        Type = "string",
+                        Description = "New description for the index (optional)"
+                    },
+                    ["Enabled"] = new OpenApiSchemaMetadata
+                    {
+                        Type = "boolean",
+                        Description = "New enabled status for the index (optional)"
                     }
                 }
             };

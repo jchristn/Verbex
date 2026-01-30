@@ -36,6 +36,13 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
   const [isSavingTags, setIsSavingTags] = useState(false);
   const [isSavingCustomMetadata, setIsSavingCustomMetadata] = useState(false);
 
+  // Edit details mode states
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editEnabled, setEditEnabled] = useState(true);
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
+
   // Metadata modal
   const [showMetadataModal, setShowMetadataModal] = useState(false);
   const [metadataIndex, setMetadataIndex] = useState(null);
@@ -224,6 +231,36 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
     }
   };
 
+  const handleStartEditDetails = () => {
+    setEditName(indexDetails.name || '');
+    setEditDescription(indexDetails.description || '');
+    setEditEnabled(indexDetails.enabled);
+    setEditingDetails(true);
+  };
+
+  const handleCancelEditDetails = () => {
+    setEditingDetails(false);
+  };
+
+  const handleSaveDetails = async () => {
+    setIsSavingDetails(true);
+    try {
+      await apiClient.updateIndex(indexDetails.identifier, {
+        name: editName,
+        description: editDescription,
+        enabled: editEnabled
+      });
+      const response = await apiClient.getIndex(indexDetails.identifier);
+      setIndexDetails(response.data);
+      setEditingDetails(false);
+      onRefresh();
+    } catch (err) {
+      showAlert('Error', `Failed to update index: ${err.message}`);
+    } finally {
+      setIsSavingDetails(false);
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleString();
@@ -405,6 +442,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
           setShowDetailModal(false);
           setSelectedIndex(null);
           setIndexDetails(null);
+          setEditingDetails(false);
         }}
         title={`Index: ${indexDetails?.name || selectedIndex?.name || selectedIndex?.identifier || ''}`}
         size="large"
@@ -412,39 +450,97 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
         {indexDetails ? (
           <div className="index-details">
             <div className="details-section">
-              <h4>General Information</h4>
-              <div className="details-grid">
-                <div className="detail-item">
-                  <span className="detail-label">Identifier</span>
-                  <span className="detail-value"><CopyableId value={indexDetails.identifier} /></span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Tenant ID</span>
-                  <span className="detail-value"><CopyableId value={indexDetails.tenantId} /></span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Name</span>
-                  <span className="detail-value">{indexDetails.name || 'N/A'}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Description</span>
-                  <span className="detail-value">{indexDetails.description || 'N/A'}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Status</span>
-                  <span className={`status-badge ${indexDetails.enabled ? 'enabled' : 'disabled'}`}>
-                    {indexDetails.enabled ? 'Active' : 'Disabled'}
-                  </span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Storage Mode</span>
-                  <span className="detail-value">{indexDetails.inMemory ? 'In-Memory' : 'Persistent'}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Created</span>
-                  <span className="detail-value">{formatDate(indexDetails.createdUtc)}</span>
-                </div>
+              <div className="section-header">
+                <h4>General Information</h4>
+                {!editingDetails && (
+                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditDetails}>
+                    Edit
+                  </button>
+                )}
               </div>
+              {editingDetails ? (
+                <div className="edit-section">
+                  <div className="form-group">
+                    <label className="form-label">Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="Index name"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Description</label>
+                    <textarea
+                      className="form-input form-textarea"
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      placeholder="Index description"
+                      rows={3}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={editEnabled}
+                        onChange={(e) => setEditEnabled(e.target.checked)}
+                      />
+                      <span>Enabled</span>
+                    </label>
+                  </div>
+                  <div className="edit-actions">
+                    <button
+                      className="btn btn-sm btn-primary"
+                      onClick={handleSaveDetails}
+                      disabled={isSavingDetails}
+                    >
+                      {isSavingDetails ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={handleCancelEditDetails}
+                      disabled={isSavingDetails}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="details-grid">
+                  <div className="detail-item">
+                    <span className="detail-label">Identifier</span>
+                    <span className="detail-value"><CopyableId value={indexDetails.identifier} /></span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Tenant ID</span>
+                    <span className="detail-value"><CopyableId value={indexDetails.tenantId} /></span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Name</span>
+                    <span className="detail-value">{indexDetails.name || 'N/A'}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Description</span>
+                    <span className="detail-value">{indexDetails.description || 'N/A'}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Status</span>
+                    <span className={`status-badge ${indexDetails.enabled ? 'enabled' : 'disabled'}`}>
+                      {indexDetails.enabled ? 'Active' : 'Disabled'}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Storage Mode</span>
+                    <span className="detail-value">{indexDetails.inMemory ? 'In-Memory' : 'Persistent'}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Created</span>
+                    <span className="detail-value">{formatDate(indexDetails.createdUtc)}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {indexDetails.statistics && (
@@ -618,6 +714,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                   setShowDetailModal(false);
                   setSelectedIndex(null);
                   setIndexDetails(null);
+                  setEditingDetails(false);
                 }}
               >
                 Close

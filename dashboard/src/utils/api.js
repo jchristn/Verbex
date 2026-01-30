@@ -189,6 +189,14 @@ class ApiClient {
     return this.put(`/v1.0/indices/${encodeURIComponent(indexId)}/customMetadata`, { CustomMetadata: customMetadata });
   }
 
+  async updateIndex(indexId, updates) {
+    const body = {};
+    if (updates.name !== undefined) body.Name = updates.name;
+    if (updates.description !== undefined) body.Description = updates.description;
+    if (updates.enabled !== undefined) body.Enabled = updates.enabled;
+    return this.put(`/v1.0/indices/${encodeURIComponent(indexId)}`, body);
+  }
+
   // Document endpoints
   async getDocuments(indexId, options = {}) {
     return this.get(`/v1.0/indices/${encodeURIComponent(indexId)}/documents`, options);

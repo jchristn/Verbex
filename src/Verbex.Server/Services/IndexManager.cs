@@ -328,6 +328,67 @@ namespace Verbex.Server.Services
         }
 
         /// <summary>
+        /// Update index core properties (name, description, enabled).
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="indexId">Index identifier.</param>
+        /// <param name="name">New name (null to keep current).</param>
+        /// <param name="description">New description (null to keep current).</param>
+        /// <param name="enabled">New enabled status (null to keep current).</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Updated metadata if successful, null if index not found.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when name conflicts with existing index in tenant.</exception>
+        public async Task<IndexMetadata?> UpdateIndexAsync(
+            string tenantId,
+            string indexId,
+            string? name,
+            string? description,
+            bool? enabled,
+            CancellationToken token = default)
+        {
+            if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(indexId)) return null;
+            if (!_Metadata.TryGetValue(indexId, out IndexMetadata? metadata)) return null;
+
+            // Check for duplicate name if name is being changed
+            if (name != null && name != metadata.Name)
+            {
+                bool nameExists = _Metadata.Values.Any(m =>
+                    m.TenantId == tenantId &&
+                    m.Identifier != indexId &&
+                    m.Name == name);
+
+                if (nameExists)
+                {
+                    throw new InvalidOperationException("Index with name '" + name + "' already exists in tenant '" + tenantId + "'");
+                }
+            }
+
+            // Update only non-null properties
+            if (name != null)
+            {
+                metadata.Name = name;
+            }
+
+            if (description != null)
+            {
+                metadata.Description = description;
+            }
+
+            if (enabled.HasValue)
+            {
+                metadata.Enabled = enabled.Value;
+            }
+
+            metadata.LastUpdateUtc = DateTime.UtcNow;
+
+            IndexMetadata updated = await _Database.Indexes.UpdateAsync(metadata, token).ConfigureAwait(false);
+            _Metadata[indexId] = updated;
+
+            _Logging?.Info(_Header + "updated index '" + indexId + "'");
+            return updated;
+        }
+
+        /// <summary>
         /// Dispose all indices and clean up resources.
         /// </summary>
         public async Task DisposeAllAsync()
