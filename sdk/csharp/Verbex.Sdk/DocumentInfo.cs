@@ -75,5 +75,12 @@ namespace Verbex.Sdk
         /// Alias for CustomMetadata for API consistency.
         /// </summary>
         public Dictionary<string, object>? Tags { get; set; }
+
+        /// <summary>
+        /// Indexing runtime in milliseconds.
+        /// Time taken to process and index the document content.
+        /// Null if not yet indexed or timing was not captured.
+        /// </summary>
+        public decimal? IndexingRuntimeMs { get; set; }
     }
 }

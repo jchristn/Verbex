@@ -27,6 +27,7 @@ namespace Test
             await runner.RunTestAsync("DocumentExistsByNameAsync returns true for existing document", TestDocumentExistsByNameAsync).ConfigureAwait(false);
             await runner.RunTestAsync("GetDefaultStorageDirectory returns valid path", TestGetDefaultStorageDirectoryAsync).ConfigureAwait(false);
             await runner.RunTestAsync("CreateOnDisk configuration has correct settings", TestCreateOnDiskConfigurationAsync).ConfigureAwait(false);
+            await runner.RunTestAsync("GetDocumentWithMetadataAsync returns indexed terms", TestGetDocumentWithMetadataReturnsTermsAsync).ConfigureAwait(false);
         }
 
         private static async Task TestGetDocumentByIdAsync()
@@ -152,6 +153,28 @@ namespace Test
             TestAssert.AreEqual(expectedDir, config.StorageDirectory);
 
             await Task.CompletedTask.ConfigureAwait(false);
+        }
+
+        private static async Task TestGetDocumentWithMetadataReturnsTermsAsync()
+        {
+            await using InvertedIndex index = await TestContext.CreateTestIndexAsync().ConfigureAwait(false);
+
+            // Add a document with known content containing specific terms
+            string content = "apple banana cherry date elderberry";
+            string docId = await index.AddDocumentAsync("terms-test.txt", content).ConfigureAwait(false);
+
+            // Retrieve document with full metadata including terms
+            DocumentMetadata? metadata = await index.GetDocumentWithMetadataAsync(docId).ConfigureAwait(false);
+
+            TestAssert.IsNotNull(metadata);
+            TestAssert.IsTrue(metadata!.Terms.Count > 0, "Document should have indexed terms");
+
+            // Verify the expected terms are present (terms are lowercased)
+            HashSet<string> expectedTerms = new HashSet<string> { "apple", "banana", "cherry", "date", "elderberry" };
+            foreach (string term in expectedTerms)
+            {
+                TestAssert.IsTrue(metadata.Terms.Contains(term), $"Document should contain term '{term}'");
+            }
         }
     }
 }

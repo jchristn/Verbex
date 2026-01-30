@@ -18,44 +18,17 @@ namespace Verbex.Server
     /// </summary>
     public static class VerbexServer
     {
-        #region Public-Members
-
-        /// <summary>
-        /// Settings.
-        /// </summary>
-        public static Settings? Settings = null;
-
-        /// <summary>
-        /// Database driver for multi-tenant data storage.
-        /// </summary>
-        public static DatabaseDriverBase? Database = null;
-
-        /// <summary>
-        /// Authentication service.
-        /// </summary>
-        public static AuthenticationService? Authentication = null;
-
-        /// <summary>
-        /// Index manager.
-        /// </summary>
-        public static IndexManager? IndexManager = null;
-
-        /// <summary>
-        /// REST service handler.
-        /// </summary>
-        public static RestServiceHandler? RestService = null;
-
-        /// <summary>
-        /// Logging module.
-        /// </summary>
-        public static LoggingModule? Logging = null;
-
-        #endregion
-
         #region Private-Members
 
         private static readonly string _Header = "[VerbexServer] ";
         private static readonly int _ProcessId = Environment.ProcessId;
+
+        private static Settings? _Settings = null;
+        private static DatabaseDriverBase? _Database = null;
+        private static AuthenticationService? _Authentication = null;
+        private static IndexManager? _IndexManager = null;
+        private static RestServiceHandler? _RestService = null;
+        private static LoggingModule? _Logging = null;
 
         #endregion
 
@@ -78,36 +51,36 @@ namespace Verbex.Server
                 await CreateDefaultRecordsAsync().ConfigureAwait(false);
                 await DiscoverAllIndicesAsync().ConfigureAwait(false);
 
-                RestService?.Start();
-                Logging?.Info(_Header + "started at " + DateTime.UtcNow + " using process ID " + _ProcessId);
+                _RestService?.Start();
+                _Logging?.Info(_Header + "started at " + DateTime.UtcNow + " using process ID " + _ProcessId);
 
                 ManualResetEventSlim shutdownEvent = new ManualResetEventSlim(false);
 
                 Console.CancelKeyPress += (sender, eventArgs) =>
                 {
                     eventArgs.Cancel = true;
-                    Logging?.Info(_Header + "shutdown signal received (Ctrl+C)");
+                    _Logging?.Info(_Header + "shutdown signal received (Ctrl+C)");
                     shutdownEvent.Set();
                 };
 
                 AppDomain.CurrentDomain.ProcessExit += (sender, eventArgs) =>
                 {
-                    Logging?.Info(_Header + "process exit signal received");
+                    _Logging?.Info(_Header + "process exit signal received");
                     shutdownEvent.Set();
                 };
 
                 shutdownEvent.Wait();
 
-                Logging?.Info(_Header + "stopping at " + DateTime.UtcNow);
-                RestService?.Stop();
+                _Logging?.Info(_Header + "stopping at " + DateTime.UtcNow);
+                _RestService?.Stop();
 
-                Logging?.Info(_Header + "disposing indices...");
-                if (IndexManager != null)
+                _Logging?.Info(_Header + "disposing indices...");
+                if (_IndexManager != null)
                 {
-                    await IndexManager.DisposeAllAsync().ConfigureAwait(false);
+                    await _IndexManager.DisposeAllAsync().ConfigureAwait(false);
                 }
 
-                Logging?.Info(_Header + "stopped at " + DateTime.UtcNow);
+                _Logging?.Info(_Header + "stopped at " + DateTime.UtcNow);
                 return 0;
             }
             catch (Exception e)
@@ -158,19 +131,19 @@ namespace Verbex.Server
             string? envSettingsFile = Environment.GetEnvironmentVariable("VERBEX_SETTINGS_FILE");
             if (!String.IsNullOrEmpty(envSettingsFile)) settingsFile = envSettingsFile;
 
-            Settings = Classes.Settings.FromFile(settingsFile);
+            _Settings = Classes.Settings.FromFile(settingsFile);
 
             // Environment variable overrides
             string? adminToken = Environment.GetEnvironmentVariable("VERBEX_ADMIN_TOKEN");
-            if (!String.IsNullOrEmpty(adminToken)) Settings.AdminBearerToken = adminToken;
+            if (!String.IsNullOrEmpty(adminToken)) _Settings.AdminBearerToken = adminToken;
 
             string? hostname = Environment.GetEnvironmentVariable("VERBEX_HOSTNAME");
-            if (!String.IsNullOrEmpty(hostname)) Settings.Rest.Hostname = hostname;
+            if (!String.IsNullOrEmpty(hostname)) _Settings.Rest.Hostname = hostname;
 
             string? port = Environment.GetEnvironmentVariable("VERBEX_PORT");
             if (!String.IsNullOrEmpty(port) && Int32.TryParse(port, out int portInt))
             {
-                Settings.Rest.Port = portInt;
+                _Settings.Rest.Port = portInt;
             }
         }
 
@@ -179,21 +152,36 @@ namespace Verbex.Server
         /// </summary>
         private static void InitializeLogging()
         {
-            if (Settings == null) throw new InvalidOperationException("Settings must be initialized before logging");
+            if (_Settings == null) throw new InvalidOperationException("Settings must be initialized before logging");
 
-            Logging = new LoggingModule();
-            Logging.Settings.EnableConsole = Settings.Logging.ConsoleLogging;
-            Logging.Settings.EnableColors = Settings.Logging.EnableColors;
-
-            if (Settings.Logging.FileLogging)
+            List<SyslogServer> syslogServers = new List<SyslogServer>();
+            if (_Settings.Logging.SyslogServers != null && _Settings.Logging.SyslogServers.Count > 0)
             {
-                if (Settings.Logging.IncludeDateInFilename)
+                foreach (SyslogServer server in _Settings.Logging.SyslogServers)
                 {
-                    Logging.Settings.FileLogging = SyslogLogging.FileLoggingMode.FileWithDate;
+                    syslogServers.Add(new SyslogServer(server.Hostname, server.Port));
+                    Console.WriteLine("| | Syslog: " + server.Hostname + ":" + server.Port);
+                }
+            }
+
+            if (syslogServers.Count > 0)
+                _Logging = new LoggingModule(syslogServers);
+            else
+                _Logging = new LoggingModule();
+
+            _Logging.Settings.EnableConsole = _Settings.Logging.ConsoleLogging;
+            _Logging.Settings.EnableColors = _Settings.Logging.EnableColors;
+            _Logging.Settings.MinimumSeverity = (Severity)_Settings.Logging.MinimumSeverity;
+
+            if (_Settings.Logging.FileLogging)
+            {
+                if (_Settings.Logging.IncludeDateInFilename)
+                {
+                    _Logging.Settings.FileLogging = SyslogLogging.FileLoggingMode.FileWithDate;
                 }
                 else
                 {
-                    Logging.Settings.FileLogging = SyslogLogging.FileLoggingMode.SingleLogFile;
+                    _Logging.Settings.FileLogging = SyslogLogging.FileLoggingMode.SingleLogFile;
                 }
             }
         }
@@ -204,15 +192,15 @@ namespace Verbex.Server
         /// <returns>Task.</returns>
         private static async Task InitializeGlobalsAsync()
         {
-            if (Settings == null) throw new InvalidOperationException("Settings must be initialized before globals");
+            if (_Settings == null) throw new InvalidOperationException("Settings must be initialized before globals");
 
             // Initialize database driver
-            Database = await DatabaseDriverFactory.CreateAndInitializeAsync(Settings.Database).ConfigureAwait(false);
-            Logging?.Info(_Header + "database driver initialized (" + Settings.Database.Type + ")");
+            _Database = await DatabaseDriverFactory.CreateAndInitializeAsync(_Settings.Database).ConfigureAwait(false);
+            _Logging?.Info(_Header + "database driver initialized (" + _Settings.Database.Type + ")");
 
-            Authentication = new AuthenticationService(Settings.AdminBearerToken, Database);
-            IndexManager = new IndexManager(Database, Logging);
-            RestService = new RestServiceHandler(Settings, Authentication, IndexManager, Database, Logging!);
+            _Authentication = new AuthenticationService(_Settings.AdminBearerToken, _Database);
+            _IndexManager = new IndexManager(_Database, _Logging);
+            _RestService = new RestServiceHandler(_Settings, _Authentication, _IndexManager, _Database, _Logging!);
         }
 
         /// <summary>
@@ -221,32 +209,32 @@ namespace Verbex.Server
         /// <returns>Task.</returns>
         private static async Task DiscoverAllIndicesAsync()
         {
-            if (Database == null || Settings == null || IndexManager == null)
+            if (_Database == null || _Settings == null || _IndexManager == null)
             {
                 throw new InvalidOperationException("Database, Settings, and IndexManager must be initialized before discovering indices");
             }
 
             try
             {
-                List<TenantMetadata> tenants = await Database.Tenants.ReadManyAsync().ConfigureAwait(false);
-                Logging?.Info(_Header + "discovering indices for " + tenants.Count + " tenant(s)");
+                List<TenantMetadata> tenants = await _Database.Tenants.ReadManyAsync().ConfigureAwait(false);
+                _Logging?.Info(_Header + "discovering indices for " + tenants.Count + " tenant(s)");
 
                 foreach (TenantMetadata tenant in tenants)
                 {
                     if (!tenant.Active)
                     {
-                        Logging?.Info(_Header + "skipping inactive tenant '" + tenant.Identifier + "'");
+                        _Logging?.Info(_Header + "skipping inactive tenant '" + tenant.Identifier + "'");
                         continue;
                     }
 
-                    await IndexManager.DiscoverIndicesAsync(tenant.Identifier, Settings.DataDirectory).ConfigureAwait(false);
+                    await _IndexManager.DiscoverIndicesAsync(tenant.Identifier, _Settings.DataDirectory).ConfigureAwait(false);
                 }
 
-                Logging?.Info(_Header + "index discovery complete");
+                _Logging?.Info(_Header + "index discovery complete");
             }
             catch (Exception e)
             {
-                Logging?.Warn(_Header + "failed to discover indices: " + e.Message);
+                _Logging?.Warn(_Header + "failed to discover indices: " + e.Message);
             }
         }
 
@@ -257,7 +245,7 @@ namespace Verbex.Server
         /// <returns>Task.</returns>
         private static async Task CreateDefaultRecordsAsync()
         {
-            if (Database == null || Settings == null || IndexManager == null)
+            if (_Database == null || _Settings == null || _IndexManager == null)
             {
                 throw new InvalidOperationException("Database, Settings, and IndexManager must be initialized before creating default records");
             }
@@ -265,14 +253,14 @@ namespace Verbex.Server
             try
             {
                 // Check if any tenants exist
-                List<TenantMetadata> existingTenants = await Database.Tenants.ReadManyAsync().ConfigureAwait(false);
+                List<TenantMetadata> existingTenants = await _Database.Tenants.ReadManyAsync().ConfigureAwait(false);
                 if (existingTenants.Count > 0)
                 {
-                    Logging?.Info(_Header + "database already has records, skipping default record creation");
+                    _Logging?.Info(_Header + "database already has records, skipping default record creation");
                     return;
                 }
 
-                Logging?.Info(_Header + "creating default records for initial setup");
+                _Logging?.Info(_Header + "creating default records for initial setup");
 
                 // Create default tenant
                 TenantMetadata defaultTenant = new TenantMetadata("Default Tenant")
@@ -281,8 +269,8 @@ namespace Verbex.Server
                     Description = "Default tenant created during initial setup",
                     Active = true
                 };
-                await Database.Tenants.CreateAsync(defaultTenant).ConfigureAwait(false);
-                Logging?.Info(_Header + "created default tenant: " + defaultTenant.Identifier);
+                await _Database.Tenants.CreateAsync(defaultTenant).ConfigureAwait(false);
+                _Logging?.Info(_Header + "created tenant: " + defaultTenant.Identifier);
 
                 // Create default user
                 UserMaster defaultUser = new UserMaster("default", "default@user.com")
@@ -295,8 +283,8 @@ namespace Verbex.Server
                     Active = true
                 };
                 defaultUser.SetPassword("password");
-                await Database.Users.CreateAsync(defaultUser).ConfigureAwait(false);
-                Logging?.Info(_Header + "created default user: " + defaultUser.Email);
+                await _Database.Users.CreateAsync(defaultUser).ConfigureAwait(false);
+                _Logging?.Info(_Header + "created default user: " + defaultUser.Email);
 
                 // Create default credential with bearer token "default"
                 Credential defaultCredential = new Credential("default", "default", "Default API Key")
@@ -306,8 +294,8 @@ namespace Verbex.Server
                     BearerToken = "default",
                     Active = true
                 };
-                await Database.Credentials.CreateAsync(defaultCredential).ConfigureAwait(false);
-                Logging?.Info(_Header + "created default credential with bearer token: default");
+                await _Database.Credentials.CreateAsync(defaultCredential).ConfigureAwait(false);
+                _Logging?.Info(_Header + "created credential with bearer token: " + defaultCredential.BearerToken);
 
                 // Create default index
                 IndexMetadata defaultIndex = new IndexMetadata(
@@ -315,17 +303,18 @@ namespace Verbex.Server
                     "Default Index", 
                     "Default index created during initial setup")
                 {
+                    Identifier = "default",
                     Enabled = true,
                     InMemory = false
                 };
-                IndexMetadata createdIndex = await IndexManager.CreateIndexAsync(defaultIndex).ConfigureAwait(false);
-                Logging?.Info(_Header + "created default index: " + createdIndex.Identifier);
+                IndexMetadata createdIndex = await _IndexManager.CreateIndexAsync(defaultIndex).ConfigureAwait(false);
+                _Logging?.Info(_Header + "created index: " + createdIndex.Identifier);
 
-                Logging?.Info(_Header + "default records created successfully");
+                _Logging?.Info(_Header + "default records created successfully");
             }
             catch (Exception e)
             {
-                Logging?.Warn(_Header + "failed to create default records: " + e.Message);
+                _Logging?.Warn(_Header + "failed to create default records: " + e.Message);
                 // Don't throw - allow server to continue even if default record creation fails
             }
         }
@@ -342,7 +331,7 @@ namespace Verbex.Server
             if (e != null && e.InnerException != null) msg = e.InnerException.Message;
             else if (e != null) msg = e.Message;
 
-            Logging?.Error(_Header + "[" + method + "] Exception: " + text + ": " + msg);
+            _Logging?.Error(_Header + "[" + method + "] Exception: " + text + ": " + msg);
         }
 
         #endregion

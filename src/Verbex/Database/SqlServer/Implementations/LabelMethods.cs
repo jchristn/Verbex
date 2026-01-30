@@ -4,6 +4,7 @@ namespace Verbex.Database.SqlServer.Implementations
     using System.Collections.Generic;
     using System.Data;
     using System.Linq;
+    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
     using Verbex.Database.Interfaces;
@@ -35,9 +36,29 @@ VALUES (N'{Sanitizer.Sanitize(id)}', {Sanitizer.FormatNullableString(documentId)
 
         public async Task AddBatchAsync(string tenantId, string indexId, IEnumerable<LabelRecord> records, CancellationToken token = default)
         {
-            foreach (LabelRecord record in records)
+            List<LabelRecord> recordList = records.ToList();
+            if (recordList.Count == 0) return;
+
+            const int ChunkSize = 200;
+            DateTime now = DateTime.UtcNow;
+            string nowFormatted = Sanitizer.FormatDateTime(now);
+
+            for (int i = 0; i < recordList.Count; i += ChunkSize)
             {
-                await AddAsync(tenantId, indexId, record.Id, record.DocumentId, record.Label, token).ConfigureAwait(false);
+                List<LabelRecord> chunk = recordList.Skip(i).Take(ChunkSize).ToList();
+                StringBuilder sb = new StringBuilder();
+                sb.Append("INSERT INTO labels (id, document_id, index_id, label, last_update_utc, created_utc) VALUES ");
+
+                List<string> valuesClauses = new List<string>();
+                foreach (LabelRecord record in chunk)
+                {
+                    valuesClauses.Add($"(N'{Sanitizer.Sanitize(record.Id)}', {Sanitizer.FormatNullableString(record.DocumentId)}, N'{Sanitizer.Sanitize(indexId)}', N'{Sanitizer.Sanitize(record.Label)}', '{nowFormatted}', '{nowFormatted}')");
+                }
+
+                sb.Append(string.Join(", ", valuesClauses));
+                sb.Append(';');
+
+                await _Driver.ExecuteQueryAsync(sb.ToString(), true, token).ConfigureAwait(false);
             }
         }
 

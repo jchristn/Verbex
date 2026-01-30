@@ -409,6 +409,32 @@ class TestHarness {
         this._testDocuments.push(docId);
     }
 
+    async testGetDocumentReturnsIndexedTerms() {
+        // Add a document with known content containing specific terms
+        const content = 'apple banana cherry date elderberry';
+        const result = await this._client.addDocument(this._testIndexId, content);
+        this._assertNotNull(result, 'result');
+        const docId = result.documentId;
+
+        // Retrieve the document and verify terms are populated
+        const document = await this._client.getDocument(this._testIndexId, docId);
+        this._assertNotNull(document, 'document');
+        this._assertNotNull(document.terms, 'document.terms');
+        this._assertGreaterThan(document.terms.length, 0, 'document.terms.length');
+
+        // Verify expected terms are present (terms are lowercased)
+        const expectedTerms = ['apple', 'banana', 'cherry', 'date', 'elderberry'];
+        for (const term of expectedTerms) {
+            this._assert(document.terms.includes(term), `Document should contain term '${term}'`);
+        }
+
+        // Verify indexing runtime is populated
+        this._assertNotNull(document.indexingRuntimeMs, 'document.indexingRuntimeMs');
+        this._assertGreaterThan(document.indexingRuntimeMs, 0, 'document.indexingRuntimeMs');
+
+        this._testDocuments.push(docId);
+    }
+
     async testGetDocumentsBatch() {
         // Need at least 2 documents
         this._assert(this._testDocuments.length >= 2, 'Need at least 2 test documents for batch retrieval test');
@@ -745,6 +771,7 @@ class TestHarness {
             await this._runTest('Get document not found', () => this.testGetDocumentNotFound());
             await this._runTest('Add document with labels and tags', () => this.testAddDocumentWithLabelsAndTags());
             await this._runTest('Get document with labels and tags', () => this.testGetDocumentWithLabelsAndTags());
+            await this._runTest('Get document returns indexed terms', () => this.testGetDocumentReturnsIndexedTerms());
             await this._runTest('Get documents batch', () => this.testGetDocumentsBatch());
             await this._runTest('Get documents batch (empty)', () => this.testGetDocumentsBatchEmpty());
             await this._runTest('Delete documents batch', () => this.testDeleteDocumentsBatch());

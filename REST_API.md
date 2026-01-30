@@ -104,6 +104,7 @@ Use the `/v1.0/auth/login` endpoint to obtain a token by providing valid credent
   "IndexedDate": "datetime",
   "LastModified": "datetime",
   "ContentSha256": "string",
+  "IndexingRuntimeMs": "decimal (nullable)",
   "Terms": ["string"],
   "IsDeleted": "boolean",
   "Labels": ["string"],
@@ -661,6 +662,7 @@ Authorization: Bearer <token>
         "IndexedDate": "2025-01-01T12:00:00Z",
         "LastModified": "2025-01-01T12:00:00Z",
         "ContentSha256": "abc123...",
+        "IndexingRuntimeMs": 12.34,
         "Labels": ["important"],
         "Tags": {"category": "tech"}
       }
@@ -705,6 +707,7 @@ Authorization: Bearer <token>
         "IndexedDate": "2025-01-01T12:00:00Z",
         "LastModified": "2025-01-01T12:00:00Z",
         "ContentSha256": "abc123...",
+        "IndexingRuntimeMs": 12.34,
         "Labels": ["important"],
         "Tags": {"category": "tech"},
         "CustomMetadata": null
@@ -716,6 +719,7 @@ Authorization: Bearer <token>
         "IndexedDate": "2025-01-01T12:00:00Z",
         "LastModified": "2025-01-01T12:00:00Z",
         "ContentSha256": "def456...",
+        "IndexingRuntimeMs": 23.45,
         "Labels": [],
         "Tags": {},
         "CustomMetadata": null
@@ -865,6 +869,7 @@ Authorization: Bearer <token>
     "IndexedDate": "2025-01-01T12:00:00Z",
     "LastModified": "2025-01-01T12:00:00Z",
     "ContentSha256": "abc123...",
+    "IndexingRuntimeMs": 12.34,
     "Labels": ["important", "review"],
     "Tags": {"category": "tech", "author": "Alice"},
     "CustomMetadata": {"source": "api", "version": 1}
@@ -1089,6 +1094,7 @@ Note: `Labels` and `Tags` are optional filters. When provided, documents must ma
           "DocumentPath": "doc_01JFXA1234567890ABCDEF",
           "DocumentLength": 5000,
           "IndexedDate": "2025-01-01T12:00:00Z",
+          "IndexingRuntimeMs": 15.67,
           "Labels": ["important"],
           "Tags": {"category": "tech"},
           "CustomMetadata": null

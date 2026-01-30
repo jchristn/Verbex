@@ -2,6 +2,7 @@ namespace Verbex
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.IO;
     using System.Linq;
     using System.Security.Cryptography;
@@ -206,12 +207,14 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(documentName);
             ArgumentNullException.ThrowIfNull(content);
 
+            Stopwatch stopwatch = Stopwatch.StartNew();
+
             string documentId = IdGenerator.GenerateDocumentId();
             string contentSha256 = ComputeContentHash(content);
 
-            await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, null, token).ConfigureAwait(false);
+            await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
 
-            await IndexDocumentContentAsync(documentId, documentName, content, token).ConfigureAwait(false);
+            await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
 
             return documentId;
         }
@@ -240,11 +243,13 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(documentName);
             ArgumentNullException.ThrowIfNull(content);
 
+            Stopwatch stopwatch = Stopwatch.StartNew();
+
             string contentSha256 = ComputeContentHash(content);
 
-            await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, null, token).ConfigureAwait(false);
+            await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
 
-            await IndexDocumentContentAsync(documentId, documentName, content, token).ConfigureAwait(false);
+            await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -401,6 +406,65 @@ namespace Verbex
             await _Driver.Terms.DeleteOrphanedAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
 
             return deleted;
+        }
+
+        /// <summary>
+        /// Removes multiple documents from the index in a single batch operation.
+        /// This is more efficient than calling RemoveDocumentAsync multiple times.
+        /// </summary>
+        /// <param name="documentIds">Collection of document IDs to remove.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>A tuple containing the list of deleted IDs and the list of not-found IDs.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when documentIds is null.</exception>
+        public async Task<(List<string> Deleted, List<string> NotFound)> RemoveDocumentsBatchAsync(IEnumerable<string> documentIds, CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotOpen();
+            ArgumentNullException.ThrowIfNull(documentIds);
+
+            List<string> requestedIds = documentIds.Distinct().Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
+            if (requestedIds.Count == 0)
+            {
+                return (new List<string>(), new List<string>());
+            }
+
+            // Step 1: Get all document-terms for all requested documents in a single query
+            List<DocumentTermRecord> allDocTerms = await _Driver.DocumentTerms.GetByDocumentsAsync(_TenantId, _IndexId, requestedIds, token).ConfigureAwait(false);
+
+            // Step 2: Aggregate term frequency decrements across all documents
+            if (allDocTerms.Count > 0)
+            {
+                Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> decrements = new Dictionary<string, (int, int)>();
+                foreach (DocumentTermRecord docTerm in allDocTerms)
+                {
+                    if (decrements.TryGetValue(docTerm.TermId, out (int DocFreqDelta, int TotalFreqDelta) existing))
+                    {
+                        decrements[docTerm.TermId] = (existing.DocFreqDelta + 1, existing.TotalFreqDelta + docTerm.TermFrequency);
+                    }
+                    else
+                    {
+                        decrements[docTerm.TermId] = (1, docTerm.TermFrequency);
+                    }
+                }
+
+                // Step 3: Single batch decrement for all term frequencies
+                await _Driver.Terms.DecrementFrequenciesBatchAsync(_TenantId, _IndexId, decrements, token).ConfigureAwait(false);
+            }
+
+            // Step 4: Delete all document-terms in one statement
+            await _Driver.DocumentTerms.DeleteByDocumentsAsync(_TenantId, _IndexId, requestedIds, token).ConfigureAwait(false);
+
+            // Step 5: Delete all documents in one statement and get back which ones existed
+            List<string> deletedIds = await _Driver.Documents.DeleteBatchAsync(_TenantId, _IndexId, requestedIds, token).ConfigureAwait(false);
+
+            // Step 6: Run orphan cleanup once at the end
+            await _Driver.Terms.DeleteOrphanedAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
+
+            // Step 7: Calculate not-found IDs
+            HashSet<string> deletedSet = new HashSet<string>(deletedIds);
+            List<string> notFoundIds = requestedIds.Where(id => !deletedSet.Contains(id)).ToList();
+
+            return (deletedIds, notFoundIds);
         }
 
         /// <summary>
@@ -1137,11 +1201,23 @@ namespace Verbex
             }
         }
 
-        private async Task IndexDocumentContentAsync(string documentId, string documentPath, string content, CancellationToken token)
+        private async Task IndexDocumentContentAsync(string documentId, string documentPath, string content, Stopwatch stopwatch, CancellationToken token)
         {
             List<string> tokens = TokenizeAndProcess(content);
             if (tokens.Count == 0)
             {
+                stopwatch.Stop();
+                await _Driver.Documents.UpdateAsync(
+                    _TenantId,
+                    _IndexId,
+                    documentId,
+                    documentPath,
+                    ComputeContentHash(content),
+                    content.Length,
+                    0,
+                    null,
+                    (decimal)stopwatch.Elapsed.TotalMilliseconds,
+                    token).ConfigureAwait(false);
                 return;
             }
 
@@ -1180,59 +1256,73 @@ namespace Verbex
 
             int distinctTermCount = termPositions.Count;
 
-            // Step 1: Batch add/get all terms (single INSERT + single SELECT)
-            List<string> termList = new List<string>(termPositions.Keys);
-            Dictionary<string, string> termIdsToGenerate = new Dictionary<string, string>();
-            foreach (string term in termList)
+            // Wrap all database operations in a single transaction for performance
+            await _Driver.BeginTransactionAsync(token).ConfigureAwait(false);
+            try
             {
-                termIdsToGenerate[IdGenerator.GenerateTermId()] = term;
-            }
-            Dictionary<string, string> termIds = await _Driver.Terms.AddOrGetBatchAsync(_TenantId, _IndexId, termIdsToGenerate, token).ConfigureAwait(false);
-
-            // Step 2: Prepare document-term mappings for batch insert
-            List<DocumentTermRecord> docTermRecords = new List<DocumentTermRecord>();
-            Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> frequencyUpdates =
-                new Dictionary<string, (int, int)>();
-
-            foreach (KeyValuePair<string, (List<int> CharacterPositions, List<int> TermPositions)> kvp in termPositions)
-            {
-                string term = kvp.Key;
-                List<int> characterPositions = kvp.Value.CharacterPositions;
-                List<int> termPositionsList = kvp.Value.TermPositions;
-                int termFrequency = characterPositions.Count;
-
-                if (termIds.TryGetValue(term, out string? termId))
+                // Step 1: Batch add/get all terms (single INSERT + single SELECT)
+                List<string> termList = new List<string>(termPositions.Keys);
+                Dictionary<string, string> termIdsToGenerate = new Dictionary<string, string>();
+                foreach (string term in termList)
                 {
-                    docTermRecords.Add(new DocumentTermRecord
-                    {
-                        Id = IdGenerator.GenerateDocumentTermId(),
-                        DocumentId = documentId,
-                        TermId = termId,
-                        TermFrequency = termFrequency,
-                        CharacterPositions = characterPositions,
-                        TermPositions = termPositionsList
-                    });
-                    frequencyUpdates[termId] = (1, termFrequency);
+                    termIdsToGenerate[IdGenerator.GenerateTermId()] = term;
                 }
+                Dictionary<string, string> termIds = await _Driver.Terms.AddOrGetBatchAsync(_TenantId, _IndexId, termIdsToGenerate, token).ConfigureAwait(false);
+
+                // Step 2: Prepare document-term mappings for batch insert
+                List<DocumentTermRecord> docTermRecords = new List<DocumentTermRecord>();
+                Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> frequencyUpdates =
+                    new Dictionary<string, (int, int)>();
+
+                foreach (KeyValuePair<string, (List<int> CharacterPositions, List<int> TermPositions)> kvp in termPositions)
+                {
+                    string term = kvp.Key;
+                    List<int> characterPositions = kvp.Value.CharacterPositions;
+                    List<int> termPositionsList = kvp.Value.TermPositions;
+                    int termFrequency = characterPositions.Count;
+
+                    if (termIds.TryGetValue(term, out string? termId))
+                    {
+                        docTermRecords.Add(new DocumentTermRecord
+                        {
+                            Id = IdGenerator.GenerateDocumentTermId(),
+                            DocumentId = documentId,
+                            TermId = termId,
+                            TermFrequency = termFrequency,
+                            CharacterPositions = characterPositions,
+                            TermPositions = termPositionsList
+                        });
+                        frequencyUpdates[termId] = (1, termFrequency);
+                    }
+                }
+
+                // Step 3: Batch insert document-term mappings (single INSERT)
+                await _Driver.DocumentTerms.AddBatchAsync(_TenantId, _IndexId, docTermRecords, token).ConfigureAwait(false);
+
+                // Step 4: Batch update term frequencies (single UPDATE)
+                await _Driver.Terms.IncrementFrequenciesBatchAsync(_TenantId, _IndexId, frequencyUpdates, token).ConfigureAwait(false);
+
+                // Step 5: Stop timing and update document metadata
+                stopwatch.Stop();
+                await _Driver.Documents.UpdateAsync(
+                    _TenantId,
+                    _IndexId,
+                    documentId,
+                    documentPath,
+                    ComputeContentHash(content),
+                    content.Length,
+                    distinctTermCount,
+                    null,
+                    (decimal)stopwatch.Elapsed.TotalMilliseconds,
+                    token).ConfigureAwait(false);
+
+                await _Driver.CommitTransactionAsync(token).ConfigureAwait(false);
             }
-
-            // Step 3: Batch insert document-term mappings (single INSERT)
-            await _Driver.DocumentTerms.AddBatchAsync(_TenantId, _IndexId, docTermRecords, token).ConfigureAwait(false);
-
-            // Step 4: Batch update term frequencies (single UPDATE)
-            await _Driver.Terms.IncrementFrequenciesBatchAsync(_TenantId, _IndexId, frequencyUpdates, token).ConfigureAwait(false);
-
-            // Step 5: Update document metadata (documentPath passed in to avoid extra query)
-            await _Driver.Documents.UpdateAsync(
-                _TenantId,
-                _IndexId,
-                documentId,
-                documentPath,
-                ComputeContentHash(content),
-                content.Length,
-                distinctTermCount,
-                null,
-                token).ConfigureAwait(false);
+            catch
+            {
+                await _Driver.RollbackTransactionAsync(token).ConfigureAwait(false);
+                throw;
+            }
         }
 
         private List<string> TokenizeAndProcess(string content)

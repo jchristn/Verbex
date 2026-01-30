@@ -3,6 +3,8 @@ namespace Verbex.Database.Mysql.Implementations
     using System;
     using System.Collections.Generic;
     using System.Data;
+    using System.Linq;
+    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
     using Verbex.Database.Interfaces;
@@ -25,18 +27,18 @@ namespace Verbex.Database.Mysql.Implementations
 
         public async Task<string> AddOrGetAsync(string tenantId, string indexId, string id, string term, CancellationToken token = default)
         {
-            TermRecord? existing = await GetAsync(tenantId, indexId, term, token).ConfigureAwait(false);
-            if (existing != null)
-            {
-                return existing.Id;
-            }
-
+            // Use INSERT IGNORE to handle concurrent inserts atomically.
+            // This avoids TOCTOU race conditions where two concurrent calls both check
+            // that a term doesn't exist, then both try to insert it.
             DateTime now = DateTime.UtcNow;
-            string query = $@"
-INSERT INTO terms (id, tenant_id, index_id, term, document_frequency, total_frequency, last_update_utc, created_utc)
+            string insertQuery = $@"
+INSERT IGNORE INTO terms (id, tenant_id, index_id, term, document_frequency, total_frequency, last_update_utc, created_utc)
 VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(tenantId)}', '{Sanitizer.Sanitize(indexId)}', '{Sanitizer.Sanitize(term)}', 0, 0, '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
-            await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
-            return id;
+            await _Driver.ExecuteQueryAsync(insertQuery, true, token).ConfigureAwait(false);
+
+            // Always fetch the actual record to get the correct ID (ours if we inserted, existing if another request won)
+            TermRecord? record = await GetAsync(tenantId, indexId, term, token).ConfigureAwait(false);
+            return record?.Id ?? id;
         }
 
         public async Task<TermRecord?> GetAsync(string tenantId, string indexId, string term, CancellationToken token = default)
@@ -123,29 +125,85 @@ FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{S
 
         public async Task<Dictionary<string, string>> AddOrGetBatchAsync(string tenantId, string indexId, Dictionary<string, string> terms, CancellationToken token = default)
         {
-            Dictionary<string, string> result = new Dictionary<string, string>();
-            foreach (KeyValuePair<string, string> kvp in terms)
+            if (terms == null || terms.Count == 0) return new Dictionary<string, string>();
+
+            const int ChunkSize = 100;
+            DateTime now = DateTime.UtcNow;
+            string nowFormatted = Sanitizer.FormatDateTime(now);
+            List<KeyValuePair<string, string>> termsList = terms.ToList();
+
+            // First, batch insert all terms with INSERT IGNORE
+            for (int i = 0; i < termsList.Count; i += ChunkSize)
             {
-                string id = await AddOrGetAsync(tenantId, indexId, kvp.Key, kvp.Value, token).ConfigureAwait(false);
-                result[kvp.Value] = id;
+                List<KeyValuePair<string, string>> chunk = termsList.Skip(i).Take(ChunkSize).ToList();
+                StringBuilder sb = new StringBuilder();
+                sb.Append("INSERT IGNORE INTO terms (id, tenant_id, index_id, term, document_frequency, total_frequency, last_update_utc, created_utc) VALUES ");
+
+                List<string> valuesClauses = new List<string>();
+                foreach (KeyValuePair<string, string> kvp in chunk)
+                {
+                    valuesClauses.Add($"('{Sanitizer.Sanitize(kvp.Key)}', '{Sanitizer.Sanitize(tenantId)}', '{Sanitizer.Sanitize(indexId)}', '{Sanitizer.Sanitize(kvp.Value)}', 0, 0, '{nowFormatted}', '{nowFormatted}')");
+                }
+
+                sb.Append(string.Join(", ", valuesClauses));
+                sb.Append(';');
+
+                await _Driver.ExecuteQueryAsync(sb.ToString(), true, token).ConfigureAwait(false);
             }
+
+            // Then, retrieve all term IDs in a single query
+            List<string> termValues = terms.Values.ToList();
+            Dictionary<string, TermRecord> existingTerms = await GetMultipleAsync(tenantId, indexId, termValues, token).ConfigureAwait(false);
+
+            Dictionary<string, string> result = new Dictionary<string, string>();
+            foreach (string termValue in termValues)
+            {
+                if (existingTerms.TryGetValue(termValue, out TermRecord? record))
+                {
+                    result[termValue] = record.Id;
+                }
+            }
+
             return result;
         }
 
         public async Task IncrementFrequenciesBatchAsync(string tenantId, string indexId, Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> updates, CancellationToken token = default)
         {
-            foreach (KeyValuePair<string, (int, int)> kvp in updates)
+            if (updates == null || updates.Count == 0) return;
+
+            DateTime now = DateTime.UtcNow;
+            List<string> termIds = new List<string>(updates.Keys);
+            string inClause = string.Join(",", termIds.ConvertAll(id => $"'{Sanitizer.Sanitize(id)}'"));
+
+            StringBuilder docFreqCase = new StringBuilder("CASE id ");
+            StringBuilder totalFreqCase = new StringBuilder("CASE id ");
+            foreach (KeyValuePair<string, (int DocFreqDelta, int TotalFreqDelta)> kvp in updates)
             {
-                await IncrementFrequenciesAsync(tenantId, indexId, kvp.Key, kvp.Value.Item1, kvp.Value.Item2, token).ConfigureAwait(false);
+                docFreqCase.Append($"WHEN '{Sanitizer.Sanitize(kvp.Key)}' THEN {kvp.Value.DocFreqDelta} ");
+                totalFreqCase.Append($"WHEN '{Sanitizer.Sanitize(kvp.Key)}' THEN {kvp.Value.TotalFreqDelta} ");
             }
+            docFreqCase.Append("ELSE 0 END");
+            totalFreqCase.Append("ELSE 0 END");
+
+            string query = $@"UPDATE terms SET
+document_frequency = document_frequency + ({docFreqCase}),
+total_frequency = total_frequency + ({totalFreqCase}),
+last_update_utc = '{Sanitizer.FormatDateTime(now)}'
+WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND id IN ({inClause});";
+            await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
         }
 
         public async Task DecrementFrequenciesBatchAsync(string tenantId, string indexId, Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> updates, CancellationToken token = default)
         {
-            foreach (KeyValuePair<string, (int, int)> kvp in updates)
+            if (updates == null || updates.Count == 0) return;
+
+            // Convert to negative deltas and call increment
+            Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> negatedUpdates = new Dictionary<string, (int, int)>();
+            foreach (KeyValuePair<string, (int DocFreqDelta, int TotalFreqDelta)> kvp in updates)
             {
-                await IncrementFrequenciesAsync(tenantId, indexId, kvp.Key, -kvp.Value.Item1, -kvp.Value.Item2, token).ConfigureAwait(false);
+                negatedUpdates[kvp.Key] = (-kvp.Value.DocFreqDelta, -kvp.Value.TotalFreqDelta);
             }
+            await IncrementFrequenciesBatchAsync(tenantId, indexId, negatedUpdates, token).ConfigureAwait(false);
         }
 
         public async Task<long> DeleteOrphanedAsync(string tenantId, string indexId, CancellationToken token = default)

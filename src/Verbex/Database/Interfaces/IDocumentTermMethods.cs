@@ -125,5 +125,25 @@ namespace Verbex.Database.Interfaces
         /// <param name="token">Cancellation token.</param>
         /// <returns>Number of mappings deleted.</returns>
         Task<long> DeleteAllAsync(string tenantId, string indexId, CancellationToken token = default);
+
+        /// <summary>
+        /// Gets all term mappings for multiple documents.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="indexId">Index identifier.</param>
+        /// <param name="documentIds">Document IDs.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>List of document-term records for all specified documents.</returns>
+        Task<List<DocumentTermRecord>> GetByDocumentsAsync(string tenantId, string indexId, IEnumerable<string> documentIds, CancellationToken token = default);
+
+        /// <summary>
+        /// Deletes all term mappings for multiple documents.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="indexId">Index identifier.</param>
+        /// <param name="documentIds">Document IDs.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Number of mappings deleted.</returns>
+        Task<long> DeleteByDocumentsAsync(string tenantId, string indexId, IEnumerable<string> documentIds, CancellationToken token = default);
     }
 }

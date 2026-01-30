@@ -8,7 +8,7 @@ namespace Verbex.Database.SqlServer.Queries
         /// <summary>
         /// Schema version for migration tracking.
         /// </summary>
-        public const string SchemaVersion = "3.2";
+        public const string SchemaVersion = "3.3";
 
         /// <summary>
         /// Creates all tables for the multi-tenant inverted index.
@@ -95,6 +95,7 @@ CREATE TABLE documents (
     document_length INT NOT NULL DEFAULT 0,
     term_count INT NOT NULL DEFAULT 0,
     custom_metadata NVARCHAR(MAX),
+    indexing_runtime_ms DECIMAL(18,4),
     indexed_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
     last_update_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
     created_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
@@ -387,6 +388,21 @@ END
 
 -- Update schema version
 UPDATE schema_metadata SET value = '3.2' WHERE [key] = 'schema_version';
+";
+
+        /// <summary>
+        /// Migration query from schema version 3.2 to 3.3.
+        /// Adds indexing_runtime_ms column to documents table.
+        /// </summary>
+        public static readonly string MigrateFrom32To33 = @"
+-- Add indexing_runtime_ms column to documents table if it doesn't exist
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('documents') AND name = 'indexing_runtime_ms')
+BEGIN
+    ALTER TABLE documents ADD indexing_runtime_ms DECIMAL(18,4);
+END
+
+-- Update schema version
+UPDATE schema_metadata SET value = '3.3' WHERE [key] = 'schema_version';
 ";
     }
 }

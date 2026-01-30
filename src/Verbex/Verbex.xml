@@ -245,6 +245,40 @@
             For server-based databases, this may be a no-op.
             </remarks>
         </member>
+        <member name="M:Verbex.Database.DatabaseDriverBase.BeginTransactionAsync(System.Threading.CancellationToken)">
+            <summary>
+            Begins a database transaction for batching multiple operations.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>A task representing the asynchronous operation.</returns>
+            <exception cref="T:System.InvalidOperationException">Thrown when a transaction is already active.</exception>
+            <remarks>
+            When a transaction is active, all subsequent queries executed via ExecuteQueryAsync
+            will use the active transaction instead of creating individual transactions.
+            Call CommitTransactionAsync or RollbackTransactionAsync to complete the transaction.
+            </remarks>
+        </member>
+        <member name="M:Verbex.Database.DatabaseDriverBase.CommitTransactionAsync(System.Threading.CancellationToken)">
+            <summary>
+            Commits the active transaction.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>A task representing the asynchronous operation.</returns>
+            <exception cref="T:System.InvalidOperationException">Thrown when no transaction is active.</exception>
+        </member>
+        <member name="M:Verbex.Database.DatabaseDriverBase.RollbackTransactionAsync(System.Threading.CancellationToken)">
+            <summary>
+            Rolls back the active transaction.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>A task representing the asynchronous operation.</returns>
+            <exception cref="T:System.InvalidOperationException">Thrown when no transaction is active.</exception>
+        </member>
+        <member name="P:Verbex.Database.DatabaseDriverBase.IsTransactionActive">
+            <summary>
+            Gets whether a transaction is currently active.
+            </summary>
+        </member>
         <member name="M:Verbex.Database.DatabaseDriverBase.ThrowIfDisposed">
             <summary>
             Throws an exception if the driver has been disposed.
@@ -774,7 +808,7 @@
             Documents are scoped to a specific tenant and index.
             </remarks>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <summary>
             Adds a new document to the index.
             </summary>
@@ -785,6 +819,7 @@
             <param name="contentSha256">SHA-256 hash for duplicate detection.</param>
             <param name="documentLength">Character count of document.</param>
             <param name="customMetadata">Optional custom metadata (any JSON-serializable value).</param>
+            <param name="indexingRuntimeMs">Optional indexing runtime in milliseconds.</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
@@ -878,7 +913,7 @@
             <param name="token">Cancellation token.</param>
             <returns>True if document exists.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <summary>
             Updates a document's metadata.
             </summary>
@@ -890,6 +925,7 @@
             <param name="documentLength">New document length.</param>
             <param name="termCount">New term count.</param>
             <param name="customMetadata">Optional custom metadata (any JSON-serializable value).</param>
+            <param name="indexingRuntimeMs">Optional indexing runtime in milliseconds.</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
@@ -922,6 +958,16 @@
             <param name="indexId">Index identifier.</param>
             <param name="token">Cancellation token.</param>
             <returns>Number of documents deleted.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.DeleteBatchAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Deletes multiple documents by IDs.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="indexId">Index identifier.</param>
+            <param name="ids">Document IDs to delete.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of document IDs that were actually deleted (existed).</returns>
         </member>
         <member name="T:Verbex.Database.Interfaces.IDocumentTermMethods">
             <summary>
@@ -1028,6 +1074,26 @@
             </summary>
             <param name="tenantId">Tenant identifier.</param>
             <param name="indexId">Index identifier.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of mappings deleted.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.GetByDocumentsAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Gets all term mappings for multiple documents.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="indexId">Index identifier.</param>
+            <param name="documentIds">Document IDs.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of document-term records for all specified documents.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.DeleteByDocumentsAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Deletes all term mappings for multiple documents.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="indexId">Index identifier.</param>
+            <param name="documentIds">Document IDs.</param>
             <param name="token">Cancellation token.</param>
             <returns>Number of mappings deleted.</returns>
         </member>
@@ -2140,7 +2206,7 @@
             </summary>
             <param name="driver">The database driver.</param>
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
@@ -2170,7 +2236,7 @@
         <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.String,System.Object,System.Threading.CancellationToken)">
@@ -2180,6 +2246,9 @@
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.DeleteAllAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.DeleteBatchAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="T:Verbex.Database.Mysql.Implementations.DocumentTermMethods">
@@ -2352,6 +2421,9 @@
         <member name="P:Verbex.Database.Mysql.MysqlDatabaseDriver.IsOpen">
             <inheritdoc />
         </member>
+        <member name="P:Verbex.Database.Mysql.MysqlDatabaseDriver.IsTransactionActive">
+            <inheritdoc />
+        </member>
         <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.#ctor(Verbex.Database.DatabaseSettings)">
             <summary>
             Initializes a new instance of the <see cref="T:Verbex.Database.Mysql.MysqlDatabaseDriver"/> class.
@@ -2370,6 +2442,15 @@
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.CloseAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.BeginTransactionAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.CommitTransactionAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.RollbackTransactionAsync(System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.BuildConnectionString">
@@ -2447,6 +2528,12 @@
             Adds custom_metadata column to documents and indexes tables.
             </summary>
         </member>
+        <member name="F:Verbex.Database.Mysql.Queries.SetupQueries.MigrateFrom32To33">
+            <summary>
+            Migration from schema version 3.2 to 3.3.
+            Adds indexing_runtime_ms column to documents table.
+            </summary>
+        </member>
         <member name="T:Verbex.Database.Mysql.Sanitizer">
             <summary>
             Provides SQL sanitization methods for MySQL to prevent SQL injection.
@@ -2501,6 +2588,13 @@
             </summary>
             <param name="value">The value to format.</param>
             <returns>"NULL" or the integer as a string.</returns>
+        </member>
+        <member name="M:Verbex.Database.Mysql.Sanitizer.FormatNullableDecimal(System.Nullable{System.Decimal})">
+            <summary>
+            Formats a nullable decimal value for SQL.
+            </summary>
+            <param name="value">The value to format.</param>
+            <returns>"NULL" or the decimal as a string.</returns>
         </member>
         <member name="T:Verbex.Database.Postgresql.Implementations.AdministratorMethods">
             <summary>
@@ -2604,7 +2698,7 @@
             </summary>
             <param name="driver">The database driver.</param>
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
@@ -2634,7 +2728,7 @@
         <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.String,System.Object,System.Threading.CancellationToken)">
@@ -2644,6 +2738,9 @@
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.DeleteAllAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.DeleteBatchAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="T:Verbex.Database.Postgresql.Implementations.DocumentTermMethods">
@@ -2816,6 +2913,9 @@
         <member name="P:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.IsOpen">
             <inheritdoc />
         </member>
+        <member name="P:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.IsTransactionActive">
+            <inheritdoc />
+        </member>
         <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.#ctor(Verbex.Database.DatabaseSettings)">
             <summary>
             Initializes a new instance of the <see cref="T:Verbex.Database.Postgresql.PostgresqlDatabaseDriver"/> class.
@@ -2834,6 +2934,15 @@
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.CloseAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.BeginTransactionAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.CommitTransactionAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.RollbackTransactionAsync(System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.BuildConnectionString">
@@ -2911,6 +3020,12 @@
             Adds custom_metadata column to documents and indexes tables.
             </summary>
         </member>
+        <member name="F:Verbex.Database.Postgresql.Queries.SetupQueries.MigrateFrom32To33">
+            <summary>
+            Migration query from schema version 3.2 to 3.3.
+            Adds indexing_runtime_ms column to documents table.
+            </summary>
+        </member>
         <member name="T:Verbex.Database.Postgresql.Sanitizer">
             <summary>
             Provides SQL sanitization methods for PostgreSQL to prevent SQL injection.
@@ -2965,6 +3080,13 @@
             </summary>
             <param name="value">The value to format.</param>
             <returns>"NULL" or the integer as a string.</returns>
+        </member>
+        <member name="M:Verbex.Database.Postgresql.Sanitizer.FormatNullableDecimal(System.Nullable{System.Decimal})">
+            <summary>
+            Formats a nullable decimal value for SQL.
+            </summary>
+            <param name="value">The value to format.</param>
+            <returns>"NULL" or the decimal as a string.</returns>
         </member>
         <member name="T:Verbex.Database.Sqlite.Implementations.AdministratorMethods">
             <summary>
@@ -3068,7 +3190,7 @@
             </summary>
             <param name="driver">The database driver.</param>
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
@@ -3098,7 +3220,7 @@
         <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.String,System.Object,System.Threading.CancellationToken)">
@@ -3108,6 +3230,9 @@
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.DeleteAllAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.DeleteBatchAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="T:Verbex.Database.Sqlite.Implementations.DocumentTermMethods">
@@ -3326,6 +3451,13 @@
             </summary>
             <returns>Migration SQL.</returns>
         </member>
+        <member name="M:Verbex.Database.Sqlite.Queries.SetupQueries.GetMigrationFromV32">
+            <summary>
+            Gets migration SQL from schema v3.2 to v3.3.
+            Adds indexing_runtime_ms column to documents table.
+            </summary>
+            <returns>Migration SQL.</returns>
+        </member>
         <member name="T:Verbex.Database.Sqlite.Sanitizer">
             <summary>
             Provides SQL sanitization methods for SQLite to prevent SQL injection.
@@ -3381,6 +3513,13 @@
             <param name="value">The value to format.</param>
             <returns>"NULL" or the integer as a string.</returns>
         </member>
+        <member name="M:Verbex.Database.Sqlite.Sanitizer.FormatNullableDecimal(System.Nullable{System.Decimal})">
+            <summary>
+            Formats a nullable decimal value for SQL.
+            </summary>
+            <param name="value">The value to format.</param>
+            <returns>"NULL" or the decimal as a string.</returns>
+        </member>
         <member name="T:Verbex.Database.Sqlite.SqliteDatabaseDriver">
             <summary>
             SQLite implementation of the database driver.
@@ -3391,6 +3530,9 @@
             </remarks>
         </member>
         <member name="P:Verbex.Database.Sqlite.SqliteDatabaseDriver.IsOpen">
+            <inheritdoc />
+        </member>
+        <member name="P:Verbex.Database.Sqlite.SqliteDatabaseDriver.IsTransactionActive">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.#ctor(Verbex.Database.DatabaseSettings)">
@@ -3414,6 +3556,15 @@
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.FlushAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.BeginTransactionAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.CommitTransactionAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.RollbackTransactionAsync(System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.CheckpointAsync(System.Threading.CancellationToken)">
@@ -3581,7 +3732,7 @@
             </summary>
             <param name="driver">The database driver.</param>
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
@@ -3611,7 +3762,7 @@
         <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.String,System.Object,System.Threading.CancellationToken)">
@@ -3621,6 +3772,9 @@
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.DeleteAllAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.DeleteBatchAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="T:Verbex.Database.SqlServer.Implementations.DocumentTermMethods">
@@ -3814,6 +3968,12 @@
             Adds custom_metadata column to documents and indexes tables.
             </summary>
         </member>
+        <member name="F:Verbex.Database.SqlServer.Queries.SetupQueries.MigrateFrom32To33">
+            <summary>
+            Migration query from schema version 3.2 to 3.3.
+            Adds indexing_runtime_ms column to documents table.
+            </summary>
+        </member>
         <member name="T:Verbex.Database.SqlServer.Sanitizer">
             <summary>
             Provides SQL sanitization methods for SQL Server to prevent SQL injection.
@@ -3869,6 +4029,13 @@
             <param name="value">The value to format.</param>
             <returns>"NULL" or the integer as a string.</returns>
         </member>
+        <member name="M:Verbex.Database.SqlServer.Sanitizer.FormatNullableDecimal(System.Nullable{System.Decimal})">
+            <summary>
+            Formats a nullable decimal value for SQL.
+            </summary>
+            <param name="value">The value to format.</param>
+            <returns>"NULL" or the decimal as a string.</returns>
+        </member>
         <member name="T:Verbex.Database.SqlServer.SqlServerDatabaseDriver">
             <summary>
             SQL Server implementation of the database driver.
@@ -3878,6 +4045,9 @@
             </remarks>
         </member>
         <member name="P:Verbex.Database.SqlServer.SqlServerDatabaseDriver.IsOpen">
+            <inheritdoc />
+        </member>
+        <member name="P:Verbex.Database.SqlServer.SqlServerDatabaseDriver.IsTransactionActive">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.#ctor(Verbex.Database.DatabaseSettings)">
@@ -3898,6 +4068,15 @@
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.CloseAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.BeginTransactionAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.CommitTransactionAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.RollbackTransactionAsync(System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.BuildConnectionString">
@@ -4030,6 +4209,13 @@
         <member name="P:Verbex.DocumentMetadata.LastModified">
             <summary>
             Gets or sets the date when the document metadata was last modified
+            </summary>
+        </member>
+        <member name="P:Verbex.DocumentMetadata.IndexingRuntimeMs">
+            <summary>
+            Gets or sets the indexing runtime in milliseconds.
+            Time taken to process and index the document content.
+            Null if not yet indexed or timing was not captured.
             </summary>
         </member>
         <member name="P:Verbex.DocumentMetadata.ContentSha256">
@@ -4423,6 +4609,16 @@
             <param name="documentId">Document ID.</param>
             <param name="token">Cancellation token.</param>
             <returns>True if document was removed.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.RemoveDocumentsBatchAsync(System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Removes multiple documents from the index in a single batch operation.
+            This is more efficient than calling RemoveDocumentAsync multiple times.
+            </summary>
+            <param name="documentIds">Collection of document IDs to remove.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>A tuple containing the list of deleted IDs and the list of not-found IDs.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when documentIds is null.</exception>
         </member>
         <member name="M:Verbex.InvertedIndex.ClearAsync(System.Threading.CancellationToken)">
             <summary>

@@ -214,6 +214,40 @@ namespace Verbex.Database
         }
 
         /// <summary>
+        /// Begins a database transaction for batching multiple operations.
+        /// </summary>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when a transaction is already active.</exception>
+        /// <remarks>
+        /// When a transaction is active, all subsequent queries executed via ExecuteQueryAsync
+        /// will use the active transaction instead of creating individual transactions.
+        /// Call CommitTransactionAsync or RollbackTransactionAsync to complete the transaction.
+        /// </remarks>
+        public abstract Task BeginTransactionAsync(CancellationToken token = default);
+
+        /// <summary>
+        /// Commits the active transaction.
+        /// </summary>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when no transaction is active.</exception>
+        public abstract Task CommitTransactionAsync(CancellationToken token = default);
+
+        /// <summary>
+        /// Rolls back the active transaction.
+        /// </summary>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when no transaction is active.</exception>
+        public abstract Task RollbackTransactionAsync(CancellationToken token = default);
+
+        /// <summary>
+        /// Gets whether a transaction is currently active.
+        /// </summary>
+        public abstract bool IsTransactionActive { get; }
+
+        /// <summary>
         /// Throws an exception if the driver has been disposed.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Thrown when the driver has been disposed.</exception>

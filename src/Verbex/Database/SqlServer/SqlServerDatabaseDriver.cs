@@ -21,10 +21,15 @@ namespace Verbex.Database.SqlServer
     {
         private readonly SemaphoreSlim _Semaphore = new SemaphoreSlim(1, 1);
         private string? _ConnectionString;
+        private SqlConnection? _ActiveConnection;
+        private SqlTransaction? _ActiveTransaction;
         private bool _IsOpen = false;
 
         /// <inheritdoc />
         public override bool IsOpen => _IsOpen;
+
+        /// <inheritdoc />
+        public override bool IsTransactionActive => _ActiveTransaction != null;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SqlServerDatabaseDriver"/> class.
@@ -164,11 +169,100 @@ namespace Verbex.Database.SqlServer
         }
 
         /// <inheritdoc />
-        public override Task CloseAsync(CancellationToken token = default)
+        public override async Task CloseAsync(CancellationToken token = default)
         {
+            if (_ActiveTransaction != null)
+            {
+                await _ActiveTransaction.DisposeAsync().ConfigureAwait(false);
+                _ActiveTransaction = null;
+            }
+
+            if (_ActiveConnection != null)
+            {
+                await _ActiveConnection.DisposeAsync().ConfigureAwait(false);
+                _ActiveConnection = null;
+            }
+
             _IsOpen = false;
             _ConnectionString = null;
-            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc />
+        public override async Task BeginTransactionAsync(CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotOpen();
+
+            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            try
+            {
+                if (_ActiveTransaction != null)
+                {
+                    throw new InvalidOperationException("A transaction is already active.");
+                }
+
+                _ActiveConnection = new SqlConnection(_ConnectionString);
+                await _ActiveConnection.OpenAsync(token).ConfigureAwait(false);
+                _ActiveTransaction = _ActiveConnection.BeginTransaction();
+            }
+            finally
+            {
+                _Semaphore.Release();
+            }
+        }
+
+        /// <inheritdoc />
+        public override async Task CommitTransactionAsync(CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotOpen();
+
+            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            try
+            {
+                if (_ActiveTransaction == null)
+                {
+                    throw new InvalidOperationException("No transaction is active.");
+                }
+
+                await _ActiveTransaction.CommitAsync(token).ConfigureAwait(false);
+                await _ActiveTransaction.DisposeAsync().ConfigureAwait(false);
+                _ActiveTransaction = null;
+
+                await _ActiveConnection!.DisposeAsync().ConfigureAwait(false);
+                _ActiveConnection = null;
+            }
+            finally
+            {
+                _Semaphore.Release();
+            }
+        }
+
+        /// <inheritdoc />
+        public override async Task RollbackTransactionAsync(CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotOpen();
+
+            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            try
+            {
+                if (_ActiveTransaction == null)
+                {
+                    throw new InvalidOperationException("No transaction is active.");
+                }
+
+                await _ActiveTransaction.RollbackAsync(token).ConfigureAwait(false);
+                await _ActiveTransaction.DisposeAsync().ConfigureAwait(false);
+                _ActiveTransaction = null;
+
+                await _ActiveConnection!.DisposeAsync().ConfigureAwait(false);
+                _ActiveConnection = null;
+            }
+            finally
+            {
+                _Semaphore.Release();
+            }
         }
 
         /// <summary>
@@ -266,41 +360,55 @@ namespace Verbex.Database.SqlServer
         {
             DataTable result = new DataTable();
 
-            await using SqlConnection connection = new SqlConnection(_ConnectionString);
-            await connection.OpenAsync(token).ConfigureAwait(false);
-            SqlTransaction? transaction = null;
+            // Use active transaction connection if one exists
+            bool useActiveTransaction = _ActiveTransaction != null && _ActiveConnection != null;
 
-            if (isTransaction)
+            if (useActiveTransaction)
             {
-                transaction = connection.BeginTransaction();
-            }
-
-            try
-            {
-                await using SqlCommand cmd = new SqlCommand(query, connection, transaction);
+                await using SqlCommand cmd = new SqlCommand(query, _ActiveConnection, _ActiveTransaction);
                 cmd.CommandTimeout = Settings.CommandTimeout;
 
                 await using SqlDataReader reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
                 result.Load(reader);
+            }
+            else
+            {
+                await using SqlConnection connection = new SqlConnection(_ConnectionString);
+                await connection.OpenAsync(token).ConfigureAwait(false);
+                SqlTransaction? transaction = null;
 
-                if (transaction != null)
+                if (isTransaction)
                 {
-                    await transaction.CommitAsync(token).ConfigureAwait(false);
+                    transaction = connection.BeginTransaction();
                 }
-            }
-            catch
-            {
-                if (transaction != null)
+
+                try
                 {
-                    await transaction.RollbackAsync(token).ConfigureAwait(false);
+                    await using SqlCommand cmd = new SqlCommand(query, connection, transaction);
+                    cmd.CommandTimeout = Settings.CommandTimeout;
+
+                    await using SqlDataReader reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
+                    result.Load(reader);
+
+                    if (transaction != null)
+                    {
+                        await transaction.CommitAsync(token).ConfigureAwait(false);
+                    }
                 }
-                throw;
-            }
-            finally
-            {
-                if (transaction != null)
+                catch
                 {
-                    await transaction.DisposeAsync().ConfigureAwait(false);
+                    if (transaction != null)
+                    {
+                        await transaction.RollbackAsync(token).ConfigureAwait(false);
+                    }
+                    throw;
+                }
+                finally
+                {
+                    if (transaction != null)
+                    {
+                        await transaction.DisposeAsync().ConfigureAwait(false);
+                    }
                 }
             }
 

@@ -4,6 +4,7 @@ namespace Verbex.Database.Sqlite.Implementations
     using System.Collections.Generic;
     using System.Data;
     using System.Linq;
+    using System.Text;
     using System.Text.Json;
     using System.Threading;
     using System.Threading.Tasks;
@@ -37,9 +38,31 @@ VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(documentId)}', '{Saniti
 
         public async Task AddBatchAsync(string tenantId, string indexId, IEnumerable<DocumentTermRecord> records, CancellationToken token = default)
         {
-            foreach (DocumentTermRecord record in records)
+            List<DocumentTermRecord> recordList = records.ToList();
+            if (recordList.Count == 0) return;
+
+            const int ChunkSize = 100;
+            DateTime now = DateTime.UtcNow;
+            string nowFormatted = Sanitizer.FormatDateTime(now);
+
+            for (int i = 0; i < recordList.Count; i += ChunkSize)
             {
-                await AddAsync(tenantId, indexId, record.Id, record.DocumentId, record.TermId, record.TermFrequency, record.CharacterPositions, record.TermPositions, token).ConfigureAwait(false);
+                List<DocumentTermRecord> chunk = recordList.Skip(i).Take(ChunkSize).ToList();
+                StringBuilder sb = new StringBuilder();
+                sb.Append("INSERT INTO document_terms (id, document_id, term_id, term_frequency, character_positions, term_positions, last_update_utc, created_utc) VALUES ");
+
+                List<string> valuesClauses = new List<string>();
+                foreach (DocumentTermRecord record in chunk)
+                {
+                    string? charPosJson = record.CharacterPositions.Count > 0 ? JsonSerializer.Serialize(record.CharacterPositions) : null;
+                    string? termPosJson = record.TermPositions.Count > 0 ? JsonSerializer.Serialize(record.TermPositions) : null;
+                    valuesClauses.Add($"('{Sanitizer.Sanitize(record.Id)}', '{Sanitizer.Sanitize(record.DocumentId)}', '{Sanitizer.Sanitize(record.TermId)}', {record.TermFrequency}, {Sanitizer.FormatNullableString(charPosJson)}, {Sanitizer.FormatNullableString(termPosJson)}, '{nowFormatted}', '{nowFormatted}')");
+                }
+
+                sb.Append(string.Join(", ", valuesClauses));
+                sb.Append(';');
+
+                await _Driver.ExecuteQueryAsync(sb.ToString(), true, token).ConfigureAwait(false);
             }
         }
 
@@ -195,6 +218,39 @@ WHERE d.tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND d.index_id = '{Sanitize
 DELETE FROM document_terms WHERE document_id IN (
     SELECT id FROM documents WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}'
 );";
+            await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
+            return count;
+        }
+
+        public async Task<List<DocumentTermRecord>> GetByDocumentsAsync(string tenantId, string indexId, IEnumerable<string> documentIds, CancellationToken token = default)
+        {
+            List<string> docIdList = documentIds.ToList();
+            if (docIdList.Count == 0) return new List<DocumentTermRecord>();
+
+            string inClause = string.Join(",", docIdList.Select(id => $"'{Sanitizer.Sanitize(id)}'"));
+            string query = $@"
+SELECT dt.id, dt.document_id, dt.term_id, dt.term_frequency, dt.character_positions, dt.term_positions, dt.last_update_utc, dt.created_utc, t.term
+FROM document_terms dt
+JOIN terms t ON dt.term_id = t.id
+WHERE dt.document_id IN ({inClause});";
+            DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
+            List<DocumentTermRecord> list = new List<DocumentTermRecord>();
+            foreach (DataRow row in dt.Rows) list.Add(MapRowToDocumentTerm(row));
+            return list;
+        }
+
+        public async Task<long> DeleteByDocumentsAsync(string tenantId, string indexId, IEnumerable<string> documentIds, CancellationToken token = default)
+        {
+            List<string> docIdList = documentIds.ToList();
+            if (docIdList.Count == 0) return 0;
+
+            string inClause = string.Join(",", docIdList.Select(id => $"'{Sanitizer.Sanitize(id)}'"));
+
+            string countQuery = $"SELECT COUNT(*) FROM document_terms WHERE document_id IN ({inClause});";
+            DataTable countResult = await _Driver.ExecuteQueryAsync(countQuery, false, token).ConfigureAwait(false);
+            long count = countResult.Rows.Count > 0 ? Convert.ToInt64(countResult.Rows[0][0]) : 0;
+
+            string query = $"DELETE FROM document_terms WHERE document_id IN ({inClause});";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
             return count;
         }

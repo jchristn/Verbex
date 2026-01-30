@@ -22,6 +22,8 @@ fi
 if [ -f "verbex.db" ]; then
     echo "Deleting verbex.db..."
     rm -f "verbex.db"
+    rm -f "verbex.db-shm"
+    rm -f "verbex.db-wal"
 fi
 
 echo "Clean complete."

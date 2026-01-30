@@ -22,6 +22,8 @@ if exist "data" (
 if exist "verbex.db" (
     echo Deleting verbex.db...
     del /f /q "verbex.db"
+    del /f /q "verbex.db-shm"
+    del /f /q "verbex.db-wal"
 )
 
 echo Clean complete.

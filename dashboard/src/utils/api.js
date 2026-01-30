@@ -4,7 +4,14 @@
  */
 
 /**
- * Convert PascalCase keys to camelCase recursively
+ * Keys whose values are user-provided dictionaries and should NOT have their
+ * nested keys transformed (e.g., tags, customMetadata).
+ */
+const PRESERVE_NESTED_KEYS = new Set(['tags', 'custommetadata']);
+
+/**
+ * Convert PascalCase keys to camelCase recursively.
+ * Preserves the exact keys for user-provided dictionaries (tags, customMetadata).
  */
 function toCamelCase(obj) {
   if (obj === null || obj === undefined) {
@@ -20,7 +27,12 @@ function toCamelCase(obj) {
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
         const camelKey = key.charAt(0).toLowerCase() + key.slice(1);
-        result[camelKey] = toCamelCase(obj[key]);
+        // For user-provided dictionaries, preserve the nested keys exactly as-is
+        if (PRESERVE_NESTED_KEYS.has(camelKey.toLowerCase())) {
+          result[camelKey] = obj[key];
+        } else {
+          result[camelKey] = toCamelCase(obj[key]);
+        }
       }
     }
     return result;

@@ -309,6 +309,14 @@ function TenantsView({ onTenantSelect }) {
         </div>
       ) : (
         <div className="workspace-card">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredAndSortedTenants.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
           <table className="data-table">
             <thead>
               <tr>
@@ -402,14 +410,6 @@ function TenantsView({ onTenantSelect }) {
               ))}
             </tbody>
           </table>
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            totalItems={filteredAndSortedTenants.length}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={setPageSize}
-          />
         </div>
       )}
 

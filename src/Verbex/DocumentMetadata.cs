@@ -22,6 +22,7 @@ namespace Verbex
         private Dictionary<string, object> _Tags;
         private List<string> _Labels;
         private object? _CustomMetadata;
+        private decimal? _IndexingRuntimeMs;
 
         /// <summary>
         /// Initializes a new instance of the DocumentMetadata class with minimal parameters.
@@ -174,6 +175,17 @@ namespace Verbex
         }
 
         /// <summary>
+        /// Gets or sets the indexing runtime in milliseconds.
+        /// Time taken to process and index the document content.
+        /// Null if not yet indexed or timing was not captured.
+        /// </summary>
+        public decimal? IndexingRuntimeMs
+        {
+            get { return _IndexingRuntimeMs; }
+            set { _IndexingRuntimeMs = value; }
+        }
+
+        /// <summary>
         /// Gets or sets the SHA-256 hash of the document content for duplicate detection
         /// </summary>
         /// <exception cref="ArgumentNullException">Thrown when value is null</exception>
@@ -191,6 +203,8 @@ namespace Verbex
         /// <summary>
         /// Gets a read-only collection of terms contained in this document
         /// </summary>
+        [JsonInclude]
+        [JsonPropertyName("terms")]
         public IReadOnlyCollection<string> Terms
         {
             get { return _Terms.ToArray(); }

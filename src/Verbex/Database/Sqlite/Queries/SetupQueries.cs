@@ -13,7 +13,7 @@ namespace Verbex.Database.Sqlite.Queries
         /// <summary>
         /// The current schema version.
         /// </summary>
-        public const string SchemaVersion = "3.2";
+        public const string SchemaVersion = "3.3";
 
         /// <summary>
         /// Gets the SQL statements to create all tables.
@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS documents (
     document_length INTEGER,
     term_count INTEGER,
     custom_metadata TEXT,
+    indexing_runtime_ms REAL,
     indexed_utc TEXT,
     last_update_utc TEXT,
     created_utc TEXT NOT NULL,
@@ -181,7 +182,7 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
 );
 
 -- Insert schema version
-INSERT OR REPLACE INTO schema_metadata (key, value) VALUES ('schema_version', '3.2');
+INSERT OR REPLACE INTO schema_metadata (key, value) VALUES ('schema_version', '3.3');
 INSERT OR REPLACE INTO schema_metadata (key, value) VALUES ('created_utc', datetime('now'));
 ";
         }
@@ -274,8 +275,8 @@ CREATE INDEX IF NOT EXISTS idx_tags_credential_key ON tags(credential_id, key);
         public static string GetPragmas()
         {
             return @"
-PRAGMA journal_mode = DELETE;
-PRAGMA synchronous = FULL;
+PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
 PRAGMA foreign_keys = ON;
 PRAGMA cache_size = -64000;
 PRAGMA temp_store = MEMORY;
@@ -438,6 +439,25 @@ ALTER TABLE documents ADD COLUMN custom_metadata TEXT;
 
 -- Update schema version
 UPDATE schema_metadata SET value = '3.2' WHERE key = 'schema_version';
+";
+        }
+
+        /// <summary>
+        /// Gets migration SQL from schema v3.2 to v3.3.
+        /// Adds indexing_runtime_ms column to documents table.
+        /// </summary>
+        /// <returns>Migration SQL.</returns>
+        public static string? GetMigrationFromV32()
+        {
+            return @"
+-- Migration from Schema v3.2 to v3.3
+-- Adds indexing_runtime_ms support for documents
+
+-- Add indexing_runtime_ms column to documents table
+ALTER TABLE documents ADD COLUMN indexing_runtime_ms REAL;
+
+-- Update schema version
+UPDATE schema_metadata SET value = '3.3' WHERE key = 'schema_version';
 ";
         }
     }

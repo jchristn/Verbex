@@ -191,6 +191,7 @@ class DocumentInfo {
         this.customMetadata = data.customMetadata || null;
         this.labels = data.labels || null;
         this.tags = data.tags || null;
+        this.indexingRuntimeMs = data.indexingRuntimeMs || null;
     }
 }
 

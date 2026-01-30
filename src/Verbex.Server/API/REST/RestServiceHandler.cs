@@ -1963,21 +1963,8 @@ namespace Verbex.Server.API.REST
 
                 try
                 {
-                    List<string> deletedIds = new List<string>();
-                    List<string> notFoundIds = new List<string>();
-
-                    foreach (string docId in requestedIds)
-                    {
-                        bool removed = await index.RemoveDocumentAsync(docId).ConfigureAwait(false);
-                        if (removed)
-                        {
-                            deletedIds.Add(docId);
-                        }
-                        else
-                        {
-                            notFoundIds.Add(docId);
-                        }
-                    }
+                    // Use optimized batch deletion method
+                    (List<string> deletedIds, List<string> notFoundIds) = await index.RemoveDocumentsBatchAsync(requestedIds).ConfigureAwait(false);
 
                     return new ResponseContext
                     {

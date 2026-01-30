@@ -23,9 +23,10 @@ namespace Verbex.Database.Interfaces
         /// <param name="contentSha256">SHA-256 hash for duplicate detection.</param>
         /// <param name="documentLength">Character count of document.</param>
         /// <param name="customMetadata">Optional custom metadata (any JSON-serializable value).</param>
+        /// <param name="indexingRuntimeMs">Optional indexing runtime in milliseconds.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Task.</returns>
-        Task AddAsync(string tenantId, string indexId, string id, string name, string? contentSha256, int documentLength, object? customMetadata = null, CancellationToken token = default);
+        Task AddAsync(string tenantId, string indexId, string id, string name, string? contentSha256, int documentLength, object? customMetadata = null, decimal? indexingRuntimeMs = null, CancellationToken token = default);
 
         /// <summary>
         /// Gets a document by ID.
@@ -128,9 +129,10 @@ namespace Verbex.Database.Interfaces
         /// <param name="documentLength">New document length.</param>
         /// <param name="termCount">New term count.</param>
         /// <param name="customMetadata">Optional custom metadata (any JSON-serializable value).</param>
+        /// <param name="indexingRuntimeMs">Optional indexing runtime in milliseconds.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Task.</returns>
-        Task UpdateAsync(string tenantId, string indexId, string id, string name, string? contentSha256, int documentLength, int termCount, object? customMetadata = null, CancellationToken token = default);
+        Task UpdateAsync(string tenantId, string indexId, string id, string name, string? contentSha256, int documentLength, int termCount, object? customMetadata = null, decimal? indexingRuntimeMs = null, CancellationToken token = default);
 
         /// <summary>
         /// Updates only the custom metadata for a document.
@@ -161,5 +163,15 @@ namespace Verbex.Database.Interfaces
         /// <param name="token">Cancellation token.</param>
         /// <returns>Number of documents deleted.</returns>
         Task<long> DeleteAllAsync(string tenantId, string indexId, CancellationToken token = default);
+
+        /// <summary>
+        /// Deletes multiple documents by IDs.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="indexId">Index identifier.</param>
+        /// <param name="ids">Document IDs to delete.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>List of document IDs that were actually deleted (existed).</returns>
+        Task<List<string>> DeleteBatchAsync(string tenantId, string indexId, IEnumerable<string> ids, CancellationToken token = default);
     }
 }

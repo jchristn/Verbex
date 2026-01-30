@@ -4,6 +4,7 @@ namespace Verbex.Database.SqlServer.Implementations
     using System.Collections.Generic;
     using System.Data;
     using System.Linq;
+    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
     using Verbex.Database.Interfaces;
@@ -58,9 +59,32 @@ VALUES (N'{Sanitizer.Sanitize(id)}', {Sanitizer.FormatNullableString(documentId)
 
         public async Task AddBatchAsync(string tenantId, string indexId, IEnumerable<TagRecord> records, CancellationToken token = default)
         {
-            foreach (TagRecord record in records)
+            List<TagRecord> recordList = records.ToList();
+            if (recordList.Count == 0) return;
+
+            const int ChunkSize = 200;
+            DateTime now = DateTime.UtcNow;
+            string nowFormatted = Sanitizer.FormatDateTime(now);
+
+            for (int i = 0; i < recordList.Count; i += ChunkSize)
             {
-                await SetAsync(tenantId, indexId, record.Id, record.DocumentId, record.Key, record.Value, token).ConfigureAwait(false);
+                List<TagRecord> chunk = recordList.Skip(i).Take(ChunkSize).ToList();
+                StringBuilder sb = new StringBuilder();
+                sb.Append("MERGE INTO tags WITH (HOLDLOCK) AS target USING (VALUES ");
+
+                List<string> valuesClauses = new List<string>();
+                foreach (TagRecord record in chunk)
+                {
+                    valuesClauses.Add($"(N'{Sanitizer.Sanitize(record.Id)}', {Sanitizer.FormatNullableString(record.DocumentId)}, N'{Sanitizer.Sanitize(indexId)}', N'{Sanitizer.Sanitize(record.Key)}', {Sanitizer.FormatNullableString(record.Value)}, '{nowFormatted}', '{nowFormatted}')");
+                }
+
+                sb.Append(string.Join(", ", valuesClauses));
+                sb.Append(") AS source (id, document_id, index_id, [key], value, last_update_utc, created_utc) ");
+                sb.Append("ON target.document_id = source.document_id AND target.[key] = source.[key] ");
+                sb.Append("WHEN MATCHED THEN UPDATE SET value = source.value, last_update_utc = source.last_update_utc ");
+                sb.Append("WHEN NOT MATCHED THEN INSERT (id, document_id, index_id, [key], value, last_update_utc, created_utc) VALUES (source.id, source.document_id, source.index_id, source.[key], source.value, source.last_update_utc, source.created_utc);");
+
+                await _Driver.ExecuteQueryAsync(sb.ToString(), true, token).ConfigureAwait(false);
             }
         }
 

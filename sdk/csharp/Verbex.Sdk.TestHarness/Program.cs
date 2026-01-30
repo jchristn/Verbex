@@ -487,6 +487,37 @@ namespace Verbex.Sdk.TestHarness
             _TestDocuments.Add(docId);
         }
 
+        private async Task TestGetDocumentReturnsIndexedTermsAsync()
+        {
+            // Add a document with known content containing specific terms
+            string content = "apple banana cherry date elderberry";
+            AddDocumentData addResult = await _Client!.AddDocumentAsync(
+                _TestIndexId,
+                content
+            ).ConfigureAwait(false);
+            AssertNotNull(addResult, "addResult");
+            string docId = addResult.DocumentId!;
+
+            // Retrieve the document and verify terms are populated
+            DocumentInfo document = await _Client!.GetDocumentAsync(_TestIndexId, docId).ConfigureAwait(false);
+            AssertNotNull(document, "document");
+            AssertNotNull(document.Terms, "document.Terms");
+            AssertGreaterThan(document.Terms!.Count, 0, "document.Terms.Count");
+
+            // Verify expected terms are present (terms are lowercased)
+            HashSet<string> expectedTerms = new HashSet<string> { "apple", "banana", "cherry", "date", "elderberry" };
+            foreach (string term in expectedTerms)
+            {
+                Assert(document.Terms.Contains(term), $"Document should contain term '{term}'");
+            }
+
+            // Verify indexing runtime is populated
+            AssertNotNull(document.IndexingRuntimeMs, "document.IndexingRuntimeMs");
+            Assert(document.IndexingRuntimeMs > 0, "document.IndexingRuntimeMs should be greater than 0");
+
+            _TestDocuments.Add(docId);
+        }
+
         private async Task TestGetDocumentsBatchAsync()
         {
             // Need at least 2 documents in _TestDocuments
@@ -857,6 +888,7 @@ namespace Verbex.Sdk.TestHarness
                 await RunTestAsync("Get document not found", TestGetDocumentNotFoundAsync).ConfigureAwait(false);
                 await RunTestAsync("Add document with labels and tags", TestAddDocumentWithLabelsAndTagsAsync).ConfigureAwait(false);
                 await RunTestAsync("Get document with labels and tags", TestGetDocumentWithLabelsAndTagsAsync).ConfigureAwait(false);
+                await RunTestAsync("Get document returns indexed terms", TestGetDocumentReturnsIndexedTermsAsync).ConfigureAwait(false);
                 await RunTestAsync("Get documents batch", TestGetDocumentsBatchAsync).ConfigureAwait(false);
                 await RunTestAsync("Get documents batch (empty)", TestGetDocumentsBatchEmptyAsync).ConfigureAwait(false);
                 await RunTestAsync("Delete documents batch", TestDeleteDocumentsBatchAsync).ConfigureAwait(false);

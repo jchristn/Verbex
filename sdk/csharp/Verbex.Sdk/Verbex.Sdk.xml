@@ -555,6 +555,37 @@
             Access to the requested resource is denied.
             </summary>
         </member>
+        <member name="T:Verbex.Sdk.BatchDeleteResult">
+            <summary>
+            Result of a batch document deletion operation.
+            Contains lists of successfully deleted and not found document IDs.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.BatchDeleteResult.Deleted">
+            <summary>
+            List of document IDs that were successfully deleted.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.BatchDeleteResult.NotFound">
+            <summary>
+            List of document IDs that were not found in the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.BatchDeleteResult.DeletedCount">
+            <summary>
+            Number of documents that were successfully deleted.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.BatchDeleteResult.NotFoundCount">
+            <summary>
+            Number of document IDs that were not found.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.BatchDeleteResult.RequestedCount">
+            <summary>
+            Total number of document IDs that were requested for deletion.
+            </summary>
+        </member>
         <member name="T:Verbex.Sdk.BatchDocumentsResult">
             <summary>
             Result of a batch document retrieval operation.
@@ -777,6 +808,13 @@
             <summary>
             Tags (key-value pairs) associated with the document.
             Alias for CustomMetadata for API consistency.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DocumentInfo.IndexingRuntimeMs">
+            <summary>
+            Indexing runtime in milliseconds.
+            Time taken to process and index the document content.
+            Null if not yet indexed or timing was not captured.
             </summary>
         </member>
         <member name="T:Verbex.Sdk.DocumentsListData">
@@ -1394,6 +1432,17 @@
             <param name="documentId">The document identifier.</param>
             <param name="cancellationToken">Cancellation token.</param>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the document is not found.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.DeleteDocumentsBatchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Deletes multiple documents from an index by IDs in a single request.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="documentIds">Collection of document IDs to delete.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Batch result containing lists of deleted and not found IDs.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when indexId or documentIds is null.</exception>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.UpdateDocumentLabelsAsync(System.String,System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
             <summary>

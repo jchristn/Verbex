@@ -4,6 +4,7 @@ namespace Verbex.Database.Mysql.Implementations
     using System.Collections.Generic;
     using System.Data;
     using System.Linq;
+    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
     using Verbex.Database.Interfaces;
@@ -58,9 +59,29 @@ VALUES ('{Sanitizer.Sanitize(id)}', {Sanitizer.FormatNullableString(documentId)}
 
         public async Task AddBatchAsync(string tenantId, string indexId, IEnumerable<TagRecord> records, CancellationToken token = default)
         {
-            foreach (TagRecord record in records)
+            List<TagRecord> recordList = records.ToList();
+            if (recordList.Count == 0) return;
+
+            const int ChunkSize = 200;
+            DateTime now = DateTime.UtcNow;
+            string nowFormatted = Sanitizer.FormatDateTime(now);
+
+            for (int i = 0; i < recordList.Count; i += ChunkSize)
             {
-                await SetAsync(tenantId, indexId, record.Id, record.DocumentId, record.Key, record.Value, token).ConfigureAwait(false);
+                List<TagRecord> chunk = recordList.Skip(i).Take(ChunkSize).ToList();
+                StringBuilder sb = new StringBuilder();
+                sb.Append("INSERT INTO tags (id, document_id, index_id, `key`, value, last_update_utc, created_utc) VALUES ");
+
+                List<string> valuesClauses = new List<string>();
+                foreach (TagRecord record in chunk)
+                {
+                    valuesClauses.Add($"('{Sanitizer.Sanitize(record.Id)}', {Sanitizer.FormatNullableString(record.DocumentId)}, '{Sanitizer.Sanitize(indexId)}', '{Sanitizer.Sanitize(record.Key)}', {Sanitizer.FormatNullableString(record.Value)}, '{nowFormatted}', '{nowFormatted}')");
+                }
+
+                sb.Append(string.Join(", ", valuesClauses));
+                sb.Append(" ON DUPLICATE KEY UPDATE value = VALUES(value), last_update_utc = VALUES(last_update_utc);");
+
+                await _Driver.ExecuteQueryAsync(sb.ToString(), true, token).ConfigureAwait(false);
             }
         }
 

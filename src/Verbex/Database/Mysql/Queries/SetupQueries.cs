@@ -10,7 +10,7 @@ namespace Verbex.Database.Mysql.Queries
         /// <summary>
         /// Schema version for migration tracking.
         /// </summary>
-        public const string SchemaVersion = "3.2";
+        public const string SchemaVersion = "3.3";
 
         /// <summary>
         /// Creates all tables for the multi-tenant inverted index.
@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS documents (
     document_length INT NOT NULL DEFAULT 0,
     term_count INT NOT NULL DEFAULT 0,
     custom_metadata TEXT,
+    indexing_runtime_ms DECIMAL(18,4),
     indexed_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -288,6 +289,18 @@ ALTER TABLE indexes ADD COLUMN custom_metadata TEXT AFTER description;
 
 -- Update schema version
 UPDATE schema_metadata SET value = '3.2' WHERE `key` = 'schema_version';
+";
+
+        /// <summary>
+        /// Migration from schema version 3.2 to 3.3.
+        /// Adds indexing_runtime_ms column to documents table.
+        /// </summary>
+        public static readonly string MigrateFrom32To33 = @"
+-- Add indexing_runtime_ms column to documents table
+ALTER TABLE documents ADD COLUMN indexing_runtime_ms DECIMAL(18,4) AFTER custom_metadata;
+
+-- Update schema version
+UPDATE schema_metadata SET value = '3.3' WHERE `key` = 'schema_version';
 ";
     }
 }

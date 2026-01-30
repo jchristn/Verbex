@@ -111,5 +111,15 @@ namespace Verbex.Database.Mysql
         {
             return value.HasValue ? value.Value.ToString() : "NULL";
         }
+
+        /// <summary>
+        /// Formats a nullable decimal value for SQL.
+        /// </summary>
+        /// <param name="value">The value to format.</param>
+        /// <returns>"NULL" or the decimal as a string.</returns>
+        public static string FormatNullableDecimal(decimal? value)
+        {
+            return value.HasValue ? value.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "NULL";
+        }
     }
 }

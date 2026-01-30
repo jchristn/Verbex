@@ -317,6 +317,14 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
         </div>
       ) : (
         <div className="workspace-card">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredAndSortedIndices.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          />
           <table className="data-table">
             <thead>
               <tr>
@@ -411,14 +419,6 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
               ))}
             </tbody>
           </table>
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            totalItems={filteredAndSortedIndices.length}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
-          />
         </div>
       )}
 

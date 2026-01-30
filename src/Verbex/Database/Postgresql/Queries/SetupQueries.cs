@@ -10,7 +10,7 @@ namespace Verbex.Database.Postgresql.Queries
         /// <summary>
         /// Schema version for migration tracking.
         /// </summary>
-        public const string SchemaVersion = "3.2";
+        public const string SchemaVersion = "3.3";
 
         /// <summary>
         /// Creates all tables for the multi-tenant inverted index.
@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS documents (
     document_length INTEGER NOT NULL DEFAULT 0,
     term_count INTEGER NOT NULL DEFAULT 0,
     custom_metadata TEXT,
+    indexing_runtime_ms NUMERIC(18,4),
     indexed_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -253,8 +254,8 @@ DROP TABLE IF EXISTS tenants CASCADE;
         /// Inserts the initial schema version into the metadata table.
         /// </summary>
         public static readonly string InsertSchemaVersion = @"
-INSERT INTO schema_metadata (key, value) VALUES ('schema_version', '3.2')
-ON CONFLICT (key) DO UPDATE SET value = '3.2';
+INSERT INTO schema_metadata (key, value) VALUES ('schema_version', '3.3')
+ON CONFLICT (key) DO UPDATE SET value = '3.3';
 ";
 
         /// <summary>
@@ -270,6 +271,18 @@ ALTER TABLE indexes ADD COLUMN IF NOT EXISTS custom_metadata TEXT;
 
 -- Update schema version
 UPDATE schema_metadata SET value = '3.2' WHERE key = 'schema_version';
+";
+
+        /// <summary>
+        /// Migration query from schema version 3.2 to 3.3.
+        /// Adds indexing_runtime_ms column to documents table.
+        /// </summary>
+        public static readonly string MigrateFrom32To33 = @"
+-- Add indexing_runtime_ms column to documents table if it doesn't exist
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS indexing_runtime_ms NUMERIC(18,4);
+
+-- Update schema version
+UPDATE schema_metadata SET value = '3.3' WHERE key = 'schema_version';
 ";
     }
 }

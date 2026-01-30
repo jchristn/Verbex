@@ -193,6 +193,10 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
           aVal = new Date(a.indexedDate || 0).getTime();
           bVal = new Date(b.indexedDate || 0).getTime();
           break;
+        case 'indexingRuntimeMs':
+          aVal = a.indexingRuntimeMs || 0;
+          bVal = b.indexingRuntimeMs || 0;
+          break;
         default:
           aVal = '';
           bVal = '';
@@ -554,6 +558,17 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
               </div>
             </div>
           )}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setCurrentPage(1);
+            }}
+          />
           <table className="data-table documents-table">
             <thead>
               <tr>
@@ -593,6 +608,14 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                   onSort={handleSort}
                   hasFilters={true}
                 />
+                <SortableHeader
+                  label="Indexing Time"
+                  sortKey="indexingRuntimeMs"
+                  currentSort={sortColumn}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                  hasFilters={true}
+                />
                 <th className="sortable-header has-filters actions-column">
                   <button className="sortable-header-btn" disabled>
                     <span className="sortable-header-label">Actions</span>
@@ -616,6 +639,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                   <td><CopyableId value={doc.documentId} /></td>
                   <td>{doc.documentLength?.toLocaleString() || 'N/A'}</td>
                   <td>{formatDate(doc.indexedDate)}</td>
+                  <td>{doc.indexingRuntimeMs != null ? `${doc.indexingRuntimeMs.toFixed(2)} ms` : 'N/A'}</td>
                   <td>
                     <ActionMenu
                       actions={[
@@ -639,17 +663,6 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
               ))}
             </tbody>
           </table>
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            totalItems={totalItems}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setCurrentPage(1);
-            }}
-          />
         </div>
       )}
 
@@ -799,6 +812,10 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                 <div className="detail-item">
                   <span className="detail-label">Last Modified</span>
                   <span className="detail-value">{formatDate(viewDocument.lastModified)}</span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Indexing Time</span>
+                  <span className="detail-value">{viewDocument.indexingRuntimeMs != null ? `${viewDocument.indexingRuntimeMs.toFixed(2)} ms` : 'N/A'}</span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Content Hash (SHA256)</span>

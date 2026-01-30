@@ -178,6 +178,7 @@ class DocumentInfo:
     custom_metadata: Optional[Any] = None
     labels: Optional[List[str]] = None
     tags: Optional[Dict[str, str]] = None
+    indexing_runtime_ms: Optional[float] = None
 
     @property
     def id(self) -> str:
@@ -903,7 +904,8 @@ class VerbexClient:
             is_deleted=data.get('is_deleted', False),
             custom_metadata=data.get('custom_metadata'),
             labels=data.get('labels'),
-            tags=data.get('tags')
+            tags=data.get('tags'),
+            indexing_runtime_ms=data.get('indexing_runtime_ms')
         )
 
     # ==================== Search Endpoint ====================

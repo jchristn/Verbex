@@ -415,6 +415,14 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
         </div>
       ) : (
         <div className="workspace-card">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredAndSortedCredentials.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
           <table className="data-table">
             <thead>
               <tr>
@@ -514,14 +522,6 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
               ))}
             </tbody>
           </table>
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            totalItems={filteredAndSortedCredentials.length}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={setPageSize}
-          />
         </div>
       )}
 

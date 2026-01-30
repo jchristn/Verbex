@@ -1,0 +1,8 @@
+# SQLite WAL mode files (created at runtime)
+*.db-wal
+*.db-shm
+
+# Keep the main database file but ignore runtime files
+!verbex.db
+!.gitkeep
+!.gitignore

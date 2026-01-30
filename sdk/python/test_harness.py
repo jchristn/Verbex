@@ -402,6 +402,31 @@ class TestHarness:
         self._assert_equals(len(document.tags), 2, "tags count")
         self._test_documents.append(doc_id)
 
+    def test_get_document_returns_indexed_terms(self):
+        """Test that document retrieval returns indexed terms."""
+        # Add a document with known content containing specific terms
+        content = "apple banana cherry date elderberry"
+        result = self._client.add_document(self._test_index_id, content)
+        self._assert_not_none(result, "result")
+        doc_id = result.document_id
+
+        # Retrieve the document and verify terms are populated
+        document = self._client.get_document(self._test_index_id, doc_id)
+        self._assert_not_none(document, "document")
+        self._assert_not_none(document.terms, "document.terms")
+        self._assert_greater_than(len(document.terms), 0, "len(document.terms)")
+
+        # Verify expected terms are present (terms are lowercased)
+        expected_terms = {"apple", "banana", "cherry", "date", "elderberry"}
+        for term in expected_terms:
+            self._assert(term in document.terms, f"Document should contain term '{term}'")
+
+        # Verify indexing runtime is populated
+        self._assert_not_none(document.indexing_runtime_ms, "document.indexing_runtime_ms")
+        self._assert_greater_than(document.indexing_runtime_ms, 0, "document.indexing_runtime_ms")
+
+        self._test_documents.append(doc_id)
+
     def test_get_documents_batch(self):
         """Test getting multiple documents by IDs in a single request."""
         # Need at least 2 documents
@@ -726,6 +751,7 @@ class TestHarness:
             self._run_test("Get document not found", self.test_get_document_not_found)
             self._run_test("Add document with labels and tags", self.test_add_document_with_labels_and_tags)
             self._run_test("Get document with labels and tags", self.test_get_document_with_labels_and_tags)
+            self._run_test("Get document returns indexed terms", self.test_get_document_returns_indexed_terms)
             self._run_test("Get documents batch", self.test_get_documents_batch)
             self._run_test("Get documents batch (empty)", self.test_get_documents_batch_empty)
             self._run_test("Document exists (HEAD)", self.test_document_exists)

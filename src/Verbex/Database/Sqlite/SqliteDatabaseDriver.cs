@@ -21,10 +21,14 @@ namespace Verbex.Database.Sqlite
     {
         private readonly SemaphoreSlim _Semaphore = new SemaphoreSlim(1, 1);
         private SqliteConnection? _Connection;
+        private SqliteTransaction? _ActiveTransaction;
         private bool _IsOpen = false;
 
         /// <inheritdoc />
         public override bool IsOpen => _IsOpen;
+
+        /// <inheritdoc />
+        public override bool IsTransactionActive => _ActiveTransaction != null;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SqliteDatabaseDriver"/> class.
@@ -189,6 +193,76 @@ namespace Verbex.Database.Sqlite
             if (!Settings.InMemory)
             {
                 await CheckpointAsync(token).ConfigureAwait(false);
+            }
+        }
+
+        /// <inheritdoc />
+        public override async Task BeginTransactionAsync(CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotOpen();
+
+            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            try
+            {
+                if (_ActiveTransaction != null)
+                {
+                    throw new InvalidOperationException("A transaction is already active.");
+                }
+
+                _ActiveTransaction = _Connection!.BeginTransaction();
+            }
+            finally
+            {
+                _Semaphore.Release();
+            }
+        }
+
+        /// <inheritdoc />
+        public override async Task CommitTransactionAsync(CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotOpen();
+
+            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            try
+            {
+                if (_ActiveTransaction == null)
+                {
+                    throw new InvalidOperationException("No transaction is active.");
+                }
+
+                await _ActiveTransaction.CommitAsync(token).ConfigureAwait(false);
+                _ActiveTransaction.Dispose();
+                _ActiveTransaction = null;
+            }
+            finally
+            {
+                _Semaphore.Release();
+            }
+        }
+
+        /// <inheritdoc />
+        public override async Task RollbackTransactionAsync(CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotOpen();
+
+            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            try
+            {
+                if (_ActiveTransaction == null)
+                {
+                    throw new InvalidOperationException("No transaction is active.");
+                }
+
+                await _ActiveTransaction.RollbackAsync(token).ConfigureAwait(false);
+                _ActiveTransaction.Dispose();
+                _ActiveTransaction = null;
+            }
+            finally
+            {
+                _Semaphore.Release();
             }
         }
 
@@ -359,12 +433,10 @@ namespace Verbex.Database.Sqlite
         private async Task<DataTable> ExecuteQueryInternalAsync(string query, bool isTransaction, CancellationToken token)
         {
             DataTable result = new DataTable();
-            SqliteTransaction? transaction = null;
 
-            if (isTransaction)
-            {
-                transaction = _Connection!.BeginTransaction();
-            }
+            // Use the active transaction if one exists, otherwise create a new one if requested
+            bool useActiveTransaction = _ActiveTransaction != null;
+            SqliteTransaction? transaction = useActiveTransaction ? _ActiveTransaction : (isTransaction ? _Connection!.BeginTransaction() : null);
 
             try
             {
@@ -380,14 +452,16 @@ namespace Verbex.Database.Sqlite
                 using SqliteDataReader reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
                 result.Load(reader);
 
-                if (transaction != null)
+                // Only commit if we created a new transaction (not using the active one)
+                if (transaction != null && !useActiveTransaction)
                 {
                     await transaction.CommitAsync(token).ConfigureAwait(false);
                 }
             }
             catch
             {
-                if (transaction != null)
+                // Only rollback if we created a new transaction (not using the active one)
+                if (transaction != null && !useActiveTransaction)
                 {
                     await transaction.RollbackAsync(token).ConfigureAwait(false);
                 }
@@ -395,7 +469,11 @@ namespace Verbex.Database.Sqlite
             }
             finally
             {
-                transaction?.Dispose();
+                // Only dispose if we created a new transaction
+                if (!useActiveTransaction)
+                {
+                    transaction?.Dispose();
+                }
             }
 
             return result;

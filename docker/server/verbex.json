@@ -1,7 +1,12 @@
 {
   "CreatedUtc": "2026-01-09T17:22:48.9590463Z",
   "Logging": {
-    "SyslogServers": [],
+    "SyslogServers": [
+      {
+        "Hostname": "127.0.0.1",
+        "Port": 514
+      }
+    ],
     "ConsoleLogging": true,
     "EnableColors": true,
     "LogDirectory": "logs",
@@ -20,7 +25,7 @@
   },
   "Database": {
     "Type": "Sqlite",
-    "Filename": "./verbex.db",
+    "Filename": "./db/verbex.db",
     "InMemory": false,
     "Hostname": "localhost",
     "Port": 0,

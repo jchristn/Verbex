@@ -28,7 +28,7 @@ namespace Verbex.Database.SqlServer.Implementations
         }
 
         /// <inheritdoc />
-        public async Task AddAsync(string tenantId, string indexId, string id, string name, string? contentSha256, int documentLength, object? customMetadata = null, CancellationToken token = default)
+        public async Task AddAsync(string tenantId, string indexId, string id, string name, string? contentSha256, int documentLength, object? customMetadata = null, decimal? indexingRuntimeMs = null, CancellationToken token = default)
         {
             DateTime now = DateTime.UtcNow;
             string? customMetadataJson = customMetadata != null
@@ -36,7 +36,7 @@ namespace Verbex.Database.SqlServer.Implementations
                 : null;
 
             string query = $@"
-INSERT INTO documents (id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexed_utc, last_update_utc, created_utc)
+INSERT INTO documents (id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexing_runtime_ms, indexed_utc, last_update_utc, created_utc)
 VALUES (
     N'{Sanitizer.Sanitize(id)}',
     N'{Sanitizer.Sanitize(tenantId)}',
@@ -46,6 +46,7 @@ VALUES (
     {documentLength},
     0,
     {Sanitizer.FormatNullableString(customMetadataJson)},
+    {Sanitizer.FormatNullableDecimal(indexingRuntimeMs)},
     '{Sanitizer.FormatDateTime(now)}',
     '{Sanitizer.FormatDateTime(now)}',
     '{Sanitizer.FormatDateTime(now)}'
@@ -57,7 +58,7 @@ VALUES (
         public async Task<DocumentMetadata?> GetAsync(string tenantId, string indexId, string id, CancellationToken token = default)
         {
             string query = $@"
-SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexed_utc, last_update_utc, created_utc
+SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexing_runtime_ms, indexed_utc, last_update_utc, created_utc
 FROM documents
 WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND index_id = N'{Sanitizer.Sanitize(indexId)}' AND id = N'{Sanitizer.Sanitize(id)}';";
 
@@ -74,7 +75,7 @@ WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND index_id = N'{Sanitizer.
         public async Task<DocumentMetadata?> GetByNameAsync(string tenantId, string indexId, string name, CancellationToken token = default)
         {
             string query = $@"
-SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexed_utc, last_update_utc, created_utc
+SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexing_runtime_ms, indexed_utc, last_update_utc, created_utc
 FROM documents
 WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND index_id = N'{Sanitizer.Sanitize(indexId)}' AND name = N'{Sanitizer.Sanitize(name)}';";
 
@@ -110,6 +111,17 @@ WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND index_id = N'{Sanitizer.
                 doc.SetTag(row["key"]?.ToString() ?? string.Empty, row["value"]?.ToString() ?? string.Empty);
             }
 
+            string termsQuery = $@"
+SELECT t.term
+FROM document_terms dt
+INNER JOIN terms t ON dt.term_id = t.id
+WHERE dt.document_id = N'{Sanitizer.Sanitize(id)}';";
+            DataTable termsResult = await _Driver.ExecuteQueryAsync(termsQuery, false, token).ConfigureAwait(false);
+            foreach (DataRow row in termsResult.Rows)
+            {
+                doc.AddTerm(row["term"]?.ToString() ?? string.Empty);
+            }
+
             return doc;
         }
 
@@ -117,7 +129,7 @@ WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND index_id = N'{Sanitizer.
         public async Task<List<DocumentMetadata>> GetByContentSha256Async(string tenantId, string indexId, string contentSha256, CancellationToken token = default)
         {
             string query = $@"
-SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexed_utc, last_update_utc, created_utc
+SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexing_runtime_ms, indexed_utc, last_update_utc, created_utc
 FROM documents
 WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND index_id = N'{Sanitizer.Sanitize(indexId)}' AND content_sha256 = N'{Sanitizer.Sanitize(contentSha256)}';";
 
@@ -134,7 +146,7 @@ WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND index_id = N'{Sanitizer.
         public async Task<List<DocumentMetadata>> GetAllAsync(string tenantId, string indexId, int limit = 100, int offset = 0, CancellationToken token = default)
         {
             string query = $@"
-SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexed_utc, last_update_utc, created_utc
+SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexing_runtime_ms, indexed_utc, last_update_utc, created_utc
 FROM documents
 WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND index_id = N'{Sanitizer.Sanitize(indexId)}'
 ORDER BY created_utc DESC
@@ -160,7 +172,7 @@ OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY;";
 
             string inClause = string.Join(",", idList.ConvertAll(id => $"N'{Sanitizer.Sanitize(id)}'"));
             string query = $@"
-SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexed_utc, last_update_utc, created_utc
+SELECT id, tenant_id, index_id, name, content_sha256, document_length, term_count, custom_metadata, indexing_runtime_ms, indexed_utc, last_update_utc, created_utc
 FROM documents
 WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND index_id = N'{Sanitizer.Sanitize(indexId)}' AND id IN ({inClause});";
 
@@ -198,7 +210,7 @@ WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND index_id = N'{Sanitizer.
         }
 
         /// <inheritdoc />
-        public async Task UpdateAsync(string tenantId, string indexId, string id, string name, string? contentSha256, int documentLength, int termCount, object? customMetadata = null, CancellationToken token = default)
+        public async Task UpdateAsync(string tenantId, string indexId, string id, string name, string? contentSha256, int documentLength, int termCount, object? customMetadata = null, decimal? indexingRuntimeMs = null, CancellationToken token = default)
         {
             DateTime now = DateTime.UtcNow;
             string? customMetadataJson = customMetadata != null
@@ -212,6 +224,7 @@ UPDATE documents SET
     document_length = {documentLength},
     term_count = {termCount},
     custom_metadata = {Sanitizer.FormatNullableString(customMetadataJson)},
+    indexing_runtime_ms = {Sanitizer.FormatNullableDecimal(indexingRuntimeMs)},
     last_update_utc = '{Sanitizer.FormatDateTime(now)}'
 WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND index_id = N'{Sanitizer.Sanitize(indexId)}' AND id = N'{Sanitizer.Sanitize(id)}';";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
@@ -258,6 +271,44 @@ WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND index_id = N'{Sanitizer.
             return count;
         }
 
+        /// <inheritdoc />
+        public async Task<List<string>> DeleteBatchAsync(string tenantId, string indexId, IEnumerable<string> ids, CancellationToken token = default)
+        {
+            List<string> idList = new List<string>(ids);
+            if (idList.Count == 0)
+            {
+                return new List<string>();
+            }
+
+            string inClause = string.Join(",", idList.ConvertAll(id => $"N'{Sanitizer.Sanitize(id)}'"));
+
+            // First get the IDs that actually exist
+            string selectQuery = $@"
+SELECT id FROM documents
+WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND index_id = N'{Sanitizer.Sanitize(indexId)}' AND id IN ({inClause});";
+            DataTable result = await _Driver.ExecuteQueryAsync(selectQuery, false, token).ConfigureAwait(false);
+
+            List<string> existingIds = new List<string>();
+            foreach (DataRow row in result.Rows)
+            {
+                existingIds.Add(row["id"]?.ToString() ?? string.Empty);
+            }
+
+            if (existingIds.Count == 0)
+            {
+                return new List<string>();
+            }
+
+            // Delete all existing documents in a single statement
+            string deleteInClause = string.Join(",", existingIds.ConvertAll(id => $"N'{Sanitizer.Sanitize(id)}'"));
+            string deleteQuery = $@"
+DELETE FROM documents
+WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND index_id = N'{Sanitizer.Sanitize(indexId)}' AND id IN ({deleteInClause});";
+            await _Driver.ExecuteQueryAsync(deleteQuery, true, token).ConfigureAwait(false);
+
+            return existingIds;
+        }
+
         private static DocumentMetadata MapRowToDocument(DataRow row)
         {
             DocumentMetadata doc = new DocumentMetadata(
@@ -268,7 +319,8 @@ WHERE tenant_id = N'{Sanitizer.Sanitize(tenantId)}' AND index_id = N'{Sanitizer.
                 ContentSha256 = row["content_sha256"]?.ToString() ?? string.Empty,
                 DocumentLength = Convert.ToInt32(row["document_length"] ?? 0),
                 IndexedDate = row["indexed_utc"] != DBNull.Value ? DateTime.Parse(row["indexed_utc"]?.ToString() ?? DateTime.UtcNow.ToString("o")) : DateTime.UtcNow,
-                LastModified = row["last_update_utc"] != DBNull.Value ? DateTime.Parse(row["last_update_utc"]?.ToString() ?? DateTime.UtcNow.ToString("o")) : DateTime.UtcNow
+                LastModified = row["last_update_utc"] != DBNull.Value ? DateTime.Parse(row["last_update_utc"]?.ToString() ?? DateTime.UtcNow.ToString("o")) : DateTime.UtcNow,
+                IndexingRuntimeMs = row["indexing_runtime_ms"] != DBNull.Value ? Convert.ToDecimal(row["indexing_runtime_ms"]) : null
             };
 
             string? customMetadataJson = row["custom_metadata"]?.ToString();

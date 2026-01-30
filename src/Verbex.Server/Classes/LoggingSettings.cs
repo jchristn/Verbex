@@ -1,5 +1,6 @@
 namespace Verbex.Server.Classes
 {
+    using SyslogLogging;
     using System;
     using System.Collections.Generic;
 
@@ -13,7 +14,7 @@ namespace Verbex.Server.Classes
         /// <summary>
         /// Syslog servers.
         /// </summary>
-        public List<string> SyslogServers
+        public List<SyslogServer> SyslogServers
         {
             get
             {
@@ -21,7 +22,7 @@ namespace Verbex.Server.Classes
             }
             set
             {
-                if (value == null) _SyslogServers = new List<string>();
+                if (value == null) _SyslogServers = new List<SyslogServer>();
                 else _SyslogServers = value;
             }
         }
@@ -54,6 +55,17 @@ namespace Verbex.Server.Classes
             {
                 _EnableColors = value;
             }
+        }
+
+        /// <summary>
+        /// Minimum severity level, 0 through 7.
+        /// Default is 0.
+        /// Invalid values are converted to 0.
+        /// </summary>
+        public int MinimumSeverity
+        {
+            get => _MinimumSeverity;
+            set => _MinimumSeverity = (value >= 0 && value <= 7) ? value : 0;
         }
 
         /// <summary>
@@ -122,9 +134,13 @@ namespace Verbex.Server.Classes
 
         #region Private-Members
 
-        private List<string> _SyslogServers = new List<string>();
+        private List<SyslogServer> _SyslogServers = new List<SyslogServer>
+        {
+            new SyslogServer("127.0.0.1", 514)
+        };
         private bool _ConsoleLogging = true;
         private bool _EnableColors = true;
+        private int _MinimumSeverity = 0;
         private string _LogDirectory = "logs";
         private string _LogFilename = "verbex.log";
         private bool _FileLogging = true;
