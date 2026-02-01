@@ -1,11 +1,11 @@
-namespace Verbex.Sdk
+namespace Verbex.Sdk.DTO.Responses
 {
     using System.Collections.Generic;
 
     /// <summary>
     /// Result of a batch document retrieval operation.
     /// </summary>
-    public class BatchDocumentsResult
+    public class BatchRetrieveResponse
     {
         /// <summary>
         /// List of documents that were found.

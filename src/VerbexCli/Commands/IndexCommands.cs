@@ -418,7 +418,7 @@ namespace VerbexCli.Commands
 
                 object stats = await IndexManager.Instance.GetStatisticsAsync(name).ConfigureAwait(false);
 
-                var exportData = new
+                IndexExportData exportData = new IndexExportData
                 {
                     Timestamp = DateTime.UtcNow,
                     IndexName = name,

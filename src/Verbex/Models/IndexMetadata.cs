@@ -4,6 +4,7 @@ namespace Verbex.Models
     using System.Collections.Generic;
     using System.Text.Json.Serialization;
     using PrettyId;
+    using Verbex;
 
     /// <summary>
     /// Represents metadata and configuration for a search index within a tenant.
@@ -32,12 +33,11 @@ namespace Verbex.Models
         private bool _EnableStopWordRemover = false;
         private int _MinTokenLength = 0;
         private int _MaxTokenLength = 0;
-        private int _HotCacheSize = 10000;
-        private int _DocumentCacheSize = 1000;
         private int _ExpectedTerms = 1000000;
         private List<string> _Labels = new List<string>();
         private Dictionary<string, string> _Tags = new Dictionary<string, string>();
         private object? _CustomMetadata = null;
+        private CacheConfiguration? _CacheConfiguration = null;
 
         /// <summary>
         /// Gets or sets the unique identifier for the index.
@@ -187,28 +187,6 @@ namespace Verbex.Models
         }
 
         /// <summary>
-        /// Gets or sets the hot cache size for frequently accessed terms.
-        /// </summary>
-        /// <value>Number of terms to keep in hot cache. Default is 10000.</value>
-        [JsonPropertyName("hotCacheSize")]
-        public int HotCacheSize
-        {
-            get => _HotCacheSize;
-            set => _HotCacheSize = value < 0 ? 0 : value;
-        }
-
-        /// <summary>
-        /// Gets or sets the document cache size.
-        /// </summary>
-        /// <value>Number of documents to keep in cache. Default is 1000.</value>
-        [JsonPropertyName("documentCacheSize")]
-        public int DocumentCacheSize
-        {
-            get => _DocumentCacheSize;
-            set => _DocumentCacheSize = value < 0 ? 0 : value;
-        }
-
-        /// <summary>
         /// Gets or sets the expected number of terms for bloom filter sizing.
         /// </summary>
         /// <value>Expected number of unique terms. Default is 1000000.</value>
@@ -251,6 +229,18 @@ namespace Verbex.Models
         {
             get => _CustomMetadata;
             set => _CustomMetadata = value;
+        }
+
+        /// <summary>
+        /// Gets or sets the cache configuration for this index.
+        /// When null, caching is disabled.
+        /// </summary>
+        /// <value>Cache configuration settings, or null for disabled caching. Default is null.</value>
+        [JsonPropertyName("cacheConfiguration")]
+        public CacheConfiguration? CacheConfiguration
+        {
+            get => _CacheConfiguration;
+            set => _CacheConfiguration = value;
         }
 
         /// <summary>

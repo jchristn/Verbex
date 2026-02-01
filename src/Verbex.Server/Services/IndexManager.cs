@@ -211,8 +211,14 @@ namespace Verbex.Server.Services
             if (String.IsNullOrEmpty(tenantId) || String.IsNullOrEmpty(indexId)) return false;
 
             // Get metadata before deletion to know if it's on-disk
-            _Metadata.TryGetValue(indexId, out IndexMetadata? metadata);
+            bool foundMetadata = _Metadata.TryGetValue(indexId, out IndexMetadata? metadata);
             bool isOnDisk = metadata != null && !metadata.InMemory;
+
+            _Logging?.Debug(_Header + "DeleteIndexAsync: indexId=" + indexId +
+                ", foundMetadata=" + foundMetadata +
+                ", InMemory=" + (metadata?.InMemory.ToString() ?? "null") +
+                ", isOnDisk=" + isOnDisk +
+                ", dataDirectory=" + _DataDirectory);
 
             // Delete from database
             bool deleted = await _Database.Indexes.DeleteByIdentifierAsync(tenantId, indexId, token).ConfigureAwait(false);
@@ -226,24 +232,88 @@ namespace Verbex.Server.Services
                 if (removedIndex && index != null)
                 {
                     await index.DisposeAsync().ConfigureAwait(false);
+                    _Logging?.Debug(_Header + "disposed index instance for '" + indexId + "'");
+
+                    // Small delay to ensure file handles are fully released by the OS
+                    await Task.Delay(50, token).ConfigureAwait(false);
                 }
 
                 // Delete on-disk storage directory if applicable
                 if (isOnDisk)
                 {
                     string indexDirectory = Path.Combine(_DataDirectory, tenantId, indexId);
+                    string indexDbPath = Path.Combine(indexDirectory, "index.db");
+                    _Logging?.Debug(_Header + "attempting to delete directory: " + indexDirectory +
+                        ", index.db exists: " + File.Exists(indexDbPath));
+
                     if (Directory.Exists(indexDirectory))
                     {
-                        try
+                        // Retry deletion with small delays to allow file handles to be released
+                        int maxRetries = 5;
+                        int delayMs = 100;
+                        bool directoryDeleted = false;
+                        Exception? lastException = null;
+
+                        for (int attempt = 1; attempt <= maxRetries; attempt++)
                         {
-                            Directory.Delete(indexDirectory, true);
-                            _Logging?.Info(_Header + "deleted storage directory for index '" + indexId + "'");
+                            try
+                            {
+                                Directory.Delete(indexDirectory, true);
+                                directoryDeleted = true;
+                                _Logging?.Info(_Header + "deleted storage directory for index '" + indexId + "' on attempt " + attempt);
+                                break;
+                            }
+                            catch (IOException ex) when (attempt < maxRetries)
+                            {
+                                lastException = ex;
+                                _Logging?.Debug(_Header + "IOException on attempt " + attempt + ": " + ex.Message);
+                                await Task.Delay(delayMs, token).ConfigureAwait(false);
+                                delayMs *= 2;
+                            }
+                            catch (UnauthorizedAccessException ex) when (attempt < maxRetries)
+                            {
+                                lastException = ex;
+                                _Logging?.Debug(_Header + "UnauthorizedAccessException on attempt " + attempt + ": " + ex.Message);
+                                await Task.Delay(delayMs, token).ConfigureAwait(false);
+                                delayMs *= 2;
+                            }
+                            catch (Exception ex)
+                            {
+                                lastException = ex;
+                                _Logging?.Warn(_Header + "failed to delete storage directory for index '" + indexId + "' after " + attempt + " attempt(s): " + ex.Message);
+                                break;
+                            }
                         }
-                        catch (Exception ex)
+
+                        // Verify the directory and index.db are actually gone
+                        bool dirStillExists = Directory.Exists(indexDirectory);
+                        bool dbFileStillExists = File.Exists(indexDbPath);
+
+                        if (!directoryDeleted || dirStillExists || dbFileStillExists)
                         {
-                            _Logging?.Warn(_Header + "failed to delete storage directory for index '" + indexId + "': " + ex.Message);
+                            _Logging?.Error(_Header + "CRITICAL: storage not fully deleted for index '" + indexId +
+                                "': directoryDeleted=" + directoryDeleted +
+                                ", dirExists=" + dirStillExists +
+                                ", dbFileExists=" + dbFileStillExists +
+                                ", path=" + indexDirectory);
+                            if (lastException != null)
+                            {
+                                _Logging?.Error(_Header + "last exception: " + lastException.GetType().Name + ": " + lastException.Message);
+                            }
+                        }
+                        else
+                        {
+                            _Logging?.Debug(_Header + "verified: directory and index.db are deleted");
                         }
                     }
+                    else
+                    {
+                        _Logging?.Debug(_Header + "directory does not exist: " + indexDirectory);
+                    }
+                }
+                else
+                {
+                    _Logging?.Debug(_Header + "index is in-memory, skipping directory deletion");
                 }
 
                 _Logging?.Info(_Header + "deleted index '" + indexId + "'");
@@ -276,6 +346,8 @@ namespace Verbex.Server.Services
                 LastUpdateUtc = metadata.LastUpdateUtc,
                 Labels = metadata.Labels,
                 Tags = metadata.Tags,
+                CustomMetadata = metadata.CustomMetadata,
+                CacheConfiguration = metadata.CacheConfiguration,
                 Statistics = await index.GetStatisticsAsync().ConfigureAwait(false)
             };
         }
@@ -455,7 +527,18 @@ namespace Verbex.Server.Services
             if (storageMode == StorageMode.OnDisk)
             {
                 string indexDirectory = Path.Combine(_DataDirectory, metadata.TenantId, metadata.Identifier);
-                if (!Directory.Exists(indexDirectory))
+                string indexDbPath = Path.Combine(indexDirectory, "index.db");
+
+                bool dirExisted = Directory.Exists(indexDirectory);
+                bool dbFileExisted = File.Exists(indexDbPath);
+                long dbFileSize = dbFileExisted ? new FileInfo(indexDbPath).Length : 0;
+
+                _Logging?.Debug(_Header + "InitializeIndexAsync: " + metadata.Identifier +
+                    ", dirExisted=" + dirExisted +
+                    ", dbFileExisted=" + dbFileExisted +
+                    ", dbFileSize=" + dbFileSize);
+
+                if (!dirExisted)
                 {
                     Directory.CreateDirectory(indexDirectory);
                 }
@@ -463,7 +546,22 @@ namespace Verbex.Server.Services
             }
 
             InvertedIndex index = new InvertedIndex(metadata.Identifier, verbexConfig);
+
+            // Log the ACTUAL path being used by InvertedIndex
+            _Logging?.Debug(_Header + "InitializeIndexAsync: " + metadata.Identifier +
+                ", actualStorageDir=" + (index.Configuration.StorageDirectory ?? "NULL") +
+                ", actualDbPath=" + index.Driver.Settings.Filename +
+                ", driverInMemory=" + index.Driver.Settings.InMemory);
+
             await index.OpenAsync().ConfigureAwait(false);
+
+            // Log document count after opening
+            if (storageMode == StorageMode.OnDisk)
+            {
+                long docCount = await index.GetDocumentCountAsync(token).ConfigureAwait(false);
+                _Logging?.Debug(_Header + "InitializeIndexAsync: " + metadata.Identifier +
+                    " opened with " + docCount + " existing documents");
+            }
 
             _Indices[metadata.Identifier] = index;
             _Metadata[metadata.Identifier] = metadata;

@@ -118,6 +118,9 @@ namespace Test
                 Console.WriteLine($"--- Configuration Tests ({modeName}) ---");
                 await ConfigurationTests.RunAllAsync(runner).ConfigureAwait(false);
 
+                Console.WriteLine($"--- TermIdCache Tests ({modeName}) ---");
+                await TermIdCacheTests.RunAllAsync(runner).ConfigureAwait(false);
+
                 Console.WriteLine($"--- Text Processing Tests ({modeName}) ---");
                 await TextProcessingTests.RunAllAsync(runner).ConfigureAwait(false);
 
@@ -138,6 +141,15 @@ namespace Test
 
                 Console.WriteLine($"--- Batch Document Retrieval Tests ({modeName}) ---");
                 await BatchDocumentRetrievalTests.RunAllAsync(runner).ConfigureAwait(false);
+
+                Console.WriteLine($"--- Batch Add Documents Tests ({modeName}) ---");
+                await BatchAddDocumentsTests.RunAllAsync(runner).ConfigureAwait(false);
+
+                Console.WriteLine($"--- Batch Delete Documents Tests ({modeName}) ---");
+                await BatchDeleteDocumentsTests.RunAllAsync(runner).ConfigureAwait(false);
+
+                Console.WriteLine($"--- Batch Existence Check Tests ({modeName}) ---");
+                await BatchExistenceCheckTests.RunAllAsync(runner).ConfigureAwait(false);
 
                 Console.WriteLine();
             }

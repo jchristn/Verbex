@@ -321,6 +321,35 @@
 						"description": "Delete an existing index and all its documents."
 					},
 					"response": []
+				},
+				{
+					"name": "Rebuild Cache",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/cache/rebuild",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"cache",
+								"rebuild"
+							]
+						},
+						"description": "Rebuild the term ID cache for an index. Use this if the database has been modified externally or to force a cache reload.\n\nResponse includes:\n- Success: Whether the rebuild was successful\n- TermsLoaded: Number of terms loaded into the cache\n- IndexId: The index identifier"
+					},
+					"response": []
 				}
 			]
 		},
@@ -549,6 +578,115 @@
 						"description": "Delete a specific document from the specified index."
 					},
 					"response": []
+				},
+				{
+					"name": "Delete Documents (Batch)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/documents?ids=doc1,doc2,doc3",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"documents"
+							],
+							"query": [
+								{
+									"key": "ids",
+									"value": "doc1,doc2,doc3",
+									"description": "Comma-separated list of document IDs to delete"
+								}
+							]
+						},
+						"description": "Delete multiple documents from an index by their IDs. This is more efficient than making multiple individual delete requests.\n\nQuery parameters:\n- ids: Comma-separated list of document IDs to delete\n\nResponse includes:\n- Deleted: Array of document IDs that were deleted\n- NotFound: Array of document IDs that were not found\n- DeletedCount: Number of documents deleted\n- NotFoundCount: Number of documents not found\n- RequestedCount: Total number of IDs requested"
+					},
+					"response": []
+				},
+				{
+					"name": "Add Documents (Batch)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Documents\": [\n        {\n            \"Name\": \"doc1.txt\",\n            \"Content\": \"This is the first document in the batch.\",\n            \"Labels\": [\"batch\", \"test\"],\n            \"Tags\": {\n                \"source\": \"batch-upload\"\n            }\n        },\n        {\n            \"Name\": \"doc2.txt\",\n            \"Content\": \"This is the second document with different content.\",\n            \"Labels\": [\"batch\"]\n        },\n        {\n            \"Id\": \"custom-id-123\",\n            \"Name\": \"doc3.txt\",\n            \"Content\": \"Third document with a custom ID.\"\n        }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/documents/batch",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"documents",
+								"batch"
+							]
+						},
+						"description": "Add multiple documents to an index in a single request. This is more efficient than making multiple individual add requests.\n\nRequest body:\n- Documents: Array of document objects\n  - Id (optional): Custom document ID (auto-generated if not provided)\n  - Name: Document name/path (required)\n  - Content: Document content to index (required)\n  - Labels (optional): Array of string labels\n  - Tags (optional): Key-value pairs\n  - CustomMetadata (optional): Any JSON value\n\nResponse includes:\n- Added: Array of successfully added documents\n- Failed: Array of documents that failed to be added\n- AddedCount: Number of documents added\n- FailedCount: Number of documents that failed\n- RequestedCount: Total number of documents in request"
+					},
+					"response": []
+				},
+				{
+					"name": "Check Documents Exist (Batch)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Ids\": [\"doc1\", \"doc2\", \"nonexistent-doc\"]\n}"
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/documents/exists",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"documents",
+								"exists"
+							]
+						},
+						"description": "Check if multiple documents exist in an index. This is useful for validating document IDs before performing operations.\n\nRequest body:\n- Ids: Array of document IDs to check\n\nResponse includes:\n- Exists: Array of document IDs that exist\n- NotFound: Array of document IDs that do not exist\n- ExistsCount: Number of documents that exist\n- NotFoundCount: Number of documents that do not exist\n- RequestedCount: Total number of IDs in request"
+					},
+					"response": []
 				}
 			]
 		},
@@ -733,6 +871,123 @@
 							]
 						},
 						"description": "Search for documents filtered by both labels and tags. Documents must match the search query AND have all specified labels AND have all specified tags."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Backup & Restore",
+			"description": "Backup and restore endpoints for creating and restoring index backups",
+			"item": [
+				{
+					"name": "Create Backup",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/backup",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"backup"
+							]
+						},
+						"description": "Create a backup of an index. Returns a ZIP archive containing the index database and metadata.\n\nThe backup archive (.vbx) contains:\n- manifest.json: Backup version, timestamp, checksums, and statistics\n- metadata.json: Index configuration and settings\n- index.db: SQLite database file\n\nNote: Only on-disk indices can be backed up. In-memory indices will return an error."
+					},
+					"response": []
+				},
+				{
+					"name": "Restore (New Index)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": "",
+									"description": "The backup file (.vbx) to restore"
+								},
+								{
+									"key": "name",
+									"value": "restored-index",
+									"type": "text",
+									"description": "Optional: Name for the restored index (defaults to original name)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/restore",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"restore"
+							]
+						},
+						"description": "Restore a backup as a new index.\n\nForm parameters:\n- file (required): The backup file (.vbx)\n- name (optional): Name for the restored index (defaults to original name)\n- indexId (optional): Custom ID for the restored index\n\nIf an index with the same name already exists, a unique name will be generated (e.g., 'myindex_restored_20240115103000').\n\nRestored indices are always on-disk (not in-memory)."
+					},
+					"response": []
+				},
+				{
+					"name": "Restore (Replace Existing)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": "",
+									"description": "The backup file (.vbx) to restore"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/restore",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"restore"
+							]
+						},
+						"description": "Restore a backup by replacing an existing index.\n\nForm parameters:\n- file (required): The backup file (.vbx)\n\nThis operation:\n1. Validates the backup file\n2. Flushes and closes the existing index\n3. Creates a backup of the current database\n4. Replaces the database with the backup\n5. Verifies the checksum\n6. Reopens the index\n\nIf verification fails, the original database is restored automatically.\n\nNote: Only on-disk indices can be replaced. In-memory indices will return an error."
 					},
 					"response": []
 				}

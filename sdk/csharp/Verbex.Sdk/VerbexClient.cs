@@ -2,6 +2,7 @@ namespace Verbex.Sdk
 {
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using System.Linq;
     using System.Net.Http;
     using System.Net.Http.Headers;
@@ -9,6 +10,8 @@ namespace Verbex.Sdk
     using System.Text.Json;
     using System.Threading;
     using System.Threading.Tasks;
+    using Verbex.Sdk.DTO.Requests;
+    using Verbex.Sdk.DTO.Responses;
 
     /// <summary>
     /// Verbex SDK Client for .NET.
@@ -588,7 +591,7 @@ namespace Verbex.Sdk
         /// <returns>Batch result containing found documents and list of not found IDs.</returns>
         /// <exception cref="ArgumentNullException">Thrown when indexId or documentIds is null.</exception>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<BatchDocumentsResult> GetDocumentsBatchAsync(
+        public async Task<BatchRetrieveResponse> GetDocumentsBatchAsync(
             string indexId,
             IEnumerable<string> documentIds,
             CancellationToken cancellationToken = default)
@@ -599,13 +602,13 @@ namespace Verbex.Sdk
             List<string> idList = new List<string>(documentIds);
             if (idList.Count == 0)
             {
-                return new BatchDocumentsResult();
+                return new BatchRetrieveResponse();
             }
 
             // Join IDs with commas - don't URL-encode the entire string as commas are valid in query strings
             // Only escape individual IDs that might contain special characters
             string idsParam = string.Join(",", idList.Select(id => Uri.EscapeDataString(id)));
-            return await MakeRequestAsync<BatchDocumentsResult>(
+            return await MakeRequestAsync<BatchRetrieveResponse>(
                 HttpMethod.Get,
                 $"/v1.0/indices/{indexId}/documents?ids={idsParam}",
                 null,
@@ -646,7 +649,7 @@ namespace Verbex.Sdk
         /// <returns>Batch result containing lists of deleted and not found IDs.</returns>
         /// <exception cref="ArgumentNullException">Thrown when indexId or documentIds is null.</exception>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        public async Task<BatchDeleteResult> DeleteDocumentsBatchAsync(
+        public async Task<BatchDeleteResponse> DeleteDocumentsBatchAsync(
             string indexId,
             IEnumerable<string> documentIds,
             CancellationToken cancellationToken = default)
@@ -657,15 +660,79 @@ namespace Verbex.Sdk
             List<string> idList = new List<string>(documentIds);
             if (idList.Count == 0)
             {
-                return new BatchDeleteResult();
+                return new BatchDeleteResponse();
             }
 
             // Join IDs with commas - escape individual IDs that might contain special characters
             string idsParam = string.Join(",", idList.Select(id => Uri.EscapeDataString(id)));
-            return await MakeRequestAsync<BatchDeleteResult>(
+            return await MakeRequestAsync<BatchDeleteResponse>(
                 HttpMethod.Delete,
                 $"/v1.0/indices/{indexId}/documents?ids={idsParam}",
                 null,
+                true,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Adds multiple documents to an index in a single request.
+        /// </summary>
+        /// <param name="indexId">The index identifier.</param>
+        /// <param name="documents">Collection of documents to add.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Batch result containing lists of added and failed documents.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when indexId or documents is null.</exception>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<BatchAddDocumentsResponse> AddDocumentsBatchAsync(
+            string indexId,
+            IEnumerable<BatchAddDocumentItem> documents,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(indexId);
+            ArgumentNullException.ThrowIfNull(documents);
+
+            List<BatchAddDocumentItem> docList = new List<BatchAddDocumentItem>(documents);
+            if (docList.Count == 0)
+            {
+                return new BatchAddDocumentsResponse();
+            }
+
+            BatchAddDocumentsRequest request = new BatchAddDocumentsRequest { Documents = docList };
+            return await MakeRequestAsync<BatchAddDocumentsResponse>(
+                HttpMethod.Post,
+                $"/v1.0/indices/{indexId}/documents/batch",
+                request,
+                true,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Checks if multiple documents exist in an index.
+        /// </summary>
+        /// <param name="indexId">The index identifier.</param>
+        /// <param name="documentIds">Collection of document IDs to check.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Batch result containing lists of existing and not found IDs.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when indexId or documentIds is null.</exception>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<BatchCheckExistenceResponse> CheckDocumentsExistAsync(
+            string indexId,
+            IEnumerable<string> documentIds,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(indexId);
+            ArgumentNullException.ThrowIfNull(documentIds);
+
+            List<string> idList = new List<string>(documentIds);
+            if (idList.Count == 0)
+            {
+                return new BatchCheckExistenceResponse();
+            }
+
+            BatchCheckExistenceRequest request = new BatchCheckExistenceRequest { Ids = idList };
+            return await MakeRequestAsync<BatchCheckExistenceResponse>(
+                HttpMethod.Post,
+                $"/v1.0/indices/{indexId}/documents/exists",
+                request,
                 true,
                 cancellationToken).ConfigureAwait(false);
         }
@@ -729,6 +796,177 @@ namespace Verbex.Sdk
         {
             SearchRequest request = new SearchRequest(query, maxResults, labels, tags);
             return await MakeRequestAsync<SearchData>(HttpMethod.Post, $"/v1.0/indices/{indexId}/search", request, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        // ==================== Backup & Restore Endpoints ====================
+
+        /// <summary>
+        /// Creates a backup of an index and returns it as a stream.
+        /// The stream contains a ZIP archive with the index database and metadata.
+        /// </summary>
+        /// <param name="indexId">The index identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>A stream containing the backup ZIP archive.</returns>
+        /// <exception cref="VerbexException">Thrown when the backup fails.</exception>
+        public async Task<Stream> BackupAsync(string indexId, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(indexId);
+
+            string url = $"{_Endpoint}/v1.0/indices/{indexId}/backup";
+
+            using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, url);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _AccessKey);
+
+            HttpResponseMessage response = await _HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                string errorBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                throw new VerbexException($"Backup failed: {errorBody}", (int)response.StatusCode);
+            }
+
+            return await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Creates a backup of an index and returns it as a byte array.
+        /// </summary>
+        /// <param name="indexId">The index identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>A byte array containing the backup ZIP archive.</returns>
+        /// <exception cref="VerbexException">Thrown when the backup fails.</exception>
+        public async Task<byte[]> BackupAsBytesAsync(string indexId, CancellationToken cancellationToken = default)
+        {
+            using Stream stream = await BackupAsync(indexId, cancellationToken).ConfigureAwait(false);
+            using MemoryStream memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream, cancellationToken).ConfigureAwait(false);
+            return memoryStream.ToArray();
+        }
+
+        /// <summary>
+        /// Creates a backup of an index and saves it to a file.
+        /// </summary>
+        /// <param name="indexId">The index identifier.</param>
+        /// <param name="filePath">The file path to save the backup to.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <exception cref="VerbexException">Thrown when the backup fails.</exception>
+        public async Task BackupToFileAsync(string indexId, string filePath, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(filePath);
+
+            using Stream backupStream = await BackupAsync(indexId, cancellationToken).ConfigureAwait(false);
+            using FileStream fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write);
+            await backupStream.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Restores a backup to create a new index.
+        /// </summary>
+        /// <param name="backupStream">The backup stream (ZIP archive).</param>
+        /// <param name="name">Optional new name for the restored index.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Information about the restored index.</returns>
+        /// <exception cref="VerbexException">Thrown when the restore fails.</exception>
+        public async Task<RestoreResult> RestoreAsync(Stream backupStream, string? name = null, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(backupStream);
+
+            string url = $"{_Endpoint}/v1.0/indices/restore";
+
+            using MultipartFormDataContent content = new MultipartFormDataContent();
+            using MemoryStream ms = new MemoryStream();
+            await backupStream.CopyToAsync(ms, cancellationToken).ConfigureAwait(false);
+            ms.Position = 0;
+
+            StreamContent fileContent = new StreamContent(ms);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
+            content.Add(fileContent, "file", "backup.vbx");
+
+            if (!string.IsNullOrEmpty(name))
+            {
+                content.Add(new StringContent(name), "name");
+            }
+
+            using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, url);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _AccessKey);
+            request.Content = content;
+
+            HttpResponseMessage response = await _HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            string responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new VerbexException($"Restore failed: {responseBody}", (int)response.StatusCode);
+            }
+
+            ApiResponse<RestoreResult>? apiResponse = JsonSerializer.Deserialize<ApiResponse<RestoreResult>>(responseBody, _JsonOptions);
+            if (apiResponse?.Data == null)
+            {
+                throw new VerbexException("Failed to parse restore response");
+            }
+
+            return apiResponse.Data;
+        }
+
+        /// <summary>
+        /// Restores a backup from a file to create a new index.
+        /// </summary>
+        /// <param name="filePath">The path to the backup file.</param>
+        /// <param name="name">Optional new name for the restored index.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Information about the restored index.</returns>
+        /// <exception cref="VerbexException">Thrown when the restore fails.</exception>
+        public async Task<RestoreResult> RestoreFromFileAsync(string filePath, string? name = null, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(filePath);
+
+            using FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+            return await RestoreAsync(fileStream, name, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Restores a backup by replacing an existing index.
+        /// </summary>
+        /// <param name="indexId">The index identifier to replace.</param>
+        /// <param name="backupStream">The backup stream (ZIP archive).</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Information about the restored index.</returns>
+        /// <exception cref="VerbexException">Thrown when the restore fails.</exception>
+        public async Task<RestoreResult> RestoreReplaceAsync(string indexId, Stream backupStream, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(indexId);
+            ArgumentNullException.ThrowIfNull(backupStream);
+
+            string url = $"{_Endpoint}/v1.0/indices/{indexId}/restore";
+
+            using MultipartFormDataContent content = new MultipartFormDataContent();
+            using MemoryStream ms = new MemoryStream();
+            await backupStream.CopyToAsync(ms, cancellationToken).ConfigureAwait(false);
+            ms.Position = 0;
+
+            StreamContent fileContent = new StreamContent(ms);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
+            content.Add(fileContent, "file", "backup.vbx");
+
+            using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, url);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _AccessKey);
+            request.Content = content;
+
+            HttpResponseMessage response = await _HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            string responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new VerbexException($"Restore failed: {responseBody}", (int)response.StatusCode);
+            }
+
+            ApiResponse<RestoreResult>? apiResponse = JsonSerializer.Deserialize<ApiResponse<RestoreResult>>(responseBody, _JsonOptions);
+            if (apiResponse?.Data == null)
+            {
+                throw new VerbexException("Failed to parse restore response");
+            }
+
+            return apiResponse.Data;
         }
 
         // ==================== Admin - Tenant Management Endpoints ====================

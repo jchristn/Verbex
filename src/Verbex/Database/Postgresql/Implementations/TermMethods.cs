@@ -8,6 +8,7 @@ namespace Verbex.Database.Postgresql.Implementations
     using System.Threading;
     using System.Threading.Tasks;
     using Verbex.Database.Interfaces;
+    using Verbex.DTO;
     using Verbex.Models;
     using Verbex.Utilities;
 
@@ -128,47 +129,43 @@ FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{S
         {
             if (terms == null || terms.Count == 0) return new Dictionary<string, string>();
 
-            const int ChunkSize = 100;
             DateTime now = DateTime.UtcNow;
             string nowFormatted = Sanitizer.FormatDateTime(now);
             List<KeyValuePair<string, string>> termsList = terms.ToList();
 
-            // First, batch insert all terms with ON CONFLICT DO NOTHING
-            for (int i = 0; i < termsList.Count; i += ChunkSize)
+            // Single INSERT with ON CONFLICT DO UPDATE and RETURNING
+            // Using DO UPDATE SET term = EXCLUDED.term (a no-op update) causes PostgreSQL
+            // to return ALL rows via RETURNING, including existing ones - not just new inserts.
+            // This eliminates the need for a separate SELECT query.
+            StringBuilder sb = new StringBuilder();
+            sb.Append("INSERT INTO terms (id, tenant_id, index_id, term, document_frequency, total_frequency, last_update_utc, created_utc) VALUES ");
+
+            List<string> valuesClauses = new List<string>();
+            foreach (KeyValuePair<string, string> kvp in termsList)
             {
-                List<KeyValuePair<string, string>> chunk = termsList.Skip(i).Take(ChunkSize).ToList();
-                StringBuilder sb = new StringBuilder();
-                sb.Append("INSERT INTO terms (id, tenant_id, index_id, term, document_frequency, total_frequency, last_update_utc, created_utc) VALUES ");
-
-                List<string> valuesClauses = new List<string>();
-                foreach (KeyValuePair<string, string> kvp in chunk)
-                {
-                    valuesClauses.Add($"('{Sanitizer.Sanitize(kvp.Key)}', '{Sanitizer.Sanitize(tenantId)}', '{Sanitizer.Sanitize(indexId)}', '{Sanitizer.Sanitize(kvp.Value)}', 0, 0, '{nowFormatted}', '{nowFormatted}')");
-                }
-
-                sb.Append(string.Join(", ", valuesClauses));
-                sb.Append(" ON CONFLICT (index_id, term) DO NOTHING;");
-
-                await _Driver.ExecuteQueryAsync(sb.ToString(), true, token).ConfigureAwait(false);
+                valuesClauses.Add($"('{Sanitizer.Sanitize(kvp.Key)}', '{Sanitizer.Sanitize(tenantId)}', '{Sanitizer.Sanitize(indexId)}', '{Sanitizer.Sanitize(kvp.Value)}', 0, 0, '{nowFormatted}', '{nowFormatted}')");
             }
 
-            // Then, retrieve all term IDs in a single query
-            List<string> termValues = terms.Values.ToList();
-            Dictionary<string, TermRecord> existingTerms = await GetMultipleAsync(tenantId, indexId, termValues, token).ConfigureAwait(false);
+            sb.Append(string.Join(", ", valuesClauses));
+            sb.Append(" ON CONFLICT (index_id, term) DO UPDATE SET term = EXCLUDED.term RETURNING id, term;");
+
+            DataTable dt = await _Driver.ExecuteQueryAsync(sb.ToString(), false, token).ConfigureAwait(false);
 
             Dictionary<string, string> result = new Dictionary<string, string>();
-            foreach (string termValue in termValues)
+            foreach (DataRow row in dt.Rows)
             {
-                if (existingTerms.TryGetValue(termValue, out TermRecord? record))
+                string termValue = row["term"]?.ToString() ?? string.Empty;
+                string termId = row["id"]?.ToString() ?? string.Empty;
+                if (!string.IsNullOrEmpty(termValue) && !string.IsNullOrEmpty(termId))
                 {
-                    result[termValue] = record.Id;
+                    result[termValue] = termId;
                 }
             }
 
             return result;
         }
 
-        public async Task IncrementFrequenciesBatchAsync(string tenantId, string indexId, Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> updates, CancellationToken token = default)
+        public async Task IncrementFrequenciesBatchAsync(string tenantId, string indexId, Dictionary<string, FrequencyDelta> updates, CancellationToken token = default)
         {
             if (updates == null || updates.Count == 0) return;
 
@@ -178,7 +175,7 @@ FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{S
 
             StringBuilder docFreqCase = new StringBuilder("CASE id ");
             StringBuilder totalFreqCase = new StringBuilder("CASE id ");
-            foreach (KeyValuePair<string, (int DocFreqDelta, int TotalFreqDelta)> kvp in updates)
+            foreach (KeyValuePair<string, FrequencyDelta> kvp in updates)
             {
                 docFreqCase.Append($"WHEN '{Sanitizer.Sanitize(kvp.Key)}' THEN {kvp.Value.DocFreqDelta} ");
                 totalFreqCase.Append($"WHEN '{Sanitizer.Sanitize(kvp.Key)}' THEN {kvp.Value.TotalFreqDelta} ");
@@ -194,15 +191,15 @@ WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sa
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
         }
 
-        public async Task DecrementFrequenciesBatchAsync(string tenantId, string indexId, Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> updates, CancellationToken token = default)
+        public async Task DecrementFrequenciesBatchAsync(string tenantId, string indexId, Dictionary<string, FrequencyDelta> updates, CancellationToken token = default)
         {
             if (updates == null || updates.Count == 0) return;
 
             // Convert to negative deltas and call increment
-            Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> negatedUpdates = new Dictionary<string, (int, int)>();
-            foreach (KeyValuePair<string, (int DocFreqDelta, int TotalFreqDelta)> kvp in updates)
+            Dictionary<string, FrequencyDelta> negatedUpdates = new Dictionary<string, FrequencyDelta>();
+            foreach (KeyValuePair<string, FrequencyDelta> kvp in updates)
             {
-                negatedUpdates[kvp.Key] = (-kvp.Value.DocFreqDelta, -kvp.Value.TotalFreqDelta);
+                negatedUpdates[kvp.Key] = new FrequencyDelta(-kvp.Value.DocFreqDelta, -kvp.Value.TotalFreqDelta);
             }
             await IncrementFrequenciesBatchAsync(tenantId, indexId, negatedUpdates, token).ConfigureAwait(false);
         }
@@ -227,6 +224,23 @@ WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sa
             string query = $"DELETE FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}';";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
             return count;
+        }
+
+        public async Task<Dictionary<string, string>> GetAllTermIdsAsync(string tenantId, string indexId, CancellationToken token = default)
+        {
+            Dictionary<string, string> result = new Dictionary<string, string>();
+            string query = $"SELECT term, id FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}';";
+            DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
+            foreach (DataRow row in dt.Rows)
+            {
+                string term = row["term"]?.ToString() ?? string.Empty;
+                string id = row["id"]?.ToString() ?? string.Empty;
+                if (!string.IsNullOrEmpty(term) && !string.IsNullOrEmpty(id))
+                {
+                    result[term] = id;
+                }
+            }
+            return result;
         }
 
         private static TermRecord MapRowToTerm(DataRow row)

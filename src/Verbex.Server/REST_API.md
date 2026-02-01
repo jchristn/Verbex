@@ -455,6 +455,174 @@ curl -X DELETE http://localhost:8080/v1.0/indices/main/documents/doc-123 \
 }
 ```
 
+### DELETE /v1.0/indices/{indexId}/documents?ids=id1,id2,id3
+
+Delete multiple documents by IDs from a specific index (batch delete).
+
+```bash
+curl -X DELETE "http://localhost:8080/v1.0/indices/main/documents?ids=doc-1,doc-2,doc-3" \
+  -H "Authorization: Bearer verbexadmin"
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "timestampUtc": "2024-01-15T10:30:00.000Z",
+  "statusCode": 200,
+  "errorMessage": null,
+  "data": {
+    "deleted": ["doc-1", "doc-2"],
+    "notFound": ["doc-3"],
+    "deletedCount": 2,
+    "notFoundCount": 1,
+    "requestedCount": 3
+  },
+  "headers": {},
+  "totalCount": null,
+  "skip": null,
+  "processingTimeMs": 15.234
+}
+```
+
+### POST /v1.0/indices/{indexId}/documents/batch
+
+Add multiple documents to a specific index in a single request (batch add).
+
+```bash
+curl -X POST http://localhost:8080/v1.0/indices/main/documents/batch \
+  -H "Authorization: Bearer verbexadmin" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Documents": [
+      {
+        "Name": "doc1.txt",
+        "Content": "This is the first document content.",
+        "Labels": ["important", "batch"],
+        "Tags": {"source": "batch-upload"}
+      },
+      {
+        "Name": "doc2.txt",
+        "Content": "This is the second document content."
+      },
+      {
+        "Id": "custom-id-123",
+        "Name": "doc3.txt",
+        "Content": "Third document with custom ID."
+      }
+    ]
+  }'
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "timestampUtc": "2024-01-15T10:30:00.000Z",
+  "statusCode": 201,
+  "errorMessage": null,
+  "data": {
+    "added": [
+      {"documentId": "auto-generated-id-1", "name": "doc1.txt", "success": true},
+      {"documentId": "auto-generated-id-2", "name": "doc2.txt", "success": true},
+      {"documentId": "custom-id-123", "name": "doc3.txt", "success": true}
+    ],
+    "failed": [],
+    "addedCount": 3,
+    "failedCount": 0,
+    "requestedCount": 3
+  },
+  "headers": {},
+  "totalCount": null,
+  "skip": null,
+  "processingTimeMs": 45.678
+}
+```
+
+### POST /v1.0/indices/{indexId}/documents/exists
+
+Check if multiple documents exist in a specific index (batch existence check).
+
+```bash
+curl -X POST http://localhost:8080/v1.0/indices/main/documents/exists \
+  -H "Authorization: Bearer verbexadmin" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Ids": ["doc-1", "doc-2", "nonexistent-doc"]
+  }'
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "timestampUtc": "2024-01-15T10:30:00.000Z",
+  "statusCode": 200,
+  "errorMessage": null,
+  "data": {
+    "exists": ["doc-1", "doc-2"],
+    "notFound": ["nonexistent-doc"],
+    "existsCount": 2,
+    "notFoundCount": 1,
+    "requestedCount": 3
+  },
+  "headers": {},
+  "totalCount": null,
+  "skip": null,
+  "processingTimeMs": 5.432
+}
+```
+
+### GET /v1.0/indices/{indexId}/documents?ids=id1,id2,id3
+
+Retrieve multiple documents by IDs from a specific index (batch retrieve).
+
+```bash
+curl -X GET "http://localhost:8080/v1.0/indices/main/documents?ids=doc-1,doc-2,doc-3" \
+  -H "Authorization: Bearer verbexadmin"
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "timestampUtc": "2024-01-15T10:30:00.000Z",
+  "statusCode": 200,
+  "errorMessage": null,
+  "data": {
+    "documents": [
+      {
+        "documentId": "doc-1",
+        "documentPath": "doc1.txt",
+        "contentSha256": "abc123...",
+        "contentLength": 150,
+        "termCount": 25,
+        "labels": ["important"],
+        "tags": {"author": "test"},
+        "addedUtc": "2024-01-15T10:30:00.000Z"
+      },
+      {
+        "documentId": "doc-2",
+        "documentPath": "doc2.txt",
+        "contentSha256": "def456...",
+        "contentLength": 200,
+        "termCount": 30,
+        "labels": [],
+        "tags": {},
+        "addedUtc": "2024-01-15T10:31:00.000Z"
+      }
+    ],
+    "notFound": ["doc-3"],
+    "count": 2,
+    "requestedCount": 3
+  },
+  "headers": {},
+  "totalCount": null,
+  "skip": null,
+  "processingTimeMs": 8.765
+}
+```
+
 ---
 
 ## Search Endpoints
@@ -529,6 +697,129 @@ curl -X POST http://localhost:8080/v1.0/indices/test/search \
     "query": "technical documentation",
     "maxResults": 5
   }'
+```
+
+---
+
+## Backup and Restore Endpoints
+
+These endpoints allow you to create backups of indices and restore them later.
+
+### POST /v1.0/indices/{id}/backup
+
+Create a backup of an index. Only on-disk indices can be backed up.
+
+```bash
+curl -X POST http://localhost:8080/v1.0/indices/main/backup \
+  -H "Authorization: Bearer verbexadmin" \
+  -o main-backup.vbx
+```
+
+**Expected Response:**
+Binary ZIP file with `Content-Type: application/zip` and `Content-Disposition: attachment; filename="main_20240115_103000.vbx"`
+
+The backup archive contains:
+- `manifest.json` - Backup metadata including version, timestamp, checksums
+- `metadata.json` - Index configuration and settings
+- `index.db` - SQLite database file
+
+**Error Response (In-Memory Index):**
+```json
+{
+  "success": false,
+  "timestampUtc": "2024-01-15T10:30:00.000Z",
+  "statusCode": 400,
+  "errorMessage": "Cannot backup in-memory indices. Index 'main' is in-memory only.",
+  "data": null,
+  "processingTimeMs": 1.5
+}
+```
+
+### POST /v1.0/indices/restore
+
+Restore a backup as a new index.
+
+```bash
+curl -X POST http://localhost:8080/v1.0/indices/restore \
+  -H "Authorization: Bearer verbexadmin" \
+  -F "file=@main-backup.vbx" \
+  -F "name=restored-index"
+```
+
+**Form Parameters:**
+- `file` (required) - The backup file (.vbx)
+- `name` (optional) - Name for the restored index (defaults to original name)
+- `indexId` (optional) - Custom ID for the restored index
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "timestampUtc": "2024-01-15T10:30:00.000Z",
+  "statusCode": 201,
+  "errorMessage": null,
+  "data": {
+    "success": true,
+    "indexId": "restored-index",
+    "message": "Index restored successfully as 'restored-index'",
+    "warnings": ["Original index had 150 documents and 5000 terms"]
+  },
+  "processingTimeMs": 125.456
+}
+```
+
+**Error Response (Invalid Backup):**
+```json
+{
+  "success": false,
+  "timestampUtc": "2024-01-15T10:30:00.000Z",
+  "statusCode": 422,
+  "errorMessage": "Backup archive is missing manifest.json",
+  "data": null,
+  "processingTimeMs": 5.0
+}
+```
+
+### POST /v1.0/indices/{id}/restore
+
+Restore a backup by replacing an existing index.
+
+```bash
+curl -X POST http://localhost:8080/v1.0/indices/main/restore \
+  -H "Authorization: Bearer verbexadmin" \
+  -F "file=@main-backup.vbx"
+```
+
+**Form Parameters:**
+- `file` (required) - The backup file (.vbx)
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "timestampUtc": "2024-01-15T10:30:00.000Z",
+  "statusCode": 200,
+  "errorMessage": null,
+  "data": {
+    "success": true,
+    "indexId": "main",
+    "message": "Index 'main' replaced successfully from backup",
+    "warnings": ["Restored backup had 150 documents and 5000 terms"]
+  },
+  "processingTimeMs": 250.789
+}
+```
+
+**Error Response (Index Not Found):**
+```json
+{
+  "success": false,
+  "timestampUtc": "2024-01-15T10:30:00.000Z",
+  "statusCode": 404,
+  "errorMessage": "Index not found: main",
+  "data": null,
+  "processingTimeMs": 1.0
+}
 ```
 
 ---

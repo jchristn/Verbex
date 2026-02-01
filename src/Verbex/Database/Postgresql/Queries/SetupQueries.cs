@@ -197,7 +197,9 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
             "CREATE INDEX IF NOT EXISTS idx_terms_index ON terms(index_id)",
             "CREATE INDEX IF NOT EXISTS idx_terms_tenant_index ON terms(tenant_id, index_id)",
             "CREATE INDEX IF NOT EXISTS idx_terms_term ON terms(index_id, term)",
+            "CREATE INDEX IF NOT EXISTS idx_terms_tenant_index_term ON terms(tenant_id, index_id, term)",
             "CREATE INDEX IF NOT EXISTS idx_terms_document_frequency ON terms(document_frequency DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_terms_orphan_cleanup ON terms(tenant_id, index_id, document_frequency)",
 
             // Document-term indexes (critical for inverted index lookups)
             "CREATE INDEX IF NOT EXISTS idx_document_terms_document ON document_terms(document_id)",

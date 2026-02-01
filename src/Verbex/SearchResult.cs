@@ -37,7 +37,7 @@ namespace Verbex
 
             _DocumentId = documentId;
             _Document = null;
-            _Score = score;
+            _Score = Math.Round(score, 4);
             _MatchedTermCount = 0;
             _TermScores = new Dictionary<string, double>();
             _TermFrequencies = new Dictionary<string, int>();
@@ -68,7 +68,7 @@ namespace Verbex
 
             _DocumentId = document.DocumentId;
             _Document = document;
-            _Score = score;
+            _Score = Math.Round(score, 4);
             _MatchedTermCount = matchedTermCount;
             _TermScores = new Dictionary<string, double>();
             _TermFrequencies = new Dictionary<string, int>();
@@ -102,7 +102,8 @@ namespace Verbex
         /// <summary>
         /// Gets or sets the overall relevance score for this result.
         /// Minimum value: 0.0
-        /// Higher scores indicate greater relevance
+        /// Higher scores indicate greater relevance.
+        /// Value is rounded to 4 decimal places.
         /// </summary>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when value is negative</exception>
         public double Score
@@ -114,7 +115,7 @@ namespace Verbex
                 {
                     throw new ArgumentOutOfRangeException(nameof(value), "Score cannot be negative");
                 }
-                _Score = value;
+                _Score = Math.Round(value, 4);
             }
         }
 
@@ -180,7 +181,7 @@ namespace Verbex
                 _TotalTermMatches -= _TermFrequencies[normalizedTerm];
             }
 
-            _TermScores[normalizedTerm] = score;
+            _TermScores[normalizedTerm] = Math.Round(score, 4);
             _TermFrequencies[normalizedTerm] = frequency;
             _TotalTermMatches += frequency;
         }
@@ -239,7 +240,8 @@ namespace Verbex
         }
 
         /// <summary>
-        /// Calculates the percentage of query terms that matched in this document
+        /// Calculates the percentage of query terms that matched in this document.
+        /// Value is rounded to 4 decimal places.
         /// </summary>
         /// <param name="totalQueryTerms">Total number of terms in the original query</param>
         /// <returns>Match percentage between 0.0 and 1.0</returns>
@@ -251,7 +253,7 @@ namespace Verbex
                 throw new ArgumentOutOfRangeException(nameof(totalQueryTerms), "Total query terms must be at least 1");
             }
 
-            return (double)_TermScores.Count / totalQueryTerms;
+            return Math.Round((double)_TermScores.Count / totalQueryTerms, 4);
         }
     }
 }

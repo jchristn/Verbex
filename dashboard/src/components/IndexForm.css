@@ -126,6 +126,30 @@
   border: 1px solid var(--color-error-border);
 }
 
+.cache-subsection {
+  padding: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin-top: 12px;
+}
+
+.cache-subsection h5 {
+  margin: 0 0 12px 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cache-subsection .form-row {
+  margin-top: 12px;
+}
+
+.cache-subsection .form-hint {
+  display: block;
+  margin-top: 4px;
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-end;

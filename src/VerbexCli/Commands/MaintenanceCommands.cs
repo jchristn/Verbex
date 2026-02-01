@@ -176,7 +176,7 @@ namespace VerbexCli.Commands
                 string actualIndex = index ?? IndexManager.Instance.CurrentIndexName ?? throw new InvalidOperationException("No index specified and no active index set. Use 'vbx index use <name>' to set an active index.");
                 OutputManager.WriteVerbose($"Running garbage collection for index '{actualIndex}'");
 
-                var indexManager = IndexManager.Instance;
+                IndexManager indexManager = IndexManager.Instance;
                 await indexManager.UseIndexAsync(actualIndex).ConfigureAwait(false);
 
                 if (indexManager.CurrentIndex != null)
@@ -209,11 +209,11 @@ namespace VerbexCli.Commands
                 string actualIndex = index ?? IndexManager.Instance.CurrentIndexName ?? throw new InvalidOperationException("No index specified and no active index set. Use 'vbx index use <name>' to set an active index.");
                 OutputManager.WriteVerbose($"Running benchmark for index '{actualIndex}' with {documents} documents");
 
-                var indexManager = IndexManager.Instance;
-                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                IndexManager indexManager = IndexManager.Instance;
+                System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
                 // Clear any existing benchmark documents first
-                var existingDocs = await indexManager.ListDocumentsAsync(actualIndex).ConfigureAwait(false);
+                object[] existingDocs = await indexManager.ListDocumentsAsync(actualIndex).ConfigureAwait(false);
                 foreach (dynamic doc in existingDocs)
                 {
                     if (doc.Name != null && doc.Name.ToString().StartsWith("bench"))
@@ -234,7 +234,7 @@ namespace VerbexCli.Commands
                 string[] words = { "benchmark", "test", "document", "performance", "index", "search", "data", "analysis" };
 
                 // Indexing benchmark
-                var indexingStart = System.Diagnostics.Stopwatch.StartNew();
+                System.Diagnostics.Stopwatch indexingStart = System.Diagnostics.Stopwatch.StartNew();
                 for (int i = 0; i < documents; i++)
                 {
                     string content = string.Join(" ", Enumerable.Range(0, random.Next(10, 50))
@@ -244,7 +244,7 @@ namespace VerbexCli.Commands
                 indexingStart.Stop();
 
                 // Search benchmark
-                var searchStart = System.Diagnostics.Stopwatch.StartNew();
+                System.Diagnostics.Stopwatch searchStart = System.Diagnostics.Stopwatch.StartNew();
                 for (int i = 0; i < 10; i++)
                 {
                     await indexManager.SearchAsync(actualIndex, words[random.Next(words.Length)], false, 10).ConfigureAwait(false);
@@ -253,7 +253,7 @@ namespace VerbexCli.Commands
 
                 stopwatch.Stop();
 
-                var results = new
+                BenchmarkResult results = new BenchmarkResult
                 {
                     Index = actualIndex,
                     Documents = documents,
@@ -282,8 +282,8 @@ namespace VerbexCli.Commands
                 string actualIndex = index ?? IndexManager.Instance.CurrentIndexName ?? throw new InvalidOperationException("No index specified and no active index set. Use 'vbx index use <name>' to set an active index.");
                 OutputManager.WriteVerbose($"Running stress test for index '{actualIndex}' with {documents} documents");
 
-                var indexManager = IndexManager.Instance;
-                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                IndexManager indexManager = IndexManager.Instance;
+                System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
                 int errors = 0;
 
                 try
@@ -333,7 +333,7 @@ namespace VerbexCli.Commands
 
                     stopwatch.Stop();
 
-                    var results = new
+                    StressTestResult results = new StressTestResult
                     {
                         Index = actualIndex,
                         Documents = documents,

@@ -173,7 +173,11 @@ namespace Verbex.Database.Sqlite
                     await CheckpointAsync(token).ConfigureAwait(false);
                 }
 
+                // Clear the connection pool before closing to prevent cached connections
+                // from being reused when a database at the same path is recreated
+                SqliteConnection connectionToClose = _Connection;
                 await _Connection.CloseAsync().ConfigureAwait(false);
+                SqliteConnection.ClearPool(connectionToClose);
                 _Connection.Dispose();
                 _Connection = null;
                 _IsOpen = false;
@@ -389,6 +393,13 @@ namespace Verbex.Database.Sqlite
                     continue;
                 }
 
+                // Replace busy_timeout with configurable value based on CommandTimeout
+                if (trimmedPragma.StartsWith("PRAGMA busy_timeout", StringComparison.OrdinalIgnoreCase))
+                {
+                    int busyTimeoutMs = Settings.CommandTimeout * 1000;
+                    trimmedPragma = $"PRAGMA busy_timeout = {busyTimeoutMs}";
+                }
+
                 using SqliteCommand cmd = _Connection!.CreateCommand();
                 cmd.CommandText = trimmedPragma;
                 await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
@@ -492,7 +503,11 @@ namespace Verbex.Database.Sqlite
                         _Semaphore.Wait();
                         try
                         {
+                            // Clear the connection pool before closing to prevent cached connections
+                            // from being reused when a database at the same path is recreated
+                            SqliteConnection connectionToClose = _Connection;
                             _Connection.Close();
+                            SqliteConnection.ClearPool(connectionToClose);
                             _Connection.Dispose();
                             _Connection = null;
                             _IsOpen = false;
@@ -509,6 +524,11 @@ namespace Verbex.Database.Sqlite
                 }
                 else
                 {
+                    // Still clear pool if connection exists but isn't open
+                    if (_Connection != null)
+                    {
+                        SqliteConnection.ClearPool(_Connection);
+                    }
                     _Connection?.Dispose();
                     _Connection = null;
                 }
@@ -529,7 +549,11 @@ namespace Verbex.Database.Sqlite
                     await _Semaphore.WaitAsync().ConfigureAwait(false);
                     try
                     {
+                        // Clear the connection pool before closing to prevent cached connections
+                        // from being reused when a database at the same path is recreated
+                        SqliteConnection connectionToClose = _Connection;
                         await _Connection.CloseAsync().ConfigureAwait(false);
+                        SqliteConnection.ClearPool(connectionToClose);
                         _Connection.Dispose();
                         _Connection = null;
                         _IsOpen = false;
@@ -546,6 +570,11 @@ namespace Verbex.Database.Sqlite
             }
             else
             {
+                // Still clear pool if connection exists but isn't open
+                if (_Connection != null)
+                {
+                    SqliteConnection.ClearPool(_Connection);
+                }
                 _Connection?.Dispose();
                 _Connection = null;
             }

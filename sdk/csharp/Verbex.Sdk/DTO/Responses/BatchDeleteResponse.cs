@@ -1,4 +1,4 @@
-namespace Verbex.Sdk
+namespace Verbex.Sdk.DTO.Responses
 {
     using System.Collections.Generic;
 
@@ -6,7 +6,7 @@ namespace Verbex.Sdk
     /// Result of a batch document deletion operation.
     /// Contains lists of successfully deleted and not found document IDs.
     /// </summary>
-    public class BatchDeleteResult
+    public class BatchDeleteResponse
     {
         /// <summary>
         /// List of document IDs that were successfully deleted.

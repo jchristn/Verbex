@@ -1,6 +1,7 @@
 namespace Verbex.Server.Classes
 {
     using System;
+    using Verbex;
 
     /// <summary>
     /// Request to update an index's core properties.
@@ -54,6 +55,22 @@ namespace Verbex.Server.Classes
             }
         }
 
+        /// <summary>
+        /// New cache configuration for the index (optional, only update if provided).
+        /// Set to a new CacheConfiguration to enable/configure caching.
+        /// </summary>
+        public CacheConfiguration? CacheConfiguration
+        {
+            get
+            {
+                return _CacheConfiguration;
+            }
+            set
+            {
+                _CacheConfiguration = value;
+            }
+        }
+
         #endregion
 
         #region Private-Members
@@ -61,6 +78,7 @@ namespace Verbex.Server.Classes
         private string? _Name = null;
         private string? _Description = null;
         private bool? _Enabled = null;
+        private CacheConfiguration? _CacheConfiguration = null;
 
         #endregion
 

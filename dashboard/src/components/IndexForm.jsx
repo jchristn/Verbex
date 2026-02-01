@@ -35,6 +35,24 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
     maxTokenLength: 50
   });
 
+  // Cache configuration state
+  const [showCacheSettings, setShowCacheSettings] = useState(false);
+  const [cacheConfig, setCacheConfig] = useState({
+    enabled: false,
+    enableTermCache: true,
+    termCacheCapacity: 10000,
+    termCacheEvictCount: 1000,
+    termCacheTtlSeconds: 300,
+    termCacheSlidingExpiration: true,
+    enableDocumentCache: true,
+    documentCacheCapacity: 5000,
+    documentCacheEvictCount: 500,
+    documentCacheTtlSeconds: 600,
+    documentCacheSlidingExpiration: true,
+    enableStatisticsCache: true,
+    statisticsCacheTtlSeconds: 60
+  });
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
@@ -46,6 +64,22 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
   const handleNumberChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
+      ...prev,
+      [name]: parseInt(value, 10) || 0
+    }));
+  };
+
+  const handleCacheChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setCacheConfig((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const handleCacheNumberChange = (e) => {
+    const { name, value } = e.target;
+    setCacheConfig((prev) => ({
       ...prev,
       [name]: parseInt(value, 10) || 0
     }));
@@ -90,6 +124,11 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
       }
       if (customMetadata !== null) {
         indexConfig.customMetadata = customMetadata;
+      }
+
+      // Include cache configuration if caching is enabled
+      if (cacheConfig.enabled) {
+        indexConfig.cacheConfiguration = cacheConfig;
       }
 
       await apiClient.createIndex(indexConfig);
@@ -268,6 +307,166 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
             />
           </div>
         </div>
+      </div>
+
+      {/* Caching Configuration Section */}
+      <div className="form-section">
+        <button
+          type="button"
+          className="advanced-toggle"
+          onClick={() => setShowCacheSettings(!showCacheSettings)}
+        >
+          {showCacheSettings ? '▼' : '▶'} Caching Configuration
+        </button>
+
+        {showCacheSettings && (
+          <div className="advanced-options">
+            <div className="form-group form-group-checkbox">
+              <label>
+                <input
+                  type="checkbox"
+                  name="enabled"
+                  checked={cacheConfig.enabled}
+                  onChange={handleCacheChange}
+                />
+                Enable Caching
+              </label>
+              <span className="form-hint">Master switch to enable or disable all caching for this index</span>
+            </div>
+
+            {cacheConfig.enabled && (
+              <>
+                {/* Term Cache Settings */}
+                <div className="cache-subsection">
+                  <h5>Term Cache</h5>
+                  <div className="form-group form-group-checkbox">
+                    <label>
+                      <input
+                        type="checkbox"
+                        name="enableTermCache"
+                        checked={cacheConfig.enableTermCache}
+                        onChange={handleCacheChange}
+                      />
+                      Enable Term Cache
+                    </label>
+                    <span className="form-hint">Cache term records for faster search operations</span>
+                  </div>
+                  {cacheConfig.enableTermCache && (
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label htmlFor="termCacheCapacity">Capacity</label>
+                        <input
+                          type="number"
+                          id="termCacheCapacity"
+                          name="termCacheCapacity"
+                          value={cacheConfig.termCacheCapacity}
+                          onChange={handleCacheNumberChange}
+                          min={1}
+                          max={100000}
+                        />
+                        <span className="form-hint">Max entries (default: 10,000)</span>
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="termCacheTtlSeconds">TTL (seconds)</label>
+                        <input
+                          type="number"
+                          id="termCacheTtlSeconds"
+                          name="termCacheTtlSeconds"
+                          value={cacheConfig.termCacheTtlSeconds}
+                          onChange={handleCacheNumberChange}
+                          min={1}
+                          max={86400}
+                        />
+                        <span className="form-hint">Time-to-live (default: 300)</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Document Cache Settings */}
+                <div className="cache-subsection">
+                  <h5>Document Cache</h5>
+                  <div className="form-group form-group-checkbox">
+                    <label>
+                      <input
+                        type="checkbox"
+                        name="enableDocumentCache"
+                        checked={cacheConfig.enableDocumentCache}
+                        onChange={handleCacheChange}
+                      />
+                      Enable Document Cache
+                    </label>
+                    <span className="form-hint">Cache document metadata for faster retrieval</span>
+                  </div>
+                  {cacheConfig.enableDocumentCache && (
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label htmlFor="documentCacheCapacity">Capacity</label>
+                        <input
+                          type="number"
+                          id="documentCacheCapacity"
+                          name="documentCacheCapacity"
+                          value={cacheConfig.documentCacheCapacity}
+                          onChange={handleCacheNumberChange}
+                          min={1}
+                          max={100000}
+                        />
+                        <span className="form-hint">Max entries (default: 5,000)</span>
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="documentCacheTtlSeconds">TTL (seconds)</label>
+                        <input
+                          type="number"
+                          id="documentCacheTtlSeconds"
+                          name="documentCacheTtlSeconds"
+                          value={cacheConfig.documentCacheTtlSeconds}
+                          onChange={handleCacheNumberChange}
+                          min={1}
+                          max={86400}
+                        />
+                        <span className="form-hint">Time-to-live (default: 600)</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Statistics Cache Settings */}
+                <div className="cache-subsection">
+                  <h5>Statistics Cache</h5>
+                  <div className="form-group form-group-checkbox">
+                    <label>
+                      <input
+                        type="checkbox"
+                        name="enableStatisticsCache"
+                        checked={cacheConfig.enableStatisticsCache}
+                        onChange={handleCacheChange}
+                      />
+                      Enable Statistics Cache
+                    </label>
+                    <span className="form-hint">Cache index statistics to reduce compute overhead</span>
+                  </div>
+                  {cacheConfig.enableStatisticsCache && (
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label htmlFor="statisticsCacheTtlSeconds">TTL (seconds)</label>
+                        <input
+                          type="number"
+                          id="statisticsCacheTtlSeconds"
+                          name="statisticsCacheTtlSeconds"
+                          value={cacheConfig.statisticsCacheTtlSeconds}
+                          onChange={handleCacheNumberChange}
+                          min={1}
+                          max={3600}
+                        />
+                        <span className="form-hint">Time-to-live (default: 60)</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {error && <div className="form-error">{error}</div>}

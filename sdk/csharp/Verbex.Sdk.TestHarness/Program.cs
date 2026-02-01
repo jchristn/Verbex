@@ -6,6 +6,8 @@ namespace Verbex.Sdk.TestHarness
     using System.Linq;
     using System.Threading.Tasks;
     using Verbex.Sdk;
+    using Verbex.Sdk.DTO.Requests;
+    using Verbex.Sdk.DTO.Responses;
 
     /// <summary>
     /// Result of a single test.
@@ -532,7 +534,7 @@ namespace Verbex.Sdk.TestHarness
                 "another-fake-doc-id-67890"
             };
 
-            BatchDocumentsResult result = await _Client!.GetDocumentsBatchAsync(_TestIndexId, requestedIds).ConfigureAwait(false);
+            BatchRetrieveResponse result = await _Client!.GetDocumentsBatchAsync(_TestIndexId, requestedIds).ConfigureAwait(false);
 
             AssertNotNull(result, "result");
             AssertNotNull(result.Documents, "result.Documents");
@@ -555,7 +557,7 @@ namespace Verbex.Sdk.TestHarness
         private async Task TestGetDocumentsBatchEmptyAsync()
         {
             // Test with empty list
-            BatchDocumentsResult result = await _Client!.GetDocumentsBatchAsync(_TestIndexId, new List<string>()).ConfigureAwait(false);
+            BatchRetrieveResponse result = await _Client!.GetDocumentsBatchAsync(_TestIndexId, new List<string>()).ConfigureAwait(false);
             AssertNotNull(result, "result");
             AssertEquals(result.Count, 0, "result.Count");
             AssertEquals(result.Documents.Count, 0, "result.Documents.Count");
@@ -573,7 +575,7 @@ namespace Verbex.Sdk.TestHarness
 
             // Request deletion of existing docs plus a fake one
             List<string> idsToDelete = new List<string> { docId1, docId2, fakeDocId };
-            BatchDeleteResult result = await _Client!.DeleteDocumentsBatchAsync(_TestIndexId, idsToDelete).ConfigureAwait(false);
+            BatchDeleteResponse result = await _Client!.DeleteDocumentsBatchAsync(_TestIndexId, idsToDelete).ConfigureAwait(false);
 
             AssertNotNull(result, "result");
             AssertNotNull(result.Deleted, "result.Deleted");
@@ -599,7 +601,7 @@ namespace Verbex.Sdk.TestHarness
         private async Task TestDeleteDocumentsBatchEmptyAsync()
         {
             // Test with empty list
-            BatchDeleteResult result = await _Client!.DeleteDocumentsBatchAsync(_TestIndexId, new List<string>()).ConfigureAwait(false);
+            BatchDeleteResponse result = await _Client!.DeleteDocumentsBatchAsync(_TestIndexId, new List<string>()).ConfigureAwait(false);
             AssertNotNull(result, "result");
             AssertEquals(result.DeletedCount, 0, "result.DeletedCount");
             AssertEquals(result.RequestedCount, 0, "result.RequestedCount");

@@ -154,10 +154,11 @@ class IndexInfo {
         this.enabled = data.enabled || null;
         this.inMemory = data.inMemory || null;
         this.createdUtc = data.createdUtc || null;
-        this.statistics = data.statistics || null;
+        this.statistics = data.statistics ? new IndexStatistics(data.statistics) : null;
         this.customMetadata = data.customMetadata || null;
         this.labels = data.labels || null;
         this.tags = data.tags || null;
+        this.cacheConfiguration = data.cacheConfiguration ? new CacheConfiguration(data.cacheConfiguration) : null;
     }
 
     /**
@@ -243,6 +244,56 @@ class BatchDeleteResult {
 }
 
 /**
+ * Batch document add result item.
+ */
+class BatchAddResultItem {
+    /**
+     * Create a BatchAddResultItem.
+     * @param {object} data - Add result item data
+     */
+    constructor(data) {
+        this.documentId = data?.documentId || '';
+        this.name = data?.name || '';
+        this.success = data?.success || false;
+        this.errorMessage = data?.errorMessage || null;
+    }
+}
+
+/**
+ * Batch document add result.
+ */
+class BatchAddResult {
+    /**
+     * Create a BatchAddResult.
+     * @param {object} data - Batch add response data
+     */
+    constructor(data) {
+        this.added = (data?.added || []).map(item => new BatchAddResultItem(item));
+        this.failed = (data?.failed || []).map(item => new BatchAddResultItem(item));
+        this.addedCount = data?.addedCount || 0;
+        this.failedCount = data?.failedCount || 0;
+        this.requestedCount = data?.requestedCount || 0;
+    }
+}
+
+/**
+ * Batch existence check result.
+ */
+class BatchExistenceResult {
+    /**
+     * Create a BatchExistenceResult.
+     * @param {object} data - Batch existence check response data
+     */
+    constructor(data) {
+        this.exists = data?.exists || [];
+        this.notFound = data?.notFound || [];
+        this.existsCount = data?.existsCount || 0;
+        this.notFoundCount = data?.notFoundCount || 0;
+        this.requestedCount = data?.requestedCount || 0;
+    }
+}
+
+/**
  * Search result model.
  */
 class SearchResult {
@@ -274,6 +325,101 @@ class SearchData {
         this.totalCount = data.totalCount || 0;
         this.maxResults = data.maxResults || 100;
         this.searchTime = data.searchTime || 0;
+    }
+}
+
+/**
+ * Cache configuration for an index.
+ */
+class CacheConfiguration {
+    /**
+     * Create a CacheConfiguration.
+     * @param {object} data - Cache configuration data
+     */
+    constructor(data = {}) {
+        this.enabled = data.enabled || false;
+        this.enableTermCache = data.enableTermCache !== undefined ? data.enableTermCache : true;
+        this.termCacheCapacity = data.termCacheCapacity || 10000;
+        this.termCacheEvictCount = data.termCacheEvictCount || 100;
+        this.termCacheTtlSeconds = data.termCacheTtlSeconds || 300;
+        this.termCacheSlidingExpiration = data.termCacheSlidingExpiration !== undefined ? data.termCacheSlidingExpiration : true;
+        this.enableDocumentCache = data.enableDocumentCache !== undefined ? data.enableDocumentCache : true;
+        this.documentCacheCapacity = data.documentCacheCapacity || 5000;
+        this.documentCacheEvictCount = data.documentCacheEvictCount || 50;
+        this.documentCacheTtlSeconds = data.documentCacheTtlSeconds || 600;
+        this.documentCacheSlidingExpiration = data.documentCacheSlidingExpiration !== undefined ? data.documentCacheSlidingExpiration : true;
+        this.enableStatisticsCache = data.enableStatisticsCache !== undefined ? data.enableStatisticsCache : true;
+        this.statisticsCacheTtlSeconds = data.statisticsCacheTtlSeconds || 60;
+    }
+
+    /**
+     * Create a CacheConfiguration with caching enabled and default settings.
+     * @returns {CacheConfiguration} Cache configuration with caching enabled
+     */
+    static createEnabled() {
+        return new CacheConfiguration({ enabled: true });
+    }
+}
+
+/**
+ * Statistics for a single cache instance.
+ */
+class CacheStats {
+    /**
+     * Create a CacheStats.
+     * @param {object} data - Cache stats data
+     */
+    constructor(data = {}) {
+        this.enabled = data.enabled || false;
+        this.hitCount = data.hitCount || 0;
+        this.missCount = data.missCount || 0;
+        this.hitRate = data.hitRate || 0;
+        this.currentCount = data.currentCount || 0;
+        this.capacity = data.capacity || 0;
+        this.evictionCount = data.evictionCount || 0;
+        this.expiredCount = data.expiredCount || 0;
+    }
+}
+
+/**
+ * Aggregate cache statistics for an index.
+ */
+class VerbexCacheStatistics {
+    /**
+     * Create a VerbexCacheStatistics.
+     * @param {object} data - Cache statistics data
+     */
+    constructor(data = {}) {
+        this.enabled = data.enabled || false;
+        this.termCache = data.termCache ? new CacheStats(data.termCache) : null;
+        this.documentCache = data.documentCache ? new CacheStats(data.documentCache) : null;
+        this.statisticsCache = data.statisticsCache ? new CacheStats(data.statisticsCache) : null;
+        this.cachedDocumentCount = data.cachedDocumentCount || null;
+    }
+}
+
+/**
+ * Index statistics model.
+ */
+class IndexStatistics {
+    /**
+     * Create an IndexStatistics.
+     * @param {object} data - Index statistics data
+     */
+    constructor(data = {}) {
+        this.documentCount = data.documentCount || 0;
+        this.termCount = data.termCount || 0;
+        this.postingCount = data.postingCount || 0;
+        this.averageDocumentLength = data.averageDocumentLength || 0;
+        this.totalDocumentSize = data.totalDocumentSize || 0;
+        this.totalTermOccurrences = data.totalTermOccurrences || 0;
+        this.averageTermsPerDocument = data.averageTermsPerDocument || 0;
+        this.averageDocumentFrequency = data.averageDocumentFrequency || 0;
+        this.maxDocumentFrequency = data.maxDocumentFrequency || 0;
+        this.minDocumentLength = data.minDocumentLength || 0;
+        this.maxDocumentLength = data.maxDocumentLength || 0;
+        this.cacheStatistics = data.cacheStatistics ? new VerbexCacheStatistics(data.cacheStatistics) : null;
+        this.generatedAt = data.generatedAt || null;
     }
 }
 
@@ -644,6 +790,7 @@ class VerbexClient {
      * @param {string[]} [options.labels] - Labels to associate with the index
      * @param {object} [options.tags] - Key-value tags to associate with the index
      * @param {object} [options.customMetadata] - Custom metadata to associate with the index
+     * @param {CacheConfiguration|object} [options.cacheConfiguration] - Cache configuration for the index
      * @returns {Promise<IndexInfo>} Created index information
      */
     async createIndex(options) {
@@ -666,6 +813,23 @@ class VerbexClient {
         }
         if (options.customMetadata) {
             requestData.CustomMetadata = options.customMetadata;
+        }
+        if (options.cacheConfiguration) {
+            requestData.CacheConfiguration = {
+                Enabled: options.cacheConfiguration.enabled || false,
+                EnableTermCache: options.cacheConfiguration.enableTermCache !== undefined ? options.cacheConfiguration.enableTermCache : true,
+                TermCacheCapacity: options.cacheConfiguration.termCacheCapacity || 10000,
+                TermCacheEvictCount: options.cacheConfiguration.termCacheEvictCount || 100,
+                TermCacheTtlSeconds: options.cacheConfiguration.termCacheTtlSeconds || 300,
+                TermCacheSlidingExpiration: options.cacheConfiguration.termCacheSlidingExpiration !== undefined ? options.cacheConfiguration.termCacheSlidingExpiration : true,
+                EnableDocumentCache: options.cacheConfiguration.enableDocumentCache !== undefined ? options.cacheConfiguration.enableDocumentCache : true,
+                DocumentCacheCapacity: options.cacheConfiguration.documentCacheCapacity || 5000,
+                DocumentCacheEvictCount: options.cacheConfiguration.documentCacheEvictCount || 50,
+                DocumentCacheTtlSeconds: options.cacheConfiguration.documentCacheTtlSeconds || 600,
+                DocumentCacheSlidingExpiration: options.cacheConfiguration.documentCacheSlidingExpiration !== undefined ? options.cacheConfiguration.documentCacheSlidingExpiration : true,
+                EnableStatisticsCache: options.cacheConfiguration.enableStatisticsCache !== undefined ? options.cacheConfiguration.enableStatisticsCache : true,
+                StatisticsCacheTtlSeconds: options.cacheConfiguration.statisticsCacheTtlSeconds || 60
+            };
         }
         const data = await this._makeRequest('POST', '/v1.0/indices', requestData);
         return new IndexInfo(data?.index || {});
@@ -837,6 +1001,43 @@ class VerbexClient {
     }
 
     /**
+     * Add multiple documents to an index in a single request.
+     * @param {string} indexId - The index identifier
+     * @param {Array<{name: string, content: string, id?: string, labels?: string[], tags?: object, customMetadata?: object}>} documents - Array of documents to add
+     * @returns {Promise<BatchAddResult>} Batch result containing lists of added and failed documents
+     */
+    async addDocumentsBatch(indexId, documents) {
+        if (!documents || documents.length === 0) {
+            return new BatchAddResult({});
+        }
+        // Convert to the expected request format
+        const requestDocs = documents.map(doc => ({
+            Id: doc.id || null,
+            Name: doc.name,
+            Content: doc.content,
+            Labels: doc.labels || [],
+            Tags: doc.tags || {},
+            CustomMetadata: doc.customMetadata || null
+        }));
+        const data = await this._makeRequest('POST', `/v1.0/indices/${indexId}/documents/batch`, { Documents: requestDocs });
+        return new BatchAddResult(data || {});
+    }
+
+    /**
+     * Check if multiple documents exist in an index.
+     * @param {string} indexId - The index identifier
+     * @param {string[]} documentIds - Array of document IDs to check
+     * @returns {Promise<BatchExistenceResult>} Batch result containing lists of existing and not found IDs
+     */
+    async checkDocumentsExist(indexId, documentIds) {
+        if (!documentIds || documentIds.length === 0) {
+            return new BatchExistenceResult({});
+        }
+        const data = await this._makeRequest('POST', `/v1.0/indices/${indexId}/documents/exists`, { Ids: documentIds });
+        return new BatchExistenceResult(data || {});
+    }
+
+    /**
      * Update labels on a document (full replacement).
      * @param {string} indexId - The index identifier
      * @param {string} documentId - The document identifier
@@ -891,6 +1092,125 @@ class VerbexClient {
         }
         const data = await this._makeRequest('POST', `/v1.0/indices/${indexId}/search`, requestData);
         return new SearchData(data || {});
+    }
+
+    // ==================== Backup & Restore Endpoints ====================
+
+    /**
+     * Create a backup of an index.
+     * @param {string} indexId - The index identifier
+     * @returns {Promise<Blob>} Blob containing the backup ZIP archive
+     */
+    async backup(indexId) {
+        if (!indexId) throw new Error('indexId is required');
+
+        const url = `${this._endpoint}/v1.0/indices/${indexId}/backup`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${this._accessKey}`
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new VerbexError(`Backup failed: ${errorText}`, response.status);
+        }
+
+        return await response.blob();
+    }
+
+    /**
+     * Create a backup of an index and trigger a file download.
+     * @param {string} indexId - The index identifier
+     * @param {string} [filename] - Optional filename (default: backup-{indexId}-{timestamp}.vbx)
+     */
+    async backupToFile(indexId, filename = null) {
+        const blob = await this.backup(indexId);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const downloadFilename = filename || `backup-${indexId}-${timestamp}.vbx`;
+
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = downloadFilename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+    }
+
+    /**
+     * Restore a backup to create a new index.
+     * @param {File|Blob} file - The backup file
+     * @param {object} [options] - Restore options
+     * @param {string} [options.name] - Optional new name for the restored index
+     * @param {string} [options.indexId] - Optional specific ID for the new index
+     * @returns {Promise<object>} Restore result including indexId
+     */
+    async restore(file, options = {}) {
+        if (!file) throw new Error('file is required');
+
+        const url = `${this._endpoint}/v1.0/indices/restore`;
+        const formData = new FormData();
+        formData.append('file', file);
+
+        if (options.name) {
+            formData.append('name', options.name);
+        }
+        if (options.indexId) {
+            formData.append('indexId', options.indexId);
+        }
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${this._accessKey}`
+            },
+            body: formData
+        });
+
+        const responseData = await response.json();
+
+        if (!response.ok) {
+            const errorMessage = responseData.ErrorMessage || responseData.errorMessage || 'Restore failed';
+            throw new VerbexError(errorMessage, response.status, responseData);
+        }
+
+        const rawData = responseData.Data || responseData.data;
+        return toCamelCaseKeys(rawData || {});
+    }
+
+    /**
+     * Restore a backup by replacing an existing index.
+     * @param {string} indexId - The index identifier to replace
+     * @param {File|Blob} file - The backup file
+     * @returns {Promise<object>} Restore result
+     */
+    async restoreReplace(indexId, file) {
+        if (!indexId) throw new Error('indexId is required');
+        if (!file) throw new Error('file is required');
+
+        const url = `${this._endpoint}/v1.0/indices/${indexId}/restore`;
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${this._accessKey}`
+            },
+            body: formData
+        });
+
+        const responseData = await response.json();
+
+        if (!response.ok) {
+            const errorMessage = responseData.ErrorMessage || responseData.errorMessage || 'Restore failed';
+            throw new VerbexError(errorMessage, response.status, responseData);
+        }
+
+        const rawData = responseData.Data || responseData.data;
+        return toCamelCaseKeys(rawData || {});
     }
 
     // ==================== Admin - Tenant Management Endpoints ====================
@@ -1133,17 +1453,24 @@ if (typeof module !== 'undefined' && module.exports) {
         AuthorizationResult,
         LoginResult,
         IndexInfo,
+        IndexStatistics,
         DocumentInfo,
         AddDocumentData,
         BatchDocumentsResult,
         BatchDeleteResult,
+        BatchAddResultItem,
+        BatchAddResult,
+        BatchExistenceResult,
         SearchResult,
         SearchData,
         HealthData,
         ValidationData,
         TenantInfo,
         UserInfo,
-        CredentialInfo
+        CredentialInfo,
+        CacheConfiguration,
+        CacheStats,
+        VerbexCacheStatistics
     };
 }
 
@@ -1155,10 +1482,14 @@ if (typeof exports !== 'undefined') {
     exports.AuthorizationResult = AuthorizationResult;
     exports.LoginResult = LoginResult;
     exports.IndexInfo = IndexInfo;
+    exports.IndexStatistics = IndexStatistics;
     exports.DocumentInfo = DocumentInfo;
     exports.AddDocumentData = AddDocumentData;
     exports.BatchDocumentsResult = BatchDocumentsResult;
     exports.BatchDeleteResult = BatchDeleteResult;
+    exports.BatchAddResultItem = BatchAddResultItem;
+    exports.BatchAddResult = BatchAddResult;
+    exports.BatchExistenceResult = BatchExistenceResult;
     exports.SearchResult = SearchResult;
     exports.SearchData = SearchData;
     exports.HealthData = HealthData;
@@ -1166,4 +1497,7 @@ if (typeof exports !== 'undefined') {
     exports.TenantInfo = TenantInfo;
     exports.UserInfo = UserInfo;
     exports.CredentialInfo = CredentialInfo;
+    exports.CacheConfiguration = CacheConfiguration;
+    exports.CacheStats = CacheStats;
+    exports.VerbexCacheStatistics = VerbexCacheStatistics;
 }

@@ -185,6 +185,25 @@ class ApiClient {
       apiConfig.CustomMetadata = indexConfig.customMetadata;
     }
 
+    // Cache configuration
+    if (indexConfig.cacheConfiguration) {
+      apiConfig.CacheConfiguration = {
+        Enabled: indexConfig.cacheConfiguration.enabled ?? false,
+        EnableTermCache: indexConfig.cacheConfiguration.enableTermCache ?? true,
+        TermCacheCapacity: indexConfig.cacheConfiguration.termCacheCapacity ?? 10000,
+        TermCacheEvictCount: indexConfig.cacheConfiguration.termCacheEvictCount ?? 1000,
+        TermCacheTtlSeconds: indexConfig.cacheConfiguration.termCacheTtlSeconds ?? 300,
+        TermCacheSlidingExpiration: indexConfig.cacheConfiguration.termCacheSlidingExpiration ?? true,
+        EnableDocumentCache: indexConfig.cacheConfiguration.enableDocumentCache ?? true,
+        DocumentCacheCapacity: indexConfig.cacheConfiguration.documentCacheCapacity ?? 5000,
+        DocumentCacheEvictCount: indexConfig.cacheConfiguration.documentCacheEvictCount ?? 500,
+        DocumentCacheTtlSeconds: indexConfig.cacheConfiguration.documentCacheTtlSeconds ?? 600,
+        DocumentCacheSlidingExpiration: indexConfig.cacheConfiguration.documentCacheSlidingExpiration ?? true,
+        EnableStatisticsCache: indexConfig.cacheConfiguration.enableStatisticsCache ?? true,
+        StatisticsCacheTtlSeconds: indexConfig.cacheConfiguration.statisticsCacheTtlSeconds ?? 60
+      };
+    }
+
     return this.post('/v1.0/indices', apiConfig);
   }
 
@@ -209,7 +228,154 @@ class ApiClient {
     if (updates.name !== undefined) body.Name = updates.name;
     if (updates.description !== undefined) body.Description = updates.description;
     if (updates.enabled !== undefined) body.Enabled = updates.enabled;
+    if (updates.cacheConfiguration !== undefined) {
+      body.CacheConfiguration = {
+        Enabled: updates.cacheConfiguration.enabled ?? false,
+        EnableTermCache: updates.cacheConfiguration.enableTermCache ?? true,
+        TermCacheCapacity: updates.cacheConfiguration.termCacheCapacity ?? 10000,
+        TermCacheEvictCount: updates.cacheConfiguration.termCacheEvictCount ?? 1000,
+        TermCacheTtlSeconds: updates.cacheConfiguration.termCacheTtlSeconds ?? 300,
+        TermCacheSlidingExpiration: updates.cacheConfiguration.termCacheSlidingExpiration ?? true,
+        EnableDocumentCache: updates.cacheConfiguration.enableDocumentCache ?? true,
+        DocumentCacheCapacity: updates.cacheConfiguration.documentCacheCapacity ?? 5000,
+        DocumentCacheEvictCount: updates.cacheConfiguration.documentCacheEvictCount ?? 500,
+        DocumentCacheTtlSeconds: updates.cacheConfiguration.documentCacheTtlSeconds ?? 600,
+        DocumentCacheSlidingExpiration: updates.cacheConfiguration.documentCacheSlidingExpiration ?? true,
+        EnableStatisticsCache: updates.cacheConfiguration.enableStatisticsCache ?? true,
+        StatisticsCacheTtlSeconds: updates.cacheConfiguration.statisticsCacheTtlSeconds ?? 60
+      };
+    }
     return this.put(`/v1.0/indices/${encodeURIComponent(indexId)}`, body);
+  }
+
+  async updateIndexCacheSettings(indexId, cacheConfiguration) {
+    const body = {
+      Enabled: cacheConfiguration.enabled ?? false,
+      EnableTermCache: cacheConfiguration.enableTermCache ?? true,
+      TermCacheCapacity: cacheConfiguration.termCacheCapacity ?? 10000,
+      TermCacheEvictCount: cacheConfiguration.termCacheEvictCount ?? 1000,
+      TermCacheTtlSeconds: cacheConfiguration.termCacheTtlSeconds ?? 300,
+      TermCacheSlidingExpiration: cacheConfiguration.termCacheSlidingExpiration ?? true,
+      EnableDocumentCache: cacheConfiguration.enableDocumentCache ?? true,
+      DocumentCacheCapacity: cacheConfiguration.documentCacheCapacity ?? 5000,
+      DocumentCacheEvictCount: cacheConfiguration.documentCacheEvictCount ?? 500,
+      DocumentCacheTtlSeconds: cacheConfiguration.documentCacheTtlSeconds ?? 600,
+      DocumentCacheSlidingExpiration: cacheConfiguration.documentCacheSlidingExpiration ?? true,
+      EnableStatisticsCache: cacheConfiguration.enableStatisticsCache ?? true,
+      StatisticsCacheTtlSeconds: cacheConfiguration.statisticsCacheTtlSeconds ?? 60
+    };
+    return this.put(`/v1.0/indices/${encodeURIComponent(indexId)}/cache/settings`, body);
+  }
+
+  async clearIndexCache(indexId) {
+    return this.post(`/v1.0/indices/${encodeURIComponent(indexId)}/cache/clear`, {});
+  }
+
+  // Backup and Restore endpoints
+
+  /**
+   * Create a backup of an index
+   * @param {string} indexId - The index identifier
+   * @returns {Promise<Blob>} - The backup file as a Blob
+   */
+  async backupIndex(indexId) {
+    const url = `${this.baseUrl}/v1.0/indices/${encodeURIComponent(indexId)}/backup`;
+    const headers = {};
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers
+    });
+
+    if (!response.ok) {
+      // Try to parse error message from JSON response
+      try {
+        const errorData = await response.json();
+        const errorMsg = errorData.ErrorMessage || errorData.errorMessage || `HTTP error ${response.status}`;
+        throw new Error(errorMsg);
+      } catch {
+        throw new Error(`Backup failed: HTTP error ${response.status}`);
+      }
+    }
+
+    return response.blob();
+  }
+
+  /**
+   * Restore a backup as a new index
+   * @param {File|Blob} file - The backup file
+   * @param {Object} options - Restore options
+   * @param {string} options.name - Optional name for the restored index
+   * @param {string} options.indexId - Optional custom ID for the restored index
+   * @returns {Promise<Object>} - The restore result
+   */
+  async restoreIndex(file, options = {}) {
+    const url = `${this.baseUrl}/v1.0/indices/restore`;
+    const headers = {};
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    if (options.name) {
+      formData.append('name', options.name);
+    }
+    if (options.indexId) {
+      formData.append('indexId', options.indexId);
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+
+    const rawData = await response.json();
+    const isSuccess = rawData.Success !== undefined ? rawData.Success : rawData.success;
+    const errorMsg = rawData.ErrorMessage || rawData.errorMessage;
+
+    if (!response.ok || isSuccess === false) {
+      throw new Error(errorMsg || `Restore failed: HTTP error ${response.status}`);
+    }
+
+    return toCamelCase(rawData);
+  }
+
+  /**
+   * Restore a backup by replacing an existing index
+   * @param {string} indexId - The index identifier to replace
+   * @param {File|Blob} file - The backup file
+   * @returns {Promise<Object>} - The restore result
+   */
+  async restoreReplaceIndex(indexId, file) {
+    const url = `${this.baseUrl}/v1.0/indices/${encodeURIComponent(indexId)}/restore`;
+    const headers = {};
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+
+    const rawData = await response.json();
+    const isSuccess = rawData.Success !== undefined ? rawData.Success : rawData.success;
+    const errorMsg = rawData.ErrorMessage || rawData.errorMessage;
+
+    if (!response.ok || isSuccess === false) {
+      throw new Error(errorMsg || `Restore failed: HTTP error ${response.status}`);
+    }
+
+    return toCamelCase(rawData);
   }
 
   // Document endpoints

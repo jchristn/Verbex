@@ -163,6 +163,23 @@ namespace Verbex.Sdk
             }
         }
 
+        /// <summary>
+        /// Cache configuration for the index.
+        /// When null, caching is disabled.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public CacheConfiguration? CacheConfiguration
+        {
+            get
+            {
+                return _CacheConfiguration;
+            }
+            set
+            {
+                _CacheConfiguration = value;
+            }
+        }
+
         #endregion
 
         #region Private-Members
@@ -176,6 +193,7 @@ namespace Verbex.Sdk
         private List<string>? _Labels = null;
         private Dictionary<string, string>? _Tags = null;
         private object? _CustomMetadata = null;
+        private CacheConfiguration? _CacheConfiguration = null;
 
         #endregion
 

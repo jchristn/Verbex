@@ -267,8 +267,14 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_terms_tenant_index')
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_terms_term')
     CREATE INDEX idx_terms_term ON terms(index_id, term);
 
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_terms_tenant_index_term')
+    CREATE INDEX idx_terms_tenant_index_term ON terms(tenant_id, index_id, term);
+
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_terms_document_frequency')
     CREATE INDEX idx_terms_document_frequency ON terms(document_frequency DESC);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_terms_orphan_cleanup')
+    CREATE INDEX idx_terms_orphan_cleanup ON terms(tenant_id, index_id, document_frequency);
 
 -- Document-term indexes (critical for inverted index lookups)
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_document_terms_document')

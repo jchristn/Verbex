@@ -5,15 +5,20 @@ namespace Verbex.Server.API.REST
     using System.Collections.Generic;
     using System.Collections.Specialized;
     using System.IO;
+    using System.IO.Compression;
     using System.Linq;
     using System.Net;
     using System.Reflection.PortableExecutable;
     using System.Text;
     using System.Text.Json;
     using System.Text.Json.Serialization;
+    using System.Text.RegularExpressions;
     using System.Threading.Tasks;
+    using Verbex;
     using Verbex.Database;
     using Verbex.Database.Interfaces;
+    using Verbex.DTO.Requests;
+    using Verbex.DTO.Responses;
     using Verbex.Models;
     using Verbex.Server.Classes;
     using Verbex.Server.Services;
@@ -45,6 +50,7 @@ namespace Verbex.Server.API.REST
         private DatabaseDriverBase? _Database = null;
         private LoggingModule? _Logging = null;
         private Webserver? _Webserver = null;
+        private BackupService? _BackupService = null;
         private readonly string _Header = "[RestServiceHandler] ";
 
         #endregion
@@ -67,6 +73,9 @@ namespace Verbex.Server.API.REST
             _IndexManager = indexManager ?? throw new ArgumentNullException(nameof(indexManager));
             _Database = database ?? throw new ArgumentNullException(nameof(database));
             _Logging = logging ?? throw new ArgumentNullException(nameof(logging));
+
+            // Initialize backup service
+            _BackupService = new BackupService(indexManager, settings.DataDirectory, logging);
 
             InitializeWebserver();
         }
@@ -350,6 +359,17 @@ namespace Verbex.Server.API.REST
                 ExceptionRoute);
 
             _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.POST, "/v1.0/indices/{id}/cache/rebuild", PostIndexCacheRebuildRoute,
+                metadata => metadata
+                    .WithTag("Indices")
+                    .WithDescription("Rebuild the term ID cache for an index. Use this if the database has been modified externally.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Cache rebuild result", CreateCacheRebuildResponseSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
                 HttpMethod.POST, "/v1.0/indices/{id}/search", PostIndexSearchRoute,
                 metadata => metadata
                     .WithTag("Search")
@@ -363,6 +383,50 @@ namespace Verbex.Server.API.REST
                     .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
                     .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
                     .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            #endregion
+
+            #region Backup-Restore-Routes
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.POST, "/v1.0/indices/{id}/backup", PostIndexBackupRoute,
+                metadata => metadata
+                    .WithTag("Backup & Restore")
+                    .WithDescription("Create a backup of an index. Returns a ZIP archive containing the index database and metadata.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index to backup"))
+                    .WithResponse(200, OpenApiResponseMetadata.Create("Backup archive (application/zip)"))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound())
+                    .WithResponse(423, OpenApiResponseMetadata.Create("Index is locked")),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Static.Add(
+                HttpMethod.POST, "/v1.0/indices/restore", PostIndicesRestoreRoute,
+                metadata => metadata
+                    .WithTag("Backup & Restore")
+                    .WithDescription("Restore a backup to create a new index. Upload a backup archive (.vbx file) via multipart form data.")
+                    .WithResponse(201, OpenApiResponseMetadata.Created(CreateRestoreResultSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(409, OpenApiResponseMetadata.Create("Index with specified ID already exists"))
+                    .WithResponse(415, OpenApiResponseMetadata.Create("Invalid file format"))
+                    .WithResponse(422, OpenApiResponseMetadata.Create("Backup validation failed")),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.POST, "/v1.0/indices/{id}/restore", PostIndexRestoreRoute,
+                metadata => metadata
+                    .WithTag("Backup & Restore")
+                    .WithDescription("Restore a backup by replacing an existing index. Upload a backup archive (.vbx file) via multipart form data.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index to replace"))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Restore result", CreateRestoreResultSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound())
+                    .WithResponse(415, OpenApiResponseMetadata.Create("Invalid file format"))
+                    .WithResponse(422, OpenApiResponseMetadata.Create("Backup validation failed"))
+                    .WithResponse(423, OpenApiResponseMetadata.Create("Index is locked")),
                 ExceptionRoute);
 
             #endregion
@@ -442,6 +506,38 @@ namespace Verbex.Server.API.REST
                     .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
                     .WithParameter(OpenApiParameterMetadata.Query("ids", "Comma-separated list of document IDs to delete", required: true))
                     .WithResponse(200, OpenApiResponseMetadata.Json("Batch delete result", CreateBatchDeleteResultSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.POST, "/v1.0/indices/{id}/documents/batch", BatchAddIndexDocumentsRoute,
+                metadata => metadata
+                    .WithTag("Documents")
+                    .WithDescription("Add multiple documents to an index in a single request. Returns which documents were added and which failed.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
+                        CreateBatchAddDocumentsRequestSchema(),
+                        "Documents to add",
+                        required: true))
+                    .WithResponse(201, OpenApiResponseMetadata.Created(CreateBatchAddDocumentsResponseSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.POST, "/v1.0/indices/{id}/documents/exists", BatchCheckDocumentsExistRoute,
+                metadata => metadata
+                    .WithTag("Documents")
+                    .WithDescription("Check if multiple documents exist in an index. Returns which IDs exist and which do not.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
+                        CreateBatchCheckExistenceRequestSchema(),
+                        "Document IDs to check",
+                        required: true))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Existence check result", CreateBatchCheckExistenceResponseSchema()))
                     .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
                     .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
                     .WithResponse(404, OpenApiResponseMetadata.NotFound()),
@@ -942,7 +1038,7 @@ namespace Verbex.Server.API.REST
                 string tenantId = !String.IsNullOrEmpty(auth?.TenantId) ? auth.TenantId : "default";
 
                 List<IndexMetadata> indices = _IndexManager!.GetAllMetadata(tenantId);
-                var response = indices.Select(m => new
+                List<IndexMetadataResponse> response = indices.Select(m => new IndexMetadataResponse
                 {
                     Identifier = m.Identifier,
                     TenantId = m.TenantId,
@@ -959,7 +1055,7 @@ namespace Verbex.Server.API.REST
                 {
                     Success = true,
                     StatusCode = 200,
-                    Data = new { Indices = response, Count = response.Count }
+                    Data = new IndicesListResponse { Indices = response, Count = response.Count }
                 };
             });
         }
@@ -1045,7 +1141,8 @@ namespace Verbex.Server.API.REST
                                 CreatedUtc = created.CreatedUtc,
                                 Labels = created.Labels,
                                 Tags = created.Tags,
-                                CustomMetadata = created.CustomMetadata
+                                CustomMetadata = created.CustomMetadata,
+                                CacheConfiguration = created.CacheConfiguration
                             }
                         }
                     };
@@ -1072,7 +1169,7 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 400, "Index ID is required");
                 }
 
-                var statistics = await _IndexManager!.GetIndexStatisticsAsync(indexId);
+                object? statistics = await _IndexManager!.GetIndexStatisticsAsync(indexId);
                 if (statistics == null)
                 {
                     return new ResponseContext(false, 404, "Index not found");
@@ -1635,7 +1732,7 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 400, "Index ID is required");
                 }
 
-                var index = _IndexManager!.GetIndex(indexId);
+                InvertedIndex? index = _IndexManager!.GetIndex(indexId);
                 if (index == null)
                 {
                     return new ResponseContext(false, 404, "Index not found");
@@ -1737,7 +1834,7 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 400, "Index ID is required");
                 }
 
-                var index = _IndexManager!.GetIndex(indexId);
+                InvertedIndex? index = _IndexManager!.GetIndex(indexId);
                 if (index == null)
                 {
                     return new ResponseContext(false, 404, "Index not found");
@@ -1848,7 +1945,7 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 400, "Document ID is required");
                 }
 
-                var index = _IndexManager!.GetIndex(indexId);
+                InvertedIndex? index = _IndexManager!.GetIndex(indexId);
                 if (index == null)
                 {
                     return new ResponseContext(false, 404, "Index not found");
@@ -1857,7 +1954,7 @@ namespace Verbex.Server.API.REST
                 try
                 {
                     // Use GetDocumentWithMetadataAsync for single query with JOINs
-                    var document = await index.GetDocumentWithMetadataAsync(docId);
+                    DocumentMetadata? document = await index.GetDocumentWithMetadataAsync(docId);
                     if (document == null)
                     {
                         return new ResponseContext(false, 404, "Document not found");
@@ -1899,7 +1996,7 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 400, "Document ID is required");
                 }
 
-                var index = _IndexManager!.GetIndex(indexId);
+                InvertedIndex? index = _IndexManager!.GetIndex(indexId);
                 if (index == null)
                 {
                     return new ResponseContext(false, 404, "Index not found");
@@ -1942,7 +2039,7 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 400, "Document ID is required");
                 }
 
-                var index = _IndexManager!.GetIndex(indexId);
+                InvertedIndex? index = _IndexManager!.GetIndex(indexId);
                 if (index == null)
                 {
                     return new ResponseContext(false, 404, "Index not found");
@@ -1988,7 +2085,7 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 400, "Index ID is required");
                 }
 
-                var index = _IndexManager!.GetIndex(indexId);
+                InvertedIndex? index = _IndexManager!.GetIndex(indexId);
                 if (index == null)
                 {
                     return new ResponseContext(false, 404, "Index not found");
@@ -2014,25 +2111,133 @@ namespace Verbex.Server.API.REST
                 try
                 {
                     // Use optimized batch deletion method
-                    (List<string> deletedIds, List<string> notFoundIds) = await index.RemoveDocumentsBatchAsync(requestedIds).ConfigureAwait(false);
+                    BatchDeleteResponse deleteResult = await index.RemoveDocumentsBatchAsync(requestedIds).ConfigureAwait(false);
 
                     return new ResponseContext
                     {
                         Success = true,
                         StatusCode = 200,
-                        Data = new
-                        {
-                            Deleted = deletedIds,
-                            NotFound = notFoundIds,
-                            DeletedCount = deletedIds.Count,
-                            NotFoundCount = notFoundIds.Count,
-                            RequestedCount = requestedIds.Count
-                        }
+                        Data = deleteResult
                     };
                 }
                 catch (Exception ex)
                 {
                     return new ResponseContext(false, 500, $"Error deleting documents: {ex.Message}");
+                }
+            });
+        }
+
+        /// <summary>
+        /// Batch add documents to index route.
+        /// Adds multiple documents in a single request.
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <returns>Task.</returns>
+        private async Task BatchAddIndexDocumentsRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.Document, async (reqCtx) =>
+            {
+                string? indexId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(indexId))
+                {
+                    return new ResponseContext(false, 400, "Index ID is required");
+                }
+
+                InvertedIndex? index = _IndexManager!.GetIndex(indexId);
+                if (index == null)
+                {
+                    return new ResponseContext(false, 404, "Index not found");
+                }
+
+                string body = await GetRequestBody(ctx);
+                if (String.IsNullOrEmpty(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                DTO.Requests.BatchAddDocumentsRequest? request = JsonSerializer.Deserialize<DTO.Requests.BatchAddDocumentsRequest>(body, _JsonOptions);
+                if (request == null)
+                {
+                    return new ResponseContext(false, 400, "Invalid JSON in request body");
+                }
+
+                if (!request.Validate(out string errorMessage))
+                {
+                    return new ResponseContext(false, 400, errorMessage);
+                }
+
+                try
+                {
+                    // Documents are already in the correct format (BatchAddDocumentItem)
+                    BatchAddDocumentsResponse addResult = await index.AddDocumentsBatchAsync(request.Documents).ConfigureAwait(false);
+
+                    return new ResponseContext
+                    {
+                        Success = true,
+                        StatusCode = 201,
+                        Data = addResult
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return new ResponseContext(false, 500, $"Error adding documents: {ex.Message}");
+                }
+            });
+        }
+
+        /// <summary>
+        /// Batch check documents exist route.
+        /// Checks if multiple documents exist in an index.
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <returns>Task.</returns>
+        private async Task BatchCheckDocumentsExistRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.Document, async (reqCtx) =>
+            {
+                string? indexId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(indexId))
+                {
+                    return new ResponseContext(false, 400, "Index ID is required");
+                }
+
+                InvertedIndex? index = _IndexManager!.GetIndex(indexId);
+                if (index == null)
+                {
+                    return new ResponseContext(false, 404, "Index not found");
+                }
+
+                string body = await GetRequestBody(ctx);
+                if (String.IsNullOrEmpty(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                DTO.Requests.BatchCheckExistenceRequest? request = JsonSerializer.Deserialize<DTO.Requests.BatchCheckExistenceRequest>(body, _JsonOptions);
+                if (request == null)
+                {
+                    return new ResponseContext(false, 400, "Invalid JSON in request body");
+                }
+
+                if (!request.Validate(out string errorMessage))
+                {
+                    return new ResponseContext(false, 400, errorMessage);
+                }
+
+                try
+                {
+                    BatchCheckExistenceResponse existResult = await index.DocumentsExistBatchAsync(request.Ids).ConfigureAwait(false);
+
+                    return new ResponseContext
+                    {
+                        Success = true,
+                        StatusCode = 200,
+                        Data = existResult
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return new ResponseContext(false, 500, $"Error checking documents: {ex.Message}");
                 }
             });
         }
@@ -2052,7 +2257,7 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 400, "Index ID is required");
                 }
 
-                var index = _IndexManager!.GetIndex(indexId);
+                InvertedIndex? index = _IndexManager!.GetIndex(indexId);
                 if (index == null)
                 {
                     return new ResponseContext(false, 404, "Index not found");
@@ -2112,6 +2317,50 @@ namespace Verbex.Server.API.REST
                 catch (Exception ex)
                 {
                     return new ResponseContext(false, 500, $"Error performing search: {ex.Message}");
+                }
+            });
+        }
+
+        /// <summary>
+        /// Rebuild term ID cache for an index.
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <returns>Task.</returns>
+        private async Task PostIndexCacheRebuildRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                string? indexId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(indexId))
+                {
+                    return new ResponseContext(false, 400, "Index ID is required");
+                }
+
+                InvertedIndex? index = _IndexManager!.GetIndex(indexId);
+                if (index == null)
+                {
+                    return new ResponseContext(false, 404, "Index not found");
+                }
+
+                try
+                {
+                    int termsLoaded = await index.RebuildTermCacheAsync().ConfigureAwait(false);
+
+                    return new ResponseContext
+                    {
+                        Success = true,
+                        StatusCode = 200,
+                        Data = new
+                        {
+                            Success = true,
+                            TermsLoaded = termsLoaded,
+                            IndexId = indexId
+                        }
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return new ResponseContext(false, 500, $"Error rebuilding cache: {ex.Message}");
                 }
             });
         }
@@ -3032,6 +3281,388 @@ namespace Verbex.Server.API.REST
             });
         }
 
+        #region Backup-Restore-Handlers
+
+        /// <summary>
+        /// Create backup of an index.
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <returns>Task.</returns>
+        private async Task PostIndexBackupRoute(HttpContextBase ctx)
+        {
+            try
+            {
+                // Get tenant from auth context
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                string tenantId = !String.IsNullOrEmpty(auth?.TenantId) ? auth.TenantId : "default";
+
+                string? indexId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(indexId))
+                {
+                    await SendResponse(ctx, new ResponseContext(false, 400, "Index ID is required"));
+                    return;
+                }
+
+                if (!_IndexManager!.IndexExists(indexId))
+                {
+                    await SendResponse(ctx, new ResponseContext(false, 404, "Index not found"));
+                    return;
+                }
+
+                // Create backup (supports both on-disk and in-memory indices)
+                Stream backupStream = await _BackupService!.CreateBackupAsync(tenantId, indexId).ConfigureAwait(false);
+
+                // Generate filename
+                string timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+                string filename = $"backup-{indexId}-{timestamp}.vbx";
+
+                // Send binary response
+                await SendBinaryResponse(ctx, backupStream, "application/zip", filename);
+            }
+            catch (InvalidOperationException ex)
+            {
+                await SendResponse(ctx, new ResponseContext(false, 400, ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _Logging?.Error(_Header + "backup failed: " + ex.Message);
+                await SendResponse(ctx, new ResponseContext(false, 500, "Backup failed: " + ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// Restore backup to create a new index.
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <returns>Task.</returns>
+        private async Task PostIndicesRestoreRoute(HttpContextBase ctx)
+        {
+            try
+            {
+                // Get tenant from auth context
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                string tenantId = !String.IsNullOrEmpty(auth?.TenantId) ? auth.TenantId : "default";
+
+                // Parse multipart form data
+                MultipartFormData? formData = await ParseMultipartFormDataAsync(ctx).ConfigureAwait(false);
+                if (formData == null || formData.FileData == null || formData.FileData.Length == 0)
+                {
+                    await SendResponse(ctx, new ResponseContext(false, 400, "Backup file is required. Use multipart/form-data with 'file' field."));
+                    return;
+                }
+
+                // Validate content type
+                if (!String.IsNullOrEmpty(formData.FileContentType) &&
+                    !formData.FileContentType.Contains("zip") &&
+                    !formData.FileContentType.Contains("octet-stream"))
+                {
+                    await SendResponse(ctx, new ResponseContext(false, 415, "Invalid file format. Expected ZIP archive (.vbx file)."));
+                    return;
+                }
+
+                string? newName = formData.Fields.ContainsKey("name") ? formData.Fields["name"] : null;
+                string? newId = formData.Fields.ContainsKey("indexId") ? formData.Fields["indexId"] : null;
+
+                // Perform restore
+                using MemoryStream backupStream = new MemoryStream(formData.FileData);
+                RestoreResult result = await _BackupService!.RestoreNewAsync(tenantId, backupStream, newName, newId).ConfigureAwait(false);
+
+                if (result.Success)
+                {
+                    await SendResponse(ctx, new ResponseContext
+                    {
+                        Success = true,
+                        StatusCode = 201,
+                        Data = new
+                        {
+                            Message = result.Message,
+                            IndexId = result.IndexId,
+                            Warnings = result.Warnings
+                        }
+                    });
+                }
+                else
+                {
+                    await SendResponse(ctx, new ResponseContext(false, 422, result.Message));
+                }
+            }
+            catch (Exception ex)
+            {
+                _Logging?.Error(_Header + "restore (new) failed: " + ex.Message);
+                await SendResponse(ctx, new ResponseContext(false, 500, "Restore failed: " + ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// Restore backup by replacing an existing index.
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <returns>Task.</returns>
+        private async Task PostIndexRestoreRoute(HttpContextBase ctx)
+        {
+            try
+            {
+                // Get tenant from auth context
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                string tenantId = !String.IsNullOrEmpty(auth?.TenantId) ? auth.TenantId : "default";
+
+                string? indexId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(indexId))
+                {
+                    await SendResponse(ctx, new ResponseContext(false, 400, "Index ID is required"));
+                    return;
+                }
+
+                if (!_IndexManager!.IndexExists(indexId))
+                {
+                    await SendResponse(ctx, new ResponseContext(false, 404, "Index not found"));
+                    return;
+                }
+
+                IndexMetadata? metadata = _IndexManager.GetMetadata(indexId);
+                if (metadata != null && metadata.InMemory)
+                {
+                    await SendResponse(ctx, new ResponseContext(false, 400, "Cannot restore to in-memory indices"));
+                    return;
+                }
+
+                // Parse multipart form data
+                MultipartFormData? formData = await ParseMultipartFormDataAsync(ctx).ConfigureAwait(false);
+                if (formData == null || formData.FileData == null || formData.FileData.Length == 0)
+                {
+                    await SendResponse(ctx, new ResponseContext(false, 400, "Backup file is required. Use multipart/form-data with 'file' field."));
+                    return;
+                }
+
+                // Validate content type
+                if (!String.IsNullOrEmpty(formData.FileContentType) &&
+                    !formData.FileContentType.Contains("zip") &&
+                    !formData.FileContentType.Contains("octet-stream"))
+                {
+                    await SendResponse(ctx, new ResponseContext(false, 415, "Invalid file format. Expected ZIP archive (.vbx file)."));
+                    return;
+                }
+
+                // Perform restore
+                using MemoryStream backupStream = new MemoryStream(formData.FileData);
+                RestoreResult result = await _BackupService!.RestoreReplaceAsync(tenantId, indexId, backupStream).ConfigureAwait(false);
+
+                if (result.Success)
+                {
+                    await SendResponse(ctx, new ResponseContext
+                    {
+                        Success = true,
+                        StatusCode = 200,
+                        Data = new
+                        {
+                            Message = result.Message,
+                            IndexId = result.IndexId,
+                            Warnings = result.Warnings
+                        }
+                    });
+                }
+                else
+                {
+                    await SendResponse(ctx, new ResponseContext(false, 422, result.Message));
+                }
+            }
+            catch (Exception ex)
+            {
+                _Logging?.Error(_Header + "restore (replace) failed: " + ex.Message);
+                await SendResponse(ctx, new ResponseContext(false, 500, "Restore failed: " + ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// Send a binary response with file download headers.
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <param name="stream">Data stream to send.</param>
+        /// <param name="contentType">Content type.</param>
+        /// <param name="filename">Filename for Content-Disposition header.</param>
+        /// <returns>Task.</returns>
+        private async Task SendBinaryResponse(HttpContextBase ctx, Stream stream, string contentType, string filename)
+        {
+            ctx.Response.StatusCode = 200;
+            ctx.Response.ContentType = contentType;
+            ctx.Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{filename}\"");
+            ctx.Response.Headers.Add("Access-Control-Allow-Origin", "*");
+
+            using (stream)
+            {
+                await ctx.Response.Send(stream.Length, stream).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// Parse multipart form data from request.
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <returns>Parsed form data or null if parsing fails.</returns>
+        private async Task<MultipartFormData?> ParseMultipartFormDataAsync(HttpContextBase ctx)
+        {
+            if (ctx.Request.Data == null || ctx.Request.ContentLength <= 0)
+            {
+                return null;
+            }
+
+            string? contentType = ctx.Request.ContentType;
+            if (String.IsNullOrEmpty(contentType) || !contentType.Contains("multipart/form-data"))
+            {
+                return null;
+            }
+
+            // Extract boundary from content type
+            Match boundaryMatch = Regex.Match(contentType, @"boundary=(?:""([^""]+)""|([^\s;]+))");
+            if (!boundaryMatch.Success)
+            {
+                return null;
+            }
+
+            string boundary = boundaryMatch.Groups[1].Success ? boundaryMatch.Groups[1].Value : boundaryMatch.Groups[2].Value;
+            byte[] boundaryBytes = Encoding.ASCII.GetBytes("--" + boundary);
+            byte[] crlfCrlf = Encoding.ASCII.GetBytes("\r\n\r\n");
+            byte[] lflf = Encoding.ASCII.GetBytes("\n\n");
+            byte[] crlf = Encoding.ASCII.GetBytes("\r\n");
+            byte[] lf = Encoding.ASCII.GetBytes("\n");
+
+            MultipartFormData result = new MultipartFormData();
+
+            // Read entire body as raw bytes
+            byte[] bodyData;
+            using (MemoryStream ms = new MemoryStream())
+            {
+                await ctx.Request.Data.CopyToAsync(ms).ConfigureAwait(false);
+                bodyData = ms.ToArray();
+            }
+
+            // Find all boundary positions in raw bytes
+            List<int> boundaryPositions = new List<int>();
+            int searchStart = 0;
+            while (searchStart < bodyData.Length)
+            {
+                int pos = FindByteSequence(bodyData, boundaryBytes, searchStart);
+                if (pos < 0) break;
+                boundaryPositions.Add(pos);
+                searchStart = pos + boundaryBytes.Length;
+            }
+
+            // Process each part between boundaries
+            for (int i = 0; i < boundaryPositions.Count - 1; i++)
+            {
+                int partStart = boundaryPositions[i] + boundaryBytes.Length;
+                int partEnd = boundaryPositions[i + 1];
+
+                // Skip leading CRLF or LF after boundary
+                if (partStart < bodyData.Length && bodyData[partStart] == '\r') partStart++;
+                if (partStart < bodyData.Length && bodyData[partStart] == '\n') partStart++;
+
+                // Skip trailing CRLF or LF before next boundary
+                if (partEnd > 0 && bodyData[partEnd - 1] == '\n') partEnd--;
+                if (partEnd > 0 && bodyData[partEnd - 1] == '\r') partEnd--;
+
+                if (partStart >= partEnd) continue;
+
+                // Find header/body separator in this part
+                int headerEndIndex = FindByteSequence(bodyData, crlfCrlf, partStart, partEnd);
+                int separatorLength = 4;
+                if (headerEndIndex < 0)
+                {
+                    headerEndIndex = FindByteSequence(bodyData, lflf, partStart, partEnd);
+                    separatorLength = 2;
+                }
+
+                if (headerEndIndex < 0 || headerEndIndex >= partEnd) continue;
+
+                // Extract headers as string (headers are always ASCII/UTF-8 text)
+                string headers = Encoding.UTF8.GetString(bodyData, partStart, headerEndIndex - partStart);
+
+                // Body starts after the separator
+                int bodyStart = headerEndIndex + separatorLength;
+                int bodyLength = partEnd - bodyStart;
+
+                if (bodyLength < 0) continue;
+
+                // Parse Content-Disposition
+                Match dispositionMatch = Regex.Match(headers, @"Content-Disposition:\s*form-data;\s*name=""([^""]+)""(?:;\s*filename=""([^""]+)"")?", RegexOptions.IgnoreCase);
+                if (!dispositionMatch.Success)
+                {
+                    continue;
+                }
+
+                string fieldName = dispositionMatch.Groups[1].Value;
+                string? fileName = dispositionMatch.Groups[2].Success ? dispositionMatch.Groups[2].Value : null;
+
+                if (!String.IsNullOrEmpty(fileName))
+                {
+                    // This is a file field - extract raw bytes without any encoding conversion
+                    byte[] fileData = new byte[bodyLength];
+                    Array.Copy(bodyData, bodyStart, fileData, 0, bodyLength);
+                    result.FileData = fileData;
+                    result.FileName = fileName;
+
+                    Match contentTypeMatch = Regex.Match(headers, @"Content-Type:\s*([^\r\n]+)", RegexOptions.IgnoreCase);
+                    if (contentTypeMatch.Success)
+                    {
+                        result.FileContentType = contentTypeMatch.Groups[1].Value.Trim();
+                    }
+                }
+                else
+                {
+                    // This is a regular form field - convert to string
+                    string fieldValue = Encoding.UTF8.GetString(bodyData, bodyStart, bodyLength).Trim();
+                    result.Fields[fieldName] = fieldValue;
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Find byte sequence in array starting from a given position.
+        /// </summary>
+        /// <param name="data">The byte array to search in.</param>
+        /// <param name="sequence">The byte sequence to find.</param>
+        /// <param name="startIndex">Starting index for search (default 0).</param>
+        /// <param name="endIndex">End index for search (default -1 means end of array).</param>
+        /// <returns>Index of the sequence if found, -1 otherwise.</returns>
+        private int FindByteSequence(byte[] data, byte[] sequence, int startIndex = 0, int endIndex = -1)
+        {
+            if (endIndex < 0) endIndex = data.Length;
+            int maxIndex = Math.Min(endIndex, data.Length) - sequence.Length;
+
+            for (int i = startIndex; i <= maxIndex; i++)
+            {
+                bool found = true;
+                for (int j = 0; j < sequence.Length; j++)
+                {
+                    if (data[i + j] != sequence[j])
+                    {
+                        found = false;
+                        break;
+                    }
+                }
+                if (found)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Container for parsed multipart form data.
+        /// </summary>
+        private class MultipartFormData
+        {
+            public Dictionary<string, string> Fields { get; set; } = new Dictionary<string, string>();
+            public byte[]? FileData { get; set; }
+            public string? FileName { get; set; }
+            public string? FileContentType { get; set; }
+        }
+
+        #endregion
+
         /// <summary>
         /// Wrapped request handler.
         /// </summary>
@@ -3275,6 +3906,111 @@ namespace Verbex.Server.API.REST
                     ["Deleted"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String()),
                     ["NotFound"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String()),
                     ["DeletedCount"] = OpenApiSchemaMetadata.Integer(),
+                    ["NotFoundCount"] = OpenApiSchemaMetadata.Integer(),
+                    ["RequestedCount"] = OpenApiSchemaMetadata.Integer()
+                }
+            };
+            return response;
+        }
+
+        /// <summary>
+        /// Create batch add documents request schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateBatchAddDocumentsRequestSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Documents"] = OpenApiSchemaMetadata.CreateArray(new OpenApiSchemaMetadata
+                    {
+                        Type = "object",
+                        Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                        {
+                            ["Id"] = new OpenApiSchemaMetadata { Type = "string", Description = "Optional document ID (auto-generated if not provided)" },
+                            ["Name"] = new OpenApiSchemaMetadata { Type = "string", Description = "Document name/path" },
+                            ["Content"] = new OpenApiSchemaMetadata { Type = "string", Description = "Document content to index" },
+                            ["Labels"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String()),
+                            ["Tags"] = new OpenApiSchemaMetadata { Type = "object", Description = "Key-value pairs" },
+                            ["CustomMetadata"] = new OpenApiSchemaMetadata { Type = "object", Description = "Custom metadata (any JSON value)" }
+                        },
+                        Required = new List<string> { "Name", "Content" }
+                    })
+                },
+                Required = new List<string> { "Documents" }
+            };
+        }
+
+        /// <summary>
+        /// Create batch add documents response schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateBatchAddDocumentsResponseSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Added"] = OpenApiSchemaMetadata.CreateArray(new OpenApiSchemaMetadata
+                    {
+                        Type = "object",
+                        Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                        {
+                            ["DocumentId"] = OpenApiSchemaMetadata.String(),
+                            ["Name"] = OpenApiSchemaMetadata.String(),
+                            ["Success"] = OpenApiSchemaMetadata.Boolean()
+                        }
+                    }),
+                    ["Failed"] = OpenApiSchemaMetadata.CreateArray(new OpenApiSchemaMetadata
+                    {
+                        Type = "object",
+                        Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                        {
+                            ["Name"] = OpenApiSchemaMetadata.String(),
+                            ["Success"] = OpenApiSchemaMetadata.Boolean(),
+                            ["ErrorMessage"] = OpenApiSchemaMetadata.String()
+                        }
+                    }),
+                    ["AddedCount"] = OpenApiSchemaMetadata.Integer(),
+                    ["FailedCount"] = OpenApiSchemaMetadata.Integer(),
+                    ["RequestedCount"] = OpenApiSchemaMetadata.Integer()
+                }
+            };
+            return response;
+        }
+
+        /// <summary>
+        /// Create batch check existence request schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateBatchCheckExistenceRequestSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Ids"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String())
+                },
+                Required = new List<string> { "Ids" }
+            };
+        }
+
+        /// <summary>
+        /// Create batch check existence response schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateBatchCheckExistenceResponseSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Exists"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String()),
+                    ["NotFound"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String()),
+                    ["ExistsCount"] = OpenApiSchemaMetadata.Integer(),
                     ["NotFoundCount"] = OpenApiSchemaMetadata.Integer(),
                     ["RequestedCount"] = OpenApiSchemaMetadata.Integer()
                 }
@@ -3668,6 +4404,45 @@ namespace Verbex.Server.API.REST
                     ["Tags"] = new OpenApiSchemaMetadata { Type = "object" }
                 }
             };
+        }
+
+        /// <summary>
+        /// Create cache rebuild response schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateCacheRebuildResponseSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Success"] = new OpenApiSchemaMetadata { Type = "boolean", Description = "Whether the rebuild was successful" },
+                    ["TermsLoaded"] = new OpenApiSchemaMetadata { Type = "integer", Description = "Number of terms loaded into the cache" },
+                    ["IndexId"] = new OpenApiSchemaMetadata { Type = "string", Description = "The index ID" }
+                }
+            };
+            return response;
+        }
+
+        /// <summary>
+        /// Create restore result schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateRestoreResultSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Success"] = new OpenApiSchemaMetadata { Type = "boolean", Description = "Whether the restore was successful" },
+                    ["IndexId"] = new OpenApiSchemaMetadata { Type = "string", Description = "The restored index ID" },
+                    ["Message"] = new OpenApiSchemaMetadata { Type = "string", Description = "Result message" },
+                    ["Warnings"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String())
+                }
+            };
+            return response;
         }
 
         #endregion

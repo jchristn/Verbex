@@ -96,13 +96,13 @@ namespace VerbexCli.Commands
             {
                 OutputManager.WriteVerbose("Showing current configuration");
 
-                var indexManager = IndexManager.Instance;
+                IndexManager indexManager = IndexManager.Instance;
 
                 string effectiveConfigDir = GlobalConfig.GetEffectiveConfigDirectory();
                 string? customConfigDir = GlobalConfig.GetConfigDirectory();
                 bool isCustomDirectory = !string.IsNullOrEmpty(customConfigDir);
 
-                var config = new
+                ConfigurationInfo config = new ConfigurationInfo
                 {
                     CurrentIndex = indexManager.CurrentIndexName ?? "none",
                     AvailableIndices = indexManager.Configurations.Count,

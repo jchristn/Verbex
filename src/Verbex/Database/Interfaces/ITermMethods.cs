@@ -3,6 +3,7 @@ namespace Verbex.Database.Interfaces
     using System.Collections.Generic;
     using System.Threading;
     using System.Threading.Tasks;
+    using Verbex.DTO;
     using Verbex.Models;
 
     /// <summary>
@@ -134,20 +135,20 @@ namespace Verbex.Database.Interfaces
         /// </summary>
         /// <param name="tenantId">Tenant identifier.</param>
         /// <param name="indexId">Index identifier.</param>
-        /// <param name="updates">Dictionary mapping term ID to (documentFrequencyDelta, totalFrequencyDelta).</param>
+        /// <param name="updates">Dictionary mapping term ID to frequency deltas.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Task.</returns>
-        Task IncrementFrequenciesBatchAsync(string tenantId, string indexId, Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> updates, CancellationToken token = default);
+        Task IncrementFrequenciesBatchAsync(string tenantId, string indexId, Dictionary<string, FrequencyDelta> updates, CancellationToken token = default);
 
         /// <summary>
         /// Decrements frequencies for multiple terms.
         /// </summary>
         /// <param name="tenantId">Tenant identifier.</param>
         /// <param name="indexId">Index identifier.</param>
-        /// <param name="updates">Dictionary mapping term ID to (documentFrequencyDelta, totalFrequencyDelta).</param>
+        /// <param name="updates">Dictionary mapping term ID to frequency deltas.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Task.</returns>
-        Task DecrementFrequenciesBatchAsync(string tenantId, string indexId, Dictionary<string, (int DocFreqDelta, int TotalFreqDelta)> updates, CancellationToken token = default);
+        Task DecrementFrequenciesBatchAsync(string tenantId, string indexId, Dictionary<string, FrequencyDelta> updates, CancellationToken token = default);
 
         /// <summary>
         /// Deletes terms with zero document frequency.
@@ -166,5 +167,14 @@ namespace Verbex.Database.Interfaces
         /// <param name="token">Cancellation token.</param>
         /// <returns>Number of terms deleted.</returns>
         Task<long> DeleteAllAsync(string tenantId, string indexId, CancellationToken token = default);
+
+        /// <summary>
+        /// Gets all term IDs in an index for cache loading.
+        /// </summary>
+        /// <param name="tenantId">Tenant identifier.</param>
+        /// <param name="indexId">Index identifier.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Dictionary mapping term text to term ID.</returns>
+        Task<Dictionary<string, string>> GetAllTermIdsAsync(string tenantId, string indexId, CancellationToken token = default);
     }
 }

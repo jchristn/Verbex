@@ -333,7 +333,7 @@ namespace Verbex.Server
         /// <param name="e">Exception.</param>
         private static void ExceptionConsole(string method, string text, Exception e)
         {
-            var msg = "";
+            string msg = "";
             if (e != null && e.InnerException != null) msg = e.InnerException.Message;
             else if (e != null) msg = e.Message;
 

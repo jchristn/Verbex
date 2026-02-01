@@ -555,60 +555,149 @@
             Access to the requested resource is denied.
             </summary>
         </member>
-        <member name="T:Verbex.Sdk.BatchDeleteResult">
+        <member name="T:Verbex.Sdk.CacheConfiguration">
             <summary>
-            Result of a batch document deletion operation.
-            Contains lists of successfully deleted and not found document IDs.
+            Configuration settings for index caching.
             </summary>
         </member>
-        <member name="P:Verbex.Sdk.BatchDeleteResult.Deleted">
+        <member name="P:Verbex.Sdk.CacheConfiguration.Enabled">
             <summary>
-            List of document IDs that were successfully deleted.
+            Whether caching is enabled.
+            Default: false
             </summary>
         </member>
-        <member name="P:Verbex.Sdk.BatchDeleteResult.NotFound">
+        <member name="P:Verbex.Sdk.CacheConfiguration.EnableTermCache">
             <summary>
-            List of document IDs that were not found in the index.
+            Whether term caching is enabled.
+            Default: true (when caching is enabled)
             </summary>
         </member>
-        <member name="P:Verbex.Sdk.BatchDeleteResult.DeletedCount">
+        <member name="P:Verbex.Sdk.CacheConfiguration.TermCacheCapacity">
             <summary>
-            Number of documents that were successfully deleted.
+            Maximum number of terms to cache.
+            Default: 10000
             </summary>
         </member>
-        <member name="P:Verbex.Sdk.BatchDeleteResult.NotFoundCount">
+        <member name="P:Verbex.Sdk.CacheConfiguration.TermCacheEvictCount">
             <summary>
-            Number of document IDs that were not found.
+            Number of terms to evict when cache is full.
+            Default: 100
             </summary>
         </member>
-        <member name="P:Verbex.Sdk.BatchDeleteResult.RequestedCount">
+        <member name="P:Verbex.Sdk.CacheConfiguration.TermCacheTtlSeconds">
             <summary>
-            Total number of document IDs that were requested for deletion.
+            Time-to-live in seconds for term cache entries.
+            Default: 300 (5 minutes)
             </summary>
         </member>
-        <member name="T:Verbex.Sdk.BatchDocumentsResult">
+        <member name="P:Verbex.Sdk.CacheConfiguration.TermCacheSlidingExpiration">
             <summary>
-            Result of a batch document retrieval operation.
+            Whether term cache uses sliding expiration.
+            Default: true
             </summary>
         </member>
-        <member name="P:Verbex.Sdk.BatchDocumentsResult.Documents">
+        <member name="P:Verbex.Sdk.CacheConfiguration.EnableDocumentCache">
             <summary>
-            List of documents that were found.
+            Whether document caching is enabled.
+            Default: true (when caching is enabled)
             </summary>
         </member>
-        <member name="P:Verbex.Sdk.BatchDocumentsResult.NotFound">
+        <member name="P:Verbex.Sdk.CacheConfiguration.DocumentCacheCapacity">
             <summary>
-            List of document IDs that were not found.
+            Maximum number of documents to cache.
+            Default: 5000
             </summary>
         </member>
-        <member name="P:Verbex.Sdk.BatchDocumentsResult.Count">
+        <member name="P:Verbex.Sdk.CacheConfiguration.DocumentCacheEvictCount">
             <summary>
-            Number of documents returned.
+            Number of documents to evict when cache is full.
+            Default: 50
             </summary>
         </member>
-        <member name="P:Verbex.Sdk.BatchDocumentsResult.RequestedCount">
+        <member name="P:Verbex.Sdk.CacheConfiguration.DocumentCacheTtlSeconds">
             <summary>
-            Total number of document IDs that were requested.
+            Time-to-live in seconds for document cache entries.
+            Default: 600 (10 minutes)
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CacheConfiguration.DocumentCacheSlidingExpiration">
+            <summary>
+            Whether document cache uses sliding expiration.
+            Default: true
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CacheConfiguration.EnableStatisticsCache">
+            <summary>
+            Whether statistics caching is enabled.
+            Default: true (when caching is enabled)
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CacheConfiguration.StatisticsCacheTtlSeconds">
+            <summary>
+            Time-to-live in seconds for statistics cache.
+            Default: 60 (1 minute)
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.CacheConfiguration.#ctor">
+            <summary>
+            Instantiate a CacheConfiguration with default values (caching disabled).
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.CacheConfiguration.#ctor(System.Boolean)">
+            <summary>
+            Instantiate a CacheConfiguration with caching enabled.
+            </summary>
+            <param name="enabled">Whether caching is enabled.</param>
+        </member>
+        <member name="M:Verbex.Sdk.CacheConfiguration.CreateEnabled">
+            <summary>
+            Creates a CacheConfiguration with default settings and caching enabled.
+            </summary>
+            <returns>A CacheConfiguration with caching enabled.</returns>
+        </member>
+        <member name="T:Verbex.Sdk.CacheStats">
+            <summary>
+            Statistics for a single cache instance.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CacheStats.Enabled">
+            <summary>
+            Whether this cache is enabled.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CacheStats.HitCount">
+            <summary>
+            Number of cache hits.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CacheStats.MissCount">
+            <summary>
+            Number of cache misses.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CacheStats.HitRate">
+            <summary>
+            Cache hit rate (0.0 to 1.0).
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CacheStats.CurrentCount">
+            <summary>
+            Current number of items in the cache.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CacheStats.Capacity">
+            <summary>
+            Maximum capacity of the cache.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CacheStats.EvictionCount">
+            <summary>
+            Number of items evicted from the cache.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CacheStats.ExpiredCount">
+            <summary>
+            Number of items expired from the cache.
             </summary>
         </member>
         <member name="T:Verbex.Sdk.CreateIndexData">
@@ -687,6 +776,12 @@
             <summary>
             Custom metadata object for the index.
             Can be any JSON-serializable object.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.CreateIndexRequest.CacheConfiguration">
+            <summary>
+            Cache configuration for the index.
+            When null, caching is disabled.
             </summary>
         </member>
         <member name="M:Verbex.Sdk.CreateIndexRequest.#ctor">
@@ -832,6 +927,269 @@
             Total count of documents.
             </summary>
         </member>
+        <member name="T:Verbex.Sdk.DTO.Requests.BatchAddDocumentItem">
+            <summary>
+            Represents a document to be added in a batch operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Requests.BatchAddDocumentItem.Id">
+            <summary>
+            Optional document ID (auto-generated if not provided).
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Requests.BatchAddDocumentItem.Name">
+            <summary>
+            Document name/path.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Requests.BatchAddDocumentItem.Content">
+            <summary>
+            Document content to index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Requests.BatchAddDocumentItem.Labels">
+            <summary>
+            Optional labels for the document.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Requests.BatchAddDocumentItem.Tags">
+            <summary>
+            Optional tags (key-value pairs) for the document.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Requests.BatchAddDocumentItem.CustomMetadata">
+            <summary>
+            Optional custom metadata (any JSON-serializable value).
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.DTO.Requests.BatchAddDocumentItem.#ctor">
+            <summary>
+            Creates a new batch add document item.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.DTO.Requests.BatchAddDocumentItem.#ctor(System.String,System.String)">
+            <summary>
+            Creates a new batch add document item with name and content.
+            </summary>
+            <param name="name">Document name.</param>
+            <param name="content">Document content.</param>
+        </member>
+        <member name="M:Verbex.Sdk.DTO.Requests.BatchAddDocumentItem.#ctor(System.String,System.String,System.String)">
+            <summary>
+            Creates a new batch add document item with ID, name, and content.
+            </summary>
+            <param name="id">Document ID.</param>
+            <param name="name">Document name.</param>
+            <param name="content">Document content.</param>
+        </member>
+        <member name="T:Verbex.Sdk.DTO.Requests.BatchAddDocumentsRequest">
+            <summary>
+            Request body for batch add documents operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Requests.BatchAddDocumentsRequest.Documents">
+            <summary>
+            List of documents to add.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.DTO.Requests.BatchAddDocumentsRequest.#ctor">
+            <summary>
+            Creates a new batch add documents request.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.DTO.Requests.BatchAddDocumentsRequest.#ctor(System.Collections.Generic.IEnumerable{Verbex.Sdk.DTO.Requests.BatchAddDocumentItem})">
+            <summary>
+            Creates a new batch add documents request with the specified documents.
+            </summary>
+            <param name="documents">List of documents to add.</param>
+        </member>
+        <member name="T:Verbex.Sdk.DTO.Requests.BatchCheckExistenceRequest">
+            <summary>
+            Request body for batch document existence check operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Requests.BatchCheckExistenceRequest.Ids">
+            <summary>
+            List of document IDs to check for existence.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.DTO.Requests.BatchCheckExistenceRequest.#ctor">
+            <summary>
+            Creates a new batch check existence request.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.DTO.Requests.BatchCheckExistenceRequest.#ctor(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Creates a new batch check existence request with the specified IDs.
+            </summary>
+            <param name="ids">List of document IDs to check.</param>
+        </member>
+        <member name="T:Verbex.Sdk.DTO.Responses.BatchAddDocumentResult">
+            <summary>
+            Result item for a single document in a batch add operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchAddDocumentResult.DocumentId">
+            <summary>
+            Document ID (populated for successful adds).
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchAddDocumentResult.Name">
+            <summary>
+            Document name.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchAddDocumentResult.Success">
+            <summary>
+            Whether the document was added successfully.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchAddDocumentResult.ErrorMessage">
+            <summary>
+            Error message if the add failed.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.DTO.Responses.BatchAddDocumentsResponse">
+            <summary>
+            Result of a batch add documents operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchAddDocumentsResponse.Added">
+            <summary>
+            List of successfully added documents.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchAddDocumentsResponse.Failed">
+            <summary>
+            List of documents that failed to be added.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchAddDocumentsResponse.AddedCount">
+            <summary>
+            Number of documents successfully added.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchAddDocumentsResponse.FailedCount">
+            <summary>
+            Number of documents that failed to be added.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchAddDocumentsResponse.RequestedCount">
+            <summary>
+            Total number of documents in the request.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.DTO.Responses.BatchCheckExistenceResponse">
+            <summary>
+            Result of a batch existence check operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchCheckExistenceResponse.Exists">
+            <summary>
+            List of document IDs that exist.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchCheckExistenceResponse.NotFound">
+            <summary>
+            List of document IDs that do not exist.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchCheckExistenceResponse.ExistsCount">
+            <summary>
+            Number of documents that exist.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchCheckExistenceResponse.NotFoundCount">
+            <summary>
+            Number of documents that do not exist.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchCheckExistenceResponse.RequestedCount">
+            <summary>
+            Total number of IDs in the request.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.DTO.Responses.BatchDeleteResponse">
+            <summary>
+            Result of a batch document deletion operation.
+            Contains lists of successfully deleted and not found document IDs.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchDeleteResponse.Deleted">
+            <summary>
+            List of document IDs that were successfully deleted.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchDeleteResponse.NotFound">
+            <summary>
+            List of document IDs that were not found in the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchDeleteResponse.DeletedCount">
+            <summary>
+            Number of documents that were successfully deleted.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchDeleteResponse.NotFoundCount">
+            <summary>
+            Number of document IDs that were not found.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchDeleteResponse.RequestedCount">
+            <summary>
+            Total number of document IDs that were requested for deletion.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.DTO.Responses.BatchRetrieveResponse">
+            <summary>
+            Result of a batch document retrieval operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchRetrieveResponse.Documents">
+            <summary>
+            List of documents that were found.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchRetrieveResponse.NotFound">
+            <summary>
+            List of document IDs that were not found.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchRetrieveResponse.Count">
+            <summary>
+            Number of documents returned.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.BatchRetrieveResponse.RequestedCount">
+            <summary>
+            Total number of document IDs that were requested.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.DTO.Responses.RestoreResult">
+            <summary>
+            Result of a restore operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.RestoreResult.Success">
+            <summary>
+            Gets or sets whether the restore was successful.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.RestoreResult.IndexId">
+            <summary>
+            Gets or sets the restored index identifier.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.RestoreResult.Message">
+            <summary>
+            Gets or sets the result message.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.DTO.Responses.RestoreResult.Warnings">
+            <summary>
+            Gets or sets any warnings from the restore operation.
+            </summary>
+        </member>
         <member name="T:Verbex.Sdk.HealthData">
             <summary>
             Health check response data.
@@ -927,6 +1285,62 @@
         <member name="P:Verbex.Sdk.IndexStatistics.TermCount">
             <summary>
             Number of unique terms in the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexStatistics.PostingCount">
+            <summary>
+            Total number of postings (term-document pairs) in the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexStatistics.AverageDocumentLength">
+            <summary>
+            Average document length in terms.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexStatistics.TotalDocumentSize">
+            <summary>
+            Total size of all documents in characters.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexStatistics.TotalTermOccurrences">
+            <summary>
+            Total number of term occurrences across all documents.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexStatistics.AverageTermsPerDocument">
+            <summary>
+            Average terms per document.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexStatistics.AverageDocumentFrequency">
+            <summary>
+            Average document frequency across all terms.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexStatistics.MaxDocumentFrequency">
+            <summary>
+            Maximum document frequency (most common term).
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexStatistics.MinDocumentLength">
+            <summary>
+            Minimum document length.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexStatistics.MaxDocumentLength">
+            <summary>
+            Maximum document length.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexStatistics.CacheStatistics">
+            <summary>
+            Cache statistics for this index.
+            Null if caching is disabled.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.IndexStatistics.GeneratedAt">
+            <summary>
+            Timestamp when these statistics were generated.
             </summary>
         </member>
         <member name="P:Verbex.Sdk.IndexStatistics.MemoryUsageMb">
@@ -1231,6 +1645,40 @@
             Indicates whether the user is a global administrator.
             </summary>
         </member>
+        <member name="T:Verbex.Sdk.VerbexCacheStatistics">
+            <summary>
+            Aggregate cache statistics for an index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.VerbexCacheStatistics.Enabled">
+            <summary>
+            Whether caching is enabled for this index.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.VerbexCacheStatistics.TermCache">
+            <summary>
+            Term cache statistics.
+            Null if term cache is disabled.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.VerbexCacheStatistics.DocumentCache">
+            <summary>
+            Document metadata cache statistics.
+            Null if document cache is disabled.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.VerbexCacheStatistics.StatisticsCache">
+            <summary>
+            Statistics cache statistics.
+            Null if statistics cache is disabled.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.VerbexCacheStatistics.CachedDocumentCount">
+            <summary>
+            Cached document count value.
+            Null if not cached.
+            </summary>
+        </member>
         <member name="T:Verbex.Sdk.VerbexClient">
             <summary>
             Verbex SDK Client for .NET.
@@ -1444,6 +1892,28 @@
             <exception cref="T:System.ArgumentNullException">Thrown when indexId or documentIds is null.</exception>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
+        <member name="M:Verbex.Sdk.VerbexClient.AddDocumentsBatchAsync(System.String,System.Collections.Generic.IEnumerable{Verbex.Sdk.DTO.Requests.BatchAddDocumentItem},System.Threading.CancellationToken)">
+            <summary>
+            Adds multiple documents to an index in a single request.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="documents">Collection of documents to add.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Batch result containing lists of added and failed documents.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when indexId or documents is null.</exception>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.CheckDocumentsExistAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Checks if multiple documents exist in an index.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="documentIds">Collection of document IDs to check.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Batch result containing lists of existing and not found IDs.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when indexId or documentIds is null.</exception>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
         <member name="M:Verbex.Sdk.VerbexClient.UpdateDocumentLabelsAsync(System.String,System.String,System.Collections.Generic.List{System.String},System.Threading.CancellationToken)">
             <summary>
             Updates labels on a document (full replacement).
@@ -1476,6 +1946,64 @@
             <param name="cancellationToken">Cancellation token.</param>
             <returns>Search data including results and metadata.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.BackupAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Creates a backup of an index and returns it as a stream.
+            The stream contains a ZIP archive with the index database and metadata.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>A stream containing the backup ZIP archive.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the backup fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.BackupAsBytesAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Creates a backup of an index and returns it as a byte array.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>A byte array containing the backup ZIP archive.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the backup fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.BackupToFileAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Creates a backup of an index and saves it to a file.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="filePath">The file path to save the backup to.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the backup fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.RestoreAsync(System.IO.Stream,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Restores a backup to create a new index.
+            </summary>
+            <param name="backupStream">The backup stream (ZIP archive).</param>
+            <param name="name">Optional new name for the restored index.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Information about the restored index.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the restore fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.RestoreFromFileAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Restores a backup from a file to create a new index.
+            </summary>
+            <param name="filePath">The path to the backup file.</param>
+            <param name="name">Optional new name for the restored index.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Information about the restored index.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the restore fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.RestoreReplaceAsync(System.String,System.IO.Stream,System.Threading.CancellationToken)">
+            <summary>
+            Restores a backup by replacing an existing index.
+            </summary>
+            <param name="indexId">The index identifier to replace.</param>
+            <param name="backupStream">The backup stream (ZIP archive).</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Information about the restored index.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the restore fails.</exception>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.ListTenantsAsync(System.Threading.CancellationToken)">
             <summary>

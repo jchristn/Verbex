@@ -17,6 +17,7 @@ namespace Verbex
         private double _PhraseSearchBonus = 2.0;
         private double _SigmoidNormalizationDivisor = 10.0;
         private char[] _TokenizationDelimiters = { ' ', '\t', '\n', '\r', '.', ',', ';', ':', '!', '?' };
+        private CacheConfiguration _CacheConfiguration = new CacheConfiguration();
 
         /// <summary>
         /// Gets or sets the storage mode for the index.
@@ -179,6 +180,17 @@ namespace Verbex
         }
 
         /// <summary>
+        /// Gets or sets the cache configuration for this index.
+        /// This property is never null; caching is controlled via CacheConfiguration.Enabled.
+        /// Default: caching disabled
+        /// </summary>
+        public CacheConfiguration CacheConfiguration
+        {
+            get { return _CacheConfiguration; }
+            set { _CacheConfiguration = value ?? new CacheConfiguration(); }
+        }
+
+        /// <summary>
         /// Gets the full database path for disk-based storage.
         /// </summary>
         /// <returns>Full path to the database file.</returns>
@@ -310,6 +322,9 @@ namespace Verbex
             {
                 throw new ArgumentException("Storage directory must be specified for OnDisk storage mode.", nameof(StorageDirectory));
             }
+
+            // Validate cache configuration
+            _CacheConfiguration.Validate();
         }
 
         /// <summary>
@@ -331,7 +346,8 @@ namespace Verbex
                 DefaultMaxSearchResults = _DefaultMaxSearchResults,
                 PhraseSearchBonus = _PhraseSearchBonus,
                 SigmoidNormalizationDivisor = _SigmoidNormalizationDivisor,
-                TokenizationDelimiters = (char[])_TokenizationDelimiters.Clone()
+                TokenizationDelimiters = (char[])_TokenizationDelimiters.Clone(),
+                CacheConfiguration = _CacheConfiguration.Clone()
             };
         }
     }

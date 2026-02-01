@@ -37,6 +37,252 @@
             <exception cref="T:System.ArgumentNullException">Thrown when word is null.</exception>
             <exception cref="T:System.ArgumentException">Thrown when word is empty or whitespace.</exception>
         </member>
+        <member name="T:Verbex.CacheConfiguration">
+            <summary>
+            Configuration settings for per-index caching.
+            </summary>
+        </member>
+        <member name="P:Verbex.CacheConfiguration.Enabled">
+            <summary>
+            Master switch to enable or disable all caching.
+            Default: false
+            </summary>
+        </member>
+        <member name="P:Verbex.CacheConfiguration.EnableTermCache">
+            <summary>
+            Enable term record caching for search operations.
+            Default: true (when caching is enabled)
+            </summary>
+        </member>
+        <member name="P:Verbex.CacheConfiguration.TermCacheCapacity">
+            <summary>
+            Maximum number of term records to cache.
+            Default: 10000
+            Minimum: 1
+            </summary>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when value is less than 1.</exception>
+        </member>
+        <member name="P:Verbex.CacheConfiguration.TermCacheEvictCount">
+            <summary>
+            Number of term entries to evict when capacity is reached.
+            Default: 1000
+            Minimum: 1
+            </summary>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when value is less than 1.</exception>
+        </member>
+        <member name="P:Verbex.CacheConfiguration.TermCacheTtlSeconds">
+            <summary>
+            Time-to-live for term cache entries in seconds.
+            Default: 300 (5 minutes)
+            Minimum: 1
+            </summary>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when value is less than 1.</exception>
+        </member>
+        <member name="P:Verbex.CacheConfiguration.TermCacheSlidingExpiration">
+            <summary>
+            Whether term cache TTL refreshes on access.
+            Default: true
+            </summary>
+        </member>
+        <member name="P:Verbex.CacheConfiguration.EnableDocumentCache">
+            <summary>
+            Enable document metadata caching.
+            Default: true (when caching is enabled)
+            </summary>
+        </member>
+        <member name="P:Verbex.CacheConfiguration.DocumentCacheCapacity">
+            <summary>
+            Maximum number of document metadata entries to cache.
+            Default: 5000
+            Minimum: 1
+            </summary>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when value is less than 1.</exception>
+        </member>
+        <member name="P:Verbex.CacheConfiguration.DocumentCacheEvictCount">
+            <summary>
+            Number of document entries to evict when capacity is reached.
+            Default: 500
+            Minimum: 1
+            </summary>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when value is less than 1.</exception>
+        </member>
+        <member name="P:Verbex.CacheConfiguration.DocumentCacheTtlSeconds">
+            <summary>
+            Time-to-live for document cache entries in seconds.
+            Default: 600 (10 minutes)
+            Minimum: 1
+            </summary>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when value is less than 1.</exception>
+        </member>
+        <member name="P:Verbex.CacheConfiguration.DocumentCacheSlidingExpiration">
+            <summary>
+            Whether document cache TTL refreshes on access.
+            Default: true
+            </summary>
+        </member>
+        <member name="P:Verbex.CacheConfiguration.EnableStatisticsCache">
+            <summary>
+            Enable index statistics caching.
+            Default: true (when caching is enabled)
+            </summary>
+        </member>
+        <member name="P:Verbex.CacheConfiguration.StatisticsCacheTtlSeconds">
+            <summary>
+            Time-to-live for statistics cache in seconds.
+            Default: 60 (1 minute)
+            Minimum: 1
+            </summary>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when value is less than 1.</exception>
+        </member>
+        <member name="P:Verbex.CacheConfiguration.EnableTermIdCache">
+            <summary>
+            Enable term ID caching for optimized document ingestion.
+            When enabled, term ID lookups are cached in memory to avoid database queries.
+            This significantly improves ingestion performance for documents with overlapping terms.
+            Default: true
+            </summary>
+        </member>
+        <member name="P:Verbex.CacheConfiguration.TermIdCacheInitialCapacity">
+            <summary>
+            Initial capacity for the term ID cache dictionary.
+            This is the number of entries the dictionary will pre-allocate.
+            Default: 10000
+            Minimum: 100
+            </summary>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when value is less than 100.</exception>
+        </member>
+        <member name="M:Verbex.CacheConfiguration.#ctor">
+            <summary>
+            Instantiate a new CacheConfiguration with default values.
+            </summary>
+        </member>
+        <member name="M:Verbex.CacheConfiguration.Validate">
+            <summary>
+            Validates the cache configuration.
+            </summary>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when values are invalid.</exception>
+        </member>
+        <member name="M:Verbex.CacheConfiguration.Clone">
+            <summary>
+            Creates a deep copy of this configuration.
+            </summary>
+            <returns>A new CacheConfiguration instance with the same values.</returns>
+        </member>
+        <member name="T:Verbex.CacheInvalidator">
+            <summary>
+            Handles cache invalidation for all write operations.
+            Ensures cache coherency by invalidating or updating cache entries when data changes.
+            </summary>
+        </member>
+        <member name="M:Verbex.CacheInvalidator.#ctor(Verbex.IndexCacheManager)">
+            <summary>
+            Instantiate a new CacheInvalidator.
+            </summary>
+            <param name="cacheManager">The cache manager to invalidate.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when cacheManager is null.</exception>
+        </member>
+        <member name="M:Verbex.CacheInvalidator.OnDocumentAdded(System.String,System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Called when a document is added to the index.
+            Updates caches appropriately.
+            </summary>
+            <param name="documentId">The added document ID.</param>
+            <param name="affectedTerms">Terms that were added or updated.</param>
+        </member>
+        <member name="M:Verbex.CacheInvalidator.OnDocumentsAdded(System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Called when multiple documents are added to the index.
+            Updates caches appropriately.
+            </summary>
+            <param name="documentIds">The added document IDs.</param>
+            <param name="affectedTerms">Terms that were added or updated.</param>
+        </member>
+        <member name="M:Verbex.CacheInvalidator.OnDocumentRemoved(System.String,System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Called when a document is removed from the index.
+            Updates caches appropriately.
+            </summary>
+            <param name="documentId">The removed document ID.</param>
+            <param name="affectedTerms">Terms that were affected (frequencies changed).</param>
+        </member>
+        <member name="M:Verbex.CacheInvalidator.OnDocumentsRemoved(System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Called when multiple documents are removed from the index.
+            Updates caches appropriately.
+            </summary>
+            <param name="documentIds">The removed document IDs.</param>
+            <param name="affectedTerms">Terms that were affected (frequencies changed).</param>
+        </member>
+        <member name="M:Verbex.CacheInvalidator.OnDocumentUpdated(System.String)">
+            <summary>
+            Called when a document's metadata is updated (labels, tags, custom metadata).
+            Does not affect term caches.
+            </summary>
+            <param name="documentId">The updated document ID.</param>
+        </member>
+        <member name="M:Verbex.CacheInvalidator.OnIndexCleared">
+            <summary>
+            Called when the index is cleared.
+            Invalidates all caches.
+            </summary>
+        </member>
+        <member name="M:Verbex.CacheInvalidator.OnTermsUpdated(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Called when terms are updated (frequencies changed).
+            </summary>
+            <param name="affectedTerms">Terms that were updated.</param>
+        </member>
+        <member name="T:Verbex.CacheStats">
+            <summary>
+            Statistics for a single cache instance (term cache, document cache, etc.).
+            </summary>
+        </member>
+        <member name="P:Verbex.CacheStats.Enabled">
+            <summary>
+            Whether this cache is enabled.
+            </summary>
+        </member>
+        <member name="P:Verbex.CacheStats.HitCount">
+            <summary>
+            Total number of cache hits.
+            </summary>
+        </member>
+        <member name="P:Verbex.CacheStats.MissCount">
+            <summary>
+            Total number of cache misses.
+            </summary>
+        </member>
+        <member name="P:Verbex.CacheStats.HitRate">
+            <summary>
+            Cache hit rate (0.0 to 1.0).
+            Value is rounded to 4 decimal places.
+            </summary>
+        </member>
+        <member name="P:Verbex.CacheStats.CurrentCount">
+            <summary>
+            Current number of entries in the cache.
+            </summary>
+        </member>
+        <member name="P:Verbex.CacheStats.Capacity">
+            <summary>
+            Maximum capacity of the cache.
+            </summary>
+        </member>
+        <member name="P:Verbex.CacheStats.EvictionCount">
+            <summary>
+            Total number of entries evicted due to capacity limits.
+            </summary>
+        </member>
+        <member name="P:Verbex.CacheStats.ExpiredCount">
+            <summary>
+            Total number of entries expired due to TTL.
+            </summary>
+        </member>
+        <member name="M:Verbex.CacheStats.#ctor">
+            <summary>
+            Instantiate a new CacheStats with default values.
+            </summary>
+        </member>
         <member name="T:Verbex.Constants">
             <summary>
             Constants.
@@ -1979,23 +2225,23 @@
             <param name="token">Cancellation token.</param>
             <returns>Dictionary mapping term text to term ID.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.IncrementFrequenciesBatchAsync(System.String,System.String,System.Collections.Generic.Dictionary{System.String,System.ValueTuple{System.Int32,System.Int32}},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.IncrementFrequenciesBatchAsync(System.String,System.String,System.Collections.Generic.Dictionary{System.String,Verbex.DTO.FrequencyDelta},System.Threading.CancellationToken)">
             <summary>
             Increments frequencies for multiple terms.
             </summary>
             <param name="tenantId">Tenant identifier.</param>
             <param name="indexId">Index identifier.</param>
-            <param name="updates">Dictionary mapping term ID to (documentFrequencyDelta, totalFrequencyDelta).</param>
+            <param name="updates">Dictionary mapping term ID to frequency deltas.</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.DecrementFrequenciesBatchAsync(System.String,System.String,System.Collections.Generic.Dictionary{System.String,System.ValueTuple{System.Int32,System.Int32}},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.DecrementFrequenciesBatchAsync(System.String,System.String,System.Collections.Generic.Dictionary{System.String,Verbex.DTO.FrequencyDelta},System.Threading.CancellationToken)">
             <summary>
             Decrements frequencies for multiple terms.
             </summary>
             <param name="tenantId">Tenant identifier.</param>
             <param name="indexId">Index identifier.</param>
-            <param name="updates">Dictionary mapping term ID to (documentFrequencyDelta, totalFrequencyDelta).</param>
+            <param name="updates">Dictionary mapping term ID to frequency deltas.</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
@@ -2016,6 +2262,15 @@
             <param name="indexId">Index identifier.</param>
             <param name="token">Cancellation token.</param>
             <returns>Number of terms deleted.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.GetAllTermIdsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gets all term IDs in an index for cache loading.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="indexId">Index identifier.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Dictionary mapping term text to term ID.</returns>
         </member>
         <member name="T:Verbex.Database.Interfaces.IUserMethods">
             <summary>
@@ -4358,6 +4613,352 @@
             Clears all tags from the document
             </summary>
         </member>
+        <member name="T:Verbex.DTO.FrequencyDelta">
+            <summary>
+            Represents changes to document and total frequency counts for a term.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.FrequencyDelta.DocFreqDelta">
+            <summary>
+            Change in document frequency (number of documents containing the term).
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.FrequencyDelta.TotalFreqDelta">
+            <summary>
+            Change in total frequency (total occurrences of the term across all documents).
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.FrequencyDelta.#ctor">
+            <summary>
+            Instantiate.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.FrequencyDelta.#ctor(System.Int32,System.Int32)">
+            <summary>
+            Instantiate with values.
+            </summary>
+            <param name="docFreqDelta">Change in document frequency.</param>
+            <param name="totalFreqDelta">Change in total frequency.</param>
+        </member>
+        <member name="T:Verbex.DTO.Requests.BatchAddDocumentItem">
+            <summary>
+            Represents a single document to be added in a batch operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Requests.BatchAddDocumentItem.Id">
+            <summary>
+            Document identifier (optional, will be auto-generated if not provided).
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Requests.BatchAddDocumentItem.Name">
+            <summary>
+            Document name/path.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Requests.BatchAddDocumentItem.Content">
+            <summary>
+            Document content.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Requests.BatchAddDocumentItem.Labels">
+            <summary>
+            Labels for categorizing the document.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Requests.BatchAddDocumentItem.Tags">
+            <summary>
+            Custom tags (key-value pairs) for the document.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Requests.BatchAddDocumentItem.CustomMetadata">
+            <summary>
+            Custom metadata for the document.
+            Can be any JSON-serializable value.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.Requests.BatchAddDocumentItem.#ctor">
+            <summary>
+            Instantiate.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.Requests.BatchAddDocumentItem.#ctor(System.String,System.String)">
+            <summary>
+            Instantiate with name and content.
+            </summary>
+            <param name="name">Document name.</param>
+            <param name="content">Document content.</param>
+        </member>
+        <member name="M:Verbex.DTO.Requests.BatchAddDocumentItem.Validate(System.String@)">
+            <summary>
+            Validate the document item.
+            </summary>
+            <param name="errorMessage">Error message if validation fails.</param>
+            <returns>True if valid, false otherwise.</returns>
+        </member>
+        <member name="T:Verbex.DTO.Requests.BatchAddDocumentsRequest">
+            <summary>
+            Request to add multiple documents in a batch operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Requests.BatchAddDocumentsRequest.Documents">
+            <summary>
+            List of documents to add.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.Requests.BatchAddDocumentsRequest.#ctor">
+            <summary>
+            Instantiate.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.Requests.BatchAddDocumentsRequest.#ctor(System.Collections.Generic.List{Verbex.DTO.Requests.BatchAddDocumentItem})">
+            <summary>
+            Instantiate with documents.
+            </summary>
+            <param name="documents">Documents to add.</param>
+        </member>
+        <member name="M:Verbex.DTO.Requests.BatchAddDocumentsRequest.Validate(System.String@)">
+            <summary>
+            Validate the request.
+            </summary>
+            <param name="errorMessage">Error message if validation fails.</param>
+            <returns>True if valid, false otherwise.</returns>
+        </member>
+        <member name="T:Verbex.DTO.Requests.BatchCheckExistenceRequest">
+            <summary>
+            Request to check existence of multiple documents.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Requests.BatchCheckExistenceRequest.Ids">
+            <summary>
+            List of document IDs to check.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.Requests.BatchCheckExistenceRequest.#ctor">
+            <summary>
+            Instantiate.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.Requests.BatchCheckExistenceRequest.#ctor(System.Collections.Generic.List{System.String})">
+            <summary>
+            Instantiate with IDs.
+            </summary>
+            <param name="ids">Document IDs to check.</param>
+        </member>
+        <member name="M:Verbex.DTO.Requests.BatchCheckExistenceRequest.Validate(System.String@)">
+            <summary>
+            Validate the request.
+            </summary>
+            <param name="errorMessage">Error message if validation fails.</param>
+            <returns>True if valid, false otherwise.</returns>
+        </member>
+        <member name="T:Verbex.DTO.Responses.BatchAddDocumentResult">
+            <summary>
+            Result of adding a single document in a batch operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchAddDocumentResult.DocumentId">
+            <summary>
+            Document identifier (the generated or provided ID).
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchAddDocumentResult.Name">
+            <summary>
+            Document name.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchAddDocumentResult.Success">
+            <summary>
+            Whether the document was added successfully.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchAddDocumentResult.ErrorMessage">
+            <summary>
+            Error message if the document failed to be added.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.Responses.BatchAddDocumentResult.#ctor">
+            <summary>
+            Instantiate.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.Responses.BatchAddDocumentResult.Successful(System.String,System.String)">
+            <summary>
+            Create a successful result.
+            </summary>
+            <param name="documentId">Document ID.</param>
+            <param name="name">Document name.</param>
+            <returns>Successful result.</returns>
+        </member>
+        <member name="M:Verbex.DTO.Responses.BatchAddDocumentResult.Failed(System.String,System.String)">
+            <summary>
+            Create a failed result.
+            </summary>
+            <param name="name">Document name.</param>
+            <param name="errorMessage">Error message.</param>
+            <returns>Failed result.</returns>
+        </member>
+        <member name="T:Verbex.DTO.Responses.BatchAddDocumentsResponse">
+            <summary>
+            Response from a batch add documents operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchAddDocumentsResponse.Added">
+            <summary>
+            List of successfully added documents.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchAddDocumentsResponse.Failed">
+            <summary>
+            List of documents that failed to be added.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchAddDocumentsResponse.AddedCount">
+            <summary>
+            Number of documents successfully added.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchAddDocumentsResponse.FailedCount">
+            <summary>
+            Number of documents that failed to be added.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchAddDocumentsResponse.RequestedCount">
+            <summary>
+            Total number of documents in the request.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.Responses.BatchAddDocumentsResponse.#ctor">
+            <summary>
+            Instantiate.
+            </summary>
+        </member>
+        <member name="T:Verbex.DTO.Responses.BatchCheckExistenceResponse">
+            <summary>
+            Response from a batch existence check operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchCheckExistenceResponse.Exists">
+            <summary>
+            List of document IDs that exist.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchCheckExistenceResponse.NotFound">
+            <summary>
+            List of document IDs that do not exist.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchCheckExistenceResponse.ExistsCount">
+            <summary>
+            Number of documents that exist.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchCheckExistenceResponse.NotFoundCount">
+            <summary>
+            Number of documents that do not exist.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchCheckExistenceResponse.RequestedCount">
+            <summary>
+            Total number of IDs in the request.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.Responses.BatchCheckExistenceResponse.#ctor">
+            <summary>
+            Instantiate.
+            </summary>
+        </member>
+        <member name="T:Verbex.DTO.Responses.BatchDeleteResponse">
+            <summary>
+            Response from a batch delete operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchDeleteResponse.Deleted">
+            <summary>
+            List of document IDs that were successfully deleted.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchDeleteResponse.NotFound">
+            <summary>
+            List of document IDs that were not found.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchDeleteResponse.DeletedCount">
+            <summary>
+            Number of documents successfully deleted.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchDeleteResponse.NotFoundCount">
+            <summary>
+            Number of documents not found.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchDeleteResponse.RequestedCount">
+            <summary>
+            Total number of IDs in the request.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.Responses.BatchDeleteResponse.#ctor">
+            <summary>
+            Instantiate.
+            </summary>
+        </member>
+        <member name="T:Verbex.DTO.Responses.BatchRetrieveResponse">
+            <summary>
+            Response from a batch retrieve operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchRetrieveResponse.Documents">
+            <summary>
+            List of documents that were found.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchRetrieveResponse.NotFound">
+            <summary>
+            List of document IDs that were not found.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchRetrieveResponse.Count">
+            <summary>
+            Number of documents found.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Responses.BatchRetrieveResponse.RequestedCount">
+            <summary>
+            Total number of IDs in the request.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.Responses.BatchRetrieveResponse.#ctor">
+            <summary>
+            Instantiate.
+            </summary>
+        </member>
+        <member name="T:Verbex.DTO.TermPositionData">
+            <summary>
+            Represents position data for a term within a document.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.TermPositionData.CharacterPositions">
+            <summary>
+            Character positions where the term appears in the document content.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.TermPositionData.TermPositions">
+            <summary>
+            Term positions (word indices) where the term appears in the document.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.TermPositionData.#ctor">
+            <summary>
+            Instantiate.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.TermPositionData.#ctor(System.Collections.Generic.List{System.Int32},System.Collections.Generic.List{System.Int32})">
+            <summary>
+            Instantiate with values.
+            </summary>
+            <param name="characterPositions">Character positions.</param>
+            <param name="termPositions">Term positions.</param>
+        </member>
         <member name="T:Verbex.ILemmatizer">
             <summary>
             Interface for text lemmatization, reducing words to their base or dictionary form.
@@ -4372,6 +4973,207 @@
             <exception cref="T:System.ArgumentNullException">Thrown when word is null.</exception>
             <exception cref="T:System.ArgumentException">Thrown when word is empty or whitespace.</exception>
         </member>
+        <member name="T:Verbex.IndexCacheManager">
+            <summary>
+            Manages per-index caches for terms, documents, and statistics.
+            Thread-safe for concurrent access.
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexCacheManager.Enabled">
+            <summary>
+            Gets whether caching is enabled.
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexCacheManager.TermCacheEnabled">
+            <summary>
+            Gets whether the term cache is enabled.
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexCacheManager.DocumentCacheEnabled">
+            <summary>
+            Gets whether the document cache is enabled.
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexCacheManager.StatisticsCacheEnabled">
+            <summary>
+            Gets whether the statistics cache is enabled.
+            </summary>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.#ctor(System.String,Verbex.CacheConfiguration)">
+            <summary>
+            Instantiate a new IndexCacheManager.
+            </summary>
+            <param name="indexId">Index identifier for cache key prefixing.</param>
+            <param name="configuration">Cache configuration.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when indexId or configuration is null.</exception>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.TryGetTerm(System.String,Verbex.Models.TermRecord@)">
+            <summary>
+            Try to get a term record from cache.
+            </summary>
+            <param name="normalizedTerm">The normalized term to look up.</param>
+            <param name="termRecord">The cached term record if found.</param>
+            <returns>True if found in cache.</returns>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.TryGetTerms(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Try to get multiple term records from cache.
+            </summary>
+            <param name="normalizedTerms">The normalized terms to look up.</param>
+            <returns>Dictionary of found terms (term -> record), and list of cache misses.</returns>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.SetTerm(System.String,Verbex.Models.TermRecord)">
+            <summary>
+            Add or update a term record in cache.
+            </summary>
+            <param name="normalizedTerm">The normalized term.</param>
+            <param name="termRecord">The term record to cache.</param>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.SetTerms(System.Collections.Generic.Dictionary{System.String,Verbex.Models.TermRecord})">
+            <summary>
+            Add or update multiple term records in cache.
+            </summary>
+            <param name="terms">Dictionary of term -> record to cache.</param>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.RemoveTerm(System.String)">
+            <summary>
+            Remove a term from cache.
+            </summary>
+            <param name="normalizedTerm">The normalized term to remove.</param>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.RemoveTerms(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Remove multiple terms from cache.
+            </summary>
+            <param name="normalizedTerms">The normalized terms to remove.</param>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.ClearTermCache">
+            <summary>
+            Clear all entries from the term cache.
+            </summary>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.TryGetDocument(System.String,Verbex.DocumentMetadata@)">
+            <summary>
+            Try to get a document from cache.
+            </summary>
+            <param name="documentId">The document ID to look up.</param>
+            <param name="document">The cached document if found.</param>
+            <returns>True if found in cache.</returns>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.TryGetDocuments(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Try to get multiple documents from cache.
+            </summary>
+            <param name="documentIds">The document IDs to look up.</param>
+            <returns>Dictionary of found documents (id -> document), and list of cache misses.</returns>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.SetDocument(System.String,Verbex.DocumentMetadata)">
+            <summary>
+            Add or update a document in cache.
+            </summary>
+            <param name="documentId">The document ID.</param>
+            <param name="document">The document to cache.</param>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.SetDocuments(System.Collections.Generic.IEnumerable{Verbex.DocumentMetadata})">
+            <summary>
+            Add or update multiple documents in cache.
+            </summary>
+            <param name="documents">List of documents to cache.</param>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.RemoveDocument(System.String)">
+            <summary>
+            Remove a document from cache.
+            </summary>
+            <param name="documentId">The document ID to remove.</param>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.RemoveDocuments(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Remove multiple documents from cache.
+            </summary>
+            <param name="documentIds">The document IDs to remove.</param>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.ClearDocumentCache">
+            <summary>
+            Clear all entries from the document cache.
+            </summary>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.TryGetStatistics(Verbex.IndexStatistics@)">
+            <summary>
+            Try to get index statistics from cache.
+            </summary>
+            <param name="statistics">The cached statistics if found.</param>
+            <returns>True if found in cache.</returns>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.SetStatistics(Verbex.IndexStatistics)">
+            <summary>
+            Add or update index statistics in cache.
+            </summary>
+            <param name="statistics">The statistics to cache.</param>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.InvalidateStatistics">
+            <summary>
+            Invalidate the statistics cache.
+            </summary>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.TryGetDocumentCount(System.Int64@)">
+            <summary>
+            Try to get the cached document count.
+            </summary>
+            <param name="count">The cached count if available.</param>
+            <returns>True if cached.</returns>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.SetDocumentCount(System.Int64)">
+            <summary>
+            Set the cached document count.
+            </summary>
+            <param name="count">The document count.</param>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.IncrementDocumentCount(System.Int32)">
+            <summary>
+            Increment the cached document count.
+            </summary>
+            <param name="delta">Amount to increment (default 1).</param>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.DecrementDocumentCount(System.Int32)">
+            <summary>
+            Decrement the cached document count.
+            </summary>
+            <param name="delta">Amount to decrement (default 1).</param>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.ClearDocumentCount">
+            <summary>
+            Clear the cached document count.
+            </summary>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.ClearAll">
+            <summary>
+            Clear all caches.
+            </summary>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.ClearAllAsync(System.Threading.CancellationToken)">
+            <summary>
+            Clear all caches asynchronously.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.GetCacheStatistics">
+            <summary>
+            Get cache statistics.
+            </summary>
+            <returns>Cache statistics for this index.</returns>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.Dispose">
+            <summary>
+            Disposes the cache manager and all its caches.
+            </summary>
+        </member>
+        <member name="M:Verbex.IndexCacheManager.Dispose(System.Boolean)">
+            <summary>
+            Disposes managed resources.
+            </summary>
+            <param name="disposing">True if called from Dispose.</param>
+        </member>
         <member name="T:Verbex.IndexStatistics">
             <summary>
             Comprehensive statistics for the inverted index
@@ -4379,108 +5181,97 @@
         </member>
         <member name="P:Verbex.IndexStatistics.DocumentCount">
             <summary>
-            Gets or sets the total number of documents in the index
+            Gets or sets the total number of documents in the index.
             </summary>
         </member>
         <member name="P:Verbex.IndexStatistics.TermCount">
             <summary>
-            Gets or sets the total number of unique terms in the index
+            Gets or sets the total number of unique terms in the index.
             </summary>
         </member>
         <member name="P:Verbex.IndexStatistics.PostingCount">
             <summary>
-            Gets or sets the total number of postings (term-document pairs) in the index
+            Gets or sets the total number of postings (term-document pairs) in the index.
             </summary>
         </member>
         <member name="P:Verbex.IndexStatistics.AverageDocumentLength">
             <summary>
-            Gets or sets the average document length in terms
+            Gets or sets the average document length in terms.
+            Value is rounded to 4 decimal places.
             </summary>
         </member>
         <member name="P:Verbex.IndexStatistics.TotalDocumentSize">
             <summary>
-            Gets or sets the total size of all documents in characters
+            Gets or sets the total size of all documents in characters.
             </summary>
         </member>
         <member name="P:Verbex.IndexStatistics.TotalTermOccurrences">
             <summary>
-            Gets or sets the total number of term occurrences across all documents
+            Gets or sets the total number of term occurrences across all documents.
             </summary>
         </member>
         <member name="P:Verbex.IndexStatistics.AverageTermsPerDocument">
             <summary>
-            Gets or sets the average terms per document
+            Gets or sets the average terms per document.
+            Value is rounded to 4 decimal places.
             </summary>
         </member>
         <member name="P:Verbex.IndexStatistics.AverageDocumentFrequency">
             <summary>
-            Gets or sets the average document frequency across all terms
+            Gets or sets the average document frequency across all terms.
+            Value is rounded to 4 decimal places.
             </summary>
         </member>
         <member name="P:Verbex.IndexStatistics.MaxDocumentFrequency">
             <summary>
-            Gets or sets the maximum document frequency (most common term)
+            Gets or sets the maximum document frequency (most common term).
             </summary>
         </member>
         <member name="P:Verbex.IndexStatistics.MinDocumentLength">
             <summary>
-            Gets or sets the minimum document length
+            Gets or sets the minimum document length.
             </summary>
         </member>
         <member name="P:Verbex.IndexStatistics.MaxDocumentLength">
             <summary>
-            Gets or sets the maximum document length
+            Gets or sets the maximum document length.
             </summary>
         </member>
-        <member name="P:Verbex.IndexStatistics.HotCacheSize">
+        <member name="P:Verbex.IndexStatistics.CacheStatistics">
             <summary>
-            Gets or sets the number of terms currently in the hot cache (deprecated, always 0)
-            </summary>
-        </member>
-        <member name="P:Verbex.IndexStatistics.DocumentCacheSize">
-            <summary>
-            Gets or sets the number of documents currently in the recent documents cache (deprecated, always 0)
-            </summary>
-        </member>
-        <member name="P:Verbex.IndexStatistics.WriteBufferSize">
-            <summary>
-            Gets or sets the current write buffer size (deprecated, always 0)
+            Gets or sets the cache statistics for this index.
+            Null if caching is disabled.
             </summary>
         </member>
         <member name="P:Verbex.IndexStatistics.GeneratedAt">
             <summary>
-            Gets or sets the timestamp when these statistics were generated
+            Gets or sets the timestamp when these statistics were generated.
             </summary>
         </member>
         <member name="P:Verbex.IndexStatistics.Memory">
             <summary>
-            Gets or sets memory usage statistics
+            Gets or sets memory usage statistics.
             </summary>
         </member>
         <member name="P:Verbex.IndexStatistics.TopTerms">
             <summary>
-            Gets or sets the top N most frequent terms
+            Gets or sets the top N most frequent terms.
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.TermIdCacheSize">
+            <summary>
+            Gets or sets the number of entries in the term ID cache.
+            </summary>
+        </member>
+        <member name="P:Verbex.IndexStatistics.TermIdCacheLoaded">
+            <summary>
+            Gets or sets whether the term ID cache has been loaded.
             </summary>
         </member>
         <member name="M:Verbex.IndexStatistics.#ctor">
             <summary>
-            Initializes a new instance of the IndexStatistics class
+            Initializes a new instance of the IndexStatistics class.
             </summary>
-        </member>
-        <member name="M:Verbex.IndexStatistics.#ctor(System.Int64,System.Int64,System.Int64,System.Double,System.Int64,System.Int32,System.Int32,System.Int32,Verbex.MemoryStatistics,System.Collections.Generic.IReadOnlyList{Verbex.TermFrequencyInfo})">
-            <summary>
-            Initializes a new instance of the IndexStatistics class
-            </summary>
-            <param name="documentCount">Total number of documents</param>
-            <param name="termCount">Total number of unique terms</param>
-            <param name="postingCount">Total number of postings</param>
-            <param name="averageDocumentLength">Average document length</param>
-            <param name="totalDocumentSize">Total document size in characters</param>
-            <param name="hotCacheSize">Hot cache size</param>
-            <param name="documentCacheSize">Document cache size</param>
-            <param name="writeBufferSize">Write buffer size</param>
-            <param name="memory">Memory statistics</param>
-            <param name="topTerms">Top frequent terms</param>
         </member>
         <member name="T:Verbex.InvertedIndex">
             <summary>
@@ -4654,6 +5445,26 @@
             <param name="token">Cancellation token.</param>
             <returns>True if document exists.</returns>
         </member>
+        <member name="M:Verbex.InvertedIndex.DocumentsExistBatchAsync(System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Checks if multiple documents exist by their IDs.
+            Returns lists of which IDs exist and which do not.
+            </summary>
+            <param name="documentIds">Collection of document IDs to check.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>A response containing the list of existing IDs and the list of not-found IDs.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when documentIds is null.</exception>
+        </member>
+        <member name="M:Verbex.InvertedIndex.AddDocumentsBatchAsync(System.Collections.Generic.IEnumerable{Verbex.DTO.Requests.BatchAddDocumentItem},System.Threading.CancellationToken)">
+            <summary>
+            Adds multiple documents to the index in a batch operation.
+            This method processes each document individually but within a single context.
+            </summary>
+            <param name="documents">Collection of documents to add.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>A response containing the list of successfully added document results and the list of failed document results.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when documents is null.</exception>
+        </member>
         <member name="M:Verbex.InvertedIndex.RemoveDocumentAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Removes a document from the index.
@@ -4669,7 +5480,7 @@
             </summary>
             <param name="documentIds">Collection of document IDs to remove.</param>
             <param name="token">Cancellation token.</param>
-            <returns>A tuple containing the list of deleted IDs and the list of not-found IDs.</returns>
+            <returns>A response containing the list of deleted IDs and the list of not-found IDs.</returns>
             <exception cref="T:System.ArgumentNullException">Thrown when documentIds is null.</exception>
         </member>
         <member name="M:Verbex.InvertedIndex.ClearAsync(System.Threading.CancellationToken)">
@@ -4937,12 +5748,39 @@
             <param name="token">Cancellation token.</param>
             <returns>List of top terms.</returns>
         </member>
+        <member name="M:Verbex.InvertedIndex.GetCacheStatistics">
+            <summary>
+            Gets the current cache statistics for this index.
+            Returns null if caching is not enabled.
+            </summary>
+            <returns>Cache statistics or null if caching is disabled.</returns>
+        </member>
         <member name="M:Verbex.InvertedIndex.FlushAsync(System.Threading.CancellationToken)">
             <summary>
             Flushes any pending changes to persistent storage.
             </summary>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.RebuildTermCacheAsync(System.Threading.CancellationToken)">
+            <summary>
+            Rebuilds the term ID cache by reloading all terms from the database.
+            Use this if the database has been modified externally.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of terms loaded into cache.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetTermCacheSize">
+            <summary>
+            Gets the current term ID cache size.
+            </summary>
+            <returns>Number of cached term IDs, or 0 if caching is disabled.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.IsTermCacheLoaded">
+            <summary>
+            Gets whether the term ID cache is loaded and ready.
+            </summary>
+            <returns>True if the cache is loaded.</returns>
         </member>
         <member name="M:Verbex.InvertedIndex.Dispose">
             <summary>
@@ -5937,6 +6775,34 @@
         <member name="P:Verbex.Models.DocumentTermRecord.DocumentName">
             <summary>Document name (joined from documents table).</summary>
         </member>
+        <member name="T:Verbex.Models.IndexContentResult">
+            <summary>
+            Internal result from indexing document content.
+            Contains both the ingestion metrics and the list of affected terms.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IndexContentResult.Metrics">
+            <summary>
+            Ingestion metrics containing timing and count information.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IndexContentResult.AffectedTerms">
+            <summary>
+            List of affected term values for cache invalidation.
+            </summary>
+        </member>
+        <member name="M:Verbex.Models.IndexContentResult.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:Verbex.Models.IndexContentResult"/> class.
+            </summary>
+        </member>
+        <member name="M:Verbex.Models.IndexContentResult.#ctor(Verbex.Models.IngestionMetrics,System.Collections.Generic.List{System.String})">
+            <summary>
+            Initializes a new instance of the <see cref="T:Verbex.Models.IndexContentResult"/> class.
+            </summary>
+            <param name="metrics">The ingestion metrics.</param>
+            <param name="affectedTerms">The list of affected terms.</param>
+        </member>
         <member name="T:Verbex.Models.IndexMetadata">
             <summary>
             Represents metadata and configuration for a search index within a tenant.
@@ -6029,18 +6895,6 @@
             </summary>
             <value>Maximum token length. Tokens longer than this are ignored. 0 means disabled. Default is 0.</value>
         </member>
-        <member name="P:Verbex.Models.IndexMetadata.HotCacheSize">
-            <summary>
-            Gets or sets the hot cache size for frequently accessed terms.
-            </summary>
-            <value>Number of terms to keep in hot cache. Default is 10000.</value>
-        </member>
-        <member name="P:Verbex.Models.IndexMetadata.DocumentCacheSize">
-            <summary>
-            Gets or sets the document cache size.
-            </summary>
-            <value>Number of documents to keep in cache. Default is 1000.</value>
-        </member>
         <member name="P:Verbex.Models.IndexMetadata.ExpectedTerms">
             <summary>
             Gets or sets the expected number of terms for bloom filter sizing.
@@ -6065,6 +6919,13 @@
             Can be any JSON-serializable value (object, array, string, number, boolean, null).
             </summary>
             <value>Any JSON-serializable value. Default is null.</value>
+        </member>
+        <member name="P:Verbex.Models.IndexMetadata.CacheConfiguration">
+            <summary>
+            Gets or sets the cache configuration for this index.
+            When null, caching is disabled.
+            </summary>
+            <value>Cache configuration settings, or null for disabled caching. Default is null.</value>
         </member>
         <member name="M:Verbex.Models.IndexMetadata.#ctor">
             <summary>
@@ -6101,6 +6962,7 @@
         <member name="P:Verbex.Models.IngestionMetrics.TotalMs">
             <summary>
             Total time for the entire ingestion process in milliseconds.
+            Value is rounded to 4 decimal places.
             </summary>
         </member>
         <member name="P:Verbex.Models.IngestionMetrics.Steps">
@@ -6121,41 +6983,56 @@
         <member name="T:Verbex.Models.IngestionStepTimings">
             <summary>
             Timing information for each step of the ingestion process.
+            All timing values are rounded to 4 decimal places.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionStepTimings.LockWaitMs">
+            <summary>
+            Time spent waiting to acquire the write lock in milliseconds.
+            High values indicate contention from concurrent operations.
+            Value is rounded to 4 decimal places.
             </summary>
         </member>
         <member name="P:Verbex.Models.IngestionStepTimings.TokenizationMs">
             <summary>
             Time spent tokenizing the document content in milliseconds.
+            Value is rounded to 4 decimal places.
             </summary>
         </member>
         <member name="P:Verbex.Models.IngestionStepTimings.PositionCalculationMs">
             <summary>
             Time spent calculating character and term positions in milliseconds.
+            Value is rounded to 4 decimal places.
             </summary>
         </member>
         <member name="P:Verbex.Models.IngestionStepTimings.TermLookupMs">
             <summary>
             Time spent looking up or adding terms to the vocabulary in milliseconds.
+            Value is rounded to 4 decimal places.
             </summary>
         </member>
         <member name="P:Verbex.Models.IngestionStepTimings.DocumentTermInsertMs">
             <summary>
             Time spent inserting document-term mappings in milliseconds.
+            Value is rounded to 4 decimal places.
             </summary>
         </member>
         <member name="P:Verbex.Models.IngestionStepTimings.FrequencyUpdateMs">
             <summary>
             Time spent updating term frequencies in milliseconds.
+            Value is rounded to 4 decimal places.
             </summary>
         </member>
         <member name="P:Verbex.Models.IngestionStepTimings.DocumentUpdateMs">
             <summary>
             Time spent updating document metadata in milliseconds.
+            Value is rounded to 4 decimal places.
             </summary>
         </member>
         <member name="P:Verbex.Models.IngestionStepTimings.TransactionCommitMs">
             <summary>
             Time spent committing the transaction in milliseconds.
+            Value is rounded to 4 decimal places.
             </summary>
         </member>
         <member name="M:Verbex.Models.IngestionStepTimings.#ctor">
@@ -6181,6 +7058,23 @@
         <member name="P:Verbex.Models.IngestionCounts.NewTerms">
             <summary>
             Number of new terms added to the vocabulary.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionCounts.TermCacheHits">
+            <summary>
+            Number of term ID lookups that were satisfied from the cache.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionCounts.TermCacheMisses">
+            <summary>
+            Number of term ID lookups that required database queries.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.IngestionCounts.TermCacheHitRate">
+            <summary>
+            Gets the term cache hit rate (0.0 to 1.0).
+            Returns 0 if no lookups were performed.
+            Value is rounded to 4 decimal places.
             </summary>
         </member>
         <member name="M:Verbex.Models.IngestionCounts.#ctor">
@@ -6815,11 +7709,13 @@
         <member name="P:Verbex.Models.TermStatisticsResult.InverseDocumentFrequency">
             <summary>
             Inverse Document Frequency (log(N/df)).
+            Value is rounded to 4 decimal places.
             </summary>
         </member>
         <member name="P:Verbex.Models.TermStatisticsResult.AverageFrequencyPerDocument">
             <summary>
             Average term frequency per document containing the term.
+            Value is rounded to 4 decimal places.
             </summary>
         </member>
         <member name="P:Verbex.Models.TermStatisticsResult.MaxFrequencyInDocument">
@@ -7006,7 +7902,8 @@
             <summary>
             Gets or sets the overall relevance score for this result.
             Minimum value: 0.0
-            Higher scores indicate greater relevance
+            Higher scores indicate greater relevance.
+            Value is rounded to 4 decimal places.
             </summary>
             <exception cref="T:System.ArgumentOutOfRangeException">Thrown when value is negative</exception>
         </member>
@@ -7071,7 +7968,8 @@
         </member>
         <member name="M:Verbex.SearchResult.CalculateTermMatchPercentage(System.Int32)">
             <summary>
-            Calculates the percentage of query terms that matched in this document
+            Calculates the percentage of query terms that matched in this document.
+            Value is rounded to 4 decimal places.
             </summary>
             <param name="totalQueryTerms">Total number of terms in the original query</param>
             <returns>Match percentage between 0.0 and 1.0</returns>
@@ -7152,6 +8050,125 @@
             <param name="documentFrequency">Document frequency</param>
             <param name="collectionFrequency">Collection frequency</param>
             <exception cref="T:System.ArgumentNullException">Thrown when term is null</exception>
+        </member>
+        <member name="T:Verbex.TermIdCache">
+            <summary>
+            Thread-safe in-memory cache for term ID lookups.
+            Implements a write-through cache pattern to eliminate database queries for known terms.
+            </summary>
+            <remarks>
+            This cache is used to optimize document ingestion performance by caching
+            the mapping between normalized terms and their database IDs.
+            Term IDs are immutable once created, so entries never need invalidation
+            except on explicit removal (e.g., orphan cleanup).
+            </remarks>
+        </member>
+        <member name="P:Verbex.TermIdCache.TenantId">
+            <summary>
+            Gets the tenant identifier for this cache.
+            </summary>
+        </member>
+        <member name="P:Verbex.TermIdCache.IndexId">
+            <summary>
+            Gets the index identifier for this cache.
+            </summary>
+        </member>
+        <member name="P:Verbex.TermIdCache.IsLoaded">
+            <summary>
+            Gets whether the cache has been populated with data.
+            </summary>
+        </member>
+        <member name="P:Verbex.TermIdCache.Count">
+            <summary>
+            Gets the number of cached entries.
+            </summary>
+        </member>
+        <member name="M:Verbex.TermIdCache.#ctor(System.String,System.String,System.Int32)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Verbex.TermIdCache"/> class.
+            </summary>
+            <param name="tenantId">Tenant identifier.</param>
+            <param name="indexId">Index identifier.</param>
+            <param name="initialCapacity">Initial capacity for the cache dictionary. Default: 10000.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when tenantId or indexId is null.</exception>
+        </member>
+        <member name="M:Verbex.TermIdCache.TryGetId(System.String,System.String@)">
+            <summary>
+            Attempts to get the ID for a term from the cache.
+            </summary>
+            <param name="term">The normalized term to look up.</param>
+            <param name="termId">The term ID if found, null otherwise.</param>
+            <returns>True if the term was found in the cache.</returns>
+            <exception cref="T:System.ObjectDisposedException">Thrown when the cache has been disposed.</exception>
+        </member>
+        <member name="M:Verbex.TermIdCache.TryGetIds(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Attempts to get IDs for multiple terms from the cache.
+            </summary>
+            <param name="terms">The normalized terms to look up.</param>
+            <returns>A tuple containing found terms (term → ID mapping) and a list of terms not found.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when terms is null.</exception>
+            <exception cref="T:System.ObjectDisposedException">Thrown when the cache has been disposed.</exception>
+        </member>
+        <member name="M:Verbex.TermIdCache.Set(System.String,System.String)">
+            <summary>
+            Sets or updates a term ID in the cache.
+            </summary>
+            <param name="term">The normalized term.</param>
+            <param name="termId">The term ID.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when term or termId is null.</exception>
+            <exception cref="T:System.ObjectDisposedException">Thrown when the cache has been disposed.</exception>
+        </member>
+        <member name="M:Verbex.TermIdCache.SetRange(System.Collections.Generic.Dictionary{System.String,System.String})">
+            <summary>
+            Sets or updates multiple term IDs in the cache.
+            </summary>
+            <param name="termIds">Dictionary mapping term text to term ID.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when termIds is null.</exception>
+            <exception cref="T:System.ObjectDisposedException">Thrown when the cache has been disposed.</exception>
+        </member>
+        <member name="M:Verbex.TermIdCache.Load(System.Collections.Generic.Dictionary{System.String,System.String})">
+            <summary>
+            Loads the cache with the provided term IDs, replacing all existing entries.
+            </summary>
+            <param name="termIds">Dictionary mapping term text to term ID.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when termIds is null.</exception>
+            <exception cref="T:System.ObjectDisposedException">Thrown when the cache has been disposed.</exception>
+        </member>
+        <member name="M:Verbex.TermIdCache.Remove(System.String)">
+            <summary>
+            Removes a term from the cache.
+            </summary>
+            <param name="term">The normalized term to remove.</param>
+            <returns>True if the term was found and removed.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when term is null.</exception>
+            <exception cref="T:System.ObjectDisposedException">Thrown when the cache has been disposed.</exception>
+        </member>
+        <member name="M:Verbex.TermIdCache.RemoveRange(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Removes multiple terms from the cache.
+            </summary>
+            <param name="terms">The normalized terms to remove.</param>
+            <returns>Number of terms removed.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when terms is null.</exception>
+            <exception cref="T:System.ObjectDisposedException">Thrown when the cache has been disposed.</exception>
+        </member>
+        <member name="M:Verbex.TermIdCache.Clear">
+            <summary>
+            Clears all entries from the cache.
+            </summary>
+            <exception cref="T:System.ObjectDisposedException">Thrown when the cache has been disposed.</exception>
+        </member>
+        <member name="M:Verbex.TermIdCache.Dispose">
+            <summary>
+            Disposes the cache and releases resources.
+            </summary>
+        </member>
+        <member name="M:Verbex.TermIdCache.Dispose(System.Boolean)">
+            <summary>
+            Disposes managed resources.
+            </summary>
+            <param name="disposing">True if called from Dispose.</param>
         </member>
         <member name="T:Verbex.TermPosition">
             <summary>
@@ -7251,8 +8268,9 @@
         </member>
         <member name="M:Verbex.TermStatistics.CalculateIdf(System.String)">
             <summary>
-            Calculates the Inverse Document Frequency (IDF) for a term
-            IDF = log(Total Documents / Document Frequency)
+            Calculates the Inverse Document Frequency (IDF) for a term.
+            IDF = log(Total Documents / Document Frequency).
+            Value is rounded to 4 decimal places.
             </summary>
             <param name="term">The term to calculate IDF for</param>
             <returns>The IDF value, or 0.0 if term doesn't exist</returns>
@@ -7452,6 +8470,42 @@
             for standard entity types. This method is provided for custom entity types.
             </remarks>
         </member>
+        <member name="T:Verbex.VerbexCacheStatistics">
+            <summary>
+            Aggregate cache statistics for an index.
+            Contains statistics for all cache types (term, document, statistics).
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexCacheStatistics.Enabled">
+            <summary>
+            Whether caching is enabled for this index.
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexCacheStatistics.TermCache">
+            <summary>
+            Term cache statistics. Null if term cache is disabled.
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexCacheStatistics.DocumentCache">
+            <summary>
+            Document metadata cache statistics. Null if document cache is disabled.
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexCacheStatistics.StatisticsCache">
+            <summary>
+            Statistics cache statistics. Null if statistics cache is disabled.
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexCacheStatistics.CachedDocumentCount">
+            <summary>
+            Cached document count value. Null if not cached.
+            </summary>
+        </member>
+        <member name="M:Verbex.VerbexCacheStatistics.#ctor">
+            <summary>
+            Instantiate a new VerbexCacheStatistics with default values.
+            </summary>
+        </member>
         <member name="T:Verbex.VerbexConfiguration">
             <summary>
             Configuration settings for the Verbex inverted index.
@@ -7530,6 +8584,13 @@
             <summary>
             Gets or sets the tokenization delimiters.
             Default: space, tab, newline, carriage return, period, comma, semicolon, colon, exclamation, question mark.
+            </summary>
+        </member>
+        <member name="P:Verbex.VerbexConfiguration.CacheConfiguration">
+            <summary>
+            Gets or sets the cache configuration for this index.
+            This property is never null; caching is controlled via CacheConfiguration.Enabled.
+            Default: caching disabled
             </summary>
         </member>
         <member name="M:Verbex.VerbexConfiguration.GetDatabasePath">

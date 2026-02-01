@@ -64,7 +64,7 @@ namespace VerbexCli.Commands
                     OutputManager.WriteVerbose($"Showing term statistics for '{term}' in index '{actualIndex}'");
 
                     // Get the index to query term stats
-                    var indexManager = IndexManager.Instance;
+                    IndexManager indexManager = IndexManager.Instance;
                     await indexManager.UseIndexAsync(actualIndex).ConfigureAwait(false);
 
                     if (indexManager.CurrentIndex != null)
@@ -97,11 +97,9 @@ namespace VerbexCli.Commands
 
                     // Extract cache-specific information
                     dynamic statsObj = stats;
-                    var cacheStats = new
+                    object cacheStats = new
                     {
-                        HotCacheSize = statsObj.Cache.HotCacheSize,
-                        DocumentCacheSize = statsObj.Cache.DocumentCacheSize,
-                        WriteBufferSize = statsObj.Cache.WriteBufferSize,
+                        CacheStatistics = statsObj.CacheStatistics,
                         Memory = statsObj.Memory
                     };
 

@@ -116,6 +116,52 @@ def _convert_keys_to_snake_case(obj: Any) -> Any:
 
 
 @dataclass
+class CacheConfiguration:
+    """Cache configuration for an index."""
+    enabled: bool = False
+    enable_term_cache: bool = True
+    term_cache_capacity: int = 10000
+    term_cache_evict_count: int = 100
+    term_cache_ttl_seconds: int = 300
+    term_cache_sliding_expiration: bool = True
+    enable_document_cache: bool = True
+    document_cache_capacity: int = 5000
+    document_cache_evict_count: int = 50
+    document_cache_ttl_seconds: int = 600
+    document_cache_sliding_expiration: bool = True
+    enable_statistics_cache: bool = True
+    statistics_cache_ttl_seconds: int = 60
+
+    @staticmethod
+    def create_enabled() -> 'CacheConfiguration':
+        """Create a CacheConfiguration with caching enabled and default settings."""
+        return CacheConfiguration(enabled=True)
+
+
+@dataclass
+class CacheStats:
+    """Statistics for a single cache instance."""
+    enabled: bool = False
+    hit_count: int = 0
+    miss_count: int = 0
+    hit_rate: float = 0.0
+    current_count: int = 0
+    capacity: int = 0
+    eviction_count: int = 0
+    expired_count: int = 0
+
+
+@dataclass
+class VerbexCacheStatistics:
+    """Aggregate cache statistics for an index."""
+    enabled: bool = False
+    term_cache: Optional[CacheStats] = None
+    document_cache: Optional[CacheStats] = None
+    statistics_cache: Optional[CacheStats] = None
+    cached_document_count: Optional[int] = None
+
+
+@dataclass
 class HealthData:
     """Health check response data."""
     status: Optional[str] = None
@@ -139,7 +185,18 @@ class IndexStatistics:
     """Index statistics."""
     document_count: int = 0
     term_count: int = 0
-    total_term_frequency: int = 0
+    posting_count: int = 0
+    average_document_length: float = 0.0
+    total_document_size: int = 0
+    total_term_occurrences: int = 0
+    average_terms_per_document: float = 0.0
+    average_document_frequency: float = 0.0
+    max_document_frequency: int = 0
+    min_document_length: int = 0
+    max_document_length: int = 0
+    cache_statistics: Optional[VerbexCacheStatistics] = None
+    generated_at: Optional[str] = None
+    total_term_frequency: int = 0  # Legacy, kept for backwards compatibility
 
 
 @dataclass
@@ -156,6 +213,7 @@ class IndexInfo:
     custom_metadata: Optional[Any] = None
     labels: Optional[List[str]] = None
     tags: Optional[Dict[str, str]] = None
+    cache_configuration: Optional[CacheConfiguration] = None
 
     @property
     def id(self) -> str:
@@ -208,6 +266,46 @@ class BatchDeleteResult:
     deleted: List[str] = field(default_factory=list)
     not_found: List[str] = field(default_factory=list)
     deleted_count: int = 0
+    not_found_count: int = 0
+    requested_count: int = 0
+
+
+@dataclass
+class BatchAddDocumentItem:
+    """A document to add in a batch operation."""
+    name: str = ""
+    content: str = ""
+    id: Optional[str] = None
+    labels: Optional[List[str]] = None
+    tags: Optional[Dict[str, str]] = None
+    custom_metadata: Optional[Any] = None
+
+
+@dataclass
+class BatchAddResultItem:
+    """Result item for a single document in a batch add operation."""
+    document_id: str = ""
+    name: str = ""
+    success: bool = False
+    error_message: Optional[str] = None
+
+
+@dataclass
+class BatchAddResult:
+    """Result of batch document add operation."""
+    added: List[BatchAddResultItem] = field(default_factory=list)
+    failed: List[BatchAddResultItem] = field(default_factory=list)
+    added_count: int = 0
+    failed_count: int = 0
+    requested_count: int = 0
+
+
+@dataclass
+class BatchExistenceResult:
+    """Result of batch existence check operation."""
+    exists: List[str] = field(default_factory=list)
+    not_found: List[str] = field(default_factory=list)
+    exists_count: int = 0
     not_found_count: int = 0
     requested_count: int = 0
 
@@ -565,7 +663,8 @@ class VerbexClient:
         max_token_length: int = 0,
         labels: Optional[List[str]] = None,
         tags: Optional[Dict[str, str]] = None,
-        custom_metadata: Optional[Any] = None
+        custom_metadata: Optional[Any] = None,
+        cache_configuration: Optional[CacheConfiguration] = None
     ) -> IndexInfo:
         """
         Create a new index.
@@ -581,6 +680,7 @@ class VerbexClient:
             labels: Optional list of labels to associate with the index
             tags: Optional key-value tags to associate with the index
             custom_metadata: Optional custom metadata to associate with the index
+            cache_configuration: Optional cache configuration for the index
 
         Returns:
             Created IndexInfo
@@ -601,6 +701,22 @@ class VerbexClient:
             request_data['Tags'] = tags
         if custom_metadata is not None:
             request_data['CustomMetadata'] = custom_metadata
+        if cache_configuration is not None:
+            request_data['CacheConfiguration'] = {
+                'Enabled': cache_configuration.enabled,
+                'EnableTermCache': cache_configuration.enable_term_cache,
+                'TermCacheCapacity': cache_configuration.term_cache_capacity,
+                'TermCacheEvictCount': cache_configuration.term_cache_evict_count,
+                'TermCacheTtlSeconds': cache_configuration.term_cache_ttl_seconds,
+                'TermCacheSlidingExpiration': cache_configuration.term_cache_sliding_expiration,
+                'EnableDocumentCache': cache_configuration.enable_document_cache,
+                'DocumentCacheCapacity': cache_configuration.document_cache_capacity,
+                'DocumentCacheEvictCount': cache_configuration.document_cache_evict_count,
+                'DocumentCacheTtlSeconds': cache_configuration.document_cache_ttl_seconds,
+                'DocumentCacheSlidingExpiration': cache_configuration.document_cache_sliding_expiration,
+                'EnableStatisticsCache': cache_configuration.enable_statistics_cache,
+                'StatisticsCacheTtlSeconds': cache_configuration.statistics_cache_ttl_seconds
+            }
 
         data = self._make_request('POST', '/v1.0/indices', data=request_data)
         return self._parse_index_info(data.get('index', {}) if data else {})
@@ -679,10 +795,89 @@ class VerbexClient:
         statistics = None
         if data.get('statistics'):
             stats = data['statistics']
+            cache_stats = None
+            if stats.get('cache_statistics'):
+                cs = stats['cache_statistics']
+                term_cache = None
+                if cs.get('term_cache'):
+                    tc = cs['term_cache']
+                    term_cache = CacheStats(
+                        enabled=tc.get('enabled', False),
+                        hit_count=tc.get('hit_count', 0),
+                        miss_count=tc.get('miss_count', 0),
+                        hit_rate=tc.get('hit_rate', 0.0),
+                        current_count=tc.get('current_count', 0),
+                        capacity=tc.get('capacity', 0),
+                        eviction_count=tc.get('eviction_count', 0),
+                        expired_count=tc.get('expired_count', 0)
+                    )
+                document_cache = None
+                if cs.get('document_cache'):
+                    dc = cs['document_cache']
+                    document_cache = CacheStats(
+                        enabled=dc.get('enabled', False),
+                        hit_count=dc.get('hit_count', 0),
+                        miss_count=dc.get('miss_count', 0),
+                        hit_rate=dc.get('hit_rate', 0.0),
+                        current_count=dc.get('current_count', 0),
+                        capacity=dc.get('capacity', 0),
+                        eviction_count=dc.get('eviction_count', 0),
+                        expired_count=dc.get('expired_count', 0)
+                    )
+                stat_cache = None
+                if cs.get('statistics_cache'):
+                    sc = cs['statistics_cache']
+                    stat_cache = CacheStats(
+                        enabled=sc.get('enabled', False),
+                        hit_count=sc.get('hit_count', 0),
+                        miss_count=sc.get('miss_count', 0),
+                        hit_rate=sc.get('hit_rate', 0.0),
+                        current_count=sc.get('current_count', 0),
+                        capacity=sc.get('capacity', 0),
+                        eviction_count=sc.get('eviction_count', 0),
+                        expired_count=sc.get('expired_count', 0)
+                    )
+                cache_stats = VerbexCacheStatistics(
+                    enabled=cs.get('enabled', False),
+                    term_cache=term_cache,
+                    document_cache=document_cache,
+                    statistics_cache=stat_cache,
+                    cached_document_count=cs.get('cached_document_count')
+                )
             statistics = IndexStatistics(
                 document_count=stats.get('document_count', 0),
                 term_count=stats.get('term_count', 0),
+                posting_count=stats.get('posting_count', 0),
+                average_document_length=stats.get('average_document_length', 0.0),
+                total_document_size=stats.get('total_document_size', 0),
+                total_term_occurrences=stats.get('total_term_occurrences', 0),
+                average_terms_per_document=stats.get('average_terms_per_document', 0.0),
+                average_document_frequency=stats.get('average_document_frequency', 0.0),
+                max_document_frequency=stats.get('max_document_frequency', 0),
+                min_document_length=stats.get('min_document_length', 0),
+                max_document_length=stats.get('max_document_length', 0),
+                cache_statistics=cache_stats,
+                generated_at=stats.get('generated_at'),
                 total_term_frequency=stats.get('total_term_frequency', 0)
+            )
+
+        cache_config = None
+        if data.get('cache_configuration'):
+            cc = data['cache_configuration']
+            cache_config = CacheConfiguration(
+                enabled=cc.get('enabled', False),
+                enable_term_cache=cc.get('enable_term_cache', True),
+                term_cache_capacity=cc.get('term_cache_capacity', 10000),
+                term_cache_evict_count=cc.get('term_cache_evict_count', 100),
+                term_cache_ttl_seconds=cc.get('term_cache_ttl_seconds', 300),
+                term_cache_sliding_expiration=cc.get('term_cache_sliding_expiration', True),
+                enable_document_cache=cc.get('enable_document_cache', True),
+                document_cache_capacity=cc.get('document_cache_capacity', 5000),
+                document_cache_evict_count=cc.get('document_cache_evict_count', 50),
+                document_cache_ttl_seconds=cc.get('document_cache_ttl_seconds', 600),
+                document_cache_sliding_expiration=cc.get('document_cache_sliding_expiration', True),
+                enable_statistics_cache=cc.get('enable_statistics_cache', True),
+                statistics_cache_ttl_seconds=cc.get('statistics_cache_ttl_seconds', 60)
             )
 
         return IndexInfo(
@@ -696,7 +891,8 @@ class VerbexClient:
             statistics=statistics,
             custom_metadata=data.get('custom_metadata'),
             labels=data.get('labels'),
-            tags=data.get('tags')
+            tags=data.get('tags'),
+            cache_configuration=cache_config
         )
 
     # ==================== Document Management Endpoints ====================
@@ -849,6 +1045,91 @@ class VerbexClient:
             requested_count=data.get('requested_count', 0) if data else 0
         )
 
+    def add_documents_batch(self, index_id: str, documents: List[BatchAddDocumentItem]) -> BatchAddResult:
+        """
+        Add multiple documents to an index in a single request.
+
+        Args:
+            index_id: The index identifier
+            documents: List of BatchAddDocumentItem objects to add
+
+        Returns:
+            BatchAddResult containing lists of added and failed documents
+        """
+        if not documents:
+            return BatchAddResult()
+
+        # Convert documents to request format
+        request_docs = []
+        for doc in documents:
+            request_doc = {
+                'Name': doc.name,
+                'Content': doc.content
+            }
+            if doc.id:
+                request_doc['Id'] = doc.id
+            if doc.labels:
+                request_doc['Labels'] = doc.labels
+            if doc.tags:
+                request_doc['Tags'] = doc.tags
+            if doc.custom_metadata is not None:
+                request_doc['CustomMetadata'] = doc.custom_metadata
+            request_docs.append(request_doc)
+
+        data = self._make_request('POST', f'/v1.0/indices/{index_id}/documents/batch',
+                                  data={'Documents': request_docs})
+
+        added_items = []
+        for item in (data.get('added', []) if data else []):
+            added_items.append(BatchAddResultItem(
+                document_id=item.get('document_id', ''),
+                name=item.get('name', ''),
+                success=item.get('success', False),
+                error_message=item.get('error_message')
+            ))
+
+        failed_items = []
+        for item in (data.get('failed', []) if data else []):
+            failed_items.append(BatchAddResultItem(
+                document_id=item.get('document_id', ''),
+                name=item.get('name', ''),
+                success=item.get('success', False),
+                error_message=item.get('error_message')
+            ))
+
+        return BatchAddResult(
+            added=added_items,
+            failed=failed_items,
+            added_count=data.get('added_count', 0) if data else 0,
+            failed_count=data.get('failed_count', 0) if data else 0,
+            requested_count=data.get('requested_count', 0) if data else 0
+        )
+
+    def check_documents_exist(self, index_id: str, document_ids: List[str]) -> BatchExistenceResult:
+        """
+        Check if multiple documents exist in an index.
+
+        Args:
+            index_id: The index identifier
+            document_ids: List of document IDs to check
+
+        Returns:
+            BatchExistenceResult containing lists of existing and not found IDs
+        """
+        if not document_ids:
+            return BatchExistenceResult()
+
+        data = self._make_request('POST', f'/v1.0/indices/{index_id}/documents/exists',
+                                  data={'Ids': document_ids})
+
+        return BatchExistenceResult(
+            exists=data.get('exists', []) if data else [],
+            not_found=data.get('not_found', []) if data else [],
+            exists_count=data.get('exists_count', 0) if data else 0,
+            not_found_count=data.get('not_found_count', 0) if data else 0,
+            requested_count=data.get('requested_count', 0) if data else 0
+        )
+
     def update_document_labels(self, index_id: str, document_id: str, labels: List[str]) -> None:
         """
         Update labels on a document (full replacement).
@@ -961,6 +1242,168 @@ class VerbexClient:
             max_results=data.get('max_results', 100) if data else 100,
             search_time=data.get('search_time', 0.0) if data else 0.0
         )
+
+    # ==================== Backup & Restore Endpoints ====================
+
+    def backup(self, index_id: str) -> bytes:
+        """
+        Create a backup of an index.
+
+        Args:
+            index_id: The index identifier
+
+        Returns:
+            Bytes containing the backup ZIP archive
+        """
+        if not index_id:
+            raise ValueError("index_id is required")
+
+        url = f"{self._endpoint}/v1.0/indices/{index_id}/backup"
+        response = requests.post(
+            url,
+            headers={'Authorization': f'Bearer {self._access_key}'}
+        )
+
+        if not response.ok:
+            raise VerbexError(f"Backup failed: {response.text}", response.status_code)
+
+        return response.content
+
+    def backup_to_file(self, index_id: str, file_path: str) -> None:
+        """
+        Create a backup of an index and save it to a file.
+
+        Args:
+            index_id: The index identifier
+            file_path: The file path to save the backup to
+        """
+        if not file_path:
+            raise ValueError("file_path is required")
+
+        backup_data = self.backup(index_id)
+        with open(file_path, 'wb') as f:
+            f.write(backup_data)
+
+    def restore(self, file_path: str, name: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Restore a backup to create a new index.
+
+        Args:
+            file_path: The path to the backup file
+            name: Optional new name for the restored index
+
+        Returns:
+            Dict containing the restore result with indexId
+        """
+        if not file_path:
+            raise ValueError("file_path is required")
+
+        url = f"{self._endpoint}/v1.0/indices/restore"
+
+        with open(file_path, 'rb') as f:
+            files = {'file': ('backup.vbx', f, 'application/zip')}
+            data = {}
+            if name:
+                data['name'] = name
+
+            response = requests.post(
+                url,
+                headers={'Authorization': f'Bearer {self._access_key}'},
+                files=files,
+                data=data
+            )
+
+        if not response.ok:
+            try:
+                error_data = response.json()
+                error_message = error_data.get('ErrorMessage') or error_data.get('errorMessage') or 'Restore failed'
+            except:
+                error_message = response.text
+            raise VerbexError(error_message, response.status_code)
+
+        result = response.json()
+        raw_data = result.get('Data') or result.get('data') or {}
+        return _convert_keys_to_snake_case(raw_data)
+
+    def restore_from_bytes(self, backup_data: bytes, name: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Restore a backup from bytes to create a new index.
+
+        Args:
+            backup_data: The backup data as bytes
+            name: Optional new name for the restored index
+
+        Returns:
+            Dict containing the restore result with index_id
+        """
+        if not backup_data:
+            raise ValueError("backup_data is required")
+
+        url = f"{self._endpoint}/v1.0/indices/restore"
+
+        from io import BytesIO
+        files = {'file': ('backup.vbx', BytesIO(backup_data), 'application/zip')}
+        data = {}
+        if name:
+            data['name'] = name
+
+        response = requests.post(
+            url,
+            headers={'Authorization': f'Bearer {self._access_key}'},
+            files=files,
+            data=data
+        )
+
+        if not response.ok:
+            try:
+                error_data = response.json()
+                error_message = error_data.get('ErrorMessage') or error_data.get('errorMessage') or 'Restore failed'
+            except:
+                error_message = response.text
+            raise VerbexError(error_message, response.status_code)
+
+        result = response.json()
+        raw_data = result.get('Data') or result.get('data') or {}
+        return _convert_keys_to_snake_case(raw_data)
+
+    def restore_replace(self, index_id: str, file_path: str) -> Dict[str, Any]:
+        """
+        Restore a backup by replacing an existing index.
+
+        Args:
+            index_id: The index identifier to replace
+            file_path: The path to the backup file
+
+        Returns:
+            Dict containing the restore result
+        """
+        if not index_id:
+            raise ValueError("index_id is required")
+        if not file_path:
+            raise ValueError("file_path is required")
+
+        url = f"{self._endpoint}/v1.0/indices/{index_id}/restore"
+
+        with open(file_path, 'rb') as f:
+            files = {'file': ('backup.vbx', f, 'application/zip')}
+
+            response = requests.post(
+                url,
+                headers={'Authorization': f'Bearer {self._access_key}'},
+                files=files
+            )
+
+        if not response.ok:
+            try:
+                error_data = response.json()
+                error_message = error_data.get('ErrorMessage') or error_data.get('errorMessage') or 'Restore failed'
+            except:
+                error_message = response.text
+            raise VerbexError(error_message, response.status_code)
+
+        result = response.json()
+        raw_data = result.get('Data') or result.get('data') or {}
+        return _convert_keys_to_snake_case(raw_data)
 
     # ==================== Admin - Tenant Management Endpoints ====================
 

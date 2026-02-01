@@ -75,6 +75,8 @@ namespace VerbexCli
             rootCommand.AddCommand(MaintenanceCommands.CreateMaintenanceCommand());
             rootCommand.AddCommand(ConfigCommands.CreateConfigCommand());
             rootCommand.AddCommand(AdminCommands.CreateAdminCommand());
+            rootCommand.AddCommand(BackupCommands.CreateBackupCommand());
+            rootCommand.AddCommand(BackupCommands.CreateRestoreCommand());
 
             return rootCommand;
         }

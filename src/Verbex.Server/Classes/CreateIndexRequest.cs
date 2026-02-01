@@ -2,6 +2,7 @@ namespace Verbex.Server.Classes
 {
     using System;
     using System.Collections.Generic;
+    using Verbex;
     using Verbex.Models;
 
     /// <summary>
@@ -114,6 +115,16 @@ namespace Verbex.Server.Classes
             set => _CustomMetadata = value;
         }
 
+        /// <summary>
+        /// Cache configuration for the index.
+        /// When null, caching is disabled.
+        /// </summary>
+        public CacheConfiguration? CacheConfiguration
+        {
+            get => _CacheConfiguration;
+            set => _CacheConfiguration = value;
+        }
+
         #endregion
 
         #region Private-Members
@@ -128,6 +139,7 @@ namespace Verbex.Server.Classes
         private List<string> _Labels = new List<string>();
         private Dictionary<string, string> _Tags = new Dictionary<string, string>();
         private object? _CustomMetadata = null;
+        private CacheConfiguration? _CacheConfiguration = null;
 
         #endregion
 
@@ -183,7 +195,8 @@ namespace Verbex.Server.Classes
                 MaxTokenLength = _MaxTokenLength,
                 Labels = _Labels,
                 Tags = _Tags,
-                CustomMetadata = _CustomMetadata
+                CustomMetadata = _CustomMetadata,
+                CacheConfiguration = _CacheConfiguration
             };
 
             // Use provided identifier if specified

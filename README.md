@@ -80,6 +80,7 @@ foreach (var result in results)
 - **Text Processing**: Lemmatization, stop word removal, token filtering
 - **Metadata Filtering**: Labels and tags for document organization
 - **Batch Operations**: Retrieve multiple documents in a single request
+- **Backup & Restore**: Create portable backups and restore indices
 - **Thread-Safe**: Optimized for concurrent read-heavy workloads
 - **REST API**: Production-ready HTTP server with authentication
 - **CLI Tool**: Professional command-line interface (`vbx`)
@@ -125,6 +126,8 @@ var config = new VerbexConfiguration
 vbx index create docs --storage disk --lemmatizer --stopwords
 vbx doc add readme --content "Getting started with Verbex"
 vbx search "getting started" --limit 10
+vbx backup docs --output docs.vbx
+vbx restore docs.vbx --name docs-restored
 ```
 
 ## REST API Example
@@ -143,6 +146,17 @@ curl -X POST http://localhost:8080/v1.0/indices/myindex/search \
 # Batch retrieve documents
 curl -X GET "http://localhost:8080/v1.0/indices/myindex/documents?ids=doc1,doc2,doc3" \
   -H "Authorization: Bearer YOUR_TOKEN"
+
+# Backup an index
+curl -X POST http://localhost:8080/v1.0/indices/myindex/backup \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -o myindex-backup.vbx
+
+# Restore from backup
+curl -X POST http://localhost:8080/v1.0/indices/restore \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@myindex-backup.vbx" \
+  -F "name=restored-index"
 ```
 
 ## Documentation
@@ -152,6 +166,7 @@ curl -X GET "http://localhost:8080/v1.0/indices/myindex/documents?ids=doc1,doc2,
 - **[VBX_CLI.md](VBX_CLI.md)** - CLI documentation
 - **[STORAGE.md](STORAGE.md)** - Storage architecture
 - **[SCORING.md](SCORING.md)** - Scoring algorithm details
+- **[BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md)** - Backup and restore guide
 
 ## Configuration
 

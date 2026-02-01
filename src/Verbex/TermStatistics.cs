@@ -120,8 +120,9 @@ namespace Verbex
         }
 
         /// <summary>
-        /// Calculates the Inverse Document Frequency (IDF) for a term
-        /// IDF = log(Total Documents / Document Frequency)
+        /// Calculates the Inverse Document Frequency (IDF) for a term.
+        /// IDF = log(Total Documents / Document Frequency).
+        /// Value is rounded to 4 decimal places.
         /// </summary>
         /// <param name="term">The term to calculate IDF for</param>
         /// <returns>The IDF value, or 0.0 if term doesn't exist</returns>
@@ -139,7 +140,7 @@ namespace Verbex
                     return 0.0;
                 }
 
-                return Math.Log((double)_TotalDocuments / documentFrequency);
+                return Math.Round(Math.Log((double)_TotalDocuments / documentFrequency), 4);
             }
             finally
             {
@@ -276,7 +277,7 @@ namespace Verbex
         {
             if (_TotalDocuments > 0)
             {
-                _AverageDocumentLength = (double)_TotalTermOccurrences / _TotalDocuments;
+                _AverageDocumentLength = Math.Round((double)_TotalTermOccurrences / _TotalDocuments, 4);
             }
             else
             {
