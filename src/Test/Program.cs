@@ -151,6 +151,9 @@ namespace Test
                 Console.WriteLine($"--- Batch Existence Check Tests ({modeName}) ---");
                 await BatchExistenceCheckTests.RunAllAsync(runner).ConfigureAwait(false);
 
+                Console.WriteLine($"--- Concurrency Tests ({modeName}) ---");
+                await ConcurrencyTests.RunAllAsync(runner).ConfigureAwait(false);
+
                 Console.WriteLine();
             }
             finally

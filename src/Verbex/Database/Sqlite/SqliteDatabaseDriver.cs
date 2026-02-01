@@ -14,13 +14,22 @@ namespace Verbex.Database.Sqlite
     /// SQLite implementation of the database driver.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Supports both in-memory and file-based SQLite databases.
     /// Uses WAL mode for improved concurrent access performance.
+    /// </para>
+    /// <para>
+    /// Thread safety: Uses ReaderWriterLockSlim to allow concurrent read operations
+    /// while serializing write operations. Read queries (SELECT) use ephemeral connections
+    /// and can execute in parallel. Write queries and transactions use a dedicated write
+    /// connection with exclusive access.
+    /// </para>
     /// </remarks>
     public class SqliteDatabaseDriver : DatabaseDriverBase
     {
-        private readonly SemaphoreSlim _Semaphore = new SemaphoreSlim(1, 1);
-        private SqliteConnection? _Connection;
+        private readonly ReaderWriterLockSlim _Lock = new ReaderWriterLockSlim();
+        private SqliteConnection? _WriteConnection;
+        private string _ConnectionString = string.Empty;
         private SqliteTransaction? _ActiveTransaction;
         private bool _IsOpen = false;
 
@@ -49,7 +58,7 @@ namespace Verbex.Database.Sqlite
         {
             ThrowIfDisposed();
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            _Lock.EnterWriteLock();
             try
             {
                 if (_IsOpen)
@@ -57,9 +66,9 @@ namespace Verbex.Database.Sqlite
                     return;
                 }
 
-                string connectionString = BuildConnectionString();
-                _Connection = new SqliteConnection(connectionString);
-                await _Connection.OpenAsync(token).ConfigureAwait(false);
+                _ConnectionString = BuildConnectionString();
+                _WriteConnection = new SqliteConnection(_ConnectionString);
+                await _WriteConnection.OpenAsync(token).ConfigureAwait(false);
 
                 await ApplyPragmasAsync(token).ConfigureAwait(false);
                 await CreateSchemaAsync(token).ConfigureAwait(false);
@@ -70,7 +79,7 @@ namespace Verbex.Database.Sqlite
             }
             finally
             {
-                _Semaphore.Release();
+                _Lock.ExitWriteLock();
             }
         }
 
@@ -85,14 +94,72 @@ namespace Verbex.Database.Sqlite
                 throw new ArgumentNullException(nameof(query));
             }
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            // If the current thread holds the write lock (we're in a transaction), execute directly
+            if (_Lock.IsWriteLockHeld)
+            {
+                return await ExecuteQueryInternalAsync(query, false, token).ConfigureAwait(false);
+            }
+
+            // If this is a read query, use read lock with ephemeral connection
+            bool isReadQuery = IsReadOnlyQuery(query) && !isTransaction;
+
+            if (isReadQuery)
+            {
+                return await ExecuteReadQueryAsync(query, token).ConfigureAwait(false);
+            }
+            else
+            {
+                return await ExecuteWriteQueryAsync(query, isTransaction, token).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// Executes a read-only query using a read lock and ephemeral connection.
+        /// </summary>
+        /// <param name="query">The SQL query to execute.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>A DataTable containing the query results.</returns>
+        private async Task<DataTable> ExecuteReadQueryAsync(string query, CancellationToken token)
+        {
+            _Lock.EnterReadLock();
+            try
+            {
+                using SqliteConnection readConnection = new SqliteConnection(_ConnectionString);
+                await readConnection.OpenAsync(token).ConfigureAwait(false);
+
+                DataTable result = new DataTable();
+                using SqliteCommand cmd = readConnection.CreateCommand();
+                cmd.CommandText = query;
+                cmd.CommandTimeout = Settings.CommandTimeout;
+
+                using SqliteDataReader reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
+                result.Load(reader);
+
+                return result;
+            }
+            finally
+            {
+                _Lock.ExitReadLock();
+            }
+        }
+
+        /// <summary>
+        /// Executes a write query using a write lock and the dedicated write connection.
+        /// </summary>
+        /// <param name="query">The SQL query to execute.</param>
+        /// <param name="isTransaction">Whether to wrap the query in a transaction.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>A DataTable containing the query results.</returns>
+        private async Task<DataTable> ExecuteWriteQueryAsync(string query, bool isTransaction, CancellationToken token)
+        {
+            _Lock.EnterWriteLock();
             try
             {
                 return await ExecuteQueryInternalAsync(query, isTransaction, token).ConfigureAwait(false);
             }
             finally
             {
-                _Semaphore.Release();
+                _Lock.ExitWriteLock();
             }
         }
 
@@ -107,15 +174,22 @@ namespace Verbex.Database.Sqlite
                 throw new ArgumentNullException(nameof(queries));
             }
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            // If the current thread holds the write lock, skip lock acquisition
+            bool lockAcquired = false;
+            if (!_Lock.IsWriteLockHeld)
+            {
+                _Lock.EnterWriteLock();
+                lockAcquired = true;
+            }
+
             try
             {
                 DataTable result = new DataTable();
                 SqliteTransaction? transaction = null;
 
-                if (isTransaction)
+                if (isTransaction && _ActiveTransaction == null)
                 {
-                    transaction = _Connection!.BeginTransaction();
+                    transaction = _WriteConnection!.BeginTransaction();
                 }
 
                 try
@@ -153,38 +227,41 @@ namespace Verbex.Database.Sqlite
             }
             finally
             {
-                _Semaphore.Release();
+                if (lockAcquired)
+                {
+                    _Lock.ExitWriteLock();
+                }
             }
         }
 
         /// <inheritdoc />
         public override async Task CloseAsync(CancellationToken token = default)
         {
-            if (!_IsOpen || _Connection == null)
+            if (!_IsOpen || _WriteConnection == null)
             {
                 return;
             }
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            _Lock.EnterWriteLock();
             try
             {
                 if (!Settings.InMemory)
                 {
-                    await CheckpointAsync(token).ConfigureAwait(false);
+                    await CheckpointInternalAsync(token).ConfigureAwait(false);
                 }
 
                 // Clear the connection pool before closing to prevent cached connections
                 // from being reused when a database at the same path is recreated
-                SqliteConnection connectionToClose = _Connection;
-                await _Connection.CloseAsync().ConfigureAwait(false);
+                SqliteConnection connectionToClose = _WriteConnection;
+                await _WriteConnection.CloseAsync().ConfigureAwait(false);
                 SqliteConnection.ClearPool(connectionToClose);
-                _Connection.Dispose();
-                _Connection = null;
+                _WriteConnection.Dispose();
+                _WriteConnection = null;
                 _IsOpen = false;
             }
             finally
             {
-                _Semaphore.Release();
+                _Lock.ExitWriteLock();
             }
         }
 
@@ -196,7 +273,15 @@ namespace Verbex.Database.Sqlite
 
             if (!Settings.InMemory)
             {
-                await CheckpointAsync(token).ConfigureAwait(false);
+                _Lock.EnterWriteLock();
+                try
+                {
+                    await CheckpointInternalAsync(token).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _Lock.ExitWriteLock();
+                }
             }
         }
 
@@ -206,20 +291,26 @@ namespace Verbex.Database.Sqlite
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            _Lock.EnterWriteLock();
             try
             {
                 if (_ActiveTransaction != null)
                 {
+                    _Lock.ExitWriteLock();
                     throw new InvalidOperationException("A transaction is already active.");
                 }
 
-                _ActiveTransaction = _Connection!.BeginTransaction();
+                _ActiveTransaction = _WriteConnection!.BeginTransaction();
+                // Note: Write lock is intentionally held while transaction is active
+                // It will be released in CommitTransactionAsync or RollbackTransactionAsync
             }
-            finally
+            catch
             {
-                _Semaphore.Release();
+                _Lock.ExitWriteLock();
+                throw;
             }
+            // Do not release the write lock here - it stays held during the transaction
+            await Task.CompletedTask.ConfigureAwait(false);
         }
 
         /// <inheritdoc />
@@ -228,7 +319,7 @@ namespace Verbex.Database.Sqlite
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            // Write lock should already be held from BeginTransactionAsync
             try
             {
                 if (_ActiveTransaction == null)
@@ -242,7 +333,7 @@ namespace Verbex.Database.Sqlite
             }
             finally
             {
-                _Semaphore.Release();
+                _Lock.ExitWriteLock();
             }
         }
 
@@ -252,7 +343,7 @@ namespace Verbex.Database.Sqlite
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            // Write lock should already be held from BeginTransactionAsync
             try
             {
                 if (_ActiveTransaction == null)
@@ -266,7 +357,7 @@ namespace Verbex.Database.Sqlite
             }
             finally
             {
-                _Semaphore.Release();
+                _Lock.ExitWriteLock();
             }
         }
 
@@ -280,17 +371,28 @@ namespace Verbex.Database.Sqlite
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            _Lock.EnterWriteLock();
             try
             {
-                using SqliteCommand cmd = _Connection!.CreateCommand();
-                cmd.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
-                await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                await CheckpointInternalAsync(token).ConfigureAwait(false);
             }
             finally
             {
-                _Semaphore.Release();
+                _Lock.ExitWriteLock();
             }
+        }
+
+        /// <summary>
+        /// Performs a WAL checkpoint without acquiring the lock.
+        /// </summary>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Task.</returns>
+        /// <remarks>Caller must hold the write lock.</remarks>
+        private async Task CheckpointInternalAsync(CancellationToken token)
+        {
+            using SqliteCommand cmd = _WriteConnection!.CreateCommand();
+            cmd.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
+            await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -310,7 +412,7 @@ namespace Verbex.Database.Sqlite
                 throw new InvalidOperationException("SaveToFile is only available for in-memory databases.");
             }
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            _Lock.EnterWriteLock();
             try
             {
                 string targetConnectionString = new SqliteConnectionStringBuilder
@@ -322,35 +424,42 @@ namespace Verbex.Database.Sqlite
                 using SqliteConnection targetConnection = new SqliteConnection(targetConnectionString);
                 await targetConnection.OpenAsync(token).ConfigureAwait(false);
 
-                _Connection!.BackupDatabase(targetConnection);
+                _WriteConnection!.BackupDatabase(targetConnection);
 
                 await targetConnection.CloseAsync().ConfigureAwait(false);
             }
             finally
             {
-                _Semaphore.Release();
+                _Lock.ExitWriteLock();
             }
         }
 
         /// <summary>
-        /// Gets the internal SQLite connection for advanced operations.
+        /// Gets the internal SQLite write connection for advanced operations.
         /// </summary>
-        /// <returns>The SQLite connection.</returns>
+        /// <returns>The SQLite write connection.</returns>
         /// <exception cref="InvalidOperationException">Thrown when connection is not open.</exception>
-        internal SqliteConnection GetConnection()
+        /// <remarks>
+        /// Caller must acquire appropriate lock before using this connection.
+        /// For read operations, prefer using ExecuteQueryAsync which handles locking automatically.
+        /// </remarks>
+        internal SqliteConnection GetWriteConnection()
         {
             ThrowIfDisposed();
             ThrowIfNotOpen();
-            return _Connection!;
+            return _WriteConnection!;
         }
 
         /// <summary>
-        /// Gets the semaphore for thread-safe operations.
+        /// Gets the reader-writer lock for thread-safe operations.
         /// </summary>
-        /// <returns>The semaphore.</returns>
-        internal SemaphoreSlim GetSemaphore()
+        /// <returns>The reader-writer lock.</returns>
+        /// <remarks>
+        /// Use EnterReadLock for read operations and EnterWriteLock for write operations.
+        /// </remarks>
+        internal ReaderWriterLockSlim GetLock()
         {
-            return _Semaphore;
+            return _Lock;
         }
 
         /// <summary>
@@ -381,6 +490,7 @@ namespace Verbex.Database.Sqlite
         /// Applies SQLite pragmas for optimal performance.
         /// </summary>
         /// <param name="token">Cancellation token.</param>
+        /// <remarks>Caller must hold the write lock.</remarks>
         private async Task ApplyPragmasAsync(CancellationToken token)
         {
             string[] pragmas = SetupQueries.GetPragmas().Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
@@ -400,7 +510,7 @@ namespace Verbex.Database.Sqlite
                     trimmedPragma = $"PRAGMA busy_timeout = {busyTimeoutMs}";
                 }
 
-                using SqliteCommand cmd = _Connection!.CreateCommand();
+                using SqliteCommand cmd = _WriteConnection!.CreateCommand();
                 cmd.CommandText = trimmedPragma;
                 await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
             }
@@ -410,9 +520,10 @@ namespace Verbex.Database.Sqlite
         /// Creates the database schema if it doesn't exist.
         /// </summary>
         /// <param name="token">Cancellation token.</param>
+        /// <remarks>Caller must hold the write lock.</remarks>
         private async Task CreateSchemaAsync(CancellationToken token)
         {
-            using SqliteCommand cmd = _Connection!.CreateCommand();
+            using SqliteCommand cmd = _WriteConnection!.CreateCommand();
             cmd.CommandText = SetupQueries.CreateTables();
             await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
 
@@ -439,19 +550,36 @@ namespace Verbex.Database.Sqlite
         }
 
         /// <summary>
-        /// Executes a query without acquiring the semaphore (internal use only).
+        /// Determines if a query is read-only (SELECT statement).
         /// </summary>
+        /// <param name="query">The SQL query to check.</param>
+        /// <returns>True if the query is a SELECT statement; otherwise false.</returns>
+        private static bool IsReadOnlyQuery(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                return false;
+            }
+
+            string trimmed = query.TrimStart();
+            return trimmed.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Executes a query using the write connection without acquiring the lock (internal use only).
+        /// </summary>
+        /// <remarks>Caller must hold the write lock.</remarks>
         private async Task<DataTable> ExecuteQueryInternalAsync(string query, bool isTransaction, CancellationToken token)
         {
             DataTable result = new DataTable();
 
             // Use the active transaction if one exists, otherwise create a new one if requested
             bool useActiveTransaction = _ActiveTransaction != null;
-            SqliteTransaction? transaction = useActiveTransaction ? _ActiveTransaction : (isTransaction ? _Connection!.BeginTransaction() : null);
+            SqliteTransaction? transaction = useActiveTransaction ? _ActiveTransaction : (isTransaction ? _WriteConnection!.BeginTransaction() : null);
 
             try
             {
-                using SqliteCommand cmd = _Connection!.CreateCommand();
+                using SqliteCommand cmd = _WriteConnection!.CreateCommand();
                 cmd.CommandText = query;
                 cmd.CommandTimeout = Settings.CommandTimeout;
 
@@ -495,26 +623,26 @@ namespace Verbex.Database.Sqlite
         {
             if (disposing)
             {
-                // Close the connection first (uses semaphore), then dispose resources
-                if (_IsOpen && _Connection != null)
+                // Close the connection first (uses write lock), then dispose resources
+                if (_IsOpen && _WriteConnection != null)
                 {
                     try
                     {
-                        _Semaphore.Wait();
+                        _Lock.EnterWriteLock();
                         try
                         {
                             // Clear the connection pool before closing to prevent cached connections
                             // from being reused when a database at the same path is recreated
-                            SqliteConnection connectionToClose = _Connection;
-                            _Connection.Close();
+                            SqliteConnection connectionToClose = _WriteConnection;
+                            _WriteConnection.Close();
                             SqliteConnection.ClearPool(connectionToClose);
-                            _Connection.Dispose();
-                            _Connection = null;
+                            _WriteConnection.Dispose();
+                            _WriteConnection = null;
                             _IsOpen = false;
                         }
                         finally
                         {
-                            _Semaphore.Release();
+                            _Lock.ExitWriteLock();
                         }
                     }
                     catch
@@ -525,15 +653,15 @@ namespace Verbex.Database.Sqlite
                 else
                 {
                     // Still clear pool if connection exists but isn't open
-                    if (_Connection != null)
+                    if (_WriteConnection != null)
                     {
-                        SqliteConnection.ClearPool(_Connection);
+                        SqliteConnection.ClearPool(_WriteConnection);
                     }
-                    _Connection?.Dispose();
-                    _Connection = null;
+                    _WriteConnection?.Dispose();
+                    _WriteConnection = null;
                 }
 
-                _Semaphore.Dispose();
+                _Lock.Dispose();
             }
             base.Dispose(disposing);
         }
@@ -541,26 +669,26 @@ namespace Verbex.Database.Sqlite
         /// <inheritdoc />
         protected override async ValueTask DisposeAsyncCore()
         {
-            // Close the connection first (uses semaphore), then dispose resources
-            if (_IsOpen && _Connection != null)
+            // Close the connection first (uses write lock), then dispose resources
+            if (_IsOpen && _WriteConnection != null)
             {
                 try
                 {
-                    await _Semaphore.WaitAsync().ConfigureAwait(false);
+                    _Lock.EnterWriteLock();
                     try
                     {
                         // Clear the connection pool before closing to prevent cached connections
                         // from being reused when a database at the same path is recreated
-                        SqliteConnection connectionToClose = _Connection;
-                        await _Connection.CloseAsync().ConfigureAwait(false);
+                        SqliteConnection connectionToClose = _WriteConnection;
+                        await _WriteConnection.CloseAsync().ConfigureAwait(false);
                         SqliteConnection.ClearPool(connectionToClose);
-                        _Connection.Dispose();
-                        _Connection = null;
+                        _WriteConnection.Dispose();
+                        _WriteConnection = null;
                         _IsOpen = false;
                     }
                     finally
                     {
-                        _Semaphore.Release();
+                        _Lock.ExitWriteLock();
                     }
                 }
                 catch
@@ -571,15 +699,15 @@ namespace Verbex.Database.Sqlite
             else
             {
                 // Still clear pool if connection exists but isn't open
-                if (_Connection != null)
+                if (_WriteConnection != null)
                 {
-                    SqliteConnection.ClearPool(_Connection);
+                    SqliteConnection.ClearPool(_WriteConnection);
                 }
-                _Connection?.Dispose();
-                _Connection = null;
+                _WriteConnection?.Dispose();
+                _WriteConnection = null;
             }
 
-            _Semaphore.Dispose();
+            _Lock.Dispose();
             await base.DisposeAsyncCore().ConfigureAwait(false);
         }
     }

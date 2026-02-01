@@ -75,7 +75,7 @@ foreach (var result in results)
 
 ## Key Features
 
-- **Flexible Storage**: In-memory SQLite or persistent on-disk SQLite
+- **Flexible Storage**: In-memory SQLite, persistent on-disk SQLite, or persistent external Postgres, SQL Server, or MySQL
 - **TF-IDF Scoring**: Relevance-ranked search results
 - **Text Processing**: Lemmatization, stop word removal, token filtering
 - **Metadata Filtering**: Labels and tags for document organization
@@ -104,6 +104,74 @@ var config = VerbexConfiguration.CreateInMemory();
 
 // On-Disk (persistent)
 var config = VerbexConfiguration.CreateOnDisk(@"C:\VerbexData");
+```
+
+## Database Backends
+
+Verbex supports four database backends: **SQLite**, **PostgreSQL**, **MySQL**, and **SQL Server**.
+
+### Choosing a Backend
+
+| Use Case | Recommended Backend |
+|----------|---------------------|
+| Development & testing | SQLite (in-memory) |
+| Single-server, low ingestion (<100 docs/min) | SQLite (file) |
+| Production with concurrent users | PostgreSQL |
+| High ingestion throughput (>1K docs/min) | PostgreSQL, MySQL, or SQL Server |
+| Existing database infrastructure | Match your infrastructure |
+
+### Why SQLite for Development
+
+SQLite is the default and requires no external database server. It's ideal when:
+- Running tests or developing locally
+- Ingestion rate is low (documents arrive infrequently)
+- Only a single application instance accesses the index
+- You want zero-configuration setup
+
+### Why Server-Based Databases for Production
+
+PostgreSQL, MySQL, and SQL Server are preferred for production workloads because:
+
+1. **Connection Pooling**: Server-based databases maintain connection pools (1-100 connections by default) allowing true parallel query execution. SQLite serializes all operations through a single connection.
+
+2. **Write Concurrency**: Server-based databases use row-level locking, enabling multiple concurrent writes. SQLite uses a single-writer model where write operations queue behind each other.
+
+3. **Horizontal Scaling**: Server-based databases support read replicas for distributing query load. SQLite is limited to a single server.
+
+4. **High Ingestion Rates**: When documents arrive faster than a single writer can process, server-based databases handle the concurrent load without queuing delays.
+
+### Configuration Examples
+
+```csharp
+// SQLite (development)
+var settings = DatabaseSettings.CreateInMemory();
+
+// SQLite (low-volume production)
+var settings = DatabaseSettings.CreateSqliteFile("./verbex.db");
+
+// PostgreSQL (recommended for production)
+var settings = DatabaseSettings.CreatePostgresql(
+    hostname: "localhost",
+    databaseName: "verbex",
+    username: "verbex_user",
+    password: "secret"
+);
+
+// MySQL
+var settings = DatabaseSettings.CreateMysql(
+    hostname: "localhost",
+    databaseName: "verbex",
+    username: "verbex_user",
+    password: "secret"
+);
+
+// SQL Server
+var settings = DatabaseSettings.CreateSqlServer(
+    hostname: "localhost",
+    databaseName: "verbex",
+    username: "verbex_user",
+    password: "secret"
+);
 ```
 
 ## Text Processing

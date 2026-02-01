@@ -181,10 +181,12 @@ DELETE FROM tenants WHERE identifier = '{Sanitizer.Sanitize(identifier)}';";
 
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
 
+            // Must use write connection (isTransaction = true) because changes()
+            // returns the row count from the most recent write on the SAME connection
             string checkQuery = $@"
 SELECT changes();";
 
-            DataTable result = await _Driver.ExecuteQueryAsync(checkQuery, false, token).ConfigureAwait(false);
+            DataTable result = await _Driver.ExecuteQueryAsync(checkQuery, true, token).ConfigureAwait(false);
 
             if (result.Rows.Count > 0)
             {

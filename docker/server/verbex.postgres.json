@@ -1,0 +1,50 @@
+{
+  "CreatedUtc": "2026-01-09T17:22:48.9590463Z",
+  "Logging": {
+    "SyslogServers": [
+      {
+        "Hostname": "127.0.0.1",
+        "Port": 514
+      }
+    ],
+    "ConsoleLogging": true,
+    "EnableColors": true,
+    "LogDirectory": "logs",
+    "LogFilename": "verbex.log",
+    "FileLogging": true,
+    "IncludeDateInFilename": true
+  },
+  "Rest": {
+    "Hostname": "*",
+    "Port": 8080,
+    "Ssl": false,
+    "SslCertificateFile": null,
+    "SslCertificatePassword": null,
+    "EnableOpenApi": true,
+    "EnableSwaggerUi": true
+  },
+  "Database": {
+    "Type": "Postgresql",
+    "Filename": "",
+    "InMemory": false,
+    "Hostname": "localhost",
+    "Port": 5432,
+    "DatabaseName": "verbex",
+    "Username": "postgres",
+    "Password": "password",
+    "RequireEncryption": false,
+    "Schema": "",
+    "MinPoolSize": 1,
+    "MaxPoolSize": 100,
+    "CommandTimeout": 30,
+    "ConnectionTimeout": 30
+  },
+  "DataDirectory": "./data",
+  "AdminBearerToken": "verbexadmin",
+  "Debug": {
+    "Authentication": false,
+    "Exceptions": true,
+    "Requests": false,
+    "DatabaseQueries": false
+  }
+}

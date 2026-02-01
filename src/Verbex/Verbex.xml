@@ -3810,8 +3810,16 @@
             SQLite implementation of the database driver.
             </summary>
             <remarks>
+            <para>
             Supports both in-memory and file-based SQLite databases.
             Uses WAL mode for improved concurrent access performance.
+            </para>
+            <para>
+            Thread safety: Uses ReaderWriterLockSlim to allow concurrent read operations
+            while serializing write operations. Read queries (SELECT) use ephemeral connections
+            and can execute in parallel. Write queries and transactions use a dedicated write
+            connection with exclusive access.
+            </para>
             </remarks>
         </member>
         <member name="P:Verbex.Database.Sqlite.SqliteDatabaseDriver.IsOpen">
@@ -3833,6 +3841,23 @@
         </member>
         <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.ExecuteQueryAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
             <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.ExecuteReadQueryAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Executes a read-only query using a read lock and ephemeral connection.
+            </summary>
+            <param name="query">The SQL query to execute.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>A DataTable containing the query results.</returns>
+        </member>
+        <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.ExecuteWriteQueryAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
+            <summary>
+            Executes a write query using a write lock and the dedicated write connection.
+            </summary>
+            <param name="query">The SQL query to execute.</param>
+            <param name="isTransaction">Whether to wrap the query in a transaction.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>A DataTable containing the query results.</returns>
         </member>
         <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.ExecuteQueriesAsync(System.Collections.Generic.IEnumerable{System.String},System.Boolean,System.Threading.CancellationToken)">
             <inheritdoc />
@@ -3859,6 +3884,14 @@
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
+        <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.CheckpointInternalAsync(System.Threading.CancellationToken)">
+            <summary>
+            Performs a WAL checkpoint without acquiring the lock.
+            </summary>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+            <remarks>Caller must hold the write lock.</remarks>
+        </member>
         <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.SaveToFileAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Saves an in-memory database to a file.
@@ -3868,18 +3901,25 @@
             <returns>Task.</returns>
             <exception cref="T:System.InvalidOperationException">Thrown when not in in-memory mode.</exception>
         </member>
-        <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.GetConnection">
+        <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.GetWriteConnection">
             <summary>
-            Gets the internal SQLite connection for advanced operations.
+            Gets the internal SQLite write connection for advanced operations.
             </summary>
-            <returns>The SQLite connection.</returns>
+            <returns>The SQLite write connection.</returns>
             <exception cref="T:System.InvalidOperationException">Thrown when connection is not open.</exception>
+            <remarks>
+            Caller must acquire appropriate lock before using this connection.
+            For read operations, prefer using ExecuteQueryAsync which handles locking automatically.
+            </remarks>
         </member>
-        <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.GetSemaphore">
+        <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.GetLock">
             <summary>
-            Gets the semaphore for thread-safe operations.
+            Gets the reader-writer lock for thread-safe operations.
             </summary>
-            <returns>The semaphore.</returns>
+            <returns>The reader-writer lock.</returns>
+            <remarks>
+            Use EnterReadLock for read operations and EnterWriteLock for write operations.
+            </remarks>
         </member>
         <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.BuildConnectionString">
             <summary>
@@ -3892,22 +3932,32 @@
             Applies SQLite pragmas for optimal performance.
             </summary>
             <param name="token">Cancellation token.</param>
+            <remarks>Caller must hold the write lock.</remarks>
         </member>
         <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.CreateSchemaAsync(System.Threading.CancellationToken)">
             <summary>
             Creates the database schema if it doesn't exist.
             </summary>
             <param name="token">Cancellation token.</param>
+            <remarks>Caller must hold the write lock.</remarks>
         </member>
         <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.InitializeMethodImplementations">
             <summary>
             Initializes all method interface implementations.
             </summary>
         </member>
+        <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.IsReadOnlyQuery(System.String)">
+            <summary>
+            Determines if a query is read-only (SELECT statement).
+            </summary>
+            <param name="query">The SQL query to check.</param>
+            <returns>True if the query is a SELECT statement; otherwise false.</returns>
+        </member>
         <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.ExecuteQueryInternalAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
             <summary>
-            Executes a query without acquiring the semaphore (internal use only).
+            Executes a query using the write connection without acquiring the lock (internal use only).
             </summary>
+            <remarks>Caller must hold the write lock.</remarks>
         </member>
         <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.Dispose(System.Boolean)">
             <inheritdoc />
