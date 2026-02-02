@@ -14,8 +14,7 @@ function Topbar() {
   return (
     <header className="topbar">
       <div className="topbar-brand">
-        <h1>Verbex</h1>
-        <span className="topbar-subtitle">Inverted Index Dashboard</span>
+        <img src="/logo.png" alt="Verbex" className="topbar-logo" />
       </div>
 
       <div className="topbar-server">

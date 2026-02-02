@@ -14,12 +14,19 @@
   padding: 40px;
   width: 100%;
   max-width: 420px;
+  position: relative;
 }
 
 .login-header {
   text-align: center;
   margin-bottom: 32px;
   position: relative;
+}
+
+.login-logo {
+  height: 80px;
+  width: auto;
+  margin: 32px 0 24px 0;
 }
 
 .login-header h1 {
@@ -35,21 +42,23 @@
   font-size: 0.95rem;
 }
 
-.login-header .theme-toggle {
+.login-card > .theme-toggle {
   position: absolute;
-  top: 0;
-  right: 0;
+  top: 12px;
+  right: 12px;
   background: none;
   border: none;
-  font-size: 1.5rem;
+  font-size: 1rem;
   cursor: pointer;
-  padding: 4px;
+  padding: 6px;
   border-radius: 4px;
   transition: background 0.2s;
+  opacity: 0.5;
 }
 
-.login-header .theme-toggle:hover {
+.login-card > .theme-toggle:hover {
   background: var(--bg-hover);
+  opacity: 1;
 }
 
 .login-form {

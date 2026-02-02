@@ -39,16 +39,16 @@ function Login() {
   return (
     <div className="login-container">
       <div className="login-card">
+        <button
+          className="theme-toggle"
+          onClick={toggleTheme}
+          title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+        >
+          {theme === 'light' ? '🌙' : '☀️'}
+        </button>
         <div className="login-header">
-          <h1>Verbex</h1>
+          <img src="/logo.png" alt="Verbex" className="login-logo" />
           <p>Inverted Index Dashboard</p>
-          <button
-            className="theme-toggle"
-            onClick={toggleTheme}
-            title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-          >
-            {theme === 'light' ? '🌙' : '☀️'}
-          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">

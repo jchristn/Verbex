@@ -11,6 +11,17 @@
 
 .topbar-brand {
   display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topbar-logo {
+  height: 36px;
+  width: auto;
+}
+
+.topbar-brand-text {
+  display: flex;
   align-items: baseline;
   gap: 12px;
 }
