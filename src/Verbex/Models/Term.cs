@@ -1,7 +1,6 @@
 namespace Verbex.Models
 {
     using System;
-    using System.Text.Json.Serialization;
     using PrettyId;
 
     /// <summary>
@@ -33,7 +32,6 @@ namespace Verbex.Models
         /// A k-sortable unique identifier with "trm_" prefix.
         /// Example: "trm_01ar5xxlajk1sxr6hzf29ksz4o01234567890abc".
         /// </value>
-        [JsonPropertyName("identifier")]
         public string Identifier
         {
             get => _Identifier;
@@ -44,7 +42,6 @@ namespace Verbex.Models
         /// Gets or sets the tenant ID this term belongs to.
         /// </summary>
         /// <value>The identifier of the tenant. Must reference a valid tenant.</value>
-        [JsonPropertyName("tenantId")]
         public string TenantId
         {
             get => _TenantId;
@@ -55,7 +52,6 @@ namespace Verbex.Models
         /// Gets or sets the index ID this term belongs to.
         /// </summary>
         /// <value>The identifier of the index. Must reference a valid index within the tenant.</value>
-        [JsonPropertyName("indexId")]
         public string IndexId
         {
             get => _IndexId;
@@ -66,7 +62,6 @@ namespace Verbex.Models
         /// Gets or sets the term text.
         /// </summary>
         /// <value>The actual term string. Unique within an index.</value>
-        [JsonPropertyName("term")]
         public string TermText
         {
             get => _TermText;
@@ -80,7 +75,6 @@ namespace Verbex.Models
         /// The number of documents containing this term.
         /// Used for IDF (Inverse Document Frequency) calculation in TF-IDF scoring.
         /// </value>
-        [JsonPropertyName("documentFrequency")]
         public int DocumentFrequency
         {
             get => _DocumentFrequency;
@@ -93,7 +87,6 @@ namespace Verbex.Models
         /// <value>
         /// The total number of times this term appears across all documents in the index.
         /// </value>
-        [JsonPropertyName("totalFrequency")]
         public long TotalFrequency
         {
             get => _TotalFrequency;
@@ -104,7 +97,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the term was last updated.
         /// </summary>
         /// <value>The last update timestamp in UTC.</value>
-        [JsonPropertyName("lastUpdateUtc")]
         public DateTime LastUpdateUtc
         {
             get => _LastUpdateUtc;
@@ -115,7 +107,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the term was created.
         /// </summary>
         /// <value>The creation timestamp in UTC.</value>
-        [JsonPropertyName("createdUtc")]
         public DateTime CreatedUtc
         {
             get => _CreatedUtc;

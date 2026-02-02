@@ -14,7 +14,7 @@ namespace Verbex.Database.Mysql.Implementations
     using Sanitizer = Verbex.Database.Mysql.Sanitizer;
 
     /// <summary>
-    /// MySQL implementation of document-term methods.
+    /// MySQL implementation of document-term methods using prefixed tables.
     /// </summary>
     internal class DocumentTermMethods : IDocumentTermMethods
     {
@@ -25,19 +25,21 @@ namespace Verbex.Database.Mysql.Implementations
             _Driver = driver ?? throw new ArgumentNullException(nameof(driver));
         }
 
-        public async Task AddAsync(string tenantId, string indexId, string id, string documentId, string termId, int termFrequency, List<int> characterPositions, List<int> termPositions, CancellationToken token = default)
+        public async Task AddAsync(string tablePrefix, string id, string documentId, string termId, int termFrequency, List<int> characterPositions, List<int> termPositions, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
             DateTime now = DateTime.UtcNow;
             string? charPosJson = characterPositions.Count > 0 ? JsonSerializer.Serialize(characterPositions) : null;
             string? termPosJson = termPositions.Count > 0 ? JsonSerializer.Serialize(termPositions) : null;
             string query = $@"
-INSERT INTO document_terms (id, document_id, term_id, term_frequency, character_positions, term_positions, last_update_utc, created_utc)
+INSERT INTO {prefix}_document_terms (id, document_id, term_id, term_frequency, character_positions, term_positions, last_update_utc, created_utc)
 VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(documentId)}', '{Sanitizer.Sanitize(termId)}', {termFrequency}, {Sanitizer.FormatNullableString(charPosJson)}, {Sanitizer.FormatNullableString(termPosJson)}, '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
         }
 
-        public async Task AddBatchAsync(string tenantId, string indexId, IEnumerable<DocumentTermRecord> records, CancellationToken token = default)
+        public async Task AddBatchAsync(string tablePrefix, IEnumerable<DocumentTermRecord> records, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
             List<DocumentTermRecord> recordList = records.ToList();
             if (recordList.Count == 0) return;
 
@@ -49,7 +51,7 @@ VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(documentId)}', '{Saniti
             {
                 List<DocumentTermRecord> chunk = recordList.Skip(i).Take(ChunkSize).ToList();
                 StringBuilder sb = new StringBuilder();
-                sb.Append("INSERT INTO document_terms (id, document_id, term_id, term_frequency, character_positions, term_positions, last_update_utc, created_utc) VALUES ");
+                sb.Append($"INSERT INTO {prefix}_document_terms (id, document_id, term_id, term_frequency, character_positions, term_positions, last_update_utc, created_utc) VALUES ");
 
                 List<string> valuesClauses = new List<string>();
                 foreach (DocumentTermRecord record in chunk)
@@ -66,12 +68,13 @@ VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(documentId)}', '{Saniti
             }
         }
 
-        public async Task<List<DocumentTermRecord>> GetByDocumentAsync(string tenantId, string indexId, string documentId, CancellationToken token = default)
+        public async Task<List<DocumentTermRecord>> GetByDocumentAsync(string tablePrefix, string documentId, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
             string query = $@"
 SELECT dt.id, dt.document_id, dt.term_id, dt.term_frequency, dt.character_positions, dt.term_positions, dt.last_update_utc, dt.created_utc, t.term
-FROM document_terms dt
-JOIN terms t ON dt.term_id = t.id
+FROM {prefix}_document_terms dt
+JOIN {prefix}_terms t ON dt.term_id = t.id
 WHERE dt.document_id = '{Sanitizer.Sanitize(documentId)}';";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             List<DocumentTermRecord> list = new List<DocumentTermRecord>();
@@ -79,16 +82,17 @@ WHERE dt.document_id = '{Sanitizer.Sanitize(documentId)}';";
             return list;
         }
 
-        public async Task<List<DocumentTermRecord>> GetPostingsAsync(string tenantId, string indexId, IEnumerable<string> termIds, CancellationToken token = default)
+        public async Task<List<DocumentTermRecord>> GetPostingsAsync(string tablePrefix, IEnumerable<string> termIds, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
             List<string> termIdList = termIds.ToList();
             if (termIdList.Count == 0) return new List<DocumentTermRecord>();
 
             string inClause = string.Join(",", termIdList.Select(id => $"'{Sanitizer.Sanitize(id)}'"));
             string query = $@"
 SELECT dt.id, dt.document_id, dt.term_id, dt.term_frequency, dt.character_positions, dt.term_positions, dt.last_update_utc, dt.created_utc, t.term
-FROM document_terms dt
-JOIN terms t ON dt.term_id = t.id
+FROM {prefix}_document_terms dt
+JOIN {prefix}_terms t ON dt.term_id = t.id
 WHERE dt.term_id IN ({inClause});";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             List<DocumentTermRecord> list = new List<DocumentTermRecord>();
@@ -96,13 +100,14 @@ WHERE dt.term_id IN ({inClause});";
             return list;
         }
 
-        public async Task<List<DocumentTermRecord>> GetPostingsByTermAsync(string tenantId, string indexId, string termId, CancellationToken token = default)
+        public async Task<List<DocumentTermRecord>> GetPostingsByTermAsync(string tablePrefix, string termId, CancellationToken token = default)
         {
-            return await GetPostingsAsync(tenantId, indexId, new[] { termId }, token).ConfigureAwait(false);
+            return await GetPostingsAsync(tablePrefix, new[] { termId }, token).ConfigureAwait(false);
         }
 
-        public async Task<List<SearchMatch>> SearchAsync(string tenantId, string indexId, IEnumerable<string> termIds, bool useAndLogic = false, int limit = 100, IEnumerable<string>? labels = null, IDictionary<string, string>? tags = null, CancellationToken token = default)
+        public async Task<List<SearchMatch>> SearchAsync(string tablePrefix, IEnumerable<string> termIds, bool useAndLogic = false, int limit = 100, IEnumerable<string>? labels = null, IDictionary<string, string>? tags = null, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
             List<string> termIdList = termIds.ToList();
             if (termIdList.Count == 0) return new List<SearchMatch>();
 
@@ -117,7 +122,7 @@ WHERE dt.term_id IN ({inClause});";
                 List<string> labelConditions = new List<string>();
                 foreach (string label in labelList)
                 {
-                    labelConditions.Add($@"EXISTS (SELECT 1 FROM labels l WHERE l.document_id = d.id AND LOWER(l.label) = LOWER('{Sanitizer.Sanitize(label)}'))");
+                    labelConditions.Add($@"EXISTS (SELECT 1 FROM {prefix}_labels l WHERE l.document_id = d.id AND LOWER(l.label) = LOWER('{Sanitizer.Sanitize(label)}'))");
                 }
                 labelFilter = " AND " + string.Join(" AND ", labelConditions);
             }
@@ -130,7 +135,7 @@ WHERE dt.term_id IN ({inClause});";
                 List<string> tagConditions = new List<string>();
                 foreach (KeyValuePair<string, string> tag in tags)
                 {
-                    tagConditions.Add($@"EXISTS (SELECT 1 FROM tags t WHERE t.document_id = d.id AND t.`key` = '{Sanitizer.Sanitize(tag.Key)}' AND t.value = '{Sanitizer.Sanitize(tag.Value)}')");
+                    tagConditions.Add($@"EXISTS (SELECT 1 FROM {prefix}_tags t WHERE t.document_id = d.id AND t.`key` = '{Sanitizer.Sanitize(tag.Key)}' AND t.value = '{Sanitizer.Sanitize(tag.Value)}')");
                 }
                 tagFilter = " AND " + string.Join(" AND ", tagConditions);
             }
@@ -140,9 +145,9 @@ WHERE dt.term_id IN ({inClause});";
             {
                 query = $@"
 SELECT dt.document_id, SUM(dt.term_frequency) as total_frequency, COUNT(DISTINCT dt.term_id) as term_count
-FROM document_terms dt
-JOIN documents d ON dt.document_id = d.id
-WHERE dt.term_id IN ({inClause}) AND d.tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND d.index_id = '{Sanitizer.Sanitize(indexId)}'{labelFilter}{tagFilter}
+FROM {prefix}_document_terms dt
+JOIN {prefix}_documents d ON dt.document_id = d.id
+WHERE dt.term_id IN ({inClause}){labelFilter}{tagFilter}
 GROUP BY dt.document_id
 HAVING COUNT(DISTINCT dt.term_id) = {termIdList.Count}
 ORDER BY total_frequency DESC
@@ -152,9 +157,9 @@ LIMIT {limit};";
             {
                 query = $@"
 SELECT dt.document_id, SUM(dt.term_frequency) as total_frequency, COUNT(DISTINCT dt.term_id) as term_count
-FROM document_terms dt
-JOIN documents d ON dt.document_id = d.id
-WHERE dt.term_id IN ({inClause}) AND d.tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND d.index_id = '{Sanitizer.Sanitize(indexId)}'{labelFilter}{tagFilter}
+FROM {prefix}_document_terms dt
+JOIN {prefix}_documents d ON dt.document_id = d.id
+WHERE dt.term_id IN ({inClause}){labelFilter}{tagFilter}
 GROUP BY dt.document_id
 ORDER BY total_frequency DESC
 LIMIT {limit};";
@@ -174,19 +179,21 @@ LIMIT {limit};";
             return results;
         }
 
-        public async Task<long> DeleteByDocumentAsync(string tenantId, string indexId, string documentId, CancellationToken token = default)
+        public async Task<long> DeleteByDocumentAsync(string tablePrefix, string documentId, CancellationToken token = default)
         {
-            string countQuery = $"SELECT COUNT(*) FROM document_terms WHERE document_id = '{Sanitizer.Sanitize(documentId)}';";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            string countQuery = $"SELECT COUNT(*) FROM {prefix}_document_terms WHERE document_id = '{Sanitizer.Sanitize(documentId)}';";
             DataTable countResult = await _Driver.ExecuteQueryAsync(countQuery, false, token).ConfigureAwait(false);
             long count = countResult.Rows.Count > 0 ? Convert.ToInt64(countResult.Rows[0][0]) : 0;
 
-            string query = $"DELETE FROM document_terms WHERE document_id = '{Sanitizer.Sanitize(documentId)}';";
+            string query = $"DELETE FROM {prefix}_document_terms WHERE document_id = '{Sanitizer.Sanitize(documentId)}';";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
             return count;
         }
 
-        public async Task<List<DocumentTermRecord>> GetByDocumentsAndTermsAsync(string tenantId, string indexId, IEnumerable<string> documentIds, IEnumerable<string> termIds, CancellationToken token = default)
+        public async Task<List<DocumentTermRecord>> GetByDocumentsAndTermsAsync(string tablePrefix, IEnumerable<string> documentIds, IEnumerable<string> termIds, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
             List<string> docIdList = documentIds.ToList();
             List<string> termIdList = termIds.ToList();
             if (docIdList.Count == 0 || termIdList.Count == 0) return new List<DocumentTermRecord>();
@@ -196,8 +203,8 @@ LIMIT {limit};";
 
             string query = $@"
 SELECT dt.id, dt.document_id, dt.term_id, dt.term_frequency, dt.character_positions, dt.term_positions, dt.last_update_utc, dt.created_utc, t.term
-FROM document_terms dt
-JOIN terms t ON dt.term_id = t.id
+FROM {prefix}_document_terms dt
+JOIN {prefix}_terms t ON dt.term_id = t.id
 WHERE dt.document_id IN ({docInClause}) AND dt.term_id IN ({termInClause});";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             List<DocumentTermRecord> list = new List<DocumentTermRecord>();
@@ -205,33 +212,29 @@ WHERE dt.document_id IN ({docInClause}) AND dt.term_id IN ({termInClause});";
             return list;
         }
 
-        public async Task<long> DeleteAllAsync(string tenantId, string indexId, CancellationToken token = default)
+        public async Task<long> DeleteAllAsync(string tablePrefix, CancellationToken token = default)
         {
-            string countQuery = $@"
-SELECT COUNT(*) FROM document_terms dt
-JOIN documents d ON dt.document_id = d.id
-WHERE d.tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND d.index_id = '{Sanitizer.Sanitize(indexId)}';";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            string countQuery = $"SELECT COUNT(*) FROM {prefix}_document_terms;";
             DataTable countResult = await _Driver.ExecuteQueryAsync(countQuery, false, token).ConfigureAwait(false);
             long count = countResult.Rows.Count > 0 ? Convert.ToInt64(countResult.Rows[0][0]) : 0;
 
-            string query = $@"
-DELETE FROM document_terms WHERE document_id IN (
-    SELECT id FROM documents WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}'
-);";
+            string query = $"DELETE FROM {prefix}_document_terms;";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
             return count;
         }
 
-        public async Task<List<DocumentTermRecord>> GetByDocumentsAsync(string tenantId, string indexId, IEnumerable<string> documentIds, CancellationToken token = default)
+        public async Task<List<DocumentTermRecord>> GetByDocumentsAsync(string tablePrefix, IEnumerable<string> documentIds, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
             List<string> docIdList = documentIds.ToList();
             if (docIdList.Count == 0) return new List<DocumentTermRecord>();
 
             string inClause = string.Join(",", docIdList.Select(id => $"'{Sanitizer.Sanitize(id)}'"));
             string query = $@"
 SELECT dt.id, dt.document_id, dt.term_id, dt.term_frequency, dt.character_positions, dt.term_positions, dt.last_update_utc, dt.created_utc, t.term
-FROM document_terms dt
-JOIN terms t ON dt.term_id = t.id
+FROM {prefix}_document_terms dt
+JOIN {prefix}_terms t ON dt.term_id = t.id
 WHERE dt.document_id IN ({inClause});";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             List<DocumentTermRecord> list = new List<DocumentTermRecord>();
@@ -239,18 +242,19 @@ WHERE dt.document_id IN ({inClause});";
             return list;
         }
 
-        public async Task<long> DeleteByDocumentsAsync(string tenantId, string indexId, IEnumerable<string> documentIds, CancellationToken token = default)
+        public async Task<long> DeleteByDocumentsAsync(string tablePrefix, IEnumerable<string> documentIds, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
             List<string> docIdList = documentIds.ToList();
             if (docIdList.Count == 0) return 0;
 
             string inClause = string.Join(",", docIdList.Select(id => $"'{Sanitizer.Sanitize(id)}'"));
 
-            string countQuery = $"SELECT COUNT(*) FROM document_terms WHERE document_id IN ({inClause});";
+            string countQuery = $"SELECT COUNT(*) FROM {prefix}_document_terms WHERE document_id IN ({inClause});";
             DataTable countResult = await _Driver.ExecuteQueryAsync(countQuery, false, token).ConfigureAwait(false);
             long count = countResult.Rows.Count > 0 ? Convert.ToInt64(countResult.Rows[0][0]) : 0;
 
-            string query = $"DELETE FROM document_terms WHERE document_id IN ({inClause});";
+            string query = $"DELETE FROM {prefix}_document_terms WHERE document_id IN ({inClause});";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
             return count;
         }

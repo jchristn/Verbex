@@ -34,7 +34,6 @@ namespace Verbex.Models
         /// A k-sortable unique identifier with "lbl_" prefix.
         /// Example: "lbl_01ar5xxlajk1sxr6hzf29ksz4o01234567890abc".
         /// </value>
-        [JsonPropertyName("identifier")]
         public string Identifier
         {
             get => _Identifier;
@@ -47,7 +46,6 @@ namespace Verbex.Models
         /// <value>
         /// The identifier of the tenant, or empty string if not a tenant-level label.
         /// </value>
-        [JsonPropertyName("tenantId")]
         public string TenantId
         {
             get => _TenantId;
@@ -60,7 +58,6 @@ namespace Verbex.Models
         /// <value>
         /// The identifier of the user, or empty string if not a user-level label.
         /// </value>
-        [JsonPropertyName("userId")]
         public string UserId
         {
             get => _UserId;
@@ -73,7 +70,6 @@ namespace Verbex.Models
         /// <value>
         /// The identifier of the credential, or empty string if not a credential-level label.
         /// </value>
-        [JsonPropertyName("credentialId")]
         public string CredentialId
         {
             get => _CredentialId;
@@ -86,7 +82,6 @@ namespace Verbex.Models
         /// <value>
         /// The identifier of the document, or empty string if this is an index-level label.
         /// </value>
-        [JsonPropertyName("documentId")]
         public string DocumentId
         {
             get => _DocumentId;
@@ -99,7 +94,6 @@ namespace Verbex.Models
         /// <value>
         /// The identifier of the index. Required for both document and index-level labels.
         /// </value>
-        [JsonPropertyName("indexId")]
         public string IndexId
         {
             get => _IndexId;
@@ -110,7 +104,6 @@ namespace Verbex.Models
         /// Gets or sets the label text.
         /// </summary>
         /// <value>The label string value.</value>
-        [JsonPropertyName("label")]
         public string LabelText
         {
             get => _LabelText;
@@ -121,7 +114,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the label was last modified.
         /// </summary>
         /// <value>The last modification timestamp in UTC.</value>
-        [JsonPropertyName("lastUpdateUtc")]
         public DateTime LastUpdateUtc
         {
             get => _LastUpdateUtc;
@@ -132,7 +124,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the label was created.
         /// </summary>
         /// <value>The creation timestamp in UTC.</value>
-        [JsonPropertyName("createdUtc")]
         public DateTime CreatedUtc
         {
             get => _CreatedUtc;

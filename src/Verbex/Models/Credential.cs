@@ -3,7 +3,6 @@ namespace Verbex.Models
     using System;
     using System.Collections.Generic;
     using System.Security.Cryptography;
-    using System.Text.Json.Serialization;
     using PrettyId;
 
     /// <summary>
@@ -39,7 +38,6 @@ namespace Verbex.Models
         /// A k-sortable unique identifier with "cred_" prefix.
         /// Example: "cred_01ar5xxlajk1sxr6hzf29ksz4o".
         /// </value>
-        [JsonPropertyName("identifier")]
         public string Identifier
         {
             get => _Identifier;
@@ -50,7 +48,6 @@ namespace Verbex.Models
         /// Gets or sets the tenant ID this credential belongs to.
         /// </summary>
         /// <value>The identifier of the tenant. Must reference a valid tenant.</value>
-        [JsonPropertyName("tenantId")]
         public string TenantId
         {
             get => _TenantId;
@@ -61,7 +58,6 @@ namespace Verbex.Models
         /// Gets or sets the user ID this credential belongs to.
         /// </summary>
         /// <value>The identifier of the user. Must reference a valid user within the tenant.</value>
-        [JsonPropertyName("userId")]
         public string UserId
         {
             get => _UserId;
@@ -75,7 +71,6 @@ namespace Verbex.Models
         /// A 64-character cryptographically secure random string.
         /// This token is globally unique across all tenants and users.
         /// </value>
-        [JsonPropertyName("bearerToken")]
         public string BearerToken
         {
             get => _BearerToken;
@@ -89,7 +84,6 @@ namespace Verbex.Models
         /// An optional name to identify the purpose of this credential.
         /// Example: "Production API Key", "CI/CD Token".
         /// </value>
-        [JsonPropertyName("name")]
         public string Name
         {
             get => _Name;
@@ -103,7 +97,6 @@ namespace Verbex.Models
         /// True if the credential can be used for authentication; false if disabled.
         /// Default is true.
         /// </value>
-        [JsonPropertyName("active")]
         public bool Active
         {
             get => _Active;
@@ -114,7 +107,6 @@ namespace Verbex.Models
         /// Gets or sets the labels for this credential.
         /// </summary>
         /// <value>A list of string labels for categorization and filtering.</value>
-        [JsonPropertyName("labels")]
         public List<string> Labels
         {
             get => _Labels;
@@ -125,7 +117,6 @@ namespace Verbex.Models
         /// Gets or sets the tags for this credential.
         /// </summary>
         /// <value>A dictionary of key-value pairs for rich metadata.</value>
-        [JsonPropertyName("tags")]
         public Dictionary<string, string> Tags
         {
             get => _Tags;
@@ -136,7 +127,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the credential was created.
         /// </summary>
         /// <value>The creation timestamp in UTC.</value>
-        [JsonPropertyName("createdUtc")]
         public DateTime CreatedUtc
         {
             get => _CreatedUtc;
@@ -147,7 +137,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the credential was last updated.
         /// </summary>
         /// <value>The last update timestamp in UTC.</value>
-        [JsonPropertyName("lastUpdateUtc")]
         public DateTime LastUpdateUtc
         {
             get => _LastUpdateUtc;

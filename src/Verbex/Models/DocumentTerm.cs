@@ -2,7 +2,6 @@ namespace Verbex.Models
 {
     using System;
     using System.Collections.Generic;
-    using System.Text.Json.Serialization;
     using PrettyId;
 
     /// <summary>
@@ -34,7 +33,6 @@ namespace Verbex.Models
         /// A k-sortable unique identifier with "dtrm_" prefix.
         /// Example: "dtrm_01ar5xxlajk1sxr6hzf29ksz4o01234567890abc".
         /// </value>
-        [JsonPropertyName("identifier")]
         public string Identifier
         {
             get => _Identifier;
@@ -45,7 +43,6 @@ namespace Verbex.Models
         /// Gets or sets the document ID.
         /// </summary>
         /// <value>The identifier of the document. Must reference a valid document.</value>
-        [JsonPropertyName("documentId")]
         public string DocumentId
         {
             get => _DocumentId;
@@ -56,7 +53,6 @@ namespace Verbex.Models
         /// Gets or sets the term ID.
         /// </summary>
         /// <value>The identifier of the term. Must reference a valid term.</value>
-        [JsonPropertyName("termId")]
         public string TermId
         {
             get => _TermId;
@@ -70,7 +66,6 @@ namespace Verbex.Models
         /// The number of times the term appears in the document.
         /// Used for TF (Term Frequency) calculation in TF-IDF scoring.
         /// </value>
-        [JsonPropertyName("termFrequency")]
         public int TermFrequency
         {
             get => _TermFrequency;
@@ -84,7 +79,6 @@ namespace Verbex.Models
         /// A list of character offsets (0-based) where the term starts in the document.
         /// Used for highlighting and snippet extraction.
         /// </value>
-        [JsonPropertyName("characterPositions")]
         public List<int> CharacterPositions
         {
             get => _CharacterPositions;
@@ -98,7 +92,6 @@ namespace Verbex.Models
         /// A list of term positions (0-based) indicating the term's ordinal position.
         /// Used for phrase queries and proximity searches.
         /// </value>
-        [JsonPropertyName("termPositions")]
         public List<int> TermPositions
         {
             get => _TermPositions;
@@ -109,7 +102,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the document-term mapping was last modified.
         /// </summary>
         /// <value>The last modification timestamp in UTC.</value>
-        [JsonPropertyName("lastUpdateUtc")]
         public DateTime LastUpdateUtc
         {
             get => _LastUpdateUtc;
@@ -120,7 +112,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the document-term mapping was created.
         /// </summary>
         /// <value>The creation timestamp in UTC.</value>
-        [JsonPropertyName("createdUtc")]
         public DateTime CreatedUtc
         {
             get => _CreatedUtc;

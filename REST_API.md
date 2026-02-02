@@ -15,6 +15,7 @@ This document describes the REST API endpoints available in the Verbex inverted 
 - [Admin - Tenant APIs](#admin---tenant-apis)
 - [Admin - User APIs](#admin---user-apis)
 - [Admin - Credential APIs](#admin---credential-apis)
+- [Backup & Restore APIs](#backup--restore-apis)
 - [Error Handling](#error-handling)
 
 ## Authentication
@@ -212,6 +213,9 @@ All API responses are wrapped in a standard format:
 | Credential | DELETE | `/v1.0/tenants/{id}/credentials/{credId}` | Delete credential | Yes (Admin) |
 | Credential | PUT | `/v1.0/tenants/{id}/credentials/{credId}/labels` | Update credential labels | Yes (Admin) |
 | Credential | PUT | `/v1.0/tenants/{id}/credentials/{credId}/tags` | Update credential tags | Yes (Admin) |
+| Backup | POST | `/v1.0/indices/{id}/backup` | Create index backup | Yes |
+| Restore | POST | `/v1.0/indices/restore` | Restore backup to new index | Yes |
+| Restore | POST | `/v1.0/indices/{id}/restore` | Restore backup to existing index | Yes |
 
 ## Health and Status
 
@@ -1305,6 +1309,121 @@ Authorization: Bearer <token>
 {
   "Tags": {"environment": "production", "service": "backend"}
 }
+```
+
+## Backup & Restore APIs
+
+### POST `/v1.0/indices/{id}/backup`
+**Description:** Create a backup of an index. Returns a ZIP archive containing the index database and metadata.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Path Parameters:**
+- `id` (string): Index identifier
+
+**Response:**
+- Content-Type: `application/zip`
+- Content-Disposition: `attachment; filename="backup-{indexId}-{timestamp}.vbx"`
+- Returns binary ZIP archive on success
+- Returns JSON error response on failure
+
+**Example:**
+```bash
+curl -X POST http://localhost:8080/v1.0/indices/myindex/backup \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -o myindex-backup.vbx
+```
+
+### POST `/v1.0/indices/restore`
+**Description:** Restore a backup to create a new index. Upload a backup archive (.vbx file) via multipart form data.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+```
+
+**Form Fields:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| file | file | Yes | The backup archive (.vbx file) |
+| name | string | No | Name for the restored index (uses original name if not specified) |
+| indexId | string | No | Custom identifier for the restored index (auto-generated if not specified) |
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 201,
+  "ErrorMessage": null,
+  "Data": {
+    "Success": true,
+    "IndexId": "idx_01JFXA1234567890ABCDEF",
+    "Message": "Index restored successfully",
+    "Warnings": []
+  },
+  "ProcessingTimeMs": 150.5
+}
+```
+
+**Example:**
+```bash
+curl -X POST http://localhost:8080/v1.0/indices/restore \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@myindex-backup.vbx" \
+  -F "name=restored-index"
+```
+
+### POST `/v1.0/indices/{id}/restore`
+**Description:** Restore a backup by replacing an existing index. The existing index will be deleted and replaced with the contents of the backup.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+```
+
+**Path Parameters:**
+- `id` (string): Index identifier of the existing index to replace
+
+**Form Fields:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| file | file | Yes | The backup archive (.vbx file) |
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "Success": true,
+    "IndexId": "idx_01JFXA1234567890ABCDEF",
+    "Message": "Index restored successfully",
+    "Warnings": []
+  },
+  "ProcessingTimeMs": 200.3
+}
+```
+
+**Notes:**
+- Cannot restore to in-memory indices
+- The existing index must exist and be accessible
+- Returns 423 if the index is locked
+
+**Example:**
+```bash
+curl -X POST http://localhost:8080/v1.0/indices/myindex/restore \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@myindex-backup.vbx"
 ```
 
 ## Error Handling

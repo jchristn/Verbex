@@ -4,7 +4,6 @@ namespace Verbex.Models
     using System.Collections.Generic;
     using System.Security.Cryptography;
     using System.Text;
-    using System.Text.Json.Serialization;
     using PrettyId;
 
     /// <summary>
@@ -40,7 +39,6 @@ namespace Verbex.Models
         /// A k-sortable unique identifier with "usr_" prefix.
         /// Example: "usr_01ar5xxlajk1sxr6hzf29ksz4o".
         /// </value>
-        [JsonPropertyName("identifier")]
         public string Identifier
         {
             get => _Identifier;
@@ -51,7 +49,6 @@ namespace Verbex.Models
         /// Gets or sets the tenant ID this user belongs to.
         /// </summary>
         /// <value>The identifier of the tenant. Must reference a valid tenant.</value>
-        [JsonPropertyName("tenantId")]
         public string TenantId
         {
             get => _TenantId;
@@ -62,7 +59,6 @@ namespace Verbex.Models
         /// Gets or sets the user's email address.
         /// </summary>
         /// <value>The email address. Must be unique within the tenant.</value>
-        [JsonPropertyName("email")]
         public string Email
         {
             get => _Email;
@@ -76,7 +72,6 @@ namespace Verbex.Models
         /// A 64-character hexadecimal string representing the SHA-256 hash.
         /// Use <see cref="SetPassword"/> to set from plain text.
         /// </value>
-        [JsonPropertyName("passwordSha256")]
         public string PasswordSha256
         {
             get => _PasswordSha256;
@@ -87,7 +82,6 @@ namespace Verbex.Models
         /// Gets or sets the user's first name.
         /// </summary>
         /// <value>The first name. Optional.</value>
-        [JsonPropertyName("firstName")]
         public string FirstName
         {
             get => _FirstName;
@@ -98,7 +92,6 @@ namespace Verbex.Models
         /// Gets or sets the user's last name.
         /// </summary>
         /// <value>The last name. Optional.</value>
-        [JsonPropertyName("lastName")]
         public string LastName
         {
             get => _LastName;
@@ -112,7 +105,6 @@ namespace Verbex.Models
         /// True if the user has administrative privileges within the tenant; false otherwise.
         /// Tenant admins can manage users and credentials within their tenant.
         /// </value>
-        [JsonPropertyName("isAdmin")]
         public bool IsAdmin
         {
             get => _IsAdmin;
@@ -126,7 +118,6 @@ namespace Verbex.Models
         /// True if the user account is active and can authenticate; false if disabled.
         /// Default is true.
         /// </value>
-        [JsonPropertyName("active")]
         public bool Active
         {
             get => _Active;
@@ -137,7 +128,6 @@ namespace Verbex.Models
         /// Gets or sets the labels for this user.
         /// </summary>
         /// <value>A list of string labels for categorization and filtering.</value>
-        [JsonPropertyName("labels")]
         public List<string> Labels
         {
             get => _Labels;
@@ -148,7 +138,6 @@ namespace Verbex.Models
         /// Gets or sets the tags for this user.
         /// </summary>
         /// <value>A dictionary of key-value pairs for rich metadata.</value>
-        [JsonPropertyName("tags")]
         public Dictionary<string, string> Tags
         {
             get => _Tags;
@@ -159,7 +148,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the user was created.
         /// </summary>
         /// <value>The creation timestamp in UTC.</value>
-        [JsonPropertyName("createdUtc")]
         public DateTime CreatedUtc
         {
             get => _CreatedUtc;
@@ -170,7 +158,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the user was last updated.
         /// </summary>
         /// <value>The last update timestamp in UTC.</value>
-        [JsonPropertyName("lastUpdateUtc")]
         public DateTime LastUpdateUtc
         {
             get => _LastUpdateUtc;

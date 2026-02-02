@@ -21,19 +21,20 @@ namespace Verbex.Database.Sqlite.Implementations
             _Driver = driver ?? throw new ArgumentNullException(nameof(driver));
         }
 
-        public async Task<IndexStatistics> GetIndexStatisticsAsync(string tenantId, string indexId, CancellationToken token = default)
+        public async Task<IndexStatistics> GetIndexStatisticsAsync(string tablePrefix, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
             IndexStatistics stats = new IndexStatistics();
 
-            string docCountQuery = $"SELECT COUNT(*) FROM documents WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}';";
+            string docCountQuery = $"SELECT COUNT(*) FROM {prefix}_documents;";
             DataTable docResult = await _Driver.ExecuteQueryAsync(docCountQuery, false, token).ConfigureAwait(false);
             stats.DocumentCount = docResult.Rows.Count > 0 ? Convert.ToInt64(docResult.Rows[0][0]) : 0;
 
-            string termCountQuery = $"SELECT COUNT(*) FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}';";
+            string termCountQuery = $"SELECT COUNT(*) FROM {prefix}_terms;";
             DataTable termResult = await _Driver.ExecuteQueryAsync(termCountQuery, false, token).ConfigureAwait(false);
             stats.TermCount = termResult.Rows.Count > 0 ? Convert.ToInt64(termResult.Rows[0][0]) : 0;
 
-            string totalTermsQuery = $"SELECT COALESCE(SUM(total_frequency), 0) FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}';";
+            string totalTermsQuery = $"SELECT COALESCE(SUM(total_frequency), 0) FROM {prefix}_terms;";
             DataTable totalResult = await _Driver.ExecuteQueryAsync(totalTermsQuery, false, token).ConfigureAwait(false);
             stats.TotalTermOccurrences = totalResult.Rows.Count > 0 ? Convert.ToInt64(totalResult.Rows[0][0]) : 0;
 
@@ -42,19 +43,21 @@ namespace Verbex.Database.Sqlite.Implementations
                 stats.AverageDocumentLength = (double)stats.TotalTermOccurrences / stats.DocumentCount;
             }
 
-            string docLengthQuery = $"SELECT COALESCE(SUM(document_length), 0) FROM documents WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}';";
+            string docLengthQuery = $"SELECT COALESCE(SUM(document_length), 0) FROM {prefix}_documents;";
             DataTable lengthResult = await _Driver.ExecuteQueryAsync(docLengthQuery, false, token).ConfigureAwait(false);
             stats.TotalDocumentSize = lengthResult.Rows.Count > 0 ? Convert.ToInt64(lengthResult.Rows[0][0]) : 0;
 
             return stats;
         }
 
-        public async Task<TermStatisticsResult?> GetTermStatisticsAsync(string tenantId, string indexId, string term, CancellationToken token = default)
+        public async Task<TermStatisticsResult?> GetTermStatisticsAsync(string tablePrefix, string term, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
             string query = $@"
 SELECT t.term, t.document_frequency, t.total_frequency
-FROM terms t
-WHERE t.tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND t.index_id = '{Sanitizer.Sanitize(indexId)}' AND t.term = '{Sanitizer.Sanitize(term)}';";
+FROM {prefix}_terms t
+WHERE t.term = '{Sanitizer.Sanitize(term)}';";
 
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             if (dt.Rows.Count == 0)

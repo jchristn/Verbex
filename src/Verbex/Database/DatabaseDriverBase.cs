@@ -155,6 +155,29 @@ namespace Verbex.Database
         public abstract Task InitializeAsync(CancellationToken token = default);
 
         /// <summary>
+        /// Creates the index-specific prefixed tables (documents, terms, document_terms, labels, tags).
+        /// </summary>
+        /// <param name="tablePrefix">The table prefix to use for the index tables.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        /// <remarks>
+        /// This method should be called when creating a new index to set up its storage tables.
+        /// The table prefix should be validated using TablePrefixValidator before calling this method.
+        /// </remarks>
+        public abstract Task CreateIndexTablesAsync(string tablePrefix, CancellationToken token = default);
+
+        /// <summary>
+        /// Drops the index-specific prefixed tables.
+        /// </summary>
+        /// <param name="tablePrefix">The table prefix of the index tables to drop.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        /// <remarks>
+        /// This method should be called when deleting an index to clean up its storage tables.
+        /// </remarks>
+        public abstract Task DropIndexTablesAsync(string tablePrefix, CancellationToken token = default);
+
+        /// <summary>
         /// Executes a single SQL query and returns the results.
         /// </summary>
         /// <param name="query">The SQL query to execute.</param>

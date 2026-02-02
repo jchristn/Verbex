@@ -46,7 +46,6 @@ namespace Verbex.Models
         /// A k-sortable unique identifier with "idx_" prefix.
         /// Example: "idx_01ar5xxlajk1sxr6hzf29ksz4o01234567890abc".
         /// </value>
-        [JsonPropertyName("identifier")]
         public string Identifier
         {
             get => _Identifier;
@@ -57,7 +56,6 @@ namespace Verbex.Models
         /// Gets or sets the tenant ID this index belongs to.
         /// </summary>
         /// <value>The identifier of the tenant. Must reference a valid tenant.</value>
-        [JsonPropertyName("tenantId")]
         public string TenantId
         {
             get => _TenantId;
@@ -68,7 +66,6 @@ namespace Verbex.Models
         /// Gets or sets the display name of the index.
         /// </summary>
         /// <value>A human-readable name for the index. Must be unique within the tenant.</value>
-        [JsonPropertyName("name")]
         public string Name
         {
             get => _Name;
@@ -79,7 +76,6 @@ namespace Verbex.Models
         /// Gets or sets the description of the index.
         /// </summary>
         /// <value>An optional description for the index.</value>
-        [JsonPropertyName("description")]
         public string Description
         {
             get => _Description;
@@ -90,7 +86,6 @@ namespace Verbex.Models
         /// Gets or sets the schema version of the index.
         /// </summary>
         /// <value>The schema version string. Default is "3.0".</value>
-        [JsonPropertyName("schemaVersion")]
         public string SchemaVersion
         {
             get => _SchemaVersion;
@@ -101,7 +96,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the index was created.
         /// </summary>
         /// <value>The creation timestamp in UTC.</value>
-        [JsonPropertyName("createdUtc")]
         public DateTime CreatedUtc
         {
             get => _CreatedUtc;
@@ -112,7 +106,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the index was last updated.
         /// </summary>
         /// <value>The last update timestamp in UTC.</value>
-        [JsonPropertyName("lastUpdateUtc")]
         public DateTime LastUpdateUtc
         {
             get => _LastUpdateUtc;
@@ -124,7 +117,6 @@ namespace Verbex.Models
         /// </summary>
         /// <value>True for in-memory storage, false for disk-based storage. Default is false.</value>
         /// <remarks>When true, index data is not persisted and will be lost on restart.</remarks>
-        [JsonPropertyName("inMemory")]
         public bool InMemory
         {
             get => _InMemory;
@@ -135,7 +127,6 @@ namespace Verbex.Models
         /// Gets or sets whether this index is enabled.
         /// </summary>
         /// <value>True if the index is enabled and can be used. Default is true.</value>
-        [JsonPropertyName("enabled")]
         public bool Enabled
         {
             get => _Enabled;
@@ -146,7 +137,6 @@ namespace Verbex.Models
         /// Gets or sets whether to enable lemmatization for this index.
         /// </summary>
         /// <value>True to enable lemmatization during indexing. Default is false.</value>
-        [JsonPropertyName("enableLemmatizer")]
         public bool EnableLemmatizer
         {
             get => _EnableLemmatizer;
@@ -157,7 +147,6 @@ namespace Verbex.Models
         /// Gets or sets whether to enable stop word removal for this index.
         /// </summary>
         /// <value>True to enable stop word removal during indexing. Default is false.</value>
-        [JsonPropertyName("enableStopWordRemover")]
         public bool EnableStopWordRemover
         {
             get => _EnableStopWordRemover;
@@ -168,7 +157,6 @@ namespace Verbex.Models
         /// Gets or sets the minimum token length for indexing.
         /// </summary>
         /// <value>Minimum token length. Tokens shorter than this are ignored. 0 means disabled. Default is 0.</value>
-        [JsonPropertyName("minTokenLength")]
         public int MinTokenLength
         {
             get => _MinTokenLength;
@@ -179,7 +167,6 @@ namespace Verbex.Models
         /// Gets or sets the maximum token length for indexing.
         /// </summary>
         /// <value>Maximum token length. Tokens longer than this are ignored. 0 means disabled. Default is 0.</value>
-        [JsonPropertyName("maxTokenLength")]
         public int MaxTokenLength
         {
             get => _MaxTokenLength;
@@ -190,7 +177,6 @@ namespace Verbex.Models
         /// Gets or sets the expected number of terms for bloom filter sizing.
         /// </summary>
         /// <value>Expected number of unique terms. Default is 1000000.</value>
-        [JsonPropertyName("expectedTerms")]
         public int ExpectedTerms
         {
             get => _ExpectedTerms;
@@ -201,7 +187,6 @@ namespace Verbex.Models
         /// Gets or sets labels for categorizing the index.
         /// </summary>
         /// <value>List of string labels. Default is empty list.</value>
-        [JsonPropertyName("labels")]
         public List<string> Labels
         {
             get => _Labels;
@@ -212,7 +197,6 @@ namespace Verbex.Models
         /// Gets or sets custom tags (key-value pairs) for the index.
         /// </summary>
         /// <value>Dictionary of string key-value pairs. Default is empty dictionary.</value>
-        [JsonPropertyName("tags")]
         public Dictionary<string, string> Tags
         {
             get => _Tags;
@@ -224,7 +208,6 @@ namespace Verbex.Models
         /// Can be any JSON-serializable value (object, array, string, number, boolean, null).
         /// </summary>
         /// <value>Any JSON-serializable value. Default is null.</value>
-        [JsonPropertyName("customMetadata")]
         public object? CustomMetadata
         {
             get => _CustomMetadata;
@@ -236,7 +219,6 @@ namespace Verbex.Models
         /// When null, caching is disabled.
         /// </summary>
         /// <value>Cache configuration settings, or null for disabled caching. Default is null.</value>
-        [JsonPropertyName("cacheConfiguration")]
         public CacheConfiguration? CacheConfiguration
         {
             get => _CacheConfiguration;

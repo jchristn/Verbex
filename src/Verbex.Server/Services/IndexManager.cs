@@ -11,6 +11,7 @@ namespace Verbex.Server.Services
     using Verbex;
     using Verbex.Database;
     using Verbex.Models;
+    using Verbex.Utilities;
 
     /// <summary>
     /// Manages multiple inverted indices with database-backed metadata storage.
@@ -508,60 +509,34 @@ namespace Verbex.Server.Services
 
         /// <summary>
         /// Initialize a single index from its metadata.
+        /// Uses the shared database driver for all database backends (MySQL, PostgreSQL, SQL Server, SQLite).
         /// </summary>
         /// <param name="metadata">Index metadata.</param>
         /// <param name="token">Cancellation token.</param>
         private async Task InitializeIndexAsync(IndexMetadata metadata, CancellationToken token = default)
         {
-            StorageMode storageMode = metadata.InMemory ? StorageMode.InMemory : StorageMode.OnDisk;
-
             VerbexConfiguration verbexConfig = new VerbexConfiguration
             {
-                StorageMode = storageMode,
                 MinTokenLength = metadata.MinTokenLength,
                 MaxTokenLength = metadata.MaxTokenLength,
                 Lemmatizer = metadata.EnableLemmatizer ? new BasicLemmatizer() : null,
                 StopWordRemover = metadata.EnableStopWordRemover ? new BasicStopWordRemover() : null
             };
 
-            if (storageMode == StorageMode.OnDisk)
-            {
-                string indexDirectory = Path.Combine(_DataDirectory, metadata.TenantId, metadata.Identifier);
-                string indexDbPath = Path.Combine(indexDirectory, "index.db");
+            // Create the InvertedIndex with the shared database driver
+            InvertedIndex index = new InvertedIndex(metadata.Name, _Database, verbexConfig);
 
-                bool dirExisted = Directory.Exists(indexDirectory);
-                bool dbFileExisted = File.Exists(indexDbPath);
-                long dbFileSize = dbFileExisted ? new FileInfo(indexDbPath).Length : 0;
+            // Always ensure the prefixed tables exist (uses CREATE TABLE IF NOT EXISTS)
+            // This is safe for both new indices and discovered indices
+            string tablePrefix = TablePrefixValidator.FromIndexId(metadata.Identifier);
+            await _Database.CreateIndexTablesAsync(tablePrefix, token).ConfigureAwait(false);
+            _Logging?.Debug(_Header + "InitializeIndexAsync: ensured prefixed tables exist for " + metadata.Identifier);
 
-                _Logging?.Debug(_Header + "InitializeIndexAsync: " + metadata.Identifier +
-                    ", dirExisted=" + dirExisted +
-                    ", dbFileExisted=" + dbFileExisted +
-                    ", dbFileSize=" + dbFileSize);
+            // Open the index with the known tenant and index IDs
+            await index.OpenAsync(metadata.TenantId, metadata.Identifier, token).ConfigureAwait(false);
 
-                if (!dirExisted)
-                {
-                    Directory.CreateDirectory(indexDirectory);
-                }
-                verbexConfig.StorageDirectory = indexDirectory;
-            }
-
-            InvertedIndex index = new InvertedIndex(metadata.Identifier, verbexConfig);
-
-            // Log the ACTUAL path being used by InvertedIndex
             _Logging?.Debug(_Header + "InitializeIndexAsync: " + metadata.Identifier +
-                ", actualStorageDir=" + (index.Configuration.StorageDirectory ?? "NULL") +
-                ", actualDbPath=" + index.Driver.Settings.Filename +
-                ", driverInMemory=" + index.Driver.Settings.InMemory);
-
-            await index.OpenAsync().ConfigureAwait(false);
-
-            // Log document count after opening
-            if (storageMode == StorageMode.OnDisk)
-            {
-                long docCount = await index.GetDocumentCountAsync(token).ConfigureAwait(false);
-                _Logging?.Debug(_Header + "InitializeIndexAsync: " + metadata.Identifier +
-                    " opened with " + docCount + " existing documents");
-            }
+                " opened successfully using shared database driver");
 
             _Indices[metadata.Identifier] = index;
             _Metadata[metadata.Identifier] = metadata;

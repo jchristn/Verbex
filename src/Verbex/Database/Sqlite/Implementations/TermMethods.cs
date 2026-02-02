@@ -26,47 +26,55 @@ namespace Verbex.Database.Sqlite.Implementations
             _Driver = driver ?? throw new ArgumentNullException(nameof(driver));
         }
 
-        public async Task<string> AddOrGetAsync(string tenantId, string indexId, string id, string term, CancellationToken token = default)
+        public async Task<string> AddOrGetAsync(string tablePrefix, string id, string term, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
             // Use INSERT OR IGNORE to handle concurrent inserts atomically.
             // This avoids TOCTOU race conditions where two concurrent calls both check
             // that a term doesn't exist, then both try to insert it.
             DateTime now = DateTime.UtcNow;
             string insertQuery = $@"
-INSERT OR IGNORE INTO terms (id, tenant_id, index_id, term, document_frequency, total_frequency, last_update_utc, created_utc)
-VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(tenantId)}', '{Sanitizer.Sanitize(indexId)}', '{Sanitizer.Sanitize(term)}', 0, 0, '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
+INSERT OR IGNORE INTO {prefix}_terms (id, term, document_frequency, total_frequency, last_update_utc, created_utc)
+VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(term)}', 0, 0, '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
             await _Driver.ExecuteQueryAsync(insertQuery, true, token).ConfigureAwait(false);
 
             // Always fetch the actual record to get the correct ID (ours if we inserted, existing if another request won)
-            TermRecord? record = await GetAsync(tenantId, indexId, term, token).ConfigureAwait(false);
+            TermRecord? record = await GetAsync(tablePrefix, term, token).ConfigureAwait(false);
             return record?.Id ?? id;
         }
 
-        public async Task<TermRecord?> GetAsync(string tenantId, string indexId, string term, CancellationToken token = default)
+        public async Task<TermRecord?> GetAsync(string tablePrefix, string term, CancellationToken token = default)
         {
-            string query = $@"SELECT id, tenant_id, index_id, term, document_frequency, total_frequency, last_update_utc, created_utc
-FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND term = '{Sanitizer.Sanitize(term)}';";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            string query = $@"SELECT id, term, document_frequency, total_frequency, last_update_utc, created_utc
+FROM {prefix}_terms WHERE term = '{Sanitizer.Sanitize(term)}';";
             DataTable result = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             return result.Rows.Count == 0 ? null : MapRowToTerm(result.Rows[0]);
         }
 
-        public async Task<TermRecord?> GetByIdAsync(string tenantId, string indexId, string id, CancellationToken token = default)
+        public async Task<TermRecord?> GetByIdAsync(string tablePrefix, string id, CancellationToken token = default)
         {
-            string query = $@"SELECT id, tenant_id, index_id, term, document_frequency, total_frequency, last_update_utc, created_utc
-FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND id = '{Sanitizer.Sanitize(id)}';";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            string query = $@"SELECT id, term, document_frequency, total_frequency, last_update_utc, created_utc
+FROM {prefix}_terms WHERE id = '{Sanitizer.Sanitize(id)}';";
             DataTable result = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             return result.Rows.Count == 0 ? null : MapRowToTerm(result.Rows[0]);
         }
 
-        public async Task<Dictionary<string, TermRecord>> GetMultipleAsync(string tenantId, string indexId, IEnumerable<string> terms, CancellationToken token = default)
+        public async Task<Dictionary<string, TermRecord>> GetMultipleAsync(string tablePrefix, IEnumerable<string> terms, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
             List<string> termList = new List<string>(terms);
             Dictionary<string, TermRecord> result = new Dictionary<string, TermRecord>();
             if (termList.Count == 0) return result;
 
             string inClause = string.Join(",", termList.ConvertAll(t => $"'{Sanitizer.Sanitize(t)}'"));
-            string query = $@"SELECT id, tenant_id, index_id, term, document_frequency, total_frequency, last_update_utc, created_utc
-FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND term IN ({inClause});";
+            string query = $@"SELECT id, term, document_frequency, total_frequency, last_update_utc, created_utc
+FROM {prefix}_terms WHERE term IN ({inClause});";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             foreach (DataRow row in dt.Rows)
             {
@@ -76,56 +84,70 @@ FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{S
             return result;
         }
 
-        public async Task<List<TermRecord>> GetByPrefixAsync(string tenantId, string indexId, string prefix, int limit = 100, CancellationToken token = default)
+        public async Task<List<TermRecord>> GetByPrefixAsync(string tablePrefix, string termPrefix, int limit = 100, CancellationToken token = default)
         {
-            string query = $@"SELECT id, tenant_id, index_id, term, document_frequency, total_frequency, last_update_utc, created_utc
-FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND term LIKE '{Sanitizer.EscapeLikePattern(prefix)}%' ESCAPE '\' LIMIT {limit};";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            string query = $@"SELECT id, term, document_frequency, total_frequency, last_update_utc, created_utc
+FROM {prefix}_terms WHERE term LIKE '{Sanitizer.EscapeLikePattern(termPrefix)}%' ESCAPE '\' LIMIT {limit};";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             List<TermRecord> list = new List<TermRecord>();
             foreach (DataRow row in dt.Rows) list.Add(MapRowToTerm(row));
             return list;
         }
 
-        public async Task<List<TermRecord>> GetTopAsync(string tenantId, string indexId, int limit = 100, CancellationToken token = default)
+        public async Task<List<TermRecord>> GetTopAsync(string tablePrefix, int limit = 100, CancellationToken token = default)
         {
-            string query = $@"SELECT id, tenant_id, index_id, term, document_frequency, total_frequency, last_update_utc, created_utc
-FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' ORDER BY document_frequency DESC LIMIT {limit};";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            string query = $@"SELECT id, term, document_frequency, total_frequency, last_update_utc, created_utc
+FROM {prefix}_terms ORDER BY document_frequency DESC LIMIT {limit};";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             List<TermRecord> list = new List<TermRecord>();
             foreach (DataRow row in dt.Rows) list.Add(MapRowToTerm(row));
             return list;
         }
 
-        public async Task<long> GetCountAsync(string tenantId, string indexId, CancellationToken token = default)
+        public async Task<long> GetCountAsync(string tablePrefix, CancellationToken token = default)
         {
-            string query = $"SELECT COUNT(*) FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}';";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            string query = $"SELECT COUNT(*) FROM {prefix}_terms;";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             return dt.Rows.Count > 0 ? Convert.ToInt64(dt.Rows[0][0]) : 0;
         }
 
-        public async Task<bool> ExistsAsync(string tenantId, string indexId, string term, CancellationToken token = default)
+        public async Task<bool> ExistsAsync(string tablePrefix, string term, CancellationToken token = default)
         {
-            string query = $"SELECT 1 FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND term = '{Sanitizer.Sanitize(term)}' LIMIT 1;";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            string query = $"SELECT 1 FROM {prefix}_terms WHERE term = '{Sanitizer.Sanitize(term)}' LIMIT 1;";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             return dt.Rows.Count > 0;
         }
 
-        public async Task UpdateFrequenciesAsync(string tenantId, string indexId, string termId, int documentFrequency, int totalFrequency, CancellationToken token = default)
+        public async Task UpdateFrequenciesAsync(string tablePrefix, string termId, int documentFrequency, int totalFrequency, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
             DateTime now = DateTime.UtcNow;
-            string query = $"UPDATE terms SET document_frequency = {documentFrequency}, total_frequency = {totalFrequency}, last_update_utc = '{Sanitizer.FormatDateTime(now)}' WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND id = '{Sanitizer.Sanitize(termId)}';";
+            string query = $"UPDATE {prefix}_terms SET document_frequency = {documentFrequency}, total_frequency = {totalFrequency}, last_update_utc = '{Sanitizer.FormatDateTime(now)}' WHERE id = '{Sanitizer.Sanitize(termId)}';";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
         }
 
-        public async Task IncrementFrequenciesAsync(string tenantId, string indexId, string termId, int documentFrequencyDelta, int totalFrequencyDelta, CancellationToken token = default)
+        public async Task IncrementFrequenciesAsync(string tablePrefix, string termId, int documentFrequencyDelta, int totalFrequencyDelta, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
             DateTime now = DateTime.UtcNow;
-            string query = $"UPDATE terms SET document_frequency = document_frequency + {documentFrequencyDelta}, total_frequency = total_frequency + {totalFrequencyDelta}, last_update_utc = '{Sanitizer.FormatDateTime(now)}' WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND id = '{Sanitizer.Sanitize(termId)}';";
+            string query = $"UPDATE {prefix}_terms SET document_frequency = document_frequency + {documentFrequencyDelta}, total_frequency = total_frequency + {totalFrequencyDelta}, last_update_utc = '{Sanitizer.FormatDateTime(now)}' WHERE id = '{Sanitizer.Sanitize(termId)}';";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
         }
 
-        public async Task<Dictionary<string, string>> AddOrGetBatchAsync(string tenantId, string indexId, Dictionary<string, string> terms, CancellationToken token = default)
+        public async Task<Dictionary<string, string>> AddOrGetBatchAsync(string tablePrefix, Dictionary<string, string> terms, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
             if (terms == null || terms.Count == 0) return new Dictionary<string, string>();
 
             DateTime now = DateTime.UtcNow;
@@ -134,12 +156,12 @@ FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{S
 
             // Single INSERT OR IGNORE for all terms (no chunking - SQLite handles large VALUES lists efficiently)
             StringBuilder sb = new StringBuilder();
-            sb.Append("INSERT OR IGNORE INTO terms (id, tenant_id, index_id, term, document_frequency, total_frequency, last_update_utc, created_utc) VALUES ");
+            sb.Append($"INSERT OR IGNORE INTO {prefix}_terms (id, term, document_frequency, total_frequency, last_update_utc, created_utc) VALUES ");
 
             List<string> valuesClauses = new List<string>();
             foreach (KeyValuePair<string, string> kvp in termsList)
             {
-                valuesClauses.Add($"('{Sanitizer.Sanitize(kvp.Key)}', '{Sanitizer.Sanitize(tenantId)}', '{Sanitizer.Sanitize(indexId)}', '{Sanitizer.Sanitize(kvp.Value)}', 0, 0, '{nowFormatted}', '{nowFormatted}')");
+                valuesClauses.Add($"('{Sanitizer.Sanitize(kvp.Key)}', '{Sanitizer.Sanitize(kvp.Value)}', 0, 0, '{nowFormatted}', '{nowFormatted}')");
             }
 
             sb.Append(string.Join(", ", valuesClauses));
@@ -151,7 +173,7 @@ FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{S
             // Note: SQLite's INSERT OR IGNORE RETURNING only returns newly inserted rows,
             // not existing ones, so we must use a separate SELECT to get all IDs.
             List<string> termValues = terms.Values.ToList();
-            Dictionary<string, TermRecord> existingTerms = await GetMultipleAsync(tenantId, indexId, termValues, token).ConfigureAwait(false);
+            Dictionary<string, TermRecord> existingTerms = await GetMultipleAsync(tablePrefix, termValues, token).ConfigureAwait(false);
 
             Dictionary<string, string> result = new Dictionary<string, string>();
             foreach (string termValue in termValues)
@@ -165,8 +187,10 @@ FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{S
             return result;
         }
 
-        public async Task IncrementFrequenciesBatchAsync(string tenantId, string indexId, Dictionary<string, FrequencyDelta> updates, CancellationToken token = default)
+        public async Task IncrementFrequenciesBatchAsync(string tablePrefix, Dictionary<string, FrequencyDelta> updates, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
             if (updates == null || updates.Count == 0) return;
 
             DateTime now = DateTime.UtcNow;
@@ -183,15 +207,15 @@ FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{S
             docFreqCase.Append("ELSE 0 END");
             totalFreqCase.Append("ELSE 0 END");
 
-            string query = $@"UPDATE terms SET
+            string query = $@"UPDATE {prefix}_terms SET
 document_frequency = document_frequency + ({docFreqCase}),
 total_frequency = total_frequency + ({totalFreqCase}),
 last_update_utc = '{Sanitizer.FormatDateTime(now)}'
-WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND id IN ({inClause});";
+WHERE id IN ({inClause});";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
         }
 
-        public async Task DecrementFrequenciesBatchAsync(string tenantId, string indexId, Dictionary<string, FrequencyDelta> updates, CancellationToken token = default)
+        public async Task DecrementFrequenciesBatchAsync(string tablePrefix, Dictionary<string, FrequencyDelta> updates, CancellationToken token = default)
         {
             if (updates == null || updates.Count == 0) return;
 
@@ -201,35 +225,56 @@ WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sa
             {
                 negatedUpdates[kvp.Key] = new FrequencyDelta(-kvp.Value.DocFreqDelta, -kvp.Value.TotalFreqDelta);
             }
-            await IncrementFrequenciesBatchAsync(tenantId, indexId, negatedUpdates, token).ConfigureAwait(false);
+            await IncrementFrequenciesBatchAsync(tablePrefix, negatedUpdates, token).ConfigureAwait(false);
         }
 
-        public async Task<long> DeleteOrphanedAsync(string tenantId, string indexId, CancellationToken token = default)
+        public async Task<List<string>> DeleteOrphanedAsync(string tablePrefix, CancellationToken token = default)
         {
-            string countQuery = $"SELECT COUNT(*) FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND document_frequency = 0;";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            // First, get the term texts that will be deleted (for cache invalidation)
+            string selectQuery = $"SELECT term FROM {prefix}_terms WHERE document_frequency = 0;";
+            DataTable selectResult = await _Driver.ExecuteQueryAsync(selectQuery, false, token).ConfigureAwait(false);
+
+            List<string> deletedTerms = new List<string>();
+            foreach (DataRow row in selectResult.Rows)
+            {
+                string term = row["term"]?.ToString() ?? string.Empty;
+                if (!string.IsNullOrEmpty(term))
+                {
+                    deletedTerms.Add(term);
+                }
+            }
+
+            // Then delete the orphaned terms
+            if (deletedTerms.Count > 0)
+            {
+                string deleteQuery = $"DELETE FROM {prefix}_terms WHERE document_frequency = 0;";
+                await _Driver.ExecuteQueryAsync(deleteQuery, true, token).ConfigureAwait(false);
+            }
+
+            return deletedTerms;
+        }
+
+        public async Task<long> DeleteAllAsync(string tablePrefix, CancellationToken token = default)
+        {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            string countQuery = $"SELECT COUNT(*) FROM {prefix}_terms;";
             DataTable countResult = await _Driver.ExecuteQueryAsync(countQuery, false, token).ConfigureAwait(false);
             long count = countResult.Rows.Count > 0 ? Convert.ToInt64(countResult.Rows[0][0]) : 0;
 
-            string query = $"DELETE FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}' AND document_frequency = 0;";
+            string query = $"DELETE FROM {prefix}_terms;";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
             return count;
         }
 
-        public async Task<long> DeleteAllAsync(string tenantId, string indexId, CancellationToken token = default)
+        public async Task<Dictionary<string, string>> GetAllTermIdsAsync(string tablePrefix, CancellationToken token = default)
         {
-            string countQuery = $"SELECT COUNT(*) FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}';";
-            DataTable countResult = await _Driver.ExecuteQueryAsync(countQuery, false, token).ConfigureAwait(false);
-            long count = countResult.Rows.Count > 0 ? Convert.ToInt64(countResult.Rows[0][0]) : 0;
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
 
-            string query = $"DELETE FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}';";
-            await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
-            return count;
-        }
-
-        public async Task<Dictionary<string, string>> GetAllTermIdsAsync(string tenantId, string indexId, CancellationToken token = default)
-        {
             Dictionary<string, string> result = new Dictionary<string, string>();
-            string query = $"SELECT term, id FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}' AND index_id = '{Sanitizer.Sanitize(indexId)}';";
+            string query = $"SELECT term, id FROM {prefix}_terms;";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             foreach (DataRow row in dt.Rows)
             {

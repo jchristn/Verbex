@@ -304,5 +304,139 @@ ALTER TABLE documents ADD COLUMN indexing_runtime_ms DECIMAL(18,4) AFTER custom_
 -- Update schema version
 UPDATE schema_metadata SET value = '3.3' WHERE `key` = 'schema_version';
 ";
+
+        /// <summary>
+        /// Generates SQL to create index-specific tables with the given table prefix.
+        /// </summary>
+        /// <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+        /// <returns>SQL CREATE TABLE statements for index-specific tables.</returns>
+        /// <exception cref="ArgumentException">Thrown when the table prefix is invalid.</exception>
+        public static string CreateIndexTables(string tablePrefix)
+        {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            return $@"
+-- Index-specific tables for prefix: {prefix}
+
+-- Documents table
+CREATE TABLE IF NOT EXISTS {prefix}_documents (
+    id VARCHAR(48) PRIMARY KEY,
+    name VARCHAR(512) NOT NULL UNIQUE,
+    content_sha256 VARCHAR(64),
+    document_length INT NOT NULL DEFAULT 0,
+    term_count INT NOT NULL DEFAULT 0,
+    custom_metadata TEXT,
+    indexing_runtime_ms DECIMAL(18,4),
+    indexed_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Terms table (vocabulary)
+CREATE TABLE IF NOT EXISTS {prefix}_terms (
+    id VARCHAR(48) PRIMARY KEY,
+    term VARCHAR(512) NOT NULL UNIQUE,
+    document_frequency INT NOT NULL DEFAULT 0,
+    total_frequency BIGINT NOT NULL DEFAULT 0,
+    last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Document-term mappings (inverted index)
+CREATE TABLE IF NOT EXISTS {prefix}_document_terms (
+    id VARCHAR(48) PRIMARY KEY,
+    document_id VARCHAR(48) NOT NULL,
+    term_id VARCHAR(48) NOT NULL,
+    term_frequency INT NOT NULL DEFAULT 0,
+    character_positions TEXT,
+    term_positions TEXT,
+    last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_document_term (document_id, term_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Labels for documents or index level
+CREATE TABLE IF NOT EXISTS {prefix}_labels (
+    id VARCHAR(48) PRIMARY KEY,
+    document_id VARCHAR(48),
+    label VARCHAR(256) NOT NULL,
+    last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tags (key-value pairs) for documents or index level
+CREATE TABLE IF NOT EXISTS {prefix}_tags (
+    id VARCHAR(48) PRIMARY KEY,
+    document_id VARCHAR(48),
+    `key` VARCHAR(256) NOT NULL,
+    value TEXT,
+    last_update_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_utc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+";
+        }
+
+        /// <summary>
+        /// Generates SQL to drop index-specific tables with the given table prefix.
+        /// </summary>
+        /// <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+        /// <returns>SQL DROP TABLE statements for index-specific tables.</returns>
+        /// <exception cref="ArgumentException">Thrown when the table prefix is invalid.</exception>
+        public static string DropIndexTables(string tablePrefix)
+        {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            return $@"
+-- Drop index-specific tables for prefix: {prefix}
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS {prefix}_tags;
+DROP TABLE IF EXISTS {prefix}_labels;
+DROP TABLE IF EXISTS {prefix}_document_terms;
+DROP TABLE IF EXISTS {prefix}_terms;
+DROP TABLE IF EXISTS {prefix}_documents;
+SET FOREIGN_KEY_CHECKS = 1;
+";
+        }
+
+        /// <summary>
+        /// Generates SQL statements to create indexes for index-specific tables.
+        /// Each statement should be executed individually with error handling for duplicate index errors.
+        /// </summary>
+        /// <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+        /// <returns>List of SQL CREATE INDEX statements.</returns>
+        /// <exception cref="ArgumentException">Thrown when the table prefix is invalid.</exception>
+        public static List<string> CreateIndexTableIndexes(string tablePrefix)
+        {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            return new List<string>
+            {
+                // Document indexes
+                $"CREATE INDEX idx_{prefix}_docs_name ON {prefix}_documents(name)",
+                $"CREATE INDEX idx_{prefix}_docs_sha256 ON {prefix}_documents(content_sha256)",
+
+                // Term indexes (critical for search performance)
+                $"CREATE INDEX idx_{prefix}_terms_term ON {prefix}_terms(term)",
+                $"CREATE INDEX idx_{prefix}_terms_docfreq ON {prefix}_terms(document_frequency DESC)",
+                $"CREATE INDEX idx_{prefix}_terms_orphan ON {prefix}_terms(document_frequency)",
+
+                // Document-term indexes (critical for inverted index lookups)
+                $"CREATE INDEX idx_{prefix}_docterms_doc ON {prefix}_document_terms(document_id)",
+                $"CREATE INDEX idx_{prefix}_docterms_term ON {prefix}_document_terms(term_id)",
+                $"CREATE INDEX idx_{prefix}_docterms_freq ON {prefix}_document_terms(term_frequency DESC)",
+                $"CREATE INDEX idx_{prefix}_docterms_term_doc ON {prefix}_document_terms(term_id, document_id)",
+
+                // Label indexes
+                $"CREATE INDEX idx_{prefix}_labels_doc ON {prefix}_labels(document_id)",
+                $"CREATE INDEX idx_{prefix}_labels_label ON {prefix}_labels(label)",
+                $"CREATE INDEX idx_{prefix}_labels_doc_label ON {prefix}_labels(document_id, label)",
+
+                // Tag indexes
+                $"CREATE INDEX idx_{prefix}_tags_doc ON {prefix}_tags(document_id)",
+                $"CREATE INDEX idx_{prefix}_tags_key ON {prefix}_tags(`key`)",
+                $"CREATE INDEX idx_{prefix}_tags_doc_key ON {prefix}_tags(document_id, `key`)",
+                $"CREATE INDEX idx_{prefix}_tags_key_value ON {prefix}_tags(`key`, value(255))"
+            };
+        }
     }
 }

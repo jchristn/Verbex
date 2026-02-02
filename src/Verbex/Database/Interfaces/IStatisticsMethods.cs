@@ -8,28 +8,27 @@ namespace Verbex.Database.Interfaces
     /// Interface for statistics-related database operations.
     /// </summary>
     /// <remarks>
-    /// Provides operations for retrieving index and term statistics.
+    /// Provides operations for retrieving index and term statistics (prefixed tables)
+    /// as well as tenant-level statistics (unprefixed tables).
     /// </remarks>
     public interface IStatisticsMethods
     {
         /// <summary>
         /// Gets overall index statistics.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Index statistics.</returns>
-        Task<IndexStatistics> GetIndexStatisticsAsync(string tenantId, string indexId, CancellationToken token = default);
+        Task<IndexStatistics> GetIndexStatisticsAsync(string tablePrefix, CancellationToken token = default);
 
         /// <summary>
         /// Gets statistics for a specific term.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="term">The term text.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Term statistics or null if term not found.</returns>
-        Task<TermStatisticsResult?> GetTermStatisticsAsync(string tenantId, string indexId, string term, CancellationToken token = default);
+        Task<TermStatisticsResult?> GetTermStatisticsAsync(string tablePrefix, string term, CancellationToken token = default);
 
         /// <summary>
         /// Gets global statistics across all indexes for a tenant.

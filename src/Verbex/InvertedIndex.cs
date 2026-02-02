@@ -36,6 +36,7 @@ namespace Verbex
         private readonly SemaphoreSlim _WriteLock = new SemaphoreSlim(1, 1);
         private string _TenantId = string.Empty;
         private string _IndexId = string.Empty;
+        private string _TablePrefix = string.Empty;
         private bool _IsDisposed;
         private volatile int _DocumentsSinceLastFlush = 0;
         private IndexCacheManager? _CacheManager;
@@ -156,6 +157,7 @@ namespace Verbex
             _TenantId = tenant.Identifier;
 
             // Get or create the index
+            bool isNewIndex = false;
             IndexMetadata? index = await _Driver.Indexes.ReadByNameAsync(_TenantId, _IndexName, token).ConfigureAwait(false);
             if (index == null)
             {
@@ -166,9 +168,62 @@ namespace Verbex
                     Description = $"Index: {_IndexName}"
                 };
                 index = await _Driver.Indexes.CreateAsync(index, token).ConfigureAwait(false);
+                isNewIndex = true;
             }
             _IndexId = index.Identifier;
+            _TablePrefix = TablePrefixValidator.FromIndexId(_IndexId);
 
+            // Create the prefixed tables for the index if this is a new index
+            if (isNewIndex)
+            {
+                await _Driver.CreateIndexTablesAsync(_TablePrefix, token).ConfigureAwait(false);
+            }
+
+            await InitializeCachesAsync(token).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Opens the index with pre-existing tenant and index identifiers.
+        /// Use this when the index metadata already exists in the database (e.g., server-managed indices).
+        /// The prefixed tables must already exist; this method will not create them.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="indexId">The index identifier.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Task.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when tenantId or indexId is null or empty.</exception>
+        public async Task OpenAsync(string tenantId, string indexId, CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+
+            if (string.IsNullOrEmpty(tenantId))
+            {
+                throw new ArgumentNullException(nameof(tenantId));
+            }
+
+            if (string.IsNullOrEmpty(indexId))
+            {
+                throw new ArgumentNullException(nameof(indexId));
+            }
+
+            if (!_Driver.IsOpen)
+            {
+                await _Driver.InitializeAsync(token).ConfigureAwait(false);
+            }
+
+            _TenantId = tenantId;
+            _IndexId = indexId;
+            _TablePrefix = TablePrefixValidator.FromIndexId(_IndexId);
+
+            await InitializeCachesAsync(token).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Initializes caches based on configuration.
+        /// </summary>
+        /// <param name="token">Cancellation token.</param>
+        private async Task InitializeCachesAsync(CancellationToken token)
+        {
             // Initialize cache manager if caching is enabled
             if (_Configuration.CacheConfiguration.Enabled)
             {
@@ -179,9 +234,9 @@ namespace Verbex
             // Initialize term ID cache for optimized ingestion
             if (_Configuration.CacheConfiguration.EnableTermIdCache)
             {
-                Dictionary<string, string> termIds = await _Driver.Terms.GetAllTermIdsAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
+                Dictionary<string, string> termIds = await _Driver.Terms.GetAllTermIdsAsync(_TablePrefix, token).ConfigureAwait(false);
                 int initialCapacity = Math.Max(termIds.Count, _Configuration.CacheConfiguration.TermIdCacheInitialCapacity);
-                _TermIdCache = new TermIdCache(_TenantId, _IndexId, initialCapacity);
+                _TermIdCache = new TermIdCache(_TablePrefix, initialCapacity);
                 _TermIdCache.Load(termIds);
             }
         }
@@ -204,6 +259,7 @@ namespace Verbex
             }
             _TenantId = string.Empty;
             _IndexId = string.Empty;
+            _TablePrefix = string.Empty;
         }
 
         #region Document Operations
@@ -224,7 +280,7 @@ namespace Verbex
                 return cachedCount;
             }
 
-            long count = await _Driver.Documents.GetCountAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
+            long count = await _Driver.Documents.GetCountAsync(_TablePrefix, token).ConfigureAwait(false);
 
             // Cache the result
             _CacheManager?.SetDocumentCount(count);
@@ -274,7 +330,7 @@ namespace Verbex
                 string documentId = IdGenerator.GenerateDocumentId();
                 string contentSha256 = ComputeContentHash(content);
 
-                await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
+                await _Driver.Documents.AddAsync(_TablePrefix, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
 
                 IndexContentResult result = await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
                 result.Metrics.Steps.LockWaitMs = lockWaitMs;
@@ -352,7 +408,7 @@ namespace Verbex
             {
                 string contentSha256 = ComputeContentHash(content);
 
-                await _Driver.Documents.AddAsync(_TenantId, _IndexId, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
+                await _Driver.Documents.AddAsync(_TablePrefix, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
 
                 IndexContentResult result = await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
                 result.Metrics.Steps.LockWaitMs = lockWaitMs;
@@ -391,7 +447,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentId);
 
-            return await _Driver.Documents.GetAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
+            return await _Driver.Documents.GetAsync(_TablePrefix, documentId, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -406,7 +462,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentId);
 
-            return await _Driver.Documents.GetWithMetadataAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
+            return await _Driver.Documents.GetWithMetadataAsync(_TablePrefix, documentId, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -421,7 +477,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentName);
 
-            return await _Driver.Documents.GetByNameAsync(_TenantId, _IndexId, documentName, token).ConfigureAwait(false);
+            return await _Driver.Documents.GetByNameAsync(_TablePrefix, documentName, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -436,7 +492,7 @@ namespace Verbex
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            return await _Driver.Documents.GetAllAsync(_TenantId, _IndexId, limit, offset, token).ConfigureAwait(false);
+            return await _Driver.Documents.GetAllAsync(_TablePrefix, limit, offset, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -482,7 +538,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentId);
 
-            return await _Driver.Documents.ExistsAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
+            return await _Driver.Documents.ExistsAsync(_TablePrefix, documentId, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -497,7 +553,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentName);
 
-            return await _Driver.Documents.ExistsByNameAsync(_TenantId, _IndexId, documentName, token).ConfigureAwait(false);
+            return await _Driver.Documents.ExistsByNameAsync(_TablePrefix, documentName, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -525,7 +581,7 @@ namespace Verbex
 
             foreach (string docId in requestedIds)
             {
-                bool exists = await _Driver.Documents.ExistsAsync(_TenantId, _IndexId, docId, token).ConfigureAwait(false);
+                bool exists = await _Driver.Documents.ExistsAsync(_TablePrefix, docId, token).ConfigureAwait(false);
                 if (exists)
                 {
                     existingIds.Add(docId);
@@ -637,34 +693,53 @@ namespace Verbex
             await _WriteLock.WaitAsync(token).ConfigureAwait(false);
             try
             {
-                List<DocumentTermRecord> docTerms = await _Driver.DocumentTerms.GetByDocumentAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
+                List<DocumentTermRecord> docTerms = await _Driver.DocumentTerms.GetByDocumentAsync(_TablePrefix, documentId, token).ConfigureAwait(false);
 
-                // Batch decrement term frequencies (single UPDATE instead of N)
-                if (docTerms.Count > 0)
+                // Wrap all deletion operations in a transaction for atomicity
+                await _Driver.BeginTransactionAsync(token).ConfigureAwait(false);
+                try
                 {
-                    Dictionary<string, FrequencyDelta> decrements =
-                        new Dictionary<string, FrequencyDelta>();
-                    foreach (DocumentTermRecord docTerm in docTerms)
+                    // Batch decrement term frequencies (single UPDATE instead of N)
+                    if (docTerms.Count > 0)
                     {
-                        decrements[docTerm.TermId] = new FrequencyDelta(1, docTerm.TermFrequency);
+                        Dictionary<string, FrequencyDelta> decrements =
+                            new Dictionary<string, FrequencyDelta>();
+                        foreach (DocumentTermRecord docTerm in docTerms)
+                        {
+                            decrements[docTerm.TermId] = new FrequencyDelta(1, docTerm.TermFrequency);
+                        }
+                        await _Driver.Terms.DecrementFrequenciesBatchAsync(_TablePrefix, decrements, token).ConfigureAwait(false);
                     }
-                    await _Driver.Terms.DecrementFrequenciesBatchAsync(_TenantId, _IndexId, decrements, token).ConfigureAwait(false);
+
+                    await _Driver.DocumentTerms.DeleteByDocumentAsync(_TablePrefix, documentId, token).ConfigureAwait(false);
+
+                    bool deleted = await _Driver.Documents.DeleteAsync(_TablePrefix, documentId, token).ConfigureAwait(false);
+
+                    // Delete orphaned terms and get the list of deleted term texts for cache invalidation
+                    List<string> deletedTermTexts = await _Driver.Terms.DeleteOrphanedAsync(_TablePrefix, token).ConfigureAwait(false);
+
+                    await _Driver.CommitTransactionAsync(token).ConfigureAwait(false);
+
+                    // Invalidate caches after successful commit
+                    if (deleted)
+                    {
+                        List<string> affectedTermIds = docTerms.Select(dt => dt.TermId).ToList();
+                        _CacheInvalidator?.OnDocumentRemoved(documentId, affectedTermIds);
+                    }
+
+                    // Invalidate TermIdCache for deleted orphan terms
+                    if (deletedTermTexts.Count > 0)
+                    {
+                        _TermIdCache?.RemoveRange(deletedTermTexts);
+                    }
+
+                    return deleted;
                 }
-
-                await _Driver.DocumentTerms.DeleteByDocumentAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
-
-                bool deleted = await _Driver.Documents.DeleteAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
-
-                await _Driver.Terms.DeleteOrphanedAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
-
-                // Invalidate cache
-                if (deleted)
+                catch
                 {
-                    List<string> affectedTermIds = docTerms.Select(dt => dt.TermId).ToList();
-                    _CacheInvalidator?.OnDocumentRemoved(documentId, affectedTermIds);
+                    await _Driver.RollbackTransactionAsync(token).ConfigureAwait(false);
+                    throw;
                 }
-
-                return deleted;
             }
             finally
             {
@@ -696,56 +771,74 @@ namespace Verbex
             try
             {
                 // Step 1: Get all document-terms for all requested documents in a single query
-                List<DocumentTermRecord> allDocTerms = await _Driver.DocumentTerms.GetByDocumentsAsync(_TenantId, _IndexId, requestedIds, token).ConfigureAwait(false);
+                List<DocumentTermRecord> allDocTerms = await _Driver.DocumentTerms.GetByDocumentsAsync(_TablePrefix, requestedIds, token).ConfigureAwait(false);
 
-                // Step 2: Aggregate term frequency decrements across all documents
-                if (allDocTerms.Count > 0)
+                // Wrap all deletion operations in a transaction for atomicity
+                await _Driver.BeginTransactionAsync(token).ConfigureAwait(false);
+                try
                 {
-                    Dictionary<string, FrequencyDelta> decrements = new Dictionary<string, FrequencyDelta>();
-                    foreach (DocumentTermRecord docTerm in allDocTerms)
+                    // Step 2: Aggregate term frequency decrements across all documents
+                    if (allDocTerms.Count > 0)
                     {
-                        if (decrements.TryGetValue(docTerm.TermId, out FrequencyDelta? existing))
+                        Dictionary<string, FrequencyDelta> decrements = new Dictionary<string, FrequencyDelta>();
+                        foreach (DocumentTermRecord docTerm in allDocTerms)
                         {
-                            decrements[docTerm.TermId] = new FrequencyDelta(existing.DocFreqDelta + 1, existing.TotalFreqDelta + docTerm.TermFrequency);
+                            if (decrements.TryGetValue(docTerm.TermId, out FrequencyDelta? existing))
+                            {
+                                decrements[docTerm.TermId] = new FrequencyDelta(existing.DocFreqDelta + 1, existing.TotalFreqDelta + docTerm.TermFrequency);
+                            }
+                            else
+                            {
+                                decrements[docTerm.TermId] = new FrequencyDelta(1, docTerm.TermFrequency);
+                            }
                         }
-                        else
-                        {
-                            decrements[docTerm.TermId] = new FrequencyDelta(1, docTerm.TermFrequency);
-                        }
+
+                        // Step 3: Single batch decrement for all term frequencies
+                        await _Driver.Terms.DecrementFrequenciesBatchAsync(_TablePrefix, decrements, token).ConfigureAwait(false);
                     }
 
-                    // Step 3: Single batch decrement for all term frequencies
-                    await _Driver.Terms.DecrementFrequenciesBatchAsync(_TenantId, _IndexId, decrements, token).ConfigureAwait(false);
+                    // Step 4: Delete all document-terms in one statement
+                    await _Driver.DocumentTerms.DeleteByDocumentsAsync(_TablePrefix, requestedIds, token).ConfigureAwait(false);
+
+                    // Step 5: Delete all documents in one statement and get back which ones existed
+                    List<string> deletedIds = await _Driver.Documents.DeleteBatchAsync(_TablePrefix, requestedIds, token).ConfigureAwait(false);
+
+                    // Step 6: Run orphan cleanup once at the end and get deleted term texts for cache invalidation
+                    List<string> deletedTermTexts = await _Driver.Terms.DeleteOrphanedAsync(_TablePrefix, token).ConfigureAwait(false);
+
+                    await _Driver.CommitTransactionAsync(token).ConfigureAwait(false);
+
+                    // Step 7: Calculate not-found IDs
+                    HashSet<string> deletedSet = new HashSet<string>(deletedIds);
+                    List<string> notFoundIds = requestedIds.Where(id => !deletedSet.Contains(id)).ToList();
+
+                    // Invalidate caches after successful commit
+                    if (deletedIds.Count > 0)
+                    {
+                        List<string> affectedTermIds = allDocTerms.Select(dt => dt.TermId).Distinct().ToList();
+                        _CacheInvalidator?.OnDocumentsRemoved(deletedIds, affectedTermIds);
+                    }
+
+                    // Invalidate TermIdCache for deleted orphan terms
+                    if (deletedTermTexts.Count > 0)
+                    {
+                        _TermIdCache?.RemoveRange(deletedTermTexts);
+                    }
+
+                    return new BatchDeleteResponse
+                    {
+                        Deleted = deletedIds,
+                        NotFound = notFoundIds,
+                        DeletedCount = deletedIds.Count,
+                        NotFoundCount = notFoundIds.Count,
+                        RequestedCount = requestedIds.Count
+                    };
                 }
-
-                // Step 4: Delete all document-terms in one statement
-                await _Driver.DocumentTerms.DeleteByDocumentsAsync(_TenantId, _IndexId, requestedIds, token).ConfigureAwait(false);
-
-                // Step 5: Delete all documents in one statement and get back which ones existed
-                List<string> deletedIds = await _Driver.Documents.DeleteBatchAsync(_TenantId, _IndexId, requestedIds, token).ConfigureAwait(false);
-
-                // Step 6: Run orphan cleanup once at the end
-                await _Driver.Terms.DeleteOrphanedAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
-
-                // Step 7: Calculate not-found IDs
-                HashSet<string> deletedSet = new HashSet<string>(deletedIds);
-                List<string> notFoundIds = requestedIds.Where(id => !deletedSet.Contains(id)).ToList();
-
-                // Invalidate cache
-                if (deletedIds.Count > 0)
+                catch
                 {
-                    List<string> affectedTermIds = allDocTerms.Select(dt => dt.TermId).Distinct().ToList();
-                    _CacheInvalidator?.OnDocumentsRemoved(deletedIds, affectedTermIds);
+                    await _Driver.RollbackTransactionAsync(token).ConfigureAwait(false);
+                    throw;
                 }
-
-                return new BatchDeleteResponse
-                {
-                    Deleted = deletedIds,
-                    NotFound = notFoundIds,
-                    DeletedCount = deletedIds.Count,
-                    NotFoundCount = notFoundIds.Count,
-                    RequestedCount = requestedIds.Count
-                };
             }
             finally
             {
@@ -767,9 +860,9 @@ namespace Verbex
             await _WriteLock.WaitAsync(token).ConfigureAwait(false);
             try
             {
-                long documentCount = await _Driver.Documents.DeleteAllAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
+                long documentCount = await _Driver.Documents.DeleteAllAsync(_TablePrefix, token).ConfigureAwait(false);
 
-                await _Driver.Terms.DeleteAllAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
+                await _Driver.Terms.DeleteAllAsync(_TablePrefix, token).ConfigureAwait(false);
 
                 // Invalidate all caches
                 _CacheInvalidator?.OnIndexCleared();
@@ -854,7 +947,7 @@ namespace Verbex
             // Fetch remaining terms from database
             if (termsToFetch.Count > 0)
             {
-                Dictionary<string, TermRecord> fetchedTerms = await _Driver.Terms.GetMultipleAsync(_TenantId, _IndexId, termsToFetch, token).ConfigureAwait(false);
+                Dictionary<string, TermRecord> fetchedTerms = await _Driver.Terms.GetMultipleAsync(_TablePrefix, termsToFetch, token).ConfigureAwait(false);
 
                 foreach (KeyValuePair<string, TermRecord> kvp in fetchedTerms)
                 {
@@ -878,7 +971,7 @@ namespace Verbex
             List<string> termIds = termRecords.Values.Select(t => t.Id).ToList();
 
             int limit = maxResults ?? _Configuration.DefaultMaxSearchResults;
-            List<SearchMatch> matches = await _Driver.DocumentTerms.SearchAsync(_TenantId, _IndexId, termIds, useAndLogic, limit, labels, tags, token).ConfigureAwait(false);
+            List<SearchMatch> matches = await _Driver.DocumentTerms.SearchAsync(_TablePrefix, termIds, useAndLogic, limit, labels, tags, token).ConfigureAwait(false);
 
             if (matches.Count == 0)
             {
@@ -888,7 +981,7 @@ namespace Verbex
             List<string> docIds = matches.Select(m => m.DocumentId).ToList();
 
             // Fetch per-term frequencies for all matched documents
-            List<DocumentTermRecord> documentTermRecords = await _Driver.DocumentTerms.GetByDocumentsAndTermsAsync(_TenantId, _IndexId, docIds, termIds, token).ConfigureAwait(false);
+            List<DocumentTermRecord> documentTermRecords = await _Driver.DocumentTerms.GetByDocumentsAndTermsAsync(_TablePrefix, docIds, termIds, token).ConfigureAwait(false);
 
             // Build lookup: documentId -> (termId -> frequency)
             Dictionary<string, Dictionary<string, int>> perDocTermFrequencies = new Dictionary<string, Dictionary<string, int>>();
@@ -911,11 +1004,11 @@ namespace Verbex
                 }
             }
 
-            List<DocumentMetadata> documents = await _Driver.Documents.GetByIdsAsync(_TenantId, _IndexId, docIds, token).ConfigureAwait(false);
+            List<DocumentMetadata> documents = await _Driver.Documents.GetByIdsAsync(_TablePrefix, docIds, token).ConfigureAwait(false);
 
             Dictionary<string, DocumentMetadata> docLookup = documents.ToDictionary(d => d.DocumentId);
 
-            long totalDocs = await _Driver.Documents.GetCountAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
+            long totalDocs = await _Driver.Documents.GetCountAsync(_TablePrefix, token).ConfigureAwait(false);
 
             List<SearchResult> results = new List<SearchResult>();
             foreach (SearchMatch match in matches)
@@ -954,7 +1047,7 @@ namespace Verbex
                 return false;
             }
 
-            return await _Driver.Terms.ExistsAsync(_TenantId, _IndexId, normalizedTerm, token).ConfigureAwait(false);
+            return await _Driver.Terms.ExistsAsync(_TablePrefix, normalizedTerm, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -975,13 +1068,13 @@ namespace Verbex
                 return new List<DocumentTermRecord>();
             }
 
-            TermRecord? termRecord = await _Driver.Terms.GetAsync(_TenantId, _IndexId, normalizedTerm, token).ConfigureAwait(false);
+            TermRecord? termRecord = await _Driver.Terms.GetAsync(_TablePrefix, normalizedTerm, token).ConfigureAwait(false);
             if (termRecord == null)
             {
                 return new List<DocumentTermRecord>();
             }
 
-            return await _Driver.DocumentTerms.GetPostingsByTermAsync(_TenantId, _IndexId, termRecord.Id, token).ConfigureAwait(false);
+            return await _Driver.DocumentTerms.GetPostingsByTermAsync(_TablePrefix, termRecord.Id, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -997,7 +1090,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(prefix);
 
-            return await _Driver.Terms.GetByPrefixAsync(_TenantId, _IndexId, prefix.ToLowerInvariant(), limit, token).ConfigureAwait(false);
+            return await _Driver.Terms.GetByPrefixAsync(_TablePrefix, prefix.ToLowerInvariant(), limit, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1012,7 +1105,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentId);
 
-            return await _Driver.DocumentTerms.GetByDocumentAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
+            return await _Driver.DocumentTerms.GetByDocumentAsync(_TablePrefix, documentId, token).ConfigureAwait(false);
         }
 
         #endregion
@@ -1034,7 +1127,7 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(label);
 
             string labelId = IdGenerator.GenerateLabelId();
-            await _Driver.Labels.AddAsync(_TenantId, _IndexId, labelId, documentId, label.ToLowerInvariant(), token).ConfigureAwait(false);
+            await _Driver.Labels.AddAsync(_TablePrefix, labelId, documentId, label.ToLowerInvariant(), token).ConfigureAwait(false);
 
             // Invalidate document cache
             _CacheInvalidator?.OnDocumentUpdated(documentId);
@@ -1066,7 +1159,7 @@ namespace Verbex
                 Label = l.ToLowerInvariant()
             }).ToList();
 
-            await _Driver.Labels.AddBatchAsync(_TenantId, _IndexId, records, token).ConfigureAwait(false);
+            await _Driver.Labels.AddBatchAsync(_TablePrefix, records, token).ConfigureAwait(false);
 
             // Invalidate document cache
             _CacheInvalidator?.OnDocumentUpdated(documentId);
@@ -1087,7 +1180,7 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(labels);
 
             List<string> normalizedLabels = labels.Select(l => l.ToLowerInvariant()).ToList();
-            await _Driver.Labels.ReplaceAsync(_TenantId, _IndexId, documentId, normalizedLabels, token).ConfigureAwait(false);
+            await _Driver.Labels.ReplaceAsync(_TablePrefix, documentId, normalizedLabels, token).ConfigureAwait(false);
 
             // Invalidate document cache
             _CacheInvalidator?.OnDocumentUpdated(documentId);
@@ -1106,7 +1199,7 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(label);
 
             string labelId = IdGenerator.GenerateLabelId();
-            await _Driver.Labels.AddAsync(_TenantId, _IndexId, labelId, null, label.ToLowerInvariant(), token).ConfigureAwait(false);
+            await _Driver.Labels.AddAsync(_TablePrefix, labelId, null, label.ToLowerInvariant(), token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1121,7 +1214,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentId);
 
-            return await _Driver.Labels.GetByDocumentAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
+            return await _Driver.Labels.GetByDocumentAsync(_TablePrefix, documentId, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1134,7 +1227,7 @@ namespace Verbex
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            return await _Driver.Labels.GetIndexLabelsAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
+            return await _Driver.Labels.GetIndexLabelsAsync(_TablePrefix, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1149,7 +1242,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(label);
 
-            return await _Driver.Labels.GetDocumentsByLabelAsync(_TenantId, _IndexId, label.ToLowerInvariant(), token).ConfigureAwait(false);
+            return await _Driver.Labels.GetDocumentsByLabelAsync(_TablePrefix, label.ToLowerInvariant(), token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1166,7 +1259,7 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(documentId);
             ArgumentNullException.ThrowIfNull(label);
 
-            bool removed = await _Driver.Labels.RemoveAsync(_TenantId, _IndexId, documentId, label.ToLowerInvariant(), token).ConfigureAwait(false);
+            bool removed = await _Driver.Labels.RemoveAsync(_TablePrefix, documentId, label.ToLowerInvariant(), token).ConfigureAwait(false);
 
             // Invalidate document cache
             if (removed)
@@ -1189,7 +1282,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(label);
 
-            return await _Driver.Labels.RemoveIndexLabelAsync(_TenantId, _IndexId, label.ToLowerInvariant(), token).ConfigureAwait(false);
+            return await _Driver.Labels.RemoveIndexLabelAsync(_TablePrefix, label.ToLowerInvariant(), token).ConfigureAwait(false);
         }
 
         #endregion
@@ -1212,7 +1305,7 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(key);
 
             string tagId = IdGenerator.GenerateTagId();
-            await _Driver.Tags.SetAsync(_TenantId, _IndexId, tagId, documentId, key, value, token).ConfigureAwait(false);
+            await _Driver.Tags.SetAsync(_TablePrefix, tagId, documentId, key, value, token).ConfigureAwait(false);
 
             // Invalidate document cache
             _CacheInvalidator?.OnDocumentUpdated(documentId);
@@ -1245,7 +1338,7 @@ namespace Verbex
                 Value = kvp.Value
             }).ToList();
 
-            await _Driver.Tags.AddBatchAsync(_TenantId, _IndexId, records, token).ConfigureAwait(false);
+            await _Driver.Tags.AddBatchAsync(_TablePrefix, records, token).ConfigureAwait(false);
 
             // Invalidate document cache
             _CacheInvalidator?.OnDocumentUpdated(documentId);
@@ -1265,7 +1358,7 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(documentId);
             ArgumentNullException.ThrowIfNull(tags);
 
-            await _Driver.Tags.ReplaceAsync(_TenantId, _IndexId, documentId, tags, token).ConfigureAwait(false);
+            await _Driver.Tags.ReplaceAsync(_TablePrefix, documentId, tags, token).ConfigureAwait(false);
 
             // Invalidate document cache
             _CacheInvalidator?.OnDocumentUpdated(documentId);
@@ -1285,7 +1378,7 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(key);
 
             string tagId = IdGenerator.GenerateTagId();
-            await _Driver.Tags.SetAsync(_TenantId, _IndexId, tagId, null, key, value, token).ConfigureAwait(false);
+            await _Driver.Tags.SetAsync(_TablePrefix, tagId, null, key, value, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1302,7 +1395,7 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(documentId);
             ArgumentNullException.ThrowIfNull(key);
 
-            return await _Driver.Tags.GetAsync(_TenantId, _IndexId, documentId, key, token).ConfigureAwait(false);
+            return await _Driver.Tags.GetAsync(_TablePrefix, documentId, key, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1317,7 +1410,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentId);
 
-            return await _Driver.Tags.GetByDocumentAsync(_TenantId, _IndexId, documentId, token).ConfigureAwait(false);
+            return await _Driver.Tags.GetByDocumentAsync(_TablePrefix, documentId, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1330,7 +1423,7 @@ namespace Verbex
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            return await _Driver.Tags.GetIndexTagsAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
+            return await _Driver.Tags.GetIndexTagsAsync(_TablePrefix, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1347,7 +1440,7 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(key);
             ArgumentNullException.ThrowIfNull(value);
 
-            return await _Driver.Tags.GetDocumentsByTagAsync(_TenantId, _IndexId, key, value, token).ConfigureAwait(false);
+            return await _Driver.Tags.GetDocumentsByTagAsync(_TablePrefix, key, value, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1364,7 +1457,7 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(documentId);
             ArgumentNullException.ThrowIfNull(key);
 
-            bool removed = await _Driver.Tags.RemoveAsync(_TenantId, _IndexId, documentId, key, token).ConfigureAwait(false);
+            bool removed = await _Driver.Tags.RemoveAsync(_TablePrefix, documentId, key, token).ConfigureAwait(false);
 
             // Invalidate document cache
             if (removed)
@@ -1387,7 +1480,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(key);
 
-            return await _Driver.Tags.RemoveIndexTagAsync(_TenantId, _IndexId, key, token).ConfigureAwait(false);
+            return await _Driver.Tags.RemoveIndexTagAsync(_TablePrefix, key, token).ConfigureAwait(false);
         }
 
         #endregion
@@ -1408,7 +1501,7 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentId);
 
-            await _Driver.Documents.UpdateCustomMetadataAsync(_TenantId, _IndexId, documentId, customMetadata, token).ConfigureAwait(false);
+            await _Driver.Documents.UpdateCustomMetadataAsync(_TablePrefix, documentId, customMetadata, token).ConfigureAwait(false);
 
             // Invalidate document cache
             _CacheInvalidator?.OnDocumentUpdated(documentId);
@@ -1438,7 +1531,7 @@ namespace Verbex
                 return cachedStats;
             }
 
-            IndexStatistics stats = await _Driver.Statistics.GetIndexStatisticsAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
+            IndexStatistics stats = await _Driver.Statistics.GetIndexStatisticsAsync(_TablePrefix, token).ConfigureAwait(false);
 
             // Cache the result
             _CacheManager?.SetStatistics(stats);
@@ -1474,7 +1567,7 @@ namespace Verbex
                 return null;
             }
 
-            return await _Driver.Statistics.GetTermStatisticsAsync(_TenantId, _IndexId, normalizedTerm, token).ConfigureAwait(false);
+            return await _Driver.Statistics.GetTermStatisticsAsync(_TablePrefix, normalizedTerm, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1487,7 +1580,7 @@ namespace Verbex
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            return await _Driver.Terms.GetCountAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
+            return await _Driver.Terms.GetCountAsync(_TablePrefix, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1501,7 +1594,7 @@ namespace Verbex
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            return await _Driver.Terms.GetTopAsync(_TenantId, _IndexId, limit, token).ConfigureAwait(false);
+            return await _Driver.Terms.GetTopAsync(_TablePrefix, limit, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -1557,12 +1650,12 @@ namespace Verbex
                     return 0;
                 }
 
-                Dictionary<string, string> termIds = await _Driver.Terms.GetAllTermIdsAsync(_TenantId, _IndexId, token).ConfigureAwait(false);
+                Dictionary<string, string> termIds = await _Driver.Terms.GetAllTermIdsAsync(_TablePrefix, token).ConfigureAwait(false);
 
                 if (_TermIdCache == null)
                 {
                     int initialCapacity = Math.Max(termIds.Count, _Configuration.CacheConfiguration.TermIdCacheInitialCapacity);
-                    _TermIdCache = new TermIdCache(_TenantId, _IndexId, initialCapacity);
+                    _TermIdCache = new TermIdCache(_TablePrefix, initialCapacity);
                 }
 
                 _TermIdCache.Load(termIds);
@@ -1745,8 +1838,7 @@ namespace Verbex
                 totalStopwatch.Stop();
                 metrics.TotalMs = totalStopwatch.Elapsed.TotalMilliseconds;
                 await _Driver.Documents.UpdateAsync(
-                    _TenantId,
-                    _IndexId,
+                    _TablePrefix,
                     documentId,
                     documentPath,
                     ComputeContentHash(content),
@@ -1837,7 +1929,7 @@ namespace Verbex
                     {
                         termIdsToGenerate[IdGenerator.GenerateTermId()] = term;
                     }
-                    Dictionary<string, string> dbTermIds = await _Driver.Terms.AddOrGetBatchAsync(_TenantId, _IndexId, termIdsToGenerate, token).ConfigureAwait(false);
+                    Dictionary<string, string> dbTermIds = await _Driver.Terms.AddOrGetBatchAsync(_TablePrefix, termIdsToGenerate, token).ConfigureAwait(false);
 
                     // Calculate new terms added (terms where we generated the ID that got used)
                     foreach (KeyValuePair<string, string> kvp in termIdsToGenerate)
@@ -1894,13 +1986,13 @@ namespace Verbex
 
                 // Step 5: Batch insert document-term mappings (single INSERT)
                 stepStopwatch.Restart();
-                await _Driver.DocumentTerms.AddBatchAsync(_TenantId, _IndexId, docTermRecords, token).ConfigureAwait(false);
+                await _Driver.DocumentTerms.AddBatchAsync(_TablePrefix, docTermRecords, token).ConfigureAwait(false);
                 stepStopwatch.Stop();
                 metrics.Steps.DocumentTermInsertMs = stepStopwatch.Elapsed.TotalMilliseconds;
 
                 // Step 6: Batch update term frequencies (single UPDATE)
                 stepStopwatch.Restart();
-                await _Driver.Terms.IncrementFrequenciesBatchAsync(_TenantId, _IndexId, frequencyUpdates, token).ConfigureAwait(false);
+                await _Driver.Terms.IncrementFrequenciesBatchAsync(_TablePrefix, frequencyUpdates, token).ConfigureAwait(false);
                 stepStopwatch.Stop();
                 metrics.Steps.FrequencyUpdateMs = stepStopwatch.Elapsed.TotalMilliseconds;
 
@@ -1908,8 +2000,7 @@ namespace Verbex
                 stepStopwatch.Restart();
                 totalStopwatch.Stop();
                 await _Driver.Documents.UpdateAsync(
-                    _TenantId,
-                    _IndexId,
+                    _TablePrefix,
                     documentId,
                     documentPath,
                     ComputeContentHash(content),

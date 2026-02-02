@@ -35,7 +35,6 @@ namespace Verbex.Models
         /// A k-sortable unique identifier with "tag_" prefix.
         /// Example: "tag_01ar5xxlajk1sxr6hzf29ksz4o01234567890abc".
         /// </value>
-        [JsonPropertyName("identifier")]
         public string Identifier
         {
             get => _Identifier;
@@ -48,7 +47,6 @@ namespace Verbex.Models
         /// <value>
         /// The identifier of the tenant, or empty string if not a tenant-level tag.
         /// </value>
-        [JsonPropertyName("tenantId")]
         public string TenantId
         {
             get => _TenantId;
@@ -61,7 +59,6 @@ namespace Verbex.Models
         /// <value>
         /// The identifier of the user, or empty string if not a user-level tag.
         /// </value>
-        [JsonPropertyName("userId")]
         public string UserId
         {
             get => _UserId;
@@ -74,7 +71,6 @@ namespace Verbex.Models
         /// <value>
         /// The identifier of the credential, or empty string if not a credential-level tag.
         /// </value>
-        [JsonPropertyName("credentialId")]
         public string CredentialId
         {
             get => _CredentialId;
@@ -87,7 +83,6 @@ namespace Verbex.Models
         /// <value>
         /// The identifier of the document, or empty string if this is an index-level tag.
         /// </value>
-        [JsonPropertyName("documentId")]
         public string DocumentId
         {
             get => _DocumentId;
@@ -100,7 +95,6 @@ namespace Verbex.Models
         /// <value>
         /// The identifier of the index. Required for both document and index-level tags.
         /// </value>
-        [JsonPropertyName("indexId")]
         public string IndexId
         {
             get => _IndexId;
@@ -111,7 +105,6 @@ namespace Verbex.Models
         /// Gets or sets the tag key.
         /// </summary>
         /// <value>The key part of the key-value pair.</value>
-        [JsonPropertyName("key")]
         public string Key
         {
             get => _Key;
@@ -122,7 +115,6 @@ namespace Verbex.Models
         /// Gets or sets the tag value.
         /// </summary>
         /// <value>The value part of the key-value pair. May be null or empty.</value>
-        [JsonPropertyName("value")]
         public string Value
         {
             get => _Value;
@@ -133,7 +125,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the tag was last modified.
         /// </summary>
         /// <value>The last modification timestamp in UTC.</value>
-        [JsonPropertyName("lastUpdateUtc")]
         public DateTime LastUpdateUtc
         {
             get => _LastUpdateUtc;
@@ -144,7 +135,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the tag was created.
         /// </summary>
         /// <value>The creation timestamp in UTC.</value>
-        [JsonPropertyName("createdUtc")]
         public DateTime CreatedUtc
         {
             get => _CreatedUtc;

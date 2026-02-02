@@ -3,7 +3,6 @@ namespace Verbex.Models
     using System;
     using System.Security.Cryptography;
     using System.Text;
-    using System.Text.Json.Serialization;
     using PrettyId;
 
     /// <summary>
@@ -36,7 +35,6 @@ namespace Verbex.Models
         /// A k-sortable unique identifier with "adm_" prefix.
         /// Example: "adm_01ar5xxlajk1sxr6hzf29ksz4o01234567890abc".
         /// </value>
-        [JsonPropertyName("identifier")]
         public string Identifier
         {
             get => _Identifier;
@@ -47,7 +45,6 @@ namespace Verbex.Models
         /// Gets or sets the administrator's email address.
         /// </summary>
         /// <value>The email address. Must be globally unique across all administrators.</value>
-        [JsonPropertyName("email")]
         public string Email
         {
             get => _Email;
@@ -61,7 +58,6 @@ namespace Verbex.Models
         /// A 64-character hexadecimal string representing the SHA-256 hash.
         /// Use <see cref="SetPassword"/> to set from plain text.
         /// </value>
-        [JsonPropertyName("passwordSha256")]
         public string PasswordSha256
         {
             get => _PasswordSha256;
@@ -72,7 +68,6 @@ namespace Verbex.Models
         /// Gets or sets the administrator's first name.
         /// </summary>
         /// <value>The first name. Optional.</value>
-        [JsonPropertyName("firstName")]
         public string FirstName
         {
             get => _FirstName;
@@ -83,7 +78,6 @@ namespace Verbex.Models
         /// Gets or sets the administrator's last name.
         /// </summary>
         /// <value>The last name. Optional.</value>
-        [JsonPropertyName("lastName")]
         public string LastName
         {
             get => _LastName;
@@ -97,7 +91,6 @@ namespace Verbex.Models
         /// True if the administrator account is active and can authenticate; false if disabled.
         /// Default is true.
         /// </value>
-        [JsonPropertyName("active")]
         public bool Active
         {
             get => _Active;
@@ -108,7 +101,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the administrator was created.
         /// </summary>
         /// <value>The creation timestamp in UTC.</value>
-        [JsonPropertyName("createdUtc")]
         public DateTime CreatedUtc
         {
             get => _CreatedUtc;
@@ -119,7 +111,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the administrator was last updated.
         /// </summary>
         /// <value>The last update timestamp in UTC.</value>
-        [JsonPropertyName("lastUpdateUtc")]
         public DateTime LastUpdateUtc
         {
             get => _LastUpdateUtc;

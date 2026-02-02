@@ -204,7 +204,6 @@ namespace Verbex
         /// Gets a read-only collection of terms contained in this document
         /// </summary>
         [JsonInclude]
-        [JsonPropertyName("terms")]
         public IReadOnlyCollection<string> Terms
         {
             get { return _Terms.ToArray(); }
@@ -229,7 +228,6 @@ namespace Verbex
         /// Gets or sets custom metadata for the document.
         /// Can be any JSON-serializable value (object, array, string, number, boolean, null).
         /// </summary>
-        [JsonPropertyName("customMetadata")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public object? CustomMetadata
         {

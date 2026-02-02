@@ -2,7 +2,6 @@ namespace Verbex.Models
 {
     using System;
     using System.Collections.Generic;
-    using System.Text.Json.Serialization;
     using PrettyId;
 
     /// <summary>
@@ -34,7 +33,6 @@ namespace Verbex.Models
         /// A k-sortable unique identifier with "ten_" prefix.
         /// Example: "ten_01ar5xxlajk1sxr6hzf29ksz4o".
         /// </value>
-        [JsonPropertyName("identifier")]
         public string Identifier
         {
             get => _Identifier;
@@ -45,7 +43,6 @@ namespace Verbex.Models
         /// Gets or sets the tenant ID (alias for <see cref="Identifier"/>).
         /// </summary>
         /// <value>Same as <see cref="Identifier"/>.</value>
-        [JsonPropertyName("tenantId")]
         public string TenantId
         {
             get => _Identifier;
@@ -56,7 +53,6 @@ namespace Verbex.Models
         /// Gets or sets the display name of the tenant.
         /// </summary>
         /// <value>A human-readable name for the tenant. Must be unique across all tenants.</value>
-        [JsonPropertyName("name")]
         public string Name
         {
             get => _Name;
@@ -67,7 +63,6 @@ namespace Verbex.Models
         /// Gets or sets the description of the tenant.
         /// </summary>
         /// <value>An optional description for the tenant.</value>
-        [JsonPropertyName("description")]
         public string Description
         {
             get => _Description;
@@ -81,7 +76,6 @@ namespace Verbex.Models
         /// True if the tenant is active and can be accessed; false if the tenant is disabled.
         /// Default is true.
         /// </value>
-        [JsonPropertyName("active")]
         public bool Active
         {
             get => _Active;
@@ -92,7 +86,6 @@ namespace Verbex.Models
         /// Gets or sets the labels for this tenant.
         /// </summary>
         /// <value>A list of string labels for categorization and filtering.</value>
-        [JsonPropertyName("labels")]
         public List<string> Labels
         {
             get => _Labels;
@@ -103,7 +96,6 @@ namespace Verbex.Models
         /// Gets or sets the tags for this tenant.
         /// </summary>
         /// <value>A dictionary of key-value pairs for rich metadata.</value>
-        [JsonPropertyName("tags")]
         public Dictionary<string, string> Tags
         {
             get => _Tags;
@@ -114,7 +106,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the tenant was created.
         /// </summary>
         /// <value>The creation timestamp in UTC.</value>
-        [JsonPropertyName("createdUtc")]
         public DateTime CreatedUtc
         {
             get => _CreatedUtc;
@@ -125,7 +116,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the tenant was last updated.
         /// </summary>
         /// <value>The last update timestamp in UTC.</value>
-        [JsonPropertyName("lastUpdateUtc")]
         public DateTime LastUpdateUtc
         {
             get => _LastUpdateUtc;

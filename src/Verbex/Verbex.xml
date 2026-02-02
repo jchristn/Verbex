@@ -435,6 +435,29 @@
             </list>
             </remarks>
         </member>
+        <member name="M:Verbex.Database.DatabaseDriverBase.CreateIndexTablesAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Creates the index-specific prefixed tables (documents, terms, document_terms, labels, tags).
+            </summary>
+            <param name="tablePrefix">The table prefix to use for the index tables.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>A task representing the asynchronous operation.</returns>
+            <remarks>
+            This method should be called when creating a new index to set up its storage tables.
+            The table prefix should be validated using TablePrefixValidator before calling this method.
+            </remarks>
+        </member>
+        <member name="M:Verbex.Database.DatabaseDriverBase.DropIndexTablesAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Drops the index-specific prefixed tables.
+            </summary>
+            <param name="tablePrefix">The table prefix of the index tables to drop.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>A task representing the asynchronous operation.</returns>
+            <remarks>
+            This method should be called when deleting an index to clean up its storage tables.
+            </remarks>
+        </member>
         <member name="M:Verbex.Database.DatabaseDriverBase.ExecuteQueryAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
             <summary>
             Executes a single SQL query and returns the results.
@@ -1081,15 +1104,14 @@
             </summary>
             <remarks>
             Provides CRUD operations for documents within indexes.
-            Documents are scoped to a specific tenant and index.
+            Documents are stored in tables prefixed with the index identifier.
             </remarks>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <summary>
             Adds a new document to the index.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="id">Document ID (k-sortable unique identifier).</param>
             <param name="name">Document name.</param>
             <param name="contentSha256">SHA-256 hash for duplicate detection.</param>
@@ -1099,102 +1121,92 @@
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Gets a document by ID.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="id">Document ID.</param>
             <param name="token">Cancellation token.</param>
             <returns>Document metadata or null if not found.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetByNameAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Gets a document by name.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="name">Document name.</param>
             <param name="token">Cancellation token.</param>
             <returns>Document metadata or null if not found.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetWithMetadataAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetWithMetadataAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Gets a document by ID with all metadata (labels, tags, terms) in a single query.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="id">Document ID.</param>
             <param name="token">Cancellation token.</param>
             <returns>Document metadata with populated labels, tags, and terms, or null if not found.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetByContentSha256Async(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetByContentSha256Async(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Gets documents by content SHA-256 hash.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="contentSha256">SHA-256 content hash.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of matching documents.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetAllAsync(System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetAllAsync(System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
             <summary>
             Gets all documents with pagination.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="limit">Maximum number of documents to return.</param>
             <param name="offset">Number of documents to skip.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of documents.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetByIdsAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetByIdsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <summary>
             Gets multiple documents by IDs.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="ids">Document IDs.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of documents.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetCountAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetCountAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Gets the total number of documents.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="token">Cancellation token.</param>
             <returns>Document count.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.ExistsAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.ExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Checks if a document exists by ID.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="id">Document ID.</param>
             <param name="token">Cancellation token.</param>
             <returns>True if document exists.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.ExistsByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.ExistsByNameAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Checks if a document exists by name.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="name">Document name.</param>
             <param name="token">Cancellation token.</param>
             <returns>True if document exists.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <summary>
             Updates a document's metadata.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="id">Document ID.</param>
             <param name="name">New document name.</param>
             <param name="contentSha256">New SHA-256 content hash.</param>
@@ -1205,42 +1217,38 @@
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.String,System.Object,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.Object,System.Threading.CancellationToken)">
             <summary>
             Updates only the custom metadata for a document.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="id">Document ID.</param>
             <param name="customMetadata">Custom metadata (any JSON-serializable value, or null to clear).</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.DeleteAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.DeleteAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Deletes a document and all associated data.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="id">Document ID.</param>
             <param name="token">Cancellation token.</param>
             <returns>True if document was deleted.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.DeleteAllAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.DeleteAllAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Deletes all documents in an index.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="token">Cancellation token.</param>
             <returns>Number of documents deleted.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.DeleteBatchAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.DeleteBatchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <summary>
             Deletes multiple documents by IDs.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="ids">Document IDs to delete.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of document IDs that were actually deleted (existed).</returns>
@@ -1252,14 +1260,14 @@
             <remarks>
             Provides operations for the inverted index mapping documents to terms.
             Used for search operations and term position tracking.
+            Document-term mappings are stored in tables prefixed with the index identifier.
             </remarks>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Collections.Generic.List{System.Int32},System.Collections.Generic.List{System.Int32},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.AddAsync(System.String,System.String,System.String,System.String,System.Int32,System.Collections.Generic.List{System.Int32},System.Collections.Generic.List{System.Int32},System.Threading.CancellationToken)">
             <summary>
             Adds a document-term mapping.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="id">Mapping ID (k-sortable unique identifier).</param>
             <param name="documentId">Document ID.</param>
             <param name="termId">Term ID.</param>
@@ -1269,52 +1277,47 @@
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.AddBatchAsync(System.String,System.String,System.Collections.Generic.IEnumerable{Verbex.Models.DocumentTermRecord},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.AddBatchAsync(System.String,System.Collections.Generic.IEnumerable{Verbex.Models.DocumentTermRecord},System.Threading.CancellationToken)">
             <summary>
             Adds multiple document-term mappings in a batch.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="records">The records to add.</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.GetByDocumentAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.GetByDocumentAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Gets all term mappings for a document.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentId">Document ID.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of document-term records.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.GetPostingsAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.GetPostingsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <summary>
             Gets posting list for multiple terms.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="termIds">Term IDs.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of document-term records.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.GetPostingsByTermAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.GetPostingsByTermAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Gets posting list for a single term.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="termId">Term ID.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of document-term records.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.SearchAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Boolean,System.Int32,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.SearchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Boolean,System.Int32,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
             <summary>
             Searches for documents containing specified terms.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="termIds">Term IDs to search for.</param>
             <param name="useAndLogic">True for AND logic, false for OR logic.</param>
             <param name="limit">Maximum number of results.</param>
@@ -1323,52 +1326,47 @@
             <param name="token">Cancellation token.</param>
             <returns>List of search matches.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.DeleteByDocumentAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.DeleteByDocumentAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Deletes all term mappings for a document.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentId">Document ID.</param>
             <param name="token">Cancellation token.</param>
             <returns>Number of mappings deleted.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.GetByDocumentsAndTermsAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.GetByDocumentsAndTermsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <summary>
             Gets document-term mappings for specific documents and terms.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentIds">Document IDs.</param>
             <param name="termIds">Term IDs.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of document-term records.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.DeleteAllAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.DeleteAllAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Deletes all document-term mappings in an index.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="token">Cancellation token.</param>
             <returns>Number of mappings deleted.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.GetByDocumentsAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.GetByDocumentsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <summary>
             Gets all term mappings for multiple documents.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentIds">Document IDs.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of document-term records for all specified documents.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.DeleteByDocumentsAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.DeleteByDocumentsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <summary>
             Deletes all term mappings for multiple documents.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentIds">Document IDs.</param>
             <param name="token">Cancellation token.</param>
             <returns>Number of mappings deleted.</returns>
@@ -1490,129 +1488,118 @@
             Interface for label-related database operations.
             </summary>
             <remarks>
-            Provides operations for tenant, user, credential, document, and index-level labels.
+            Provides operations for document and index-level labels (prefixed tables)
+            as well as tenant, user, and credential-level labels (unprefixed tables).
             Labels are string tags used for categorization and filtering.
             </remarks>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ILabelMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.AddAsync(System.String,System.String,System.String,System.String,System.Threading.CancellationToken)">
             <summary>
-            Adds a label to a document.
+            Adds a label to a document or index.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="id">Label ID (k-sortable unique identifier).</param>
             <param name="documentId">Document ID (or null for index-level label).</param>
             <param name="label">The label text.</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ILabelMethods.AddBatchAsync(System.String,System.String,System.Collections.Generic.IEnumerable{Verbex.Models.LabelRecord},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.AddBatchAsync(System.String,System.Collections.Generic.IEnumerable{Verbex.Models.LabelRecord},System.Threading.CancellationToken)">
             <summary>
             Adds multiple labels in a batch.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="records">The label records to add.</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ILabelMethods.GetByDocumentAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.GetByDocumentAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Gets all labels for a document.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentId">Document ID.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of labels.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ILabelMethods.GetIndexLabelsAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.GetIndexLabelsAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Gets all index-level labels.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of labels.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ILabelMethods.GetAllDistinctAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.GetAllDistinctAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Gets all distinct labels in the index.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of distinct labels.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ILabelMethods.GetDocumentsByLabelAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.GetDocumentsByLabelAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Gets document IDs that have a specific label.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="label">The label to search for.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of document IDs.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ILabelMethods.ExistsAsync(System.String,System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.ExistsAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Checks if a label exists on a document.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentId">Document ID.</param>
             <param name="label">The label to check.</param>
             <param name="token">Cancellation token.</param>
             <returns>True if the label exists.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ILabelMethods.RemoveAsync(System.String,System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.RemoveAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Removes a label from a document.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentId">Document ID.</param>
             <param name="label">The label to remove.</param>
             <param name="token">Cancellation token.</param>
             <returns>True if the label was removed.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ILabelMethods.RemoveIndexLabelAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.RemoveIndexLabelAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Removes an index-level label.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="label">The label to remove.</param>
             <param name="token">Cancellation token.</param>
             <returns>True if the label was removed.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ILabelMethods.RemoveAllAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.RemoveAllAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Removes all labels from a document.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentId">Document ID.</param>
             <param name="token">Cancellation token.</param>
             <returns>Number of labels removed.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ILabelMethods.ReplaceAsync(System.String,System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.ReplaceAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <summary>
             Replaces all labels on a document.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentId">Document ID.</param>
             <param name="labels">The new labels.</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ILabelMethods.DeleteAllAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.DeleteAllAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Deletes all labels in an index.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="token">Cancellation token.</param>
             <returns>Number of labels deleted.</returns>
         </member>
@@ -1702,24 +1689,23 @@
             Interface for statistics-related database operations.
             </summary>
             <remarks>
-            Provides operations for retrieving index and term statistics.
+            Provides operations for retrieving index and term statistics (prefixed tables)
+            as well as tenant-level statistics (unprefixed tables).
             </remarks>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IStatisticsMethods.GetIndexStatisticsAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IStatisticsMethods.GetIndexStatisticsAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Gets overall index statistics.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="token">Cancellation token.</param>
             <returns>Index statistics.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.IStatisticsMethods.GetTermStatisticsAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.IStatisticsMethods.GetTermStatisticsAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Gets statistics for a specific term.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="term">The term text.</param>
             <param name="token">Cancellation token.</param>
             <returns>Term statistics or null if term not found.</returns>
@@ -1772,16 +1758,16 @@
             Interface for tag-related database operations.
             </summary>
             <remarks>
-            Provides operations for tenant, user, credential, document, and index-level key-value tags.
+            Provides operations for document and index-level key-value tags (prefixed tables)
+            as well as tenant, user, and credential-level tags (unprefixed tables).
             Tags are used for metadata and filtering.
             </remarks>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITagMethods.SetAsync(System.String,System.String,System.String,System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.SetAsync(System.String,System.String,System.String,System.String,System.String,System.Threading.CancellationToken)">
             <summary>
-            Sets a tag on a document.
+            Sets a tag on a document or index.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="id">Tag ID (k-sortable unique identifier).</param>
             <param name="documentId">Document ID (or null for index-level tag).</param>
             <param name="key">The tag key.</param>
@@ -1789,135 +1775,122 @@
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITagMethods.AddBatchAsync(System.String,System.String,System.Collections.Generic.IEnumerable{Verbex.Models.TagRecord},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.AddBatchAsync(System.String,System.Collections.Generic.IEnumerable{Verbex.Models.TagRecord},System.Threading.CancellationToken)">
             <summary>
             Adds multiple tags in a batch.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="records">The tag records to add.</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITagMethods.GetAsync(System.String,System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.GetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Gets a tag value by key.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentId">Document ID.</param>
             <param name="key">The tag key.</param>
             <param name="token">Cancellation token.</param>
             <returns>The tag value or null if not found.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITagMethods.GetByDocumentAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.GetByDocumentAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Gets all tags for a document.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentId">Document ID.</param>
             <param name="token">Cancellation token.</param>
             <returns>Dictionary of key-value pairs.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITagMethods.GetIndexTagsAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.GetIndexTagsAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Gets all index-level tags.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="token">Cancellation token.</param>
             <returns>Dictionary of key-value pairs.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITagMethods.GetAllDistinctKeysAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.GetAllDistinctKeysAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Gets all distinct tag keys in the index.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of distinct keys.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITagMethods.GetDocumentsByKeyAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.GetDocumentsByKeyAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Gets document IDs that have a specific tag key.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="key">The tag key.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of document IDs.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITagMethods.GetDocumentsByTagAsync(System.String,System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.GetDocumentsByTagAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Gets document IDs that have a specific tag key-value pair.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="key">The tag key.</param>
             <param name="value">The tag value.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of document IDs.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITagMethods.ExistsAsync(System.String,System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.ExistsAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Checks if a tag exists on a document.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentId">Document ID.</param>
             <param name="key">The tag key.</param>
             <param name="token">Cancellation token.</param>
             <returns>True if the tag exists.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITagMethods.RemoveAsync(System.String,System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.RemoveAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Removes a tag from a document.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentId">Document ID.</param>
             <param name="key">The tag key.</param>
             <param name="token">Cancellation token.</param>
             <returns>True if the tag was removed.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITagMethods.RemoveIndexTagAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.RemoveIndexTagAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Removes an index-level tag.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="key">The tag key.</param>
             <param name="token">Cancellation token.</param>
             <returns>True if the tag was removed.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITagMethods.RemoveAllAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.RemoveAllAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Removes all tags from a document.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentId">Document ID.</param>
             <param name="token">Cancellation token.</param>
             <returns>Number of tags removed.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITagMethods.ReplaceAsync(System.String,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.ReplaceAsync(System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
             <summary>
             Replaces all tags on a document.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentId">Document ID.</param>
             <param name="tags">The new tags.</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITagMethods.DeleteAllAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.DeleteAllAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Deletes all tags in an index.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="token">Cancellation token.</param>
             <returns>Number of tags deleted.</returns>
         </member>
@@ -2107,168 +2080,152 @@
             </summary>
             <remarks>
             Provides CRUD operations for terms (vocabulary) within indexes.
-            Terms are scoped to a specific tenant and index.
+            Terms are stored in tables prefixed with the index identifier.
             </remarks>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.AddOrGetAsync(System.String,System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.AddOrGetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Adds a term or returns existing if already present.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="id">Term ID (k-sortable unique identifier).</param>
             <param name="term">The term text.</param>
             <param name="token">Cancellation token.</param>
             <returns>The term ID (new or existing).</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.GetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.GetAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Gets a term by its text value.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="term">The term text.</param>
             <param name="token">Cancellation token.</param>
             <returns>The term record or null if not found.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.GetByIdAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.GetByIdAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Gets a term by its ID.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="id">Term ID.</param>
             <param name="token">Cancellation token.</param>
             <returns>The term record or null if not found.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.GetMultipleAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.GetMultipleAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <summary>
             Gets multiple terms by their text values.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="terms">The term texts.</param>
             <param name="token">Cancellation token.</param>
             <returns>Dictionary mapping term text to term record.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.GetByPrefixAsync(System.String,System.String,System.String,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.GetByPrefixAsync(System.String,System.String,System.Int32,System.Threading.CancellationToken)">
             <summary>
             Gets terms starting with a prefix.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="prefix">The prefix to search for.</param>
             <param name="limit">Maximum number of terms to return.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of matching term records.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.GetTopAsync(System.String,System.String,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.GetTopAsync(System.String,System.Int32,System.Threading.CancellationToken)">
             <summary>
             Gets the top terms by document frequency.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="limit">Maximum number of terms to return.</param>
             <param name="token">Cancellation token.</param>
             <returns>List of term records ordered by document frequency descending.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.GetCountAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.GetCountAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Gets the total number of unique terms.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="token">Cancellation token.</param>
             <returns>Term count.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.ExistsAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.ExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Checks if a term exists.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="term">The term text.</param>
             <param name="token">Cancellation token.</param>
             <returns>True if term exists.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.UpdateFrequenciesAsync(System.String,System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.UpdateFrequenciesAsync(System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
             <summary>
             Updates frequency statistics for a term.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="termId">Term ID.</param>
             <param name="documentFrequency">New document frequency.</param>
             <param name="totalFrequency">New total frequency.</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.IncrementFrequenciesAsync(System.String,System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.IncrementFrequenciesAsync(System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
             <summary>
             Increments frequency statistics for a term.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="termId">Term ID.</param>
             <param name="documentFrequencyDelta">Document frequency increment.</param>
             <param name="totalFrequencyDelta">Total frequency increment.</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.AddOrGetBatchAsync(System.String,System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.AddOrGetBatchAsync(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
             <summary>
             Adds or gets multiple terms in a batch.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="terms">Dictionary of term ID to term text.</param>
             <param name="token">Cancellation token.</param>
             <returns>Dictionary mapping term text to term ID.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.IncrementFrequenciesBatchAsync(System.String,System.String,System.Collections.Generic.Dictionary{System.String,Verbex.DTO.FrequencyDelta},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.IncrementFrequenciesBatchAsync(System.String,System.Collections.Generic.Dictionary{System.String,Verbex.DTO.FrequencyDelta},System.Threading.CancellationToken)">
             <summary>
             Increments frequencies for multiple terms.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="updates">Dictionary mapping term ID to frequency deltas.</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.DecrementFrequenciesBatchAsync(System.String,System.String,System.Collections.Generic.Dictionary{System.String,Verbex.DTO.FrequencyDelta},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.DecrementFrequenciesBatchAsync(System.String,System.Collections.Generic.Dictionary{System.String,Verbex.DTO.FrequencyDelta},System.Threading.CancellationToken)">
             <summary>
             Decrements frequencies for multiple terms.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="updates">Dictionary mapping term ID to frequency deltas.</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.DeleteOrphanedAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.DeleteOrphanedAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Deletes terms with zero document frequency.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="token">Cancellation token.</param>
-            <returns>Number of terms deleted.</returns>
+            <returns>List of deleted term texts (for cache invalidation).</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.DeleteAllAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.DeleteAllAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Deletes all terms in an index.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="token">Cancellation token.</param>
             <returns>Number of terms deleted.</returns>
         </member>
-        <member name="M:Verbex.Database.Interfaces.ITermMethods.GetAllTermIdsAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.GetAllTermIdsAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Gets all term IDs in an index for cache loading.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="token">Cancellation token.</param>
             <returns>Dictionary mapping term text to term ID.</returns>
         </member>
@@ -2482,7 +2439,7 @@
         </member>
         <member name="T:Verbex.Database.Mysql.Implementations.DocumentMethods">
             <summary>
-            MySQL implementation of document methods.
+            MySQL implementation of document methods using prefixed tables.
             </summary>
         </member>
         <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.#ctor(Verbex.Database.Mysql.MysqlDatabaseDriver)">
@@ -2491,54 +2448,54 @@
             </summary>
             <param name="driver">The database driver.</param>
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetByNameAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetWithMetadataAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetWithMetadataAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetByContentSha256Async(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetByContentSha256Async(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetAllAsync(System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetAllAsync(System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetByIdsAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetByIdsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetCountAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetCountAsync(System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.ExistsAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.ExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.String,System.Object,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.Object,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.DeleteAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.DeleteAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.DeleteAllAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.DeleteAllAsync(System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.DeleteBatchAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.DeleteBatchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="T:Verbex.Database.Mysql.Implementations.DocumentTermMethods">
             <summary>
-            MySQL implementation of document-term methods.
+            MySQL implementation of document-term methods using prefixed tables.
             </summary>
         </member>
         <member name="T:Verbex.Database.Mysql.Implementations.IndexMethods">
@@ -2720,6 +2677,12 @@
         <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.InitializeAsync(System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.CreateIndexTablesAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.DropIndexTablesAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
         <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.ExecuteQueryAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
@@ -2765,6 +2728,14 @@
             <summary>
             Initializes all method interface implementations.
             </summary>
+        </member>
+        <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.LoadDataTableWithoutConstraintsAsync(MySqlConnector.MySqlDataReader,System.Threading.CancellationToken)">
+            <summary>
+            Loads data from a reader into a DataTable without constraint checking.
+            </summary>
+            <param name="reader">The data reader to read from.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>A DataTable containing the data.</returns>
         </member>
         <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.ExecuteQueryInternalAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
             <summary>
@@ -2818,6 +2789,31 @@
             Migration from schema version 3.2 to 3.3.
             Adds indexing_runtime_ms column to documents table.
             </summary>
+        </member>
+        <member name="M:Verbex.Database.Mysql.Queries.SetupQueries.CreateIndexTables(System.String)">
+            <summary>
+            Generates SQL to create index-specific tables with the given table prefix.
+            </summary>
+            <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+            <returns>SQL CREATE TABLE statements for index-specific tables.</returns>
+            <exception cref="T:System.ArgumentException">Thrown when the table prefix is invalid.</exception>
+        </member>
+        <member name="M:Verbex.Database.Mysql.Queries.SetupQueries.DropIndexTables(System.String)">
+            <summary>
+            Generates SQL to drop index-specific tables with the given table prefix.
+            </summary>
+            <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+            <returns>SQL DROP TABLE statements for index-specific tables.</returns>
+            <exception cref="T:System.ArgumentException">Thrown when the table prefix is invalid.</exception>
+        </member>
+        <member name="M:Verbex.Database.Mysql.Queries.SetupQueries.CreateIndexTableIndexes(System.String)">
+            <summary>
+            Generates SQL statements to create indexes for index-specific tables.
+            Each statement should be executed individually with error handling for duplicate index errors.
+            </summary>
+            <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+            <returns>List of SQL CREATE INDEX statements.</returns>
+            <exception cref="T:System.ArgumentException">Thrown when the table prefix is invalid.</exception>
         </member>
         <member name="T:Verbex.Database.Mysql.Sanitizer">
             <summary>
@@ -2974,7 +2970,7 @@
         </member>
         <member name="T:Verbex.Database.Postgresql.Implementations.DocumentMethods">
             <summary>
-            PostgreSQL implementation of document methods.
+            PostgreSQL implementation of document methods using prefixed tables.
             </summary>
         </member>
         <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.#ctor(Verbex.Database.Postgresql.PostgresqlDatabaseDriver)">
@@ -2983,54 +2979,54 @@
             </summary>
             <param name="driver">The database driver.</param>
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetByNameAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetWithMetadataAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetWithMetadataAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetByContentSha256Async(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetByContentSha256Async(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetAllAsync(System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetAllAsync(System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetByIdsAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetByIdsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetCountAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetCountAsync(System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.ExistsAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.ExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.String,System.Object,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.Object,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.DeleteAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.DeleteAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.DeleteAllAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.DeleteAllAsync(System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.DeleteBatchAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.DeleteBatchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="T:Verbex.Database.Postgresql.Implementations.DocumentTermMethods">
             <summary>
-            PostgreSQL implementation of document-term methods.
+            PostgreSQL implementation of document-term methods using prefixed tables.
             </summary>
         </member>
         <member name="T:Verbex.Database.Postgresql.Implementations.IndexMethods">
@@ -3212,6 +3208,12 @@
         <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.InitializeAsync(System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.CreateIndexTablesAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.DropIndexTablesAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
         <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.ExecuteQueryAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
@@ -3256,6 +3258,14 @@
             <summary>
             Initializes all method interface implementations.
             </summary>
+        </member>
+        <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.LoadDataTableWithoutConstraintsAsync(Npgsql.NpgsqlDataReader,System.Threading.CancellationToken)">
+            <summary>
+            Loads data from a reader into a DataTable without constraint checking.
+            </summary>
+            <param name="reader">The data reader to read from.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>A DataTable containing the data.</returns>
         </member>
         <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.ExecuteQueryInternalAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
             <summary>
@@ -3310,6 +3320,30 @@
             Migration query from schema version 3.2 to 3.3.
             Adds indexing_runtime_ms column to documents table.
             </summary>
+        </member>
+        <member name="M:Verbex.Database.Postgresql.Queries.SetupQueries.CreateIndexTables(System.String)">
+            <summary>
+            Generates SQL to create index-specific tables with the given table prefix.
+            </summary>
+            <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+            <returns>SQL CREATE TABLE statements for index-specific tables.</returns>
+            <exception cref="T:System.ArgumentException">Thrown when the table prefix is invalid.</exception>
+        </member>
+        <member name="M:Verbex.Database.Postgresql.Queries.SetupQueries.DropIndexTables(System.String)">
+            <summary>
+            Generates SQL to drop index-specific tables with the given table prefix.
+            </summary>
+            <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+            <returns>SQL DROP TABLE statements for index-specific tables.</returns>
+            <exception cref="T:System.ArgumentException">Thrown when the table prefix is invalid.</exception>
+        </member>
+        <member name="M:Verbex.Database.Postgresql.Queries.SetupQueries.CreateIndexTableIndexes(System.String)">
+            <summary>
+            Generates SQL statements to create indexes for index-specific tables.
+            </summary>
+            <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+            <returns>List of SQL CREATE INDEX statements.</returns>
+            <exception cref="T:System.ArgumentException">Thrown when the table prefix is invalid.</exception>
         </member>
         <member name="T:Verbex.Database.Postgresql.Sanitizer">
             <summary>
@@ -3466,7 +3500,7 @@
         </member>
         <member name="T:Verbex.Database.Sqlite.Implementations.DocumentMethods">
             <summary>
-            SQLite implementation of document methods.
+            SQLite implementation of document methods using prefixed tables.
             </summary>
         </member>
         <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.#ctor(Verbex.Database.Sqlite.SqliteDatabaseDriver)">
@@ -3475,54 +3509,54 @@
             </summary>
             <param name="driver">The database driver.</param>
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetByNameAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetWithMetadataAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetWithMetadataAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetByContentSha256Async(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetByContentSha256Async(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetAllAsync(System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetAllAsync(System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetByIdsAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetByIdsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetCountAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetCountAsync(System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.ExistsAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.ExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.String,System.Object,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.Object,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.DeleteAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.DeleteAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.DeleteAllAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.DeleteAllAsync(System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.DeleteBatchAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.DeleteBatchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="T:Verbex.Database.Sqlite.Implementations.DocumentTermMethods">
             <summary>
-            SQLite implementation of document-term methods.
+            SQLite implementation of document-term methods using prefixed tables.
             </summary>
         </member>
         <member name="T:Verbex.Database.Sqlite.Implementations.IndexMethods">
@@ -3743,6 +3777,30 @@
             </summary>
             <returns>Migration SQL.</returns>
         </member>
+        <member name="M:Verbex.Database.Sqlite.Queries.SetupQueries.CreateIndexTables(System.String)">
+            <summary>
+            Generates SQL to create index-specific tables with the given table prefix.
+            </summary>
+            <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+            <returns>SQL CREATE TABLE statements for index-specific tables.</returns>
+            <exception cref="T:System.ArgumentException">Thrown when the table prefix is invalid.</exception>
+        </member>
+        <member name="M:Verbex.Database.Sqlite.Queries.SetupQueries.DropIndexTables(System.String)">
+            <summary>
+            Generates SQL to drop index-specific tables with the given table prefix.
+            </summary>
+            <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+            <returns>SQL DROP TABLE statements for index-specific tables.</returns>
+            <exception cref="T:System.ArgumentException">Thrown when the table prefix is invalid.</exception>
+        </member>
+        <member name="M:Verbex.Database.Sqlite.Queries.SetupQueries.CreateIndexTableIndexes(System.String)">
+            <summary>
+            Generates SQL statements to create indexes for index-specific tables.
+            </summary>
+            <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+            <returns>List of SQL CREATE INDEX statements.</returns>
+            <exception cref="T:System.ArgumentException">Thrown when the table prefix is invalid.</exception>
+        </member>
         <member name="T:Verbex.Database.Sqlite.Sanitizer">
             <summary>
             Provides SQL sanitization methods for SQLite to prevent SQL injection.
@@ -3839,8 +3897,22 @@
         <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.InitializeAsync(System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.CreateIndexTablesAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.DropIndexTablesAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
         <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.ExecuteQueryAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
             <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.LoadDataTableWithoutConstraintsAsync(Microsoft.Data.Sqlite.SqliteDataReader,System.Threading.CancellationToken)">
+            <summary>
+            Loads data from a reader into a DataTable without constraint checking.
+            </summary>
+            <param name="reader">The data reader to read from.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>A DataTable containing the data.</returns>
         </member>
         <member name="M:Verbex.Database.Sqlite.SqliteDatabaseDriver.ExecuteReadQueryAsync(System.String,System.Threading.CancellationToken)">
             <summary>
@@ -4058,7 +4130,7 @@
         </member>
         <member name="T:Verbex.Database.SqlServer.Implementations.DocumentMethods">
             <summary>
-            SQL Server implementation of document methods.
+            SQL Server implementation of document methods using prefixed tables.
             </summary>
         </member>
         <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.#ctor(Verbex.Database.SqlServer.SqlServerDatabaseDriver)">
@@ -4067,54 +4139,54 @@
             </summary>
             <param name="driver">The database driver.</param>
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.AddAsync(System.String,System.String,System.String,System.String,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetByNameAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetWithMetadataAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetWithMetadataAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetByContentSha256Async(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetByContentSha256Async(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetAllAsync(System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetAllAsync(System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetByIdsAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetByIdsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetCountAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetCountAsync(System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.ExistsAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.ExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.UpdateAsync(System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Object,System.Nullable{System.Decimal},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.String,System.Object,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.UpdateCustomMetadataAsync(System.String,System.String,System.Object,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.DeleteAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.DeleteAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.DeleteAllAsync(System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.DeleteAllAsync(System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.DeleteBatchAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.DeleteBatchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="T:Verbex.Database.SqlServer.Implementations.DocumentTermMethods">
             <summary>
-            SQL Server implementation of document-term methods.
+            SQL Server implementation of document-term methods using prefixed tables.
             </summary>
         </member>
         <member name="T:Verbex.Database.SqlServer.Implementations.IndexMethods">
@@ -4309,6 +4381,30 @@
             Adds indexing_runtime_ms column to documents table.
             </summary>
         </member>
+        <member name="M:Verbex.Database.SqlServer.Queries.SetupQueries.CreateIndexTables(System.String)">
+            <summary>
+            Generates SQL to create index-specific tables with the given table prefix.
+            </summary>
+            <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+            <returns>SQL CREATE TABLE statements for index-specific tables.</returns>
+            <exception cref="T:System.ArgumentException">Thrown when the table prefix is invalid.</exception>
+        </member>
+        <member name="M:Verbex.Database.SqlServer.Queries.SetupQueries.DropIndexTables(System.String)">
+            <summary>
+            Generates SQL to drop index-specific tables with the given table prefix.
+            </summary>
+            <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+            <returns>SQL DROP TABLE statements for index-specific tables.</returns>
+            <exception cref="T:System.ArgumentException">Thrown when the table prefix is invalid.</exception>
+        </member>
+        <member name="M:Verbex.Database.SqlServer.Queries.SetupQueries.CreateIndexTableIndexes(System.String)">
+            <summary>
+            Generates SQL statements to create indexes for index-specific tables.
+            </summary>
+            <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+            <returns>List of SQL CREATE INDEX statements.</returns>
+            <exception cref="T:System.ArgumentException">Thrown when the table prefix is invalid.</exception>
+        </member>
         <member name="T:Verbex.Database.SqlServer.Sanitizer">
             <summary>
             Provides SQL sanitization methods for SQL Server to prevent SQL injection.
@@ -4396,6 +4492,12 @@
         <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.InitializeAsync(System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.CreateIndexTablesAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.DropIndexTablesAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
         <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.ExecuteQueryAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
@@ -4440,6 +4542,14 @@
             Initializes all method interface implementations.
             </summary>
         </member>
+        <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.LoadDataTableWithoutConstraintsAsync(Microsoft.Data.SqlClient.SqlDataReader,System.Threading.CancellationToken)">
+            <summary>
+            Loads data from a reader into a DataTable without constraint checking.
+            </summary>
+            <param name="reader">The data reader to read from.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>A DataTable containing the data.</returns>
+        </member>
         <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.ExecuteQueryInternalAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
             <summary>
             Executes a query without acquiring the semaphore (internal use only).
@@ -4450,6 +4560,56 @@
         </member>
         <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.DisposeAsyncCore">
             <inheritdoc />
+        </member>
+        <member name="T:Verbex.Database.TablePrefixValidator">
+            <summary>
+            Validates and sanitizes table prefixes for index-specific tables.
+            </summary>
+            <remarks>
+            Table prefixes are used to isolate index data in a shared database.
+            Each index gets its own set of tables with names like {prefix}_documents.
+            </remarks>
+        </member>
+        <member name="F:Verbex.Database.TablePrefixValidator.MaxPrefixLength">
+            <summary>
+            Maximum length for a table prefix to ensure total table name stays within database limits.
+            MySQL has a 64-character identifier limit. With suffix "_document_terms" (15 chars),
+            we allow 48 characters for the prefix.
+            </summary>
+        </member>
+        <member name="F:Verbex.Database.TablePrefixValidator.MinPrefixLength">
+            <summary>
+            Minimum length for a table prefix to ensure meaningful identifiers.
+            </summary>
+        </member>
+        <member name="F:Verbex.Database.TablePrefixValidator._ValidPrefixPattern">
+            <summary>
+            Pattern for valid table prefixes: alphanumeric and underscore only, must start with letter or underscore.
+            </summary>
+        </member>
+        <member name="M:Verbex.Database.TablePrefixValidator.Validate(System.String)">
+            <summary>
+            Validates and returns the table prefix if valid.
+            </summary>
+            <param name="prefix">The table prefix to validate.</param>
+            <returns>The validated prefix.</returns>
+            <exception cref="T:System.ArgumentException">Thrown when the prefix is invalid.</exception>
+        </member>
+        <member name="M:Verbex.Database.TablePrefixValidator.IsValid(System.String)">
+            <summary>
+            Checks if a table prefix is valid without throwing exceptions.
+            </summary>
+            <param name="prefix">The table prefix to check.</param>
+            <returns>True if the prefix is valid, false otherwise.</returns>
+        </member>
+        <member name="M:Verbex.Database.TablePrefixValidator.FromIndexId(System.String)">
+            <summary>
+            Creates a safe table prefix from an index identifier.
+            Replaces invalid characters with underscores.
+            </summary>
+            <param name="indexId">The index identifier to convert.</param>
+            <returns>A safe table prefix derived from the index ID.</returns>
+            <exception cref="T:System.ArgumentException">Thrown when the resulting prefix is empty or too long.</exception>
         </member>
         <member name="T:Verbex.DefaultTokenizer">
             <summary>
@@ -5377,6 +5537,24 @@
             </summary>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.OpenAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Opens the index with pre-existing tenant and index identifiers.
+            Use this when the index metadata already exists in the database (e.g., server-managed indices).
+            The prefixed tables must already exist; this method will not create them.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="indexId">The index identifier.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Task.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when tenantId or indexId is null or empty.</exception>
+        </member>
+        <member name="M:Verbex.InvertedIndex.InitializeCachesAsync(System.Threading.CancellationToken)">
+            <summary>
+            Initializes caches based on configuration.
+            </summary>
+            <param name="token">Cancellation token.</param>
         </member>
         <member name="M:Verbex.InvertedIndex.CloseAsync(System.Threading.CancellationToken)">
             <summary>
@@ -8113,14 +8291,9 @@
             except on explicit removal (e.g., orphan cleanup).
             </remarks>
         </member>
-        <member name="P:Verbex.TermIdCache.TenantId">
+        <member name="P:Verbex.TermIdCache.TablePrefix">
             <summary>
-            Gets the tenant identifier for this cache.
-            </summary>
-        </member>
-        <member name="P:Verbex.TermIdCache.IndexId">
-            <summary>
-            Gets the index identifier for this cache.
+            Gets the table prefix for this cache.
             </summary>
         </member>
         <member name="P:Verbex.TermIdCache.IsLoaded">
@@ -8133,14 +8306,13 @@
             Gets the number of cached entries.
             </summary>
         </member>
-        <member name="M:Verbex.TermIdCache.#ctor(System.String,System.String,System.Int32)">
+        <member name="M:Verbex.TermIdCache.#ctor(System.String,System.Int32)">
             <summary>
             Initializes a new instance of the <see cref="T:Verbex.TermIdCache"/> class.
             </summary>
-            <param name="tenantId">Tenant identifier.</param>
-            <param name="indexId">Index identifier.</param>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="initialCapacity">Initial capacity for the cache dictionary. Default: 10000.</param>
-            <exception cref="T:System.ArgumentNullException">Thrown when tenantId or indexId is null.</exception>
+            <exception cref="T:System.ArgumentNullException">Thrown when tablePrefix is null.</exception>
         </member>
         <member name="M:Verbex.TermIdCache.TryGetId(System.String,System.String@)">
             <summary>

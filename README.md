@@ -230,11 +230,10 @@ curl -X POST http://localhost:8080/v1.0/indices/restore \
 ## Documentation
 
 - **[DOCKER.md](DOCKER.md)** - Docker deployment guide
-- **[REST_API.md](REST_API.md)** - REST API reference
+- **[REST_API.md](REST_API.md)** - REST API reference (includes backup & restore)
 - **[VBX_CLI.md](VBX_CLI.md)** - CLI documentation
 - **[STORAGE.md](STORAGE.md)** - Storage architecture
 - **[SCORING.md](SCORING.md)** - Scoring algorithm details
-- **[BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md)** - Backup and restore guide
 
 ## Configuration
 

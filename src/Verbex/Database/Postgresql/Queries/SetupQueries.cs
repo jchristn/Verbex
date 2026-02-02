@@ -286,5 +286,136 @@ ALTER TABLE documents ADD COLUMN IF NOT EXISTS indexing_runtime_ms NUMERIC(18,4)
 -- Update schema version
 UPDATE schema_metadata SET value = '3.3' WHERE key = 'schema_version';
 ";
+
+        /// <summary>
+        /// Generates SQL to create index-specific tables with the given table prefix.
+        /// </summary>
+        /// <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+        /// <returns>SQL CREATE TABLE statements for index-specific tables.</returns>
+        /// <exception cref="ArgumentException">Thrown when the table prefix is invalid.</exception>
+        public static string CreateIndexTables(string tablePrefix)
+        {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            return $@"
+-- Index-specific tables for prefix: {prefix}
+
+-- Documents table
+CREATE TABLE IF NOT EXISTS {prefix}_documents (
+    id VARCHAR(48) PRIMARY KEY,
+    name VARCHAR(512) NOT NULL UNIQUE,
+    content_sha256 VARCHAR(64),
+    document_length INTEGER NOT NULL DEFAULT 0,
+    term_count INTEGER NOT NULL DEFAULT 0,
+    custom_metadata TEXT,
+    indexing_runtime_ms NUMERIC(18,4),
+    indexed_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Terms table (vocabulary)
+CREATE TABLE IF NOT EXISTS {prefix}_terms (
+    id VARCHAR(48) PRIMARY KEY,
+    term VARCHAR(512) NOT NULL UNIQUE,
+    document_frequency INTEGER NOT NULL DEFAULT 0,
+    total_frequency BIGINT NOT NULL DEFAULT 0,
+    last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Document-term mappings (inverted index)
+CREATE TABLE IF NOT EXISTS {prefix}_document_terms (
+    id VARCHAR(48) PRIMARY KEY,
+    document_id VARCHAR(48) NOT NULL,
+    term_id VARCHAR(48) NOT NULL,
+    term_frequency INTEGER NOT NULL DEFAULT 0,
+    character_positions TEXT,
+    term_positions TEXT,
+    last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(document_id, term_id)
+);
+
+-- Labels for documents or index level
+CREATE TABLE IF NOT EXISTS {prefix}_labels (
+    id VARCHAR(48) PRIMARY KEY,
+    document_id VARCHAR(48),
+    label VARCHAR(256) NOT NULL,
+    last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Tags (key-value pairs) for documents or index level
+CREATE TABLE IF NOT EXISTS {prefix}_tags (
+    id VARCHAR(48) PRIMARY KEY,
+    document_id VARCHAR(48),
+    key VARCHAR(256) NOT NULL,
+    value TEXT,
+    last_update_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+";
+        }
+
+        /// <summary>
+        /// Generates SQL to drop index-specific tables with the given table prefix.
+        /// </summary>
+        /// <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+        /// <returns>SQL DROP TABLE statements for index-specific tables.</returns>
+        /// <exception cref="ArgumentException">Thrown when the table prefix is invalid.</exception>
+        public static string DropIndexTables(string tablePrefix)
+        {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            return $@"
+-- Drop index-specific tables for prefix: {prefix}
+DROP TABLE IF EXISTS {prefix}_tags CASCADE;
+DROP TABLE IF EXISTS {prefix}_labels CASCADE;
+DROP TABLE IF EXISTS {prefix}_document_terms CASCADE;
+DROP TABLE IF EXISTS {prefix}_terms CASCADE;
+DROP TABLE IF EXISTS {prefix}_documents CASCADE;
+";
+        }
+
+        /// <summary>
+        /// Generates SQL statements to create indexes for index-specific tables.
+        /// </summary>
+        /// <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+        /// <returns>List of SQL CREATE INDEX statements.</returns>
+        /// <exception cref="ArgumentException">Thrown when the table prefix is invalid.</exception>
+        public static List<string> CreateIndexTableIndexes(string tablePrefix)
+        {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            return new List<string>
+            {
+                // Document indexes
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_docs_name ON {prefix}_documents(name)",
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_docs_sha256 ON {prefix}_documents(content_sha256)",
+
+                // Term indexes (critical for search performance)
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_terms_term ON {prefix}_terms(term)",
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_terms_docfreq ON {prefix}_terms(document_frequency DESC)",
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_terms_orphan ON {prefix}_terms(document_frequency)",
+
+                // Document-term indexes (critical for inverted index lookups)
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_docterms_doc ON {prefix}_document_terms(document_id)",
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_docterms_term ON {prefix}_document_terms(term_id)",
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_docterms_freq ON {prefix}_document_terms(term_frequency DESC)",
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_docterms_term_doc ON {prefix}_document_terms(term_id, document_id)",
+
+                // Label indexes
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_labels_doc ON {prefix}_labels(document_id)",
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_labels_label ON {prefix}_labels(label)",
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_labels_doc_label ON {prefix}_labels(document_id, label)",
+
+                // Tag indexes
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_doc ON {prefix}_tags(document_id)",
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_key ON {prefix}_tags(key)",
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_doc_key ON {prefix}_tags(document_id, key)",
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_key_value ON {prefix}_tags(key, value)"
+            };
+        }
     }
 }

@@ -25,17 +25,19 @@ namespace Verbex.Database.Postgresql.Implementations
             _Driver = driver ?? throw new ArgumentNullException(nameof(driver));
         }
 
-        public async Task AddAsync(string tenantId, string indexId, string id, string? documentId, string label, CancellationToken token = default)
+        public async Task AddAsync(string tablePrefix, string id, string? documentId, string label, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
             DateTime now = DateTime.UtcNow;
             string query = $@"
-INSERT INTO labels (id, document_id, index_id, label, last_update_utc, created_utc)
-VALUES ('{Sanitizer.Sanitize(id)}', {Sanitizer.FormatNullableString(documentId)}, '{Sanitizer.Sanitize(indexId)}', '{Sanitizer.Sanitize(label)}', '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
+INSERT INTO {prefix}_labels (id, document_id, label, last_update_utc, created_utc)
+VALUES ('{Sanitizer.Sanitize(id)}', {Sanitizer.FormatNullableString(documentId)}, '{Sanitizer.Sanitize(label)}', '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
         }
 
-        public async Task AddBatchAsync(string tenantId, string indexId, IEnumerable<LabelRecord> records, CancellationToken token = default)
+        public async Task AddBatchAsync(string tablePrefix, IEnumerable<LabelRecord> records, CancellationToken token = default)
         {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
             List<LabelRecord> recordList = records.ToList();
             if (recordList.Count == 0) return;
 
@@ -47,12 +49,12 @@ VALUES ('{Sanitizer.Sanitize(id)}', {Sanitizer.FormatNullableString(documentId)}
             {
                 List<LabelRecord> chunk = recordList.Skip(i).Take(ChunkSize).ToList();
                 StringBuilder sb = new StringBuilder();
-                sb.Append("INSERT INTO labels (id, document_id, index_id, label, last_update_utc, created_utc) VALUES ");
+                sb.Append($"INSERT INTO {prefix}_labels (id, document_id, label, last_update_utc, created_utc) VALUES ");
 
                 List<string> valuesClauses = new List<string>();
                 foreach (LabelRecord record in chunk)
                 {
-                    valuesClauses.Add($"('{Sanitizer.Sanitize(record.Id)}', {Sanitizer.FormatNullableString(record.DocumentId)}, '{Sanitizer.Sanitize(indexId)}', '{Sanitizer.Sanitize(record.Label)}', '{nowFormatted}', '{nowFormatted}')");
+                    valuesClauses.Add($"('{Sanitizer.Sanitize(record.Id)}', {Sanitizer.FormatNullableString(record.DocumentId)}, '{Sanitizer.Sanitize(record.Label)}', '{nowFormatted}', '{nowFormatted}')");
                 }
 
                 sb.Append(string.Join(", ", valuesClauses));
@@ -62,90 +64,99 @@ VALUES ('{Sanitizer.Sanitize(id)}', {Sanitizer.FormatNullableString(documentId)}
             }
         }
 
-        public async Task<List<string>> GetByDocumentAsync(string tenantId, string indexId, string documentId, CancellationToken token = default)
+        public async Task<List<string>> GetByDocumentAsync(string tablePrefix, string documentId, CancellationToken token = default)
         {
-            string query = $"SELECT DISTINCT label FROM labels WHERE document_id = '{Sanitizer.Sanitize(documentId)}';";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            string query = $"SELECT DISTINCT label FROM {prefix}_labels WHERE document_id = '{Sanitizer.Sanitize(documentId)}';";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             return dt.Rows.Cast<DataRow>().Select(r => r["label"]?.ToString() ?? string.Empty).ToList();
         }
 
-        public async Task<List<string>> GetIndexLabelsAsync(string tenantId, string indexId, CancellationToken token = default)
+        public async Task<List<string>> GetIndexLabelsAsync(string tablePrefix, CancellationToken token = default)
         {
-            string query = $"SELECT DISTINCT label FROM labels WHERE index_id = '{Sanitizer.Sanitize(indexId)}' AND document_id IS NULL;";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            string query = $"SELECT DISTINCT label FROM {prefix}_labels WHERE document_id IS NULL;";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             return dt.Rows.Cast<DataRow>().Select(r => r["label"]?.ToString() ?? string.Empty).ToList();
         }
 
-        public async Task<List<string>> GetAllDistinctAsync(string tenantId, string indexId, CancellationToken token = default)
+        public async Task<List<string>> GetAllDistinctAsync(string tablePrefix, CancellationToken token = default)
         {
-            string query = $"SELECT DISTINCT label FROM labels WHERE index_id = '{Sanitizer.Sanitize(indexId)}';";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            string query = $"SELECT DISTINCT label FROM {prefix}_labels;";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             return dt.Rows.Cast<DataRow>().Select(r => r["label"]?.ToString() ?? string.Empty).ToList();
         }
 
-        public async Task<List<string>> GetDocumentsByLabelAsync(string tenantId, string indexId, string label, CancellationToken token = default)
+        public async Task<List<string>> GetDocumentsByLabelAsync(string tablePrefix, string label, CancellationToken token = default)
         {
-            string query = $"SELECT DISTINCT document_id FROM labels WHERE index_id = '{Sanitizer.Sanitize(indexId)}' AND label = '{Sanitizer.Sanitize(label)}' AND document_id IS NOT NULL;";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            string query = $"SELECT DISTINCT document_id FROM {prefix}_labels WHERE label = '{Sanitizer.Sanitize(label)}' AND document_id IS NOT NULL;";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             return dt.Rows.Cast<DataRow>().Select(r => r["document_id"]?.ToString() ?? string.Empty).ToList();
         }
 
-        public async Task<bool> ExistsAsync(string tenantId, string indexId, string documentId, string label, CancellationToken token = default)
+        public async Task<bool> ExistsAsync(string tablePrefix, string documentId, string label, CancellationToken token = default)
         {
-            string query = $"SELECT 1 FROM labels WHERE document_id = '{Sanitizer.Sanitize(documentId)}' AND label = '{Sanitizer.Sanitize(label)}' LIMIT 1;";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            string query = $"SELECT 1 FROM {prefix}_labels WHERE document_id = '{Sanitizer.Sanitize(documentId)}' AND label = '{Sanitizer.Sanitize(label)}' LIMIT 1;";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             return dt.Rows.Count > 0;
         }
 
-        public async Task<bool> RemoveAsync(string tenantId, string indexId, string documentId, string label, CancellationToken token = default)
+        public async Task<bool> RemoveAsync(string tablePrefix, string documentId, string label, CancellationToken token = default)
         {
-            bool exists = await ExistsAsync(tenantId, indexId, documentId, label, token).ConfigureAwait(false);
+            bool exists = await ExistsAsync(tablePrefix, documentId, label, token).ConfigureAwait(false);
             if (!exists) return false;
 
-            string query = $"DELETE FROM labels WHERE document_id = '{Sanitizer.Sanitize(documentId)}' AND label = '{Sanitizer.Sanitize(label)}';";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            string query = $"DELETE FROM {prefix}_labels WHERE document_id = '{Sanitizer.Sanitize(documentId)}' AND label = '{Sanitizer.Sanitize(label)}';";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
             return true;
         }
 
-        public async Task<bool> RemoveIndexLabelAsync(string tenantId, string indexId, string label, CancellationToken token = default)
+        public async Task<bool> RemoveIndexLabelAsync(string tablePrefix, string label, CancellationToken token = default)
         {
-            string checkQuery = $"SELECT 1 FROM labels WHERE index_id = '{Sanitizer.Sanitize(indexId)}' AND document_id IS NULL AND label = '{Sanitizer.Sanitize(label)}' LIMIT 1;";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            string checkQuery = $"SELECT 1 FROM {prefix}_labels WHERE document_id IS NULL AND label = '{Sanitizer.Sanitize(label)}' LIMIT 1;";
             DataTable dt = await _Driver.ExecuteQueryAsync(checkQuery, false, token).ConfigureAwait(false);
             if (dt.Rows.Count == 0) return false;
 
-            string query = $"DELETE FROM labels WHERE index_id = '{Sanitizer.Sanitize(indexId)}' AND document_id IS NULL AND label = '{Sanitizer.Sanitize(label)}';";
+            string query = $"DELETE FROM {prefix}_labels WHERE document_id IS NULL AND label = '{Sanitizer.Sanitize(label)}';";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
             return true;
         }
 
-        public async Task<long> RemoveAllAsync(string tenantId, string indexId, string documentId, CancellationToken token = default)
+        public async Task<long> RemoveAllAsync(string tablePrefix, string documentId, CancellationToken token = default)
         {
-            string countQuery = $"SELECT COUNT(*) FROM labels WHERE document_id = '{Sanitizer.Sanitize(documentId)}';";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            string countQuery = $"SELECT COUNT(*) FROM {prefix}_labels WHERE document_id = '{Sanitizer.Sanitize(documentId)}';";
             DataTable countResult = await _Driver.ExecuteQueryAsync(countQuery, false, token).ConfigureAwait(false);
             long count = countResult.Rows.Count > 0 ? Convert.ToInt64(countResult.Rows[0][0]) : 0;
 
-            string query = $"DELETE FROM labels WHERE document_id = '{Sanitizer.Sanitize(documentId)}';";
+            string query = $"DELETE FROM {prefix}_labels WHERE document_id = '{Sanitizer.Sanitize(documentId)}';";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
             return count;
         }
 
-        public async Task ReplaceAsync(string tenantId, string indexId, string documentId, IEnumerable<string> labels, CancellationToken token = default)
+        public async Task ReplaceAsync(string tablePrefix, string documentId, IEnumerable<string> labels, CancellationToken token = default)
         {
-            await RemoveAllAsync(tenantId, indexId, documentId, token).ConfigureAwait(false);
+            await RemoveAllAsync(tablePrefix, documentId, token).ConfigureAwait(false);
             foreach (string label in labels)
             {
                 string id = IdGenerator.GenerateLabelId();
-                await AddAsync(tenantId, indexId, id, documentId, label, token).ConfigureAwait(false);
+                await AddAsync(tablePrefix, id, documentId, label, token).ConfigureAwait(false);
             }
         }
 
-        public async Task<long> DeleteAllAsync(string tenantId, string indexId, CancellationToken token = default)
+        public async Task<long> DeleteAllAsync(string tablePrefix, CancellationToken token = default)
         {
-            string countQuery = $"SELECT COUNT(*) FROM labels WHERE index_id = '{Sanitizer.Sanitize(indexId)}';";
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            string countQuery = $"SELECT COUNT(*) FROM {prefix}_labels;";
             DataTable countResult = await _Driver.ExecuteQueryAsync(countQuery, false, token).ConfigureAwait(false);
             long count = countResult.Rows.Count > 0 ? Convert.ToInt64(countResult.Rows[0][0]) : 0;
 
-            string query = $"DELETE FROM labels WHERE index_id = '{Sanitizer.Sanitize(indexId)}';";
+            string query = $"DELETE FROM {prefix}_labels;";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
             return count;
         }

@@ -1,7 +1,6 @@
 namespace Verbex.Models
 {
     using System;
-    using System.Text.Json.Serialization;
     using PrettyId;
 
     /// <summary>
@@ -35,7 +34,6 @@ namespace Verbex.Models
         /// A k-sortable unique identifier with "doc_" prefix.
         /// Example: "doc_01ar5xxlajk1sxr6hzf29ksz4o01234567890abc".
         /// </value>
-        [JsonPropertyName("identifier")]
         public string Identifier
         {
             get => _Identifier;
@@ -46,7 +44,6 @@ namespace Verbex.Models
         /// Gets or sets the tenant ID this document belongs to.
         /// </summary>
         /// <value>The identifier of the tenant. Must reference a valid tenant.</value>
-        [JsonPropertyName("tenantId")]
         public string TenantId
         {
             get => _TenantId;
@@ -57,7 +54,6 @@ namespace Verbex.Models
         /// Gets or sets the index ID this document belongs to.
         /// </summary>
         /// <value>The identifier of the index. Must reference a valid index within the tenant.</value>
-        [JsonPropertyName("indexId")]
         public string IndexId
         {
             get => _IndexId;
@@ -68,7 +64,6 @@ namespace Verbex.Models
         /// Gets or sets the name of the document.
         /// </summary>
         /// <value>A unique name for the document within its index.</value>
-        [JsonPropertyName("name")]
         public string Name
         {
             get => _Name;
@@ -82,7 +77,6 @@ namespace Verbex.Models
         /// A 64-character hexadecimal string representing the SHA-256 hash of the content.
         /// Used for duplicate detection and content verification.
         /// </value>
-        [JsonPropertyName("contentSha256")]
         public string ContentSha256
         {
             get => _ContentSha256;
@@ -93,7 +87,6 @@ namespace Verbex.Models
         /// Gets or sets the length of the document content in characters.
         /// </summary>
         /// <value>The content length. Default is 0.</value>
-        [JsonPropertyName("documentLength")]
         public int DocumentLength
         {
             get => _DocumentLength;
@@ -104,7 +97,6 @@ namespace Verbex.Models
         /// Gets or sets the number of unique terms in the document.
         /// </summary>
         /// <value>The term count. Default is 0.</value>
-        [JsonPropertyName("termCount")]
         public int TermCount
         {
             get => _TermCount;
@@ -115,7 +107,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the document was indexed.
         /// </summary>
         /// <value>The indexing timestamp in UTC.</value>
-        [JsonPropertyName("indexedUtc")]
         public DateTime IndexedUtc
         {
             get => _IndexedUtc;
@@ -126,7 +117,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the document was last modified.
         /// </summary>
         /// <value>The last modification timestamp in UTC.</value>
-        [JsonPropertyName("lastUpdateUtc")]
         public DateTime LastUpdateUtc
         {
             get => _LastUpdateUtc;
@@ -137,7 +127,6 @@ namespace Verbex.Models
         /// Gets or sets the UTC timestamp when the document was created.
         /// </summary>
         /// <value>The creation timestamp in UTC.</value>
-        [JsonPropertyName("createdUtc")]
         public DateTime CreatedUtc
         {
             get => _CreatedUtc;

@@ -358,7 +358,8 @@ namespace Test
         {
             using DatabaseDriverBase driver = await CreateTestDriverAsync().ConfigureAwait(false);
 
-            Administrator admin = new Administrator("admin@example.com");
+            string uniqueEmail = $"admin_{Guid.NewGuid():N}@example.com";
+            Administrator admin = new Administrator(uniqueEmail);
             admin.SetPassword("adminpassword");
             admin.FirstName = "System";
             admin.LastName = "Admin";
@@ -366,7 +367,7 @@ namespace Test
 
             TestAssert.IsNotNull(admin.Identifier);
             TestAssert.IsTrue(admin.Identifier.StartsWith("adm_"));
-            TestAssert.AreEqual("admin@example.com", admin.Email);
+            TestAssert.AreEqual(uniqueEmail, admin.Email);
             TestAssert.IsTrue(admin.Active);
         }
 
@@ -374,15 +375,16 @@ namespace Test
         {
             using DatabaseDriverBase driver = await CreateTestDriverAsync().ConfigureAwait(false);
 
-            Administrator admin = new Administrator("lookup.admin@example.com");
+            string uniqueEmail = $"lookup.admin_{Guid.NewGuid():N}@example.com";
+            Administrator admin = new Administrator(uniqueEmail);
             admin.SetPassword("password");
             await driver.Administrators.CreateAsync(admin).ConfigureAwait(false);
 
-            Administrator? retrieved = await driver.Administrators.ReadByEmailAsync("lookup.admin@example.com").ConfigureAwait(false);
+            Administrator? retrieved = await driver.Administrators.ReadByEmailAsync(uniqueEmail).ConfigureAwait(false);
 
             TestAssert.IsNotNull(retrieved);
             TestAssert.AreEqual(admin.Identifier, retrieved!.Identifier);
-            TestAssert.AreEqual("lookup.admin@example.com", retrieved.Email);
+            TestAssert.AreEqual(uniqueEmail, retrieved.Email);
         }
 
         // Tenant Isolation Tests

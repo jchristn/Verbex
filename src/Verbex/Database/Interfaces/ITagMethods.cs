@@ -9,157 +9,148 @@ namespace Verbex.Database.Interfaces
     /// Interface for tag-related database operations.
     /// </summary>
     /// <remarks>
-    /// Provides operations for tenant, user, credential, document, and index-level key-value tags.
+    /// Provides operations for document and index-level key-value tags (prefixed tables)
+    /// as well as tenant, user, and credential-level tags (unprefixed tables).
     /// Tags are used for metadata and filtering.
     /// </remarks>
     public interface ITagMethods
     {
+        #region Document and Index Tags (Prefixed Tables)
+
         /// <summary>
-        /// Sets a tag on a document.
+        /// Sets a tag on a document or index.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="id">Tag ID (k-sortable unique identifier).</param>
         /// <param name="documentId">Document ID (or null for index-level tag).</param>
         /// <param name="key">The tag key.</param>
         /// <param name="value">The tag value.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Task.</returns>
-        Task SetAsync(string tenantId, string indexId, string id, string? documentId, string key, string? value, CancellationToken token = default);
+        Task SetAsync(string tablePrefix, string id, string? documentId, string key, string? value, CancellationToken token = default);
 
         /// <summary>
         /// Adds multiple tags in a batch.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="records">The tag records to add.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Task.</returns>
-        Task AddBatchAsync(string tenantId, string indexId, IEnumerable<TagRecord> records, CancellationToken token = default);
+        Task AddBatchAsync(string tablePrefix, IEnumerable<TagRecord> records, CancellationToken token = default);
 
         /// <summary>
         /// Gets a tag value by key.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="documentId">Document ID.</param>
         /// <param name="key">The tag key.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>The tag value or null if not found.</returns>
-        Task<string?> GetAsync(string tenantId, string indexId, string documentId, string key, CancellationToken token = default);
+        Task<string?> GetAsync(string tablePrefix, string documentId, string key, CancellationToken token = default);
 
         /// <summary>
         /// Gets all tags for a document.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="documentId">Document ID.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Dictionary of key-value pairs.</returns>
-        Task<Dictionary<string, string>> GetByDocumentAsync(string tenantId, string indexId, string documentId, CancellationToken token = default);
+        Task<Dictionary<string, string>> GetByDocumentAsync(string tablePrefix, string documentId, CancellationToken token = default);
 
         /// <summary>
         /// Gets all index-level tags.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Dictionary of key-value pairs.</returns>
-        Task<Dictionary<string, string>> GetIndexTagsAsync(string tenantId, string indexId, CancellationToken token = default);
+        Task<Dictionary<string, string>> GetIndexTagsAsync(string tablePrefix, CancellationToken token = default);
 
         /// <summary>
         /// Gets all distinct tag keys in the index.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>List of distinct keys.</returns>
-        Task<List<string>> GetAllDistinctKeysAsync(string tenantId, string indexId, CancellationToken token = default);
+        Task<List<string>> GetAllDistinctKeysAsync(string tablePrefix, CancellationToken token = default);
 
         /// <summary>
         /// Gets document IDs that have a specific tag key.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="key">The tag key.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>List of document IDs.</returns>
-        Task<List<string>> GetDocumentsByKeyAsync(string tenantId, string indexId, string key, CancellationToken token = default);
+        Task<List<string>> GetDocumentsByKeyAsync(string tablePrefix, string key, CancellationToken token = default);
 
         /// <summary>
         /// Gets document IDs that have a specific tag key-value pair.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="key">The tag key.</param>
         /// <param name="value">The tag value.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>List of document IDs.</returns>
-        Task<List<string>> GetDocumentsByTagAsync(string tenantId, string indexId, string key, string value, CancellationToken token = default);
+        Task<List<string>> GetDocumentsByTagAsync(string tablePrefix, string key, string value, CancellationToken token = default);
 
         /// <summary>
         /// Checks if a tag exists on a document.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="documentId">Document ID.</param>
         /// <param name="key">The tag key.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>True if the tag exists.</returns>
-        Task<bool> ExistsAsync(string tenantId, string indexId, string documentId, string key, CancellationToken token = default);
+        Task<bool> ExistsAsync(string tablePrefix, string documentId, string key, CancellationToken token = default);
 
         /// <summary>
         /// Removes a tag from a document.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="documentId">Document ID.</param>
         /// <param name="key">The tag key.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>True if the tag was removed.</returns>
-        Task<bool> RemoveAsync(string tenantId, string indexId, string documentId, string key, CancellationToken token = default);
+        Task<bool> RemoveAsync(string tablePrefix, string documentId, string key, CancellationToken token = default);
 
         /// <summary>
         /// Removes an index-level tag.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="key">The tag key.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>True if the tag was removed.</returns>
-        Task<bool> RemoveIndexTagAsync(string tenantId, string indexId, string key, CancellationToken token = default);
+        Task<bool> RemoveIndexTagAsync(string tablePrefix, string key, CancellationToken token = default);
 
         /// <summary>
         /// Removes all tags from a document.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="documentId">Document ID.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Number of tags removed.</returns>
-        Task<long> RemoveAllAsync(string tenantId, string indexId, string documentId, CancellationToken token = default);
+        Task<long> RemoveAllAsync(string tablePrefix, string documentId, CancellationToken token = default);
 
         /// <summary>
         /// Replaces all tags on a document.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="documentId">Document ID.</param>
         /// <param name="tags">The new tags.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Task.</returns>
-        Task ReplaceAsync(string tenantId, string indexId, string documentId, IDictionary<string, string> tags, CancellationToken token = default);
+        Task ReplaceAsync(string tablePrefix, string documentId, IDictionary<string, string> tags, CancellationToken token = default);
 
         /// <summary>
         /// Deletes all tags in an index.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Number of tags deleted.</returns>
-        Task<long> DeleteAllAsync(string tenantId, string indexId, CancellationToken token = default);
+        Task<long> DeleteAllAsync(string tablePrefix, CancellationToken token = default);
 
-        #region Tenant Tags
+        #endregion
+
+        #region Tenant Tags (Unprefixed Tables)
 
         /// <summary>
         /// Gets all tags for a tenant.
@@ -188,7 +179,7 @@ namespace Verbex.Database.Interfaces
 
         #endregion
 
-        #region User Tags
+        #region User Tags (Unprefixed Tables)
 
         /// <summary>
         /// Gets all tags for a user.
@@ -220,7 +211,7 @@ namespace Verbex.Database.Interfaces
 
         #endregion
 
-        #region Credential Tags
+        #region Credential Tags (Unprefixed Tables)
 
         /// <summary>
         /// Gets all tags for a credential.

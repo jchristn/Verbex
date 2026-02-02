@@ -1,5 +1,7 @@
 namespace Verbex.Database.SqlServer.Queries
 {
+    using System.Collections.Generic;
+
     /// <summary>
     /// SQL Server setup queries for creating and managing the database schema.
     /// </summary>
@@ -410,5 +412,142 @@ END
 -- Update schema version
 UPDATE schema_metadata SET value = '3.3' WHERE [key] = 'schema_version';
 ";
+
+        /// <summary>
+        /// Generates SQL to create index-specific tables with the given table prefix.
+        /// </summary>
+        /// <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+        /// <returns>SQL CREATE TABLE statements for index-specific tables.</returns>
+        /// <exception cref="ArgumentException">Thrown when the table prefix is invalid.</exception>
+        public static string CreateIndexTables(string tablePrefix)
+        {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            return $@"
+-- Index-specific tables for prefix: {prefix}
+
+-- Documents table
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='{prefix}_documents' AND xtype='U')
+CREATE TABLE {prefix}_documents (
+    id NVARCHAR(48) PRIMARY KEY,
+    name NVARCHAR(512) NOT NULL,
+    content_sha256 NVARCHAR(64),
+    document_length INT NOT NULL DEFAULT 0,
+    term_count INT NOT NULL DEFAULT 0,
+    custom_metadata NVARCHAR(MAX),
+    indexing_runtime_ms DECIMAL(18,4),
+    indexed_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    last_update_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    created_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT uq_{prefix}_docs_name UNIQUE (name)
+);
+
+-- Terms table (vocabulary)
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='{prefix}_terms' AND xtype='U')
+CREATE TABLE {prefix}_terms (
+    id NVARCHAR(48) PRIMARY KEY,
+    term NVARCHAR(512) NOT NULL,
+    document_frequency INT NOT NULL DEFAULT 0,
+    total_frequency BIGINT NOT NULL DEFAULT 0,
+    last_update_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    created_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT uq_{prefix}_terms_term UNIQUE (term)
+);
+
+-- Document-term mappings (inverted index)
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='{prefix}_document_terms' AND xtype='U')
+CREATE TABLE {prefix}_document_terms (
+    id NVARCHAR(48) PRIMARY KEY,
+    document_id NVARCHAR(48) NOT NULL,
+    term_id NVARCHAR(48) NOT NULL,
+    term_frequency INT NOT NULL DEFAULT 0,
+    character_positions NVARCHAR(MAX),
+    term_positions NVARCHAR(MAX),
+    last_update_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    created_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT uq_{prefix}_docterms UNIQUE (document_id, term_id)
+);
+
+-- Labels for documents or index level
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='{prefix}_labels' AND xtype='U')
+CREATE TABLE {prefix}_labels (
+    id NVARCHAR(48) PRIMARY KEY,
+    document_id NVARCHAR(48),
+    label NVARCHAR(256) NOT NULL,
+    last_update_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    created_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+);
+
+-- Tags (key-value pairs) for documents or index level
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='{prefix}_tags' AND xtype='U')
+CREATE TABLE {prefix}_tags (
+    id NVARCHAR(48) PRIMARY KEY,
+    document_id NVARCHAR(48),
+    [key] NVARCHAR(256) NOT NULL,
+    value NVARCHAR(MAX),
+    last_update_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    created_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+);
+";
+        }
+
+        /// <summary>
+        /// Generates SQL to drop index-specific tables with the given table prefix.
+        /// </summary>
+        /// <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+        /// <returns>SQL DROP TABLE statements for index-specific tables.</returns>
+        /// <exception cref="ArgumentException">Thrown when the table prefix is invalid.</exception>
+        public static string DropIndexTables(string tablePrefix)
+        {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            return $@"
+-- Drop index-specific tables for prefix: {prefix}
+DROP TABLE IF EXISTS {prefix}_tags;
+DROP TABLE IF EXISTS {prefix}_labels;
+DROP TABLE IF EXISTS {prefix}_document_terms;
+DROP TABLE IF EXISTS {prefix}_terms;
+DROP TABLE IF EXISTS {prefix}_documents;
+";
+        }
+
+        /// <summary>
+        /// Generates SQL statements to create indexes for index-specific tables.
+        /// </summary>
+        /// <param name="tablePrefix">The table prefix (typically the index identifier).</param>
+        /// <returns>List of SQL CREATE INDEX statements.</returns>
+        /// <exception cref="ArgumentException">Thrown when the table prefix is invalid.</exception>
+        public static List<string> CreateIndexTableIndexes(string tablePrefix)
+        {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+
+            return new List<string>
+            {
+                // Document indexes
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_docs_name') CREATE INDEX idx_{prefix}_docs_name ON {prefix}_documents(name)",
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_docs_sha256') CREATE INDEX idx_{prefix}_docs_sha256 ON {prefix}_documents(content_sha256)",
+
+                // Term indexes (critical for search performance)
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_terms_term') CREATE INDEX idx_{prefix}_terms_term ON {prefix}_terms(term)",
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_terms_docfreq') CREATE INDEX idx_{prefix}_terms_docfreq ON {prefix}_terms(document_frequency DESC)",
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_terms_orphan') CREATE INDEX idx_{prefix}_terms_orphan ON {prefix}_terms(document_frequency)",
+
+                // Document-term indexes (critical for inverted index lookups)
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_docterms_doc') CREATE INDEX idx_{prefix}_docterms_doc ON {prefix}_document_terms(document_id)",
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_docterms_term') CREATE INDEX idx_{prefix}_docterms_term ON {prefix}_document_terms(term_id)",
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_docterms_freq') CREATE INDEX idx_{prefix}_docterms_freq ON {prefix}_document_terms(term_frequency DESC)",
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_docterms_term_doc') CREATE INDEX idx_{prefix}_docterms_term_doc ON {prefix}_document_terms(term_id, document_id)",
+
+                // Label indexes
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_labels_doc') CREATE INDEX idx_{prefix}_labels_doc ON {prefix}_labels(document_id)",
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_labels_label') CREATE INDEX idx_{prefix}_labels_label ON {prefix}_labels(label)",
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_labels_doc_label') CREATE INDEX idx_{prefix}_labels_doc_label ON {prefix}_labels(document_id, label)",
+
+                // Tag indexes
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_doc') CREATE INDEX idx_{prefix}_tags_doc ON {prefix}_tags(document_id)",
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_key') CREATE INDEX idx_{prefix}_tags_key ON {prefix}_tags([key])",
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_doc_key') CREATE INDEX idx_{prefix}_tags_doc_key ON {prefix}_tags(document_id, [key])"
+            };
+        }
     }
 }

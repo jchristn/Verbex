@@ -11,14 +11,14 @@ namespace Verbex.Database.Interfaces
     /// <remarks>
     /// Provides operations for the inverted index mapping documents to terms.
     /// Used for search operations and term position tracking.
+    /// Document-term mappings are stored in tables prefixed with the index identifier.
     /// </remarks>
     public interface IDocumentTermMethods
     {
         /// <summary>
         /// Adds a document-term mapping.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="id">Mapping ID (k-sortable unique identifier).</param>
         /// <param name="documentId">Document ID.</param>
         /// <param name="termId">Term ID.</param>
@@ -27,53 +27,48 @@ namespace Verbex.Database.Interfaces
         /// <param name="termPositions">List of term positions.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Task.</returns>
-        Task AddAsync(string tenantId, string indexId, string id, string documentId, string termId, int termFrequency, List<int> characterPositions, List<int> termPositions, CancellationToken token = default);
+        Task AddAsync(string tablePrefix, string id, string documentId, string termId, int termFrequency, List<int> characterPositions, List<int> termPositions, CancellationToken token = default);
 
         /// <summary>
         /// Adds multiple document-term mappings in a batch.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="records">The records to add.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Task.</returns>
-        Task AddBatchAsync(string tenantId, string indexId, IEnumerable<DocumentTermRecord> records, CancellationToken token = default);
+        Task AddBatchAsync(string tablePrefix, IEnumerable<DocumentTermRecord> records, CancellationToken token = default);
 
         /// <summary>
         /// Gets all term mappings for a document.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="documentId">Document ID.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>List of document-term records.</returns>
-        Task<List<DocumentTermRecord>> GetByDocumentAsync(string tenantId, string indexId, string documentId, CancellationToken token = default);
+        Task<List<DocumentTermRecord>> GetByDocumentAsync(string tablePrefix, string documentId, CancellationToken token = default);
 
         /// <summary>
         /// Gets posting list for multiple terms.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="termIds">Term IDs.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>List of document-term records.</returns>
-        Task<List<DocumentTermRecord>> GetPostingsAsync(string tenantId, string indexId, IEnumerable<string> termIds, CancellationToken token = default);
+        Task<List<DocumentTermRecord>> GetPostingsAsync(string tablePrefix, IEnumerable<string> termIds, CancellationToken token = default);
 
         /// <summary>
         /// Gets posting list for a single term.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="termId">Term ID.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>List of document-term records.</returns>
-        Task<List<DocumentTermRecord>> GetPostingsByTermAsync(string tenantId, string indexId, string termId, CancellationToken token = default);
+        Task<List<DocumentTermRecord>> GetPostingsByTermAsync(string tablePrefix, string termId, CancellationToken token = default);
 
         /// <summary>
         /// Searches for documents containing specified terms.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="termIds">Term IDs to search for.</param>
         /// <param name="useAndLogic">True for AND logic, false for OR logic.</param>
         /// <param name="limit">Maximum number of results.</param>
@@ -82,8 +77,7 @@ namespace Verbex.Database.Interfaces
         /// <param name="token">Cancellation token.</param>
         /// <returns>List of search matches.</returns>
         Task<List<SearchMatch>> SearchAsync(
-            string tenantId,
-            string indexId,
+            string tablePrefix,
             IEnumerable<string> termIds,
             bool useAndLogic = false,
             int limit = 100,
@@ -94,25 +88,22 @@ namespace Verbex.Database.Interfaces
         /// <summary>
         /// Deletes all term mappings for a document.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="documentId">Document ID.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Number of mappings deleted.</returns>
-        Task<long> DeleteByDocumentAsync(string tenantId, string indexId, string documentId, CancellationToken token = default);
+        Task<long> DeleteByDocumentAsync(string tablePrefix, string documentId, CancellationToken token = default);
 
         /// <summary>
         /// Gets document-term mappings for specific documents and terms.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="documentIds">Document IDs.</param>
         /// <param name="termIds">Term IDs.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>List of document-term records.</returns>
         Task<List<DocumentTermRecord>> GetByDocumentsAndTermsAsync(
-            string tenantId,
-            string indexId,
+            string tablePrefix,
             IEnumerable<string> documentIds,
             IEnumerable<string> termIds,
             CancellationToken token = default);
@@ -120,30 +111,27 @@ namespace Verbex.Database.Interfaces
         /// <summary>
         /// Deletes all document-term mappings in an index.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Number of mappings deleted.</returns>
-        Task<long> DeleteAllAsync(string tenantId, string indexId, CancellationToken token = default);
+        Task<long> DeleteAllAsync(string tablePrefix, CancellationToken token = default);
 
         /// <summary>
         /// Gets all term mappings for multiple documents.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="documentIds">Document IDs.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>List of document-term records for all specified documents.</returns>
-        Task<List<DocumentTermRecord>> GetByDocumentsAsync(string tenantId, string indexId, IEnumerable<string> documentIds, CancellationToken token = default);
+        Task<List<DocumentTermRecord>> GetByDocumentsAsync(string tablePrefix, IEnumerable<string> documentIds, CancellationToken token = default);
 
         /// <summary>
         /// Deletes all term mappings for multiple documents.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="documentIds">Document IDs.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Number of mappings deleted.</returns>
-        Task<long> DeleteByDocumentsAsync(string tenantId, string indexId, IEnumerable<string> documentIds, CancellationToken token = default);
+        Task<long> DeleteByDocumentsAsync(string tablePrefix, IEnumerable<string> documentIds, CancellationToken token = default);
     }
 }

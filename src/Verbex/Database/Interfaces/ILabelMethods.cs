@@ -9,134 +9,127 @@ namespace Verbex.Database.Interfaces
     /// Interface for label-related database operations.
     /// </summary>
     /// <remarks>
-    /// Provides operations for tenant, user, credential, document, and index-level labels.
+    /// Provides operations for document and index-level labels (prefixed tables)
+    /// as well as tenant, user, and credential-level labels (unprefixed tables).
     /// Labels are string tags used for categorization and filtering.
     /// </remarks>
     public interface ILabelMethods
     {
+        #region Document and Index Labels (Prefixed Tables)
+
         /// <summary>
-        /// Adds a label to a document.
+        /// Adds a label to a document or index.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="id">Label ID (k-sortable unique identifier).</param>
         /// <param name="documentId">Document ID (or null for index-level label).</param>
         /// <param name="label">The label text.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Task.</returns>
-        Task AddAsync(string tenantId, string indexId, string id, string? documentId, string label, CancellationToken token = default);
+        Task AddAsync(string tablePrefix, string id, string? documentId, string label, CancellationToken token = default);
 
         /// <summary>
         /// Adds multiple labels in a batch.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="records">The label records to add.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Task.</returns>
-        Task AddBatchAsync(string tenantId, string indexId, IEnumerable<LabelRecord> records, CancellationToken token = default);
+        Task AddBatchAsync(string tablePrefix, IEnumerable<LabelRecord> records, CancellationToken token = default);
 
         /// <summary>
         /// Gets all labels for a document.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="documentId">Document ID.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>List of labels.</returns>
-        Task<List<string>> GetByDocumentAsync(string tenantId, string indexId, string documentId, CancellationToken token = default);
+        Task<List<string>> GetByDocumentAsync(string tablePrefix, string documentId, CancellationToken token = default);
 
         /// <summary>
         /// Gets all index-level labels.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>List of labels.</returns>
-        Task<List<string>> GetIndexLabelsAsync(string tenantId, string indexId, CancellationToken token = default);
+        Task<List<string>> GetIndexLabelsAsync(string tablePrefix, CancellationToken token = default);
 
         /// <summary>
         /// Gets all distinct labels in the index.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>List of distinct labels.</returns>
-        Task<List<string>> GetAllDistinctAsync(string tenantId, string indexId, CancellationToken token = default);
+        Task<List<string>> GetAllDistinctAsync(string tablePrefix, CancellationToken token = default);
 
         /// <summary>
         /// Gets document IDs that have a specific label.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="label">The label to search for.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>List of document IDs.</returns>
-        Task<List<string>> GetDocumentsByLabelAsync(string tenantId, string indexId, string label, CancellationToken token = default);
+        Task<List<string>> GetDocumentsByLabelAsync(string tablePrefix, string label, CancellationToken token = default);
 
         /// <summary>
         /// Checks if a label exists on a document.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="documentId">Document ID.</param>
         /// <param name="label">The label to check.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>True if the label exists.</returns>
-        Task<bool> ExistsAsync(string tenantId, string indexId, string documentId, string label, CancellationToken token = default);
+        Task<bool> ExistsAsync(string tablePrefix, string documentId, string label, CancellationToken token = default);
 
         /// <summary>
         /// Removes a label from a document.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="documentId">Document ID.</param>
         /// <param name="label">The label to remove.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>True if the label was removed.</returns>
-        Task<bool> RemoveAsync(string tenantId, string indexId, string documentId, string label, CancellationToken token = default);
+        Task<bool> RemoveAsync(string tablePrefix, string documentId, string label, CancellationToken token = default);
 
         /// <summary>
         /// Removes an index-level label.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="label">The label to remove.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>True if the label was removed.</returns>
-        Task<bool> RemoveIndexLabelAsync(string tenantId, string indexId, string label, CancellationToken token = default);
+        Task<bool> RemoveIndexLabelAsync(string tablePrefix, string label, CancellationToken token = default);
 
         /// <summary>
         /// Removes all labels from a document.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="documentId">Document ID.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Number of labels removed.</returns>
-        Task<long> RemoveAllAsync(string tenantId, string indexId, string documentId, CancellationToken token = default);
+        Task<long> RemoveAllAsync(string tablePrefix, string documentId, CancellationToken token = default);
 
         /// <summary>
         /// Replaces all labels on a document.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="documentId">Document ID.</param>
         /// <param name="labels">The new labels.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Task.</returns>
-        Task ReplaceAsync(string tenantId, string indexId, string documentId, IEnumerable<string> labels, CancellationToken token = default);
+        Task ReplaceAsync(string tablePrefix, string documentId, IEnumerable<string> labels, CancellationToken token = default);
 
         /// <summary>
         /// Deletes all labels in an index.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Number of labels deleted.</returns>
-        Task<long> DeleteAllAsync(string tenantId, string indexId, CancellationToken token = default);
+        Task<long> DeleteAllAsync(string tablePrefix, CancellationToken token = default);
 
-        #region Tenant Labels
+        #endregion
+
+        #region Tenant Labels (Unprefixed Tables)
 
         /// <summary>
         /// Gets all labels for a tenant.
@@ -165,7 +158,7 @@ namespace Verbex.Database.Interfaces
 
         #endregion
 
-        #region User Labels
+        #region User Labels (Unprefixed Tables)
 
         /// <summary>
         /// Gets all labels for a user.
@@ -197,7 +190,7 @@ namespace Verbex.Database.Interfaces
 
         #endregion
 
-        #region Credential Labels
+        #region Credential Labels (Unprefixed Tables)
 
         /// <summary>
         /// Gets all labels for a credential.

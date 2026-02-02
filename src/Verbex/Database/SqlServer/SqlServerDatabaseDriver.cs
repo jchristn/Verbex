@@ -74,6 +74,32 @@ namespace Verbex.Database.SqlServer
         }
 
         /// <inheritdoc />
+        public override async Task CreateIndexTablesAsync(string tablePrefix, CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotOpen();
+
+            string createTablesQuery = Queries.SetupQueries.CreateIndexTables(tablePrefix);
+            await ExecuteQueryAsync(createTablesQuery, true, token).ConfigureAwait(false);
+
+            List<string> indexQueries = Queries.SetupQueries.CreateIndexTableIndexes(tablePrefix);
+            foreach (string indexQuery in indexQueries)
+            {
+                await ExecuteQueryAsync(indexQuery, true, token).ConfigureAwait(false);
+            }
+        }
+
+        /// <inheritdoc />
+        public override async Task DropIndexTablesAsync(string tablePrefix, CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotOpen();
+
+            string dropTablesQuery = Queries.SetupQueries.DropIndexTables(tablePrefix);
+            await ExecuteQueryAsync(dropTablesQuery, true, token).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc />
         public override async Task<DataTable> ExecuteQueryAsync(string query, bool isTransaction = false, CancellationToken token = default)
         {
             ThrowIfDisposed();
@@ -135,8 +161,7 @@ namespace Verbex.Database.SqlServer
                         cmd.CommandTimeout = Settings.CommandTimeout;
 
                         await using SqlDataReader reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
-                        result = new DataTable();
-                        result.Load(reader);
+                        result = await LoadDataTableWithoutConstraintsAsync(reader, token).ConfigureAwait(false);
                     }
 
                     if (transaction != null)
@@ -354,6 +379,45 @@ namespace Verbex.Database.SqlServer
         }
 
         /// <summary>
+        /// Loads data from a reader into a DataTable without constraint checking.
+        /// </summary>
+        /// <param name="reader">The data reader to read from.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>A DataTable containing the data.</returns>
+        private static async Task<DataTable> LoadDataTableWithoutConstraintsAsync(SqlDataReader reader, CancellationToken token)
+        {
+            DataTable result = new DataTable();
+
+            // Create columns from the reader's schema
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                string columnName = reader.GetName(i);
+                Type columnType = reader.GetFieldType(i);
+                DataColumn column = new DataColumn(columnName, columnType);
+                column.AllowDBNull = true;
+                result.Columns.Add(column);
+            }
+
+            // Read all rows synchronously to ensure the reader is fully consumed
+            // before returning, preventing connection reuse issues
+            while (reader.Read())
+            {
+                token.ThrowIfCancellationRequested();
+                DataRow row = result.NewRow();
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    row[i] = reader.IsDBNull(i) ? DBNull.Value : reader.GetValue(i);
+                }
+                result.Rows.Add(row);
+            }
+
+            // Explicitly close the reader to release the connection
+            await reader.CloseAsync().ConfigureAwait(false);
+
+            return result;
+        }
+
+        /// <summary>
         /// Executes a query without acquiring the semaphore (internal use only).
         /// </summary>
         private async Task<DataTable> ExecuteQueryInternalAsync(string query, bool isTransaction, CancellationToken token)
@@ -369,7 +433,7 @@ namespace Verbex.Database.SqlServer
                 cmd.CommandTimeout = Settings.CommandTimeout;
 
                 await using SqlDataReader reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
-                result.Load(reader);
+                result = await LoadDataTableWithoutConstraintsAsync(reader, token).ConfigureAwait(false);
             }
             else
             {
@@ -388,7 +452,7 @@ namespace Verbex.Database.SqlServer
                     cmd.CommandTimeout = Settings.CommandTimeout;
 
                     await using SqlDataReader reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
-                    result.Load(reader);
+                    result = await LoadDataTableWithoutConstraintsAsync(reader, token).ConfigureAwait(false);
 
                     if (transaction != null)
                     {

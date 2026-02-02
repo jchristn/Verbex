@@ -41,7 +41,6 @@ namespace Verbex.Models
         /// The tenant identifier. Required for user authentication.
         /// Not required for global administrator authentication.
         /// </value>
-        [JsonPropertyName("tenantId")]
         public string TenantId
         {
             get => _TenantId;
@@ -52,7 +51,6 @@ namespace Verbex.Models
         /// Gets or sets the email for authentication.
         /// </summary>
         /// <value>The email address of the user or administrator.</value>
-        [JsonPropertyName("email")]
         public string Email
         {
             get => _Email;
@@ -66,7 +64,6 @@ namespace Verbex.Models
         /// The plain text password. This should be cleared after authentication
         /// using <see cref="ClearSensitiveData"/>.
         /// </value>
-        [JsonPropertyName("password")]
         public string Password
         {
             get => _Password;
@@ -80,7 +77,6 @@ namespace Verbex.Models
         /// The pre-computed password hash. Used when the client provides a hash
         /// instead of plain text password.
         /// </value>
-        [JsonPropertyName("passwordSha256")]
         public string PasswordSha256
         {
             get => _PasswordSha256;
@@ -91,7 +87,6 @@ namespace Verbex.Models
         /// Gets or sets the bearer token for API authentication.
         /// </summary>
         /// <value>The bearer token from the Authorization header.</value>
-        [JsonPropertyName("bearerToken")]
         public string BearerToken
         {
             get => _BearerToken;
@@ -158,7 +153,6 @@ namespace Verbex.Models
         /// Gets or sets the result of the authentication attempt.
         /// </summary>
         /// <value>The authentication result. Default is <see cref="AuthenticationResultEnum.NotAuthenticated"/>.</value>
-        [JsonPropertyName("result")]
         public AuthenticationResultEnum Result
         {
             get => _Result;
@@ -172,7 +166,6 @@ namespace Verbex.Models
         /// A human-readable error message when authentication fails;
         /// empty string on success.
         /// </value>
-        [JsonPropertyName("errorMessage")]
         public string ErrorMessage
         {
             get => _ErrorMessage;
@@ -183,28 +176,24 @@ namespace Verbex.Models
         /// Gets whether authentication was successful.
         /// </summary>
         /// <value>True if <see cref="Result"/> is <see cref="AuthenticationResultEnum.Success"/>.</value>
-        [JsonPropertyName("isAuthenticated")]
         public bool IsAuthenticated => _Result == AuthenticationResultEnum.Success;
 
         /// <summary>
         /// Gets whether the authenticated principal is a global administrator.
         /// </summary>
         /// <value>True if authentication was successful with administrator credentials.</value>
-        [JsonPropertyName("isGlobalAdmin")]
         public bool IsGlobalAdmin => IsAuthenticated && _Administrator != null;
 
         /// <summary>
         /// Gets whether the authenticated principal is a tenant administrator.
         /// </summary>
         /// <value>True if authentication was successful and the user has IsAdmin flag set.</value>
-        [JsonPropertyName("isTenantAdmin")]
         public bool IsTenantAdmin => IsAuthenticated && _User != null && _User.IsAdmin;
 
         /// <summary>
         /// Gets whether the authenticated principal has any administrative privileges.
         /// </summary>
         /// <value>True if the principal is either a global admin or a tenant admin.</value>
-        [JsonPropertyName("hasAdminPrivileges")]
         public bool HasAdminPrivileges => IsGlobalAdmin || IsTenantAdmin;
 
         /// <summary>

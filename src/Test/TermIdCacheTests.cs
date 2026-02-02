@@ -32,7 +32,7 @@ namespace Test
 
         private static async Task TestBasicGetSetAsync()
         {
-            using (TermIdCache cache = new TermIdCache("tenant1", "index1"))
+            using (TermIdCache cache = new TermIdCache("test_index"))
             {
                 // Set a value
                 cache.Set("hello", "term_id_1");
@@ -50,7 +50,7 @@ namespace Test
 
         private static async Task TestTryGetIdReturnsFalseForMissingAsync()
         {
-            using (TermIdCache cache = new TermIdCache("tenant1", "index1"))
+            using (TermIdCache cache = new TermIdCache("test_index"))
             {
                 bool found = cache.TryGetId("nonexistent", out string? termId);
 
@@ -63,7 +63,7 @@ namespace Test
 
         private static async Task TestTryGetIdsMixedAsync()
         {
-            using (TermIdCache cache = new TermIdCache("tenant1", "index1"))
+            using (TermIdCache cache = new TermIdCache("test_index"))
             {
                 // Add some terms
                 cache.Set("apple", "id_1");
@@ -89,7 +89,7 @@ namespace Test
 
         private static async Task TestSetRangeAsync()
         {
-            using (TermIdCache cache = new TermIdCache("tenant1", "index1"))
+            using (TermIdCache cache = new TermIdCache("test_index"))
             {
                 Dictionary<string, string> termIds = new Dictionary<string, string>
                 {
@@ -116,7 +116,7 @@ namespace Test
 
         private static async Task TestLoadReplacesContentAsync()
         {
-            using (TermIdCache cache = new TermIdCache("tenant1", "index1"))
+            using (TermIdCache cache = new TermIdCache("test_index"))
             {
                 // Add initial content
                 cache.Set("old_term", "old_id");
@@ -148,7 +148,7 @@ namespace Test
 
         private static async Task TestRemoveOperationsAsync()
         {
-            using (TermIdCache cache = new TermIdCache("tenant1", "index1"))
+            using (TermIdCache cache = new TermIdCache("test_index"))
             {
                 cache.Set("term1", "id_1");
                 cache.Set("term2", "id_2");
@@ -177,7 +177,7 @@ namespace Test
 
         private static async Task TestClearOperationsAsync()
         {
-            using (TermIdCache cache = new TermIdCache("tenant1", "index1"))
+            using (TermIdCache cache = new TermIdCache("test_index"))
             {
                 // Load some data
                 Dictionary<string, string> termIds = new Dictionary<string, string>
@@ -202,7 +202,7 @@ namespace Test
 
         private static async Task TestDisposeBehaviorAsync()
         {
-            TermIdCache cache = new TermIdCache("tenant1", "index1");
+            TermIdCache cache = new TermIdCache("test_index");
             cache.Set("term", "id");
             cache.Dispose();
 
@@ -234,7 +234,7 @@ namespace Test
 
         private static async Task TestThreadSafetyAsync()
         {
-            using (TermIdCache cache = new TermIdCache("tenant1", "index1"))
+            using (TermIdCache cache = new TermIdCache("test_index"))
             {
                 int numThreads = 10;
                 int numOperationsPerThread = 1000;
@@ -275,7 +275,7 @@ namespace Test
 
         private static async Task TestIsLoadedStateAsync()
         {
-            using (TermIdCache cache = new TermIdCache("tenant1", "index1"))
+            using (TermIdCache cache = new TermIdCache("test_index"))
             {
                 // Initially not loaded
                 TestAssert.IsFalse(cache.IsLoaded);

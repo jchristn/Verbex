@@ -18,8 +18,7 @@ namespace Verbex
     {
         #region Private-Members
 
-        private readonly string _TenantId;
-        private readonly string _IndexId;
+        private readonly string _TablePrefix;
         private readonly Dictionary<string, string> _Cache;
         private readonly ReaderWriterLockSlim _Lock;
         private bool _IsLoaded;
@@ -30,14 +29,9 @@ namespace Verbex
         #region Public-Members
 
         /// <summary>
-        /// Gets the tenant identifier for this cache.
+        /// Gets the table prefix for this cache.
         /// </summary>
-        public string TenantId => _TenantId;
-
-        /// <summary>
-        /// Gets the index identifier for this cache.
-        /// </summary>
-        public string IndexId => _IndexId;
+        public string TablePrefix => _TablePrefix;
 
         /// <summary>
         /// Gets whether the cache has been populated with data.
@@ -70,17 +64,14 @@ namespace Verbex
         /// <summary>
         /// Initializes a new instance of the <see cref="TermIdCache"/> class.
         /// </summary>
-        /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="indexId">Index identifier.</param>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
         /// <param name="initialCapacity">Initial capacity for the cache dictionary. Default: 10000.</param>
-        /// <exception cref="ArgumentNullException">Thrown when tenantId or indexId is null.</exception>
-        public TermIdCache(string tenantId, string indexId, int initialCapacity = 10000)
+        /// <exception cref="ArgumentNullException">Thrown when tablePrefix is null.</exception>
+        public TermIdCache(string tablePrefix, int initialCapacity = 10000)
         {
-            ArgumentNullException.ThrowIfNull(tenantId);
-            ArgumentNullException.ThrowIfNull(indexId);
+            ArgumentNullException.ThrowIfNull(tablePrefix);
 
-            _TenantId = tenantId;
-            _IndexId = indexId;
+            _TablePrefix = tablePrefix;
             _Cache = new Dictionary<string, string>(initialCapacity);
             _Lock = new ReaderWriterLockSlim();
             _IsLoaded = false;
