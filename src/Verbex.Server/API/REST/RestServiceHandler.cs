@@ -387,6 +387,22 @@ namespace Verbex.Server.API.REST
 
             #endregion
 
+            #region Terms-Routes
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.GET, "/v1.0/indices/{id}/terms/top", GetTopTermsRoute,
+                metadata => metadata
+                    .WithTag("Terms")
+                    .WithDescription("Get the top terms in an index sorted by document frequency (most common first).")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
+                    .WithParameter(OpenApiParameterMetadata.Query("limit", "Maximum number of terms to return (default: 10)", required: false))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Top terms with their frequencies", CreateTopTermsResponseSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            #endregion
+
             #region Backup-Restore-Routes
 
             _Webserver.Routes.PostAuthentication.Parameter.Add(
@@ -2317,6 +2333,59 @@ namespace Verbex.Server.API.REST
                 catch (Exception ex)
                 {
                     return new ResponseContext(false, 500, $"Error performing search: {ex.Message}");
+                }
+            });
+        }
+
+        /// <summary>
+        /// Get top terms in an index.
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <returns>Task.</returns>
+        private async Task GetTopTermsRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.Search, async (reqCtx) =>
+            {
+                string? indexId = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrEmpty(indexId))
+                {
+                    return new ResponseContext(false, 400, "Index ID is required");
+                }
+
+                InvertedIndex? index = _IndexManager!.GetIndex(indexId);
+                if (index == null)
+                {
+                    return new ResponseContext(false, 404, "Index not found");
+                }
+
+                int limit = 10;
+                string? limitParam = ctx.Request.Query?.Elements?["limit"];
+                if (!String.IsNullOrEmpty(limitParam) && Int32.TryParse(limitParam, out int parsedLimit) && parsedLimit > 0)
+                {
+                    limit = parsedLimit;
+                }
+
+                try
+                {
+                    List<TermRecord> topTerms = await index.GetTopTermsAsync(limit).ConfigureAwait(false);
+
+                    // Convert to dictionary format { "term": documentFrequency }
+                    Dictionary<string, int> result = new Dictionary<string, int>();
+                    foreach (TermRecord term in topTerms)
+                    {
+                        result[term.Term] = term.DocumentFrequency;
+                    }
+
+                    return new ResponseContext
+                    {
+                        Success = true,
+                        StatusCode = 200,
+                        Data = result
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return new ResponseContext(false, 500, $"Error getting top terms: {ex.Message}");
                 }
             });
         }
@@ -4404,6 +4473,20 @@ namespace Verbex.Server.API.REST
                     ["Tags"] = new OpenApiSchemaMetadata { Type = "object" }
                 }
             };
+        }
+
+        /// <summary>
+        /// Create top terms response schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateTopTermsResponseSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Description = "Dictionary of terms with their document frequencies (term -> count)"
+            };
+            return response;
         }
 
         /// <summary>

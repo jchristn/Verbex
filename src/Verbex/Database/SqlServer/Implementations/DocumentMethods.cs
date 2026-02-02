@@ -208,6 +208,28 @@ WHERE id IN ({inClause});";
         }
 
         /// <inheritdoc />
+        public async Task<List<string>> ExistsBatchAsync(string tablePrefix, IEnumerable<string> ids, CancellationToken token = default)
+        {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            List<string> idList = new List<string>(ids);
+            if (idList.Count == 0)
+            {
+                return new List<string>();
+            }
+
+            string inClause = string.Join(",", idList.ConvertAll(id => $"N'{Sanitizer.Sanitize(id)}'"));
+            string query = $"SELECT id FROM {prefix}_documents WHERE id IN ({inClause});";
+
+            DataTable result = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
+            List<string> existingIds = new List<string>();
+            foreach (DataRow row in result.Rows)
+            {
+                existingIds.Add(row["id"]?.ToString() ?? string.Empty);
+            }
+            return existingIds;
+        }
+
+        /// <inheritdoc />
         public async Task<bool> ExistsByNameAsync(string tablePrefix, string name, CancellationToken token = default)
         {
             string prefix = TablePrefixValidator.Validate(tablePrefix);

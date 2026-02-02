@@ -100,6 +100,15 @@ namespace Verbex.Database.Interfaces
         Task<bool> ExistsAsync(string tablePrefix, string id, CancellationToken token = default);
 
         /// <summary>
+        /// Checks if multiple documents exist by their IDs in a single query.
+        /// </summary>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+        /// <param name="ids">Document IDs to check.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>List of document IDs that exist.</returns>
+        Task<List<string>> ExistsBatchAsync(string tablePrefix, IEnumerable<string> ids, CancellationToken token = default);
+
+        /// <summary>
         /// Checks if a document exists by name.
         /// </summary>
         /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>

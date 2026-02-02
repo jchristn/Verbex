@@ -607,6 +607,55 @@ namespace Verbex.Sdk.TestHarness
             AssertEquals(result.RequestedCount, 0, "result.RequestedCount");
         }
 
+        // ==================== Top Terms Tests ====================
+
+        private async Task TestGetTopTermsAsync()
+        {
+            // Get top terms from the index - we've added several documents with various terms
+            Dictionary<string, int> topTerms = await _Client!.GetTopTermsAsync(_TestIndexId, 10).ConfigureAwait(false);
+            AssertNotNull(topTerms, "topTerms");
+            // We have documents, so we should have some terms
+            AssertGreaterThan(topTerms.Count, 0, "topTerms.Count");
+            // Verify each term has a positive frequency
+            foreach (KeyValuePair<string, int> term in topTerms)
+            {
+                AssertNotNull(term.Key, "term.Key");
+                AssertGreaterThan(term.Value, 0, $"frequency for '{term.Key}'");
+            }
+        }
+
+        private async Task TestGetTopTermsDefaultLimitAsync()
+        {
+            // Test with default limit (10)
+            Dictionary<string, int> topTerms = await _Client!.GetTopTermsAsync(_TestIndexId).ConfigureAwait(false);
+            AssertNotNull(topTerms, "topTerms");
+            // Should not exceed 10 results
+            Assert(topTerms.Count <= 10, $"topTerms.Count should be <= 10, got {topTerms.Count}");
+        }
+
+        private async Task TestGetTopTermsCustomLimitAsync()
+        {
+            // Test with custom limit
+            Dictionary<string, int> topTerms = await _Client!.GetTopTermsAsync(_TestIndexId, 3).ConfigureAwait(false);
+            AssertNotNull(topTerms, "topTerms");
+            // Should not exceed 3 results
+            Assert(topTerms.Count <= 3, $"topTerms.Count should be <= 3, got {topTerms.Count}");
+        }
+
+        private async Task TestGetTopTermsNotFoundAsync()
+        {
+            // Test with non-existent index
+            try
+            {
+                await _Client!.GetTopTermsAsync("non-existent-index-99999").ConfigureAwait(false);
+                Assert(false, "Should have thrown VerbexException for not found");
+            }
+            catch (VerbexException ex)
+            {
+                AssertEquals(ex.StatusCode, 404, "error.StatusCode");
+            }
+        }
+
         // ==================== Search Tests ====================
 
         private async Task TestSearchBasicAsync()
@@ -897,6 +946,13 @@ namespace Verbex.Sdk.TestHarness
                 await RunTestAsync("Delete documents batch (empty)", TestDeleteDocumentsBatchEmptyAsync).ConfigureAwait(false);
                 await RunTestAsync("Document exists (HEAD)", TestDocumentExistsAsync).ConfigureAwait(false);
                 await RunTestAsync("Document exists not found (HEAD)", TestDocumentExistsNotFoundAsync).ConfigureAwait(false);
+
+                // Top Terms Tests
+                PrintSubheader("Top Terms");
+                await RunTestAsync("Get top terms", TestGetTopTermsAsync).ConfigureAwait(false);
+                await RunTestAsync("Get top terms default limit", TestGetTopTermsDefaultLimitAsync).ConfigureAwait(false);
+                await RunTestAsync("Get top terms custom limit", TestGetTopTermsCustomLimitAsync).ConfigureAwait(false);
+                await RunTestAsync("Get top terms not found", TestGetTopTermsNotFoundAsync).ConfigureAwait(false);
 
                 // Search Tests
                 PrintSubheader("Search");

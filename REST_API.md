@@ -12,6 +12,7 @@ This document describes the REST API endpoints available in the Verbex inverted 
 - [Index Management APIs](#index-management-apis)
 - [Document Management APIs](#document-management-apis)
 - [Search APIs](#search-apis)
+- [Terms APIs](#terms-apis)
 - [Admin - Tenant APIs](#admin---tenant-apis)
 - [Admin - User APIs](#admin---user-apis)
 - [Admin - Credential APIs](#admin---credential-apis)
@@ -193,6 +194,7 @@ All API responses are wrapped in a standard format:
 | Document | PUT | `/v1.0/indices/{id}/documents/{docId}/tags` | Update document tags | Yes |
 | Document | PUT | `/v1.0/indices/{id}/documents/{docId}/customMetadata` | Update document custom metadata | Yes |
 | Search | POST | `/v1.0/indices/{id}/search` | Search documents | Yes |
+| Terms | GET | `/v1.0/indices/{id}/terms/top` | Get top terms by frequency | Yes |
 | Tenant | GET | `/v1.0/tenants` | List tenants | Yes (Admin) |
 | Tenant | POST | `/v1.0/tenants` | Create tenant | Yes (Global Admin) |
 | Tenant | GET | `/v1.0/tenants/{id}` | Get tenant with statistics | Yes (Admin) |
@@ -1126,6 +1128,67 @@ Note: `Labels` and `Tags` are optional filters. When provided, documents must ma
   "Skip": null,
   "ProcessingTimeMs": 12.34
 }
+```
+
+## Terms APIs
+
+### GET `/v1.0/indices/{id}/terms/top`
+**Description:** Get the top terms in an index sorted by document frequency (most common first). This is useful for understanding the vocabulary of an index and identifying the most frequently occurring terms.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Path Parameters:**
+- `id` (string): Index identifier
+
+**Query Parameters:**
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| limit | integer | No | 10 | Maximum number of terms to return |
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2025-01-01T12:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "the": 150,
+    "and": 120,
+    "search": 85,
+    "document": 72,
+    "index": 68,
+    "machine": 45,
+    "learning": 42,
+    "data": 38,
+    "algorithm": 35,
+    "neural": 30
+  },
+  "Headers": {},
+  "TotalCount": null,
+  "Skip": null,
+  "ProcessingTimeMs": 5.23
+}
+```
+
+**Notes:**
+- The response is a dictionary where keys are terms and values are their document frequencies (the number of documents containing each term)
+- Terms are sorted by document frequency in descending order
+- Returns 404 if the index does not exist
+
+**Example:**
+```bash
+# Get top 10 terms (default)
+curl -X GET http://localhost:8080/v1.0/indices/myindex/terms/top \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Get top 5 terms
+curl -X GET "http://localhost:8080/v1.0/indices/myindex/terms/top?limit=5" \
+  -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 ## Admin - Tenant APIs

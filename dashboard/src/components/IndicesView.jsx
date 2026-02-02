@@ -69,6 +69,13 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
   const [isRestoringReplace, setIsRestoringReplace] = useState(false);
   const [restoreReplaceError, setRestoreReplaceError] = useState(null);
 
+  // Top Terms modal states
+  const [showTopTermsModal, setShowTopTermsModal] = useState(false);
+  const [topTermsIndex, setTopTermsIndex] = useState(null);
+  const [topTermsData, setTopTermsData] = useState(null);
+  const [isLoadingTopTerms, setIsLoadingTopTerms] = useState(false);
+  const [topTermsError, setTopTermsError] = useState(null);
+
   // Sorting
   const [sortKey, setSortKey] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
@@ -450,6 +457,24 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
     }
   };
 
+  // Top Terms handler
+  const handleViewTopTerms = async (index) => {
+    setTopTermsIndex(index);
+    setShowTopTermsModal(true);
+    setIsLoadingTopTerms(true);
+    setTopTermsError(null);
+    setTopTermsData(null);
+
+    try {
+      const response = await apiClient.getTopTerms(index.identifier, 25);
+      setTopTermsData(response.data);
+    } catch (err) {
+      setTopTermsError(err.message);
+    } finally {
+      setIsLoadingTopTerms(false);
+    }
+  };
+
   const formatSize = (bytes) => {
     if (!bytes) return 'N/A';
     const sizes = ['B', 'KB', 'MB', 'GB'];
@@ -593,6 +618,10 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                             setMetadataIndex(index);
                             setShowMetadataModal(true);
                           }
+                        },
+                        {
+                          label: 'View Top Terms',
+                          onClick: () => handleViewTopTerms(index)
                         },
                         ...(index.inMemory ? [] : [
                           {
@@ -1385,6 +1414,57 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
               disabled={isRestoringReplace}
             >
               Cancel
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Top Terms Modal */}
+      <Modal
+        isOpen={showTopTermsModal}
+        onClose={() => {
+          setShowTopTermsModal(false);
+          setTopTermsIndex(null);
+          setTopTermsData(null);
+          setTopTermsError(null);
+        }}
+        title={`Top Terms: ${topTermsIndex?.name || topTermsIndex?.identifier || ''}`}
+      >
+        <div className="top-terms-modal-content">
+          {isLoadingTopTerms ? (
+            <div className="loading-spinner">Loading top terms...</div>
+          ) : topTermsError ? (
+            <div className="error-message">{topTermsError}</div>
+          ) : topTermsData && Object.keys(topTermsData).length > 0 ? (
+            <div className="top-terms-list">
+              <div className="top-terms-header">
+                <span className="term-column">Term</span>
+                <span className="count-column">Document Count</span>
+              </div>
+              {Object.entries(topTermsData)
+                .sort((a, b) => b[1] - a[1])
+                .map(([term, count], index) => (
+                  <div key={term} className="top-terms-row">
+                    <span className="term-rank">{index + 1}.</span>
+                    <span className="term-value">{term}</span>
+                    <span className="term-count">{count.toLocaleString()}</span>
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <p className="no-content-notice">No terms found in this index.</p>
+          )}
+          <div className="modal-actions">
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                setShowTopTermsModal(false);
+                setTopTermsIndex(null);
+                setTopTermsData(null);
+                setTopTermsError(null);
+              }}
+            >
+              Close
             </button>
           </div>
         </div>

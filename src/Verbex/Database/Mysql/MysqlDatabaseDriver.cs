@@ -82,10 +82,26 @@ namespace Verbex.Database.Mysql
             string createTablesQuery = Queries.SetupQueries.CreateIndexTables(tablePrefix);
             await ExecuteQueryAsync(createTablesQuery, true, token).ConfigureAwait(false);
 
+            // Create indexes individually, catching duplicate key errors (MySQL error 1061)
+            // since the indexes may already exist if the index tables were previously created
             List<string> indexQueries = Queries.SetupQueries.CreateIndexTableIndexes(tablePrefix);
+            await using MySqlConnection connection = new MySqlConnection(_ConnectionString);
+            await connection.OpenAsync(token).ConfigureAwait(false);
+
             foreach (string indexQuery in indexQueries)
             {
-                await ExecuteQueryAsync(indexQuery, true, token).ConfigureAwait(false);
+                token.ThrowIfCancellationRequested();
+
+                try
+                {
+                    await using MySqlCommand cmd = new MySqlCommand(indexQuery, connection);
+                    cmd.CommandTimeout = Settings.CommandTimeout;
+                    await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                }
+                catch (MySqlException ex) when (ex.Number == 1061)
+                {
+                    // Error 1061: Duplicate key name - index already exists, continue silently
+                }
             }
         }
 

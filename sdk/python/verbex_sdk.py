@@ -1243,6 +1243,25 @@ class VerbexClient:
             search_time=data.get('search_time', 0.0) if data else 0.0
         )
 
+    # ==================== Terms Endpoints ====================
+
+    def get_top_terms(self, index_id: str, limit: int = 10) -> Dict[str, int]:
+        """
+        Get the top terms in an index sorted by document frequency.
+
+        Args:
+            index_id: The index identifier
+            limit: Maximum number of terms to return (default: 10)
+
+        Returns:
+            Dictionary mapping terms to their document frequencies
+        """
+        endpoint = f'/v1.0/indices/{index_id}/terms/top'
+        if limit != 10:
+            endpoint += f'?limit={limit}'
+        data = self._make_request('GET', endpoint)
+        return data if data else {}
+
     # ==================== Backup & Restore Endpoints ====================
 
     def backup(self, index_id: str) -> bytes:

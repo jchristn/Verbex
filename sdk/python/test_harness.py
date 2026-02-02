@@ -507,6 +507,44 @@ class TestHarness:
         self._assert_equals(result.deleted_count, 0, "result.deleted_count")
         self._assert_equals(result.requested_count, 0, "result.requested_count")
 
+    # ==================== Top Terms Tests ====================
+
+    def test_get_top_terms(self):
+        """Test getting top terms from an index."""
+        # Get top terms from the index - we've added several documents with various terms
+        top_terms = self._client.get_top_terms(self._test_index_id, 10)
+        self._assert_not_none(top_terms, "top_terms")
+        # We have documents, so we should have some terms
+        self._assert_greater_than(len(top_terms), 0, "len(top_terms)")
+        # Verify each term has a positive frequency
+        for term, count in top_terms.items():
+            self._assert_not_none(term, "term")
+            self._assert_greater_than(count, 0, f"frequency for '{term}'")
+
+    def test_get_top_terms_default_limit(self):
+        """Test getting top terms with default limit."""
+        # Test with default limit (10)
+        top_terms = self._client.get_top_terms(self._test_index_id)
+        self._assert_not_none(top_terms, "top_terms")
+        # Should not exceed 10 results
+        self._assert(len(top_terms) <= 10, f"len(top_terms) should be <= 10, got {len(top_terms)}")
+
+    def test_get_top_terms_custom_limit(self):
+        """Test getting top terms with custom limit."""
+        # Test with custom limit
+        top_terms = self._client.get_top_terms(self._test_index_id, 3)
+        self._assert_not_none(top_terms, "top_terms")
+        # Should not exceed 3 results
+        self._assert(len(top_terms) <= 3, f"len(top_terms) should be <= 3, got {len(top_terms)}")
+
+    def test_get_top_terms_not_found(self):
+        """Test getting top terms from non-existent index."""
+        try:
+            self._client.get_top_terms("non-existent-index-99999")
+            self._assert(False, "Should have thrown VerbexError for not found")
+        except VerbexError as e:
+            self._assert_equals(e.status_code, 404, "error.status_code")
+
     # ==================== Search Tests ====================
 
     def test_search_basic(self):
@@ -758,6 +796,13 @@ class TestHarness:
             self._run_test("Document exists not found (HEAD)", self.test_document_exists_not_found)
             self._run_test("Delete documents batch", self.test_delete_documents_batch)
             self._run_test("Delete documents batch (empty)", self.test_delete_documents_batch_empty)
+
+            # Top Terms Tests
+            self._print_subheader("Top Terms")
+            self._run_test("Get top terms", self.test_get_top_terms)
+            self._run_test("Get top terms default limit", self.test_get_top_terms_default_limit)
+            self._run_test("Get top terms custom limit", self.test_get_top_terms_custom_limit)
+            self._run_test("Get top terms not found", self.test_get_top_terms_not_found)
 
             # Search Tests
             self._print_subheader("Search")

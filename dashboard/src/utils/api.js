@@ -454,6 +454,15 @@ class ApiClient {
     return this.post(`/v1.0/indices/${encodeURIComponent(indexId)}/search`, body);
   }
 
+  // Terms endpoints
+  async getTopTerms(indexId, limit = 10, options = {}) {
+    let endpoint = `/v1.0/indices/${encodeURIComponent(indexId)}/terms/top`;
+    if (limit !== undefined && limit !== 10) {
+      endpoint += `?limit=${limit}`;
+    }
+    return this.get(endpoint, options);
+  }
+
   // Admin - Tenant endpoints
   async getTenants(options = {}) {
     return this.get('/v1.0/tenants', options);

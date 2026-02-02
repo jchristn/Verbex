@@ -576,21 +576,10 @@ namespace Verbex
                 return new BatchCheckExistenceResponse();
             }
 
-            List<string> existingIds = new List<string>();
-            List<string> notFoundIds = new List<string>();
-
-            foreach (string docId in requestedIds)
-            {
-                bool exists = await _Driver.Documents.ExistsAsync(_TablePrefix, docId, token).ConfigureAwait(false);
-                if (exists)
-                {
-                    existingIds.Add(docId);
-                }
-                else
-                {
-                    notFoundIds.Add(docId);
-                }
-            }
+            // Use batch query to check all IDs in a single database call
+            List<string> existingIds = await _Driver.Documents.ExistsBatchAsync(_TablePrefix, requestedIds, token).ConfigureAwait(false);
+            HashSet<string> existingSet = new HashSet<string>(existingIds);
+            List<string> notFoundIds = requestedIds.Where(id => !existingSet.Contains(id)).ToList();
 
             return new BatchCheckExistenceResponse
             {

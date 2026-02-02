@@ -798,6 +798,29 @@ namespace Verbex.Sdk
             return await MakeRequestAsync<SearchData>(HttpMethod.Post, $"/v1.0/indices/{indexId}/search", request, true, cancellationToken).ConfigureAwait(false);
         }
 
+        // ==================== Terms Endpoints ====================
+
+        /// <summary>
+        /// Gets the top terms in an index sorted by document frequency.
+        /// </summary>
+        /// <param name="indexId">The index identifier.</param>
+        /// <param name="limit">Maximum number of terms to return (default: 10).</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Dictionary mapping terms to their document frequencies.</returns>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<Dictionary<string, int>> GetTopTermsAsync(
+            string indexId,
+            int limit = 10,
+            CancellationToken cancellationToken = default)
+        {
+            string endpoint = $"/v1.0/indices/{indexId}/terms/top";
+            if (limit != 10)
+            {
+                endpoint += $"?limit={limit}";
+            }
+            return await MakeRequestAsync<Dictionary<string, int>>(HttpMethod.Get, endpoint, null, false, cancellationToken).ConfigureAwait(false);
+        }
+
         // ==================== Backup & Restore Endpoints ====================
 
         /// <summary>

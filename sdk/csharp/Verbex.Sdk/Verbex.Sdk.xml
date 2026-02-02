@@ -1947,6 +1947,16 @@
             <returns>Search data including results and metadata.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
+        <member name="M:Verbex.Sdk.VerbexClient.GetTopTermsAsync(System.String,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Gets the top terms in an index sorted by document frequency.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="limit">Maximum number of terms to return (default: 10).</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Dictionary mapping terms to their document frequencies.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
         <member name="M:Verbex.Sdk.VerbexClient.BackupAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Creates a backup of an index and returns it as a stream.

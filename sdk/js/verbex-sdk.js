@@ -1094,6 +1094,23 @@ class VerbexClient {
         return new SearchData(data || {});
     }
 
+    // ==================== Terms Endpoints ====================
+
+    /**
+     * Get the top terms in an index sorted by document frequency.
+     * @param {string} indexId - The index identifier
+     * @param {number} [limit=10] - Maximum number of terms to return
+     * @returns {Promise<Object>} Object mapping terms to their document frequencies
+     */
+    async getTopTerms(indexId, limit = 10) {
+        let endpoint = `/v1.0/indices/${indexId}/terms/top`;
+        if (limit !== 10) {
+            endpoint += `?limit=${limit}`;
+        }
+        const data = await this._makeRequest('GET', endpoint);
+        return data || {};
+    }
+
     // ==================== Backup & Restore Endpoints ====================
 
     /**

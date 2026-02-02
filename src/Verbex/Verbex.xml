@@ -1193,6 +1193,15 @@
             <param name="token">Cancellation token.</param>
             <returns>True if document exists.</returns>
         </member>
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.ExistsBatchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Checks if multiple documents exist by their IDs in a single query.
+            </summary>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+            <param name="ids">Document IDs to check.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of document IDs that exist.</returns>
+        </member>
         <member name="M:Verbex.Database.Interfaces.IDocumentMethods.ExistsByNameAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Checks if a document exists by name.
@@ -2475,6 +2484,9 @@
         <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.ExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.ExistsBatchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
         <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
@@ -3006,6 +3018,9 @@
         <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.ExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.ExistsBatchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
         <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
@@ -3534,6 +3549,9 @@
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.ExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.ExistsBatchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.Threading.CancellationToken)">
@@ -4164,6 +4182,9 @@
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.ExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.ExistsBatchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.ExistsByNameAsync(System.String,System.String,System.Threading.CancellationToken)">
