@@ -1053,25 +1053,54 @@ namespace Verbex.Server.API.REST
                 AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
                 string tenantId = !String.IsNullOrEmpty(auth?.TenantId) ? auth.TenantId : "default";
 
-                List<IndexMetadata> indices = _IndexManager!.GetAllMetadata(tenantId);
-                List<IndexMetadataResponse> response = indices.Select(m => new IndexMetadataResponse
+                // Parse enumeration query parameters
+                EnumerationQuery query = EnumerationQuery.Parse(
+                    ctx.Request.Query?.Elements?["maxResults"],
+                    ctx.Request.Query?.Elements?["skip"],
+                    ctx.Request.Query?.Elements?["continuationToken"],
+                    ctx.Request.Query?.Elements?["ordering"]
+                );
+
+                // Handle continuation token if provided
+                if (!String.IsNullOrEmpty(query.ContinuationToken) &&
+                    EnumerationResult<IndexMetadataResponse>.TryParseContinuationToken(query.ContinuationToken, out int tokenSkip))
                 {
-                    Identifier = m.Identifier,
-                    TenantId = m.TenantId,
-                    Name = m.Name,
-                    Description = m.Description,
-                    Enabled = m.Enabled,
-                    InMemory = m.InMemory,
-                    CreatedUtc = m.CreatedUtc,
-                    Labels = m.Labels,
-                    Tags = m.Tags
-                }).ToList();
+                    query.Skip = tokenSkip;
+                }
+
+                List<IndexMetadata> allIndices = _IndexManager!.GetAllMetadata(tenantId);
+                long totalCount = allIndices.Count;
+
+                // Apply ordering
+                IEnumerable<IndexMetadata> ordered = query.Ordering == EnumerationOrderEnum.CreatedAscending
+                    ? allIndices.OrderBy(x => x.CreatedUtc)
+                    : allIndices.OrderByDescending(x => x.CreatedUtc);
+
+                // Apply pagination
+                List<IndexMetadataResponse> pagedIndices = ordered
+                    .Skip(query.Skip)
+                    .Take(query.MaxResults)
+                    .Select(m => new IndexMetadataResponse
+                    {
+                        Identifier = m.Identifier,
+                        TenantId = m.TenantId,
+                        Name = m.Name,
+                        Description = m.Description,
+                        Enabled = m.Enabled,
+                        InMemory = m.InMemory,
+                        CreatedUtc = m.CreatedUtc,
+                        Labels = m.Labels,
+                        Tags = m.Tags
+                    })
+                    .ToList();
+
+                EnumerationResult<IndexMetadataResponse> result = new EnumerationResult<IndexMetadataResponse>(query, pagedIndices, totalCount);
 
                 return new ResponseContext
                 {
                     Success = true,
                     StatusCode = 200,
-                    Data = new IndicesListResponse { Indices = response, Count = response.Count }
+                    Data = result
                 };
             });
         }
@@ -1761,7 +1790,7 @@ namespace Verbex.Server.API.REST
 
                     if (!String.IsNullOrEmpty(idsParam))
                     {
-                        // Batch retrieval mode
+                        // Batch retrieval mode - preserves existing behavior
                         List<string> requestedIds = idsParam
                             .Split(',', StringSplitOptions.RemoveEmptyEntries)
                             .Select(id => id.Trim())
@@ -1792,39 +1821,59 @@ namespace Verbex.Server.API.REST
                     }
                     else
                     {
-                        // Paginated list behavior
-                        int limit = 100;
-                        int offset = 0;
+                        // Paginated list behavior using EnumerationQuery
+                        EnumerationQuery query = EnumerationQuery.Parse(
+                            ctx.Request.Query?.Elements?["maxResults"],
+                            ctx.Request.Query?.Elements?["skip"],
+                            ctx.Request.Query?.Elements?["continuationToken"],
+                            ctx.Request.Query?.Elements?["ordering"]
+                        );
 
-                        string? limitParam = ctx.Request.Query?.Elements?["limit"];
-                        string? offsetParam = ctx.Request.Query?.Elements?["offset"];
-
-                        if (!String.IsNullOrEmpty(limitParam) && Int32.TryParse(limitParam, out int parsedLimit))
+                        // Handle continuation token if provided
+                        if (!String.IsNullOrEmpty(query.ContinuationToken) &&
+                            EnumerationResult<DocumentMetadata>.TryParseContinuationToken(query.ContinuationToken, out int tokenSkip))
                         {
-                            // limit=0 means no limit (return all documents)
-                            limit = parsedLimit <= 0 ? Int32.MaxValue : parsedLimit;
-                        }
-
-                        if (!String.IsNullOrEmpty(offsetParam) && Int32.TryParse(offsetParam, out int parsedOffset))
-                        {
-                            offset = Math.Max(0, parsedOffset);
+                            query.Skip = tokenSkip;
                         }
 
                         long totalCount = await index.GetDocumentCountAsync().ConfigureAwait(false);
-                        List<DocumentMetadata> documentList = await index.GetDocumentsAsync(limit: limit, offset: offset).ConfigureAwait(false);
+
+                        // Use database-level pagination for efficiency
+                        // Database orders by created_utc DESC by default
+                        List<DocumentMetadata> pagedDocuments;
+
+                        if (query.Ordering == EnumerationOrderEnum.CreatedAscending)
+                        {
+                            // For ascending order, calculate offset from the end
+                            // e.g., total=100, skip=0, limit=10 ascending = offset 90 descending, then reverse
+                            int availableFromEnd = (int)Math.Max(0, totalCount - query.Skip);
+                            int actualLimit = Math.Min(query.MaxResults, availableFromEnd);
+                            int ascendingOffset = (int)Math.Max(0, totalCount - query.Skip - actualLimit);
+
+                            pagedDocuments = await index.GetDocumentsAsync(
+                                limit: actualLimit,
+                                offset: ascendingOffset
+                            ).ConfigureAwait(false);
+
+                            // Reverse to get ascending order
+                            pagedDocuments.Reverse();
+                        }
+                        else
+                        {
+                            // Descending order - use database directly
+                            pagedDocuments = await index.GetDocumentsAsync(
+                                limit: query.MaxResults,
+                                offset: query.Skip
+                            ).ConfigureAwait(false);
+                        }
+
+                        EnumerationResult<DocumentMetadata> result = new EnumerationResult<DocumentMetadata>(query, pagedDocuments, totalCount);
 
                         return new ResponseContext
                         {
                             Success = true,
                             StatusCode = 200,
-                            Data = new
-                            {
-                                Documents = documentList,
-                                Count = documentList.Count,
-                                TotalCount = totalCount,
-                                Limit = limit,
-                                Offset = offset
-                            }
+                            Data = result
                         };
                     }
                 }
@@ -2326,7 +2375,19 @@ namespace Verbex.Server.API.REST
                             Results = searchResults.Results,
                             TotalCount = searchResults.TotalCount,
                             MaxResults = searchRequest.MaxResults,
-                            SearchTime = searchResults.SearchTime.TotalMilliseconds
+                            SearchTime = searchResults.SearchTime.TotalMilliseconds,
+                            TimingInfo = searchResults.TimingInfo != null ? new {
+                                TermLookupMs = searchResults.TimingInfo.TermLookupMs,
+                                TermsFound = searchResults.TimingInfo.TermsFound,
+                                MainSearchMs = searchResults.TimingInfo.MainSearchMs,
+                                MatchesFound = searchResults.TimingInfo.MatchesFound,
+                                TermFrequenciesMs = searchResults.TimingInfo.TermFrequenciesMs,
+                                TermFrequencyRecords = searchResults.TimingInfo.TermFrequencyRecords,
+                                DocumentMetadataMs = searchResults.TimingInfo.DocumentMetadataMs,
+                                DocumentsFetched = searchResults.TimingInfo.DocumentsFetched,
+                                DocumentCountMs = searchResults.TimingInfo.DocumentCountMs,
+                                TotalDocuments = searchResults.TimingInfo.TotalDocuments
+                            } : null
                         }
                     };
                 }
@@ -2449,24 +2510,54 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 403, "Admin access required");
                 }
 
-                List<TenantMetadata> tenants;
+                // Parse enumeration query parameters
+                EnumerationQuery query = EnumerationQuery.Parse(
+                    ctx.Request.Query?.Elements?["maxResults"],
+                    ctx.Request.Query?.Elements?["skip"],
+                    ctx.Request.Query?.Elements?["continuationToken"],
+                    ctx.Request.Query?.Elements?["ordering"]
+                );
+
+                // Handle continuation token if provided
+                if (!String.IsNullOrEmpty(query.ContinuationToken) &&
+                    EnumerationResult<TenantMetadata>.TryParseContinuationToken(query.ContinuationToken, out int tokenSkip))
+                {
+                    query.Skip = tokenSkip;
+                }
+
+                List<TenantMetadata> allTenants;
                 if (auth.IsGlobalAdmin)
                 {
                     // Global admins can see all tenants
-                    tenants = await _Database!.Tenants.ReadManyAsync().ConfigureAwait(false);
+                    allTenants = await _Database!.Tenants.ReadManyAsync().ConfigureAwait(false);
                 }
                 else
                 {
                     // Tenant admins can only see their own tenant
                     TenantMetadata? tenant = await _Database!.Tenants.ReadByIdentifierAsync(auth.TenantId).ConfigureAwait(false);
-                    tenants = tenant != null ? new List<TenantMetadata> { tenant } : new List<TenantMetadata>();
+                    allTenants = tenant != null ? new List<TenantMetadata> { tenant } : new List<TenantMetadata>();
                 }
+
+                long totalCount = allTenants.Count;
+
+                // Apply ordering
+                IEnumerable<TenantMetadata> ordered = query.Ordering == EnumerationOrderEnum.CreatedAscending
+                    ? allTenants.OrderBy(x => x.CreatedUtc)
+                    : allTenants.OrderByDescending(x => x.CreatedUtc);
+
+                // Apply pagination
+                List<TenantMetadata> pagedTenants = ordered
+                    .Skip(query.Skip)
+                    .Take(query.MaxResults)
+                    .ToList();
+
+                EnumerationResult<TenantMetadata> result = new EnumerationResult<TenantMetadata>(query, pagedTenants, totalCount);
 
                 return new ResponseContext
                 {
                     Success = true,
                     StatusCode = 200,
-                    Data = new { Tenants = tenants, Count = tenants.Count }
+                    Data = result
                 };
             });
         }
@@ -2655,12 +2746,43 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 403, "Admin access required");
                 }
 
-                List<UserMaster> users = await _Database!.Users.ReadManyAsync(tenantId).ConfigureAwait(false);
+                // Parse enumeration query parameters
+                EnumerationQuery query = EnumerationQuery.Parse(
+                    ctx.Request.Query?.Elements?["maxResults"],
+                    ctx.Request.Query?.Elements?["skip"],
+                    ctx.Request.Query?.Elements?["continuationToken"],
+                    ctx.Request.Query?.Elements?["ordering"]
+                );
+
+                // Handle continuation token if provided
+                if (!String.IsNullOrEmpty(query.ContinuationToken) &&
+                    EnumerationResult<object>.TryParseContinuationToken(query.ContinuationToken, out int tokenSkip))
+                {
+                    query.Skip = tokenSkip;
+                }
+
+                List<UserMaster> allUsers = await _Database!.Users.ReadManyAsync(tenantId).ConfigureAwait(false);
+                long totalCount = allUsers.Count;
+
+                // Apply ordering
+                IEnumerable<UserMaster> ordered = query.Ordering == EnumerationOrderEnum.CreatedAscending
+                    ? allUsers.OrderBy(x => x.CreatedUtc)
+                    : allUsers.OrderByDescending(x => x.CreatedUtc);
+
+                // Apply pagination and project to response format
+                List<object> pagedUsers = ordered
+                    .Skip(query.Skip)
+                    .Take(query.MaxResults)
+                    .Select(u => new { u.Identifier, u.TenantId, u.Email, u.FirstName, u.LastName, u.IsAdmin, u.Active, u.CreatedUtc } as object)
+                    .ToList();
+
+                EnumerationResult<object> result = new EnumerationResult<object>(query, pagedUsers, totalCount);
+
                 return new ResponseContext
                 {
                     Success = true,
                     StatusCode = 200,
-                    Data = new { Users = users.Select(u => new { u.Identifier, u.TenantId, u.Email, u.FirstName, u.LastName, u.IsAdmin, u.Active, u.CreatedUtc }), Count = users.Count }
+                    Data = result
                 };
             });
         }
@@ -2877,12 +2999,43 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 403, "Admin access required");
                 }
 
-                List<Credential> credentials = await _Database!.Credentials.ReadManyAsync(tenantId).ConfigureAwait(false);
+                // Parse enumeration query parameters
+                EnumerationQuery query = EnumerationQuery.Parse(
+                    ctx.Request.Query?.Elements?["maxResults"],
+                    ctx.Request.Query?.Elements?["skip"],
+                    ctx.Request.Query?.Elements?["continuationToken"],
+                    ctx.Request.Query?.Elements?["ordering"]
+                );
+
+                // Handle continuation token if provided
+                if (!String.IsNullOrEmpty(query.ContinuationToken) &&
+                    EnumerationResult<object>.TryParseContinuationToken(query.ContinuationToken, out int tokenSkip))
+                {
+                    query.Skip = tokenSkip;
+                }
+
+                List<Credential> allCredentials = await _Database!.Credentials.ReadManyAsync(tenantId).ConfigureAwait(false);
+                long totalCount = allCredentials.Count;
+
+                // Apply ordering
+                IEnumerable<Credential> ordered = query.Ordering == EnumerationOrderEnum.CreatedAscending
+                    ? allCredentials.OrderBy(x => x.CreatedUtc)
+                    : allCredentials.OrderByDescending(x => x.CreatedUtc);
+
+                // Apply pagination and project to response format
+                List<object> pagedCredentials = ordered
+                    .Skip(query.Skip)
+                    .Take(query.MaxResults)
+                    .Select(c => new { c.Identifier, c.TenantId, c.UserId, c.Name, c.Active, c.CreatedUtc, TokenPreview = c.BearerToken.Substring(0, Math.Min(8, c.BearerToken.Length)) + "..." } as object)
+                    .ToList();
+
+                EnumerationResult<object> result = new EnumerationResult<object>(query, pagedCredentials, totalCount);
+
                 return new ResponseContext
                 {
                     Success = true,
                     StatusCode = 200,
-                    Data = new { Credentials = credentials.Select(c => new { c.Identifier, c.TenantId, c.UserId, c.Name, c.Active, c.CreatedUtc, TokenPreview = c.BearerToken.Substring(0, Math.Min(8, c.BearerToken.Length)) + "..." }), Count = credentials.Count }
+                    Data = result
                 };
             });
         }

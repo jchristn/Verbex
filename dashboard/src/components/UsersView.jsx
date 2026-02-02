@@ -79,8 +79,8 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiClient.getUsers(selectedTenant, signal ? { signal } : {});
-      setUsers(response.data?.users || []);
+      const response = await apiClient.getUsers(selectedTenant, { maxResults: 1000, skip: 0, ...(signal ? { signal } : {}) });
+      setUsers(response.data?.objects || []);
     } catch (err) {
       if (err.name === 'AbortError') return;
       console.error('Failed to load users:', err);

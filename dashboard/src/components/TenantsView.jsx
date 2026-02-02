@@ -66,8 +66,8 @@ function TenantsView({ onTenantSelect }) {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiClient.getTenants(signal ? { signal } : {});
-      setTenants(response.data?.tenants || []);
+      const response = await apiClient.getTenants({ maxResults: 1000, skip: 0, ...(signal ? { signal } : {}) });
+      setTenants(response.data?.objects || []);
     } catch (err) {
       if (err.name === 'AbortError') return;
       console.error('Failed to load tenants:', err);

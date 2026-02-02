@@ -9,6 +9,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Verbex\Verbex.csproj" />
+		<ProjectReference Include="..\Verbex.Server\Verbex.Server.csproj" />
 	</ItemGroup>
 
 </Project>

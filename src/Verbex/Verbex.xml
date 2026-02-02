@@ -8239,6 +8239,17 @@
             <exception cref="T:System.ArgumentNullException">Thrown when results is null.</exception>
             <exception cref="T:System.ArgumentOutOfRangeException">Thrown when totalCount is negative.</exception>
         </member>
+        <member name="M:Verbex.SearchResults.#ctor(System.Collections.Generic.IEnumerable{Verbex.SearchResult},System.Int32,System.TimeSpan,Verbex.SearchTimingInfo)">
+            <summary>
+            Initializes a new instance of the SearchResults class with timing breakdown.
+            </summary>
+            <param name="results">The search results.</param>
+            <param name="totalCount">Total number of matching documents.</param>
+            <param name="searchTime">Time taken to perform the search.</param>
+            <param name="timingInfo">Detailed timing breakdown for each search step.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when results is null.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when totalCount is negative.</exception>
+        </member>
         <member name="P:Verbex.SearchResults.Results">
             <summary>
             Gets the search results.
@@ -8252,6 +8263,67 @@
         <member name="P:Verbex.SearchResults.SearchTime">
             <summary>
             Gets the time taken to perform the search.
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchResults.TimingInfo">
+            <summary>
+            Gets detailed timing information for each search step.
+            May be null if timing was not collected.
+            </summary>
+        </member>
+        <member name="T:Verbex.SearchTimingInfo">
+            <summary>
+            Detailed timing information for search operations.
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchTimingInfo.TermLookupMs">
+            <summary>
+            Time spent looking up search terms in the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchTimingInfo.TermsFound">
+            <summary>
+            Number of terms found in the index.
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchTimingInfo.MainSearchMs">
+            <summary>
+            Time spent executing the main search query.
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchTimingInfo.MatchesFound">
+            <summary>
+            Number of documents matching the search criteria.
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchTimingInfo.TermFrequenciesMs">
+            <summary>
+            Time spent fetching term frequency data for scoring.
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchTimingInfo.TermFrequencyRecords">
+            <summary>
+            Number of term frequency records fetched.
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchTimingInfo.DocumentMetadataMs">
+            <summary>
+            Time spent fetching document metadata.
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchTimingInfo.DocumentsFetched">
+            <summary>
+            Number of documents fetched.
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchTimingInfo.DocumentCountMs">
+            <summary>
+            Time spent getting total document count.
+            </summary>
+        </member>
+        <member name="P:Verbex.SearchTimingInfo.TotalDocuments">
+            <summary>
+            Total documents in the index.
             </summary>
         </member>
         <member name="T:Verbex.StorageMode">

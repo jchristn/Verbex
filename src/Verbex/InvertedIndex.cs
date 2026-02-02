@@ -903,6 +903,8 @@ namespace Verbex
             }
 
             DateTime startTime = DateTime.UtcNow;
+            System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
+            SearchTimingInfo timingInfo = new SearchTimingInfo();
 
             List<string> queryTerms = TokenizeAndProcess(query);
             if (queryTerms.Count == 0)
@@ -945,16 +947,20 @@ namespace Verbex
                 }
             }
 
+            timingInfo.TermLookupMs = sw.ElapsedMilliseconds;
+            timingInfo.TermsFound = termRecords.Count;
+            sw.Restart();
+
             if (termRecords.Count == 0)
             {
-                return new SearchResults(new List<SearchResult>(), 0, DateTime.UtcNow - startTime);
+                return new SearchResults(new List<SearchResult>(), 0, DateTime.UtcNow - startTime, timingInfo);
             }
 
             // When using AND logic, ALL query terms must exist in the index
             // If any term doesn't exist, no document can match all terms
             if (useAndLogic && termRecords.Count < queryTerms.Count)
             {
-                return new SearchResults(new List<SearchResult>(), 0, DateTime.UtcNow - startTime);
+                return new SearchResults(new List<SearchResult>(), 0, DateTime.UtcNow - startTime, timingInfo);
             }
 
             List<string> termIds = termRecords.Values.Select(t => t.Id).ToList();
@@ -962,15 +968,23 @@ namespace Verbex
             int limit = maxResults ?? _Configuration.DefaultMaxSearchResults;
             List<SearchMatch> matches = await _Driver.DocumentTerms.SearchAsync(_TablePrefix, termIds, useAndLogic, limit, labels, tags, token).ConfigureAwait(false);
 
+            timingInfo.MainSearchMs = sw.ElapsedMilliseconds;
+            timingInfo.MatchesFound = matches.Count;
+            sw.Restart();
+
             if (matches.Count == 0)
             {
-                return new SearchResults(new List<SearchResult>(), 0, DateTime.UtcNow - startTime);
+                return new SearchResults(new List<SearchResult>(), 0, DateTime.UtcNow - startTime, timingInfo);
             }
 
             List<string> docIds = matches.Select(m => m.DocumentId).ToList();
 
             // Fetch per-term frequencies for all matched documents
             List<DocumentTermRecord> documentTermRecords = await _Driver.DocumentTerms.GetByDocumentsAndTermsAsync(_TablePrefix, docIds, termIds, token).ConfigureAwait(false);
+
+            timingInfo.TermFrequenciesMs = sw.ElapsedMilliseconds;
+            timingInfo.TermFrequencyRecords = documentTermRecords.Count;
+            sw.Restart();
 
             // Build lookup: documentId -> (termId -> frequency)
             Dictionary<string, Dictionary<string, int>> perDocTermFrequencies = new Dictionary<string, Dictionary<string, int>>();
@@ -995,9 +1009,16 @@ namespace Verbex
 
             List<DocumentMetadata> documents = await _Driver.Documents.GetByIdsAsync(_TablePrefix, docIds, token).ConfigureAwait(false);
 
+            timingInfo.DocumentMetadataMs = sw.ElapsedMilliseconds;
+            timingInfo.DocumentsFetched = documents.Count;
+            sw.Restart();
+
             Dictionary<string, DocumentMetadata> docLookup = documents.ToDictionary(d => d.DocumentId);
 
-            long totalDocs = await _Driver.Documents.GetCountAsync(_TablePrefix, token).ConfigureAwait(false);
+            long totalDocs = await GetDocumentCountAsync(token).ConfigureAwait(false);
+
+            timingInfo.DocumentCountMs = sw.ElapsedMilliseconds;
+            timingInfo.TotalDocuments = totalDocs;
 
             List<SearchResult> results = new List<SearchResult>();
             foreach (SearchMatch match in matches)
@@ -1015,7 +1036,7 @@ namespace Verbex
             results = results.OrderByDescending(r => r.Score).Take(limit).ToList();
 
             TimeSpan searchTime = DateTime.UtcNow - startTime;
-            return new SearchResults(results, results.Count, searchTime);
+            return new SearchResults(results, results.Count, searchTime, timingInfo);
         }
 
         /// <summary>

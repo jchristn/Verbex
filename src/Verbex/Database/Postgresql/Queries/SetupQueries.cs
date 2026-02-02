@@ -404,6 +404,7 @@ DROP TABLE IF EXISTS {prefix}_documents CASCADE;
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_docterms_term ON {prefix}_document_terms(term_id)",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_docterms_freq ON {prefix}_document_terms(term_frequency DESC)",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_docterms_term_doc ON {prefix}_document_terms(term_id, document_id)",
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_docterms_doc_term ON {prefix}_document_terms(document_id, term_id)",
 
                 // Label indexes
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_labels_doc ON {prefix}_labels(document_id)",

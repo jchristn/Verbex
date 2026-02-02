@@ -1190,6 +1190,139 @@
             Gets or sets any warnings from the restore operation.
             </summary>
         </member>
+        <member name="T:Verbex.Sdk.EnumerationOptions">
+            <summary>
+            Options for paginated enumeration requests.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.EnumerationOptions.MaxResults">
+            <summary>
+            Maximum number of results to return per page.
+            Must be between 1 and 1000, inclusive.
+            Default is 100.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.EnumerationOptions.Skip">
+            <summary>
+            Number of records to skip before returning results.
+            Default is 0.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.EnumerationOptions.ContinuationToken">
+            <summary>
+            Opaque continuation token for pagination.
+            Use the token from a previous result to fetch the next page.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.EnumerationOptions.Ordering">
+            <summary>
+            Ordering for the results.
+            Default is CreatedDescending (newest first).
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.EnumerationOptions.#ctor">
+            <summary>
+            Instantiate with default values.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.EnumerationOptions.#ctor(System.Int32,System.Int32,System.String,Verbex.Sdk.EnumerationOrderEnum)">
+            <summary>
+            Instantiate with specified parameters.
+            </summary>
+            <param name="maxResults">Maximum number of results per page.</param>
+            <param name="skip">Number of records to skip.</param>
+            <param name="continuationToken">Optional continuation token.</param>
+            <param name="ordering">Result ordering.</param>
+        </member>
+        <member name="M:Verbex.Sdk.EnumerationOptions.ToQueryString">
+            <summary>
+            Builds the query string portion for the URL.
+            </summary>
+            <returns>Query string without leading '?'.</returns>
+        </member>
+        <member name="T:Verbex.Sdk.EnumerationOrderEnum">
+            <summary>
+            Specifies the ordering for enumeration results.
+            </summary>
+        </member>
+        <member name="F:Verbex.Sdk.EnumerationOrderEnum.CreatedAscending">
+            <summary>
+            Order by creation timestamp ascending (oldest first).
+            </summary>
+        </member>
+        <member name="F:Verbex.Sdk.EnumerationOrderEnum.CreatedDescending">
+            <summary>
+            Order by creation timestamp descending (newest first).
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.EnumerationResult`1">
+            <summary>
+            Result container for paginated enumeration of collections.
+            </summary>
+            <typeparam name="T">The type of objects in the collection.</typeparam>
+        </member>
+        <member name="P:Verbex.Sdk.EnumerationResult`1.Success">
+            <summary>
+            Indicates whether the request was successful.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.EnumerationResult`1.Timestamp">
+            <summary>
+            Timestamp of when the result was generated.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.EnumerationResult`1.MaxResults">
+            <summary>
+            Maximum number of results requested.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.EnumerationResult`1.Skip">
+            <summary>
+            Number of records skipped.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.EnumerationResult`1.IterationsRequired">
+            <summary>
+            Number of iterations required to produce this result.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.EnumerationResult`1.ContinuationToken">
+            <summary>
+            Opaque continuation token for fetching the next page.
+            Null when EndOfResults is true.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.EnumerationResult`1.EndOfResults">
+            <summary>
+            Indicates whether there are no more records to fetch.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.EnumerationResult`1.TotalRecords">
+            <summary>
+            Total number of records in the collection before pagination.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.EnumerationResult`1.RecordsRemaining">
+            <summary>
+            Number of records remaining after this page.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.EnumerationResult`1.Objects">
+            <summary>
+            The paginated items for this result page.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.EnumerationResult`1.HasMore">
+            <summary>
+            Returns true if there are more records available to fetch.
+            </summary>
+        </member>
+        <member name="M:Verbex.Sdk.EnumerationResult`1.GetNextPageOptions">
+            <summary>
+            Creates EnumerationOptions to fetch the next page.
+            </summary>
+            <returns>Options for fetching the next page, or null if at end of results.</returns>
+        </member>
         <member name="T:Verbex.Sdk.HealthData">
             <summary>
             Health check response data.
@@ -1759,6 +1892,22 @@
             <returns>List of index information objects.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
+        <member name="M:Verbex.Sdk.VerbexClient.ListIndicesAsync(Verbex.Sdk.EnumerationOptions,System.Threading.CancellationToken)">
+            <summary>
+            Lists available indices with pagination support.
+            </summary>
+            <param name="options">Pagination options (optional).</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Enumeration result containing indices and pagination information.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.ListAllIndicesAsync(System.Threading.CancellationToken)">
+            <summary>
+            Lists all indices by iterating through all pages.
+            </summary>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Async enumerable of all indices.</returns>
+        </member>
         <member name="M:Verbex.Sdk.VerbexClient.CreateIndexAsync(System.String,System.String,System.Boolean,System.Boolean,System.Boolean,System.Int32,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.String,System.Threading.CancellationToken)">
             <summary>
             Creates a new index.
@@ -1828,6 +1977,24 @@
             <param name="cancellationToken">Cancellation token.</param>
             <returns>List of document information objects.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.ListDocumentsAsync(System.String,Verbex.Sdk.EnumerationOptions,System.Threading.CancellationToken)">
+            <summary>
+            Lists documents in an index with pagination support.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="options">Pagination options (optional).</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Enumeration result containing documents and pagination information.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.ListAllDocumentsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Lists all documents in an index by iterating through all pages.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Async enumerable of all documents.</returns>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.AddDocumentAsync(System.String,System.String,System.String,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
             <summary>
@@ -2023,6 +2190,22 @@
             <returns>List of tenant information objects.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
         </member>
+        <member name="M:Verbex.Sdk.VerbexClient.ListTenantsAsync(Verbex.Sdk.EnumerationOptions,System.Threading.CancellationToken)">
+            <summary>
+            Lists tenants with pagination support.
+            </summary>
+            <param name="options">Pagination options (optional).</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Enumeration result containing tenants and pagination information.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.ListAllTenantsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Lists all tenants by iterating through all pages.
+            </summary>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Async enumerable of all tenants.</returns>
+        </member>
         <member name="M:Verbex.Sdk.VerbexClient.GetTenantAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Gets a specific tenant.
@@ -2058,6 +2241,24 @@
             <param name="cancellationToken">Cancellation token.</param>
             <returns>List of user information objects.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.ListUsersAsync(System.String,Verbex.Sdk.EnumerationOptions,System.Threading.CancellationToken)">
+            <summary>
+            Lists users in a tenant with pagination support.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="options">Pagination options (optional).</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Enumeration result containing users and pagination information.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.ListAllUsersAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Lists all users in a tenant by iterating through all pages.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Async enumerable of all users.</returns>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.GetUserAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
@@ -2100,6 +2301,24 @@
             <param name="cancellationToken">Cancellation token.</param>
             <returns>List of credential information objects.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.ListCredentialsAsync(System.String,Verbex.Sdk.EnumerationOptions,System.Threading.CancellationToken)">
+            <summary>
+            Lists credentials in a tenant with pagination support.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="options">Pagination options (optional).</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Enumeration result containing credentials and pagination information.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.ListAllCredentialsAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Lists all credentials in a tenant by iterating through all pages.
+            </summary>
+            <param name="tenantId">The tenant identifier.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Async enumerable of all credentials.</returns>
         </member>
         <member name="M:Verbex.Sdk.VerbexClient.GetCredentialAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>

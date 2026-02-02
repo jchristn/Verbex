@@ -414,10 +414,56 @@ namespace Verbex.Sdk
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of index information objects.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        [Obsolete("Use ListIndicesAsync(EnumerationOptions, CancellationToken) instead.")]
         public async Task<List<IndexInfo>> ListIndicesAsync(CancellationToken cancellationToken = default)
         {
-            IndicesListData data = await MakeRequestAsync<IndicesListData>(HttpMethod.Get, "/v1.0/indices", null, true, cancellationToken).ConfigureAwait(false);
-            return data.Indices ?? new List<IndexInfo>();
+            EnumerationResult<IndexInfo> result = await ListIndicesAsync(null, cancellationToken).ConfigureAwait(false);
+            return result.Objects;
+        }
+
+        /// <summary>
+        /// Lists available indices with pagination support.
+        /// </summary>
+        /// <param name="options">Pagination options (optional).</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Enumeration result containing indices and pagination information.</returns>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<EnumerationResult<IndexInfo>> ListIndicesAsync(EnumerationOptions? options, CancellationToken cancellationToken = default)
+        {
+            string path = "/v1.0/indices";
+            string queryString = options?.ToQueryString() ?? string.Empty;
+            if (!string.IsNullOrEmpty(queryString))
+            {
+                path += "?" + queryString;
+            }
+            return await MakeRequestAsync<EnumerationResult<IndexInfo>>(HttpMethod.Get, path, null, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Lists all indices by iterating through all pages.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Async enumerable of all indices.</returns>
+        public async IAsyncEnumerable<IndexInfo> ListAllIndicesAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            EnumerationOptions options = new EnumerationOptions { MaxResults = 1000 };
+
+            while (true)
+            {
+                EnumerationResult<IndexInfo> result = await ListIndicesAsync(options, cancellationToken).ConfigureAwait(false);
+
+                foreach (IndexInfo index in result.Objects)
+                {
+                    yield return index;
+                }
+
+                if (result.EndOfResults || string.IsNullOrEmpty(result.ContinuationToken))
+                {
+                    break;
+                }
+
+                options = result.GetNextPageOptions()!;
+            }
         }
 
         /// <summary>
@@ -540,10 +586,58 @@ namespace Verbex.Sdk
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of document information objects.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        [Obsolete("Use ListDocumentsAsync(string, EnumerationOptions, CancellationToken) instead.")]
         public async Task<List<DocumentInfo>> ListDocumentsAsync(string indexId, CancellationToken cancellationToken = default)
         {
-            DocumentsListData data = await MakeRequestAsync<DocumentsListData>(HttpMethod.Get, $"/v1.0/indices/{indexId}/documents", null, true, cancellationToken).ConfigureAwait(false);
-            return data.Documents ?? new List<DocumentInfo>();
+            EnumerationResult<DocumentInfo> result = await ListDocumentsAsync(indexId, null, cancellationToken).ConfigureAwait(false);
+            return result.Objects;
+        }
+
+        /// <summary>
+        /// Lists documents in an index with pagination support.
+        /// </summary>
+        /// <param name="indexId">The index identifier.</param>
+        /// <param name="options">Pagination options (optional).</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Enumeration result containing documents and pagination information.</returns>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<EnumerationResult<DocumentInfo>> ListDocumentsAsync(string indexId, EnumerationOptions? options, CancellationToken cancellationToken = default)
+        {
+            string path = $"/v1.0/indices/{indexId}/documents";
+            string queryString = options?.ToQueryString() ?? string.Empty;
+            if (!string.IsNullOrEmpty(queryString))
+            {
+                path += "?" + queryString;
+            }
+            return await MakeRequestAsync<EnumerationResult<DocumentInfo>>(HttpMethod.Get, path, null, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Lists all documents in an index by iterating through all pages.
+        /// </summary>
+        /// <param name="indexId">The index identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Async enumerable of all documents.</returns>
+        public async IAsyncEnumerable<DocumentInfo> ListAllDocumentsAsync(string indexId, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            EnumerationOptions options = new EnumerationOptions { MaxResults = 1000 };
+
+            while (true)
+            {
+                EnumerationResult<DocumentInfo> result = await ListDocumentsAsync(indexId, options, cancellationToken).ConfigureAwait(false);
+
+                foreach (DocumentInfo doc in result.Objects)
+                {
+                    yield return doc;
+                }
+
+                if (result.EndOfResults || string.IsNullOrEmpty(result.ContinuationToken))
+                {
+                    break;
+                }
+
+                options = result.GetNextPageOptions()!;
+            }
         }
 
         /// <summary>
@@ -1000,10 +1094,56 @@ namespace Verbex.Sdk
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of tenant information objects.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        [Obsolete("Use ListTenantsAsync(EnumerationOptions, CancellationToken) instead.")]
         public async Task<List<TenantInfo>> ListTenantsAsync(CancellationToken cancellationToken = default)
         {
-            TenantsListData data = await MakeRequestAsync<TenantsListData>(HttpMethod.Get, "/v1.0/admin/tenants", null, true, cancellationToken).ConfigureAwait(false);
-            return data.Tenants ?? new List<TenantInfo>();
+            EnumerationResult<TenantInfo> result = await ListTenantsAsync(null, cancellationToken).ConfigureAwait(false);
+            return result.Objects;
+        }
+
+        /// <summary>
+        /// Lists tenants with pagination support.
+        /// </summary>
+        /// <param name="options">Pagination options (optional).</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Enumeration result containing tenants and pagination information.</returns>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<EnumerationResult<TenantInfo>> ListTenantsAsync(EnumerationOptions? options, CancellationToken cancellationToken = default)
+        {
+            string path = "/v1.0/tenants";
+            string queryString = options?.ToQueryString() ?? string.Empty;
+            if (!string.IsNullOrEmpty(queryString))
+            {
+                path += "?" + queryString;
+            }
+            return await MakeRequestAsync<EnumerationResult<TenantInfo>>(HttpMethod.Get, path, null, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Lists all tenants by iterating through all pages.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Async enumerable of all tenants.</returns>
+        public async IAsyncEnumerable<TenantInfo> ListAllTenantsAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            EnumerationOptions options = new EnumerationOptions { MaxResults = 1000 };
+
+            while (true)
+            {
+                EnumerationResult<TenantInfo> result = await ListTenantsAsync(options, cancellationToken).ConfigureAwait(false);
+
+                foreach (TenantInfo tenant in result.Objects)
+                {
+                    yield return tenant;
+                }
+
+                if (result.EndOfResults || string.IsNullOrEmpty(result.ContinuationToken))
+                {
+                    break;
+                }
+
+                options = result.GetNextPageOptions()!;
+            }
         }
 
         /// <summary>
@@ -1056,10 +1196,58 @@ namespace Verbex.Sdk
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of user information objects.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        [Obsolete("Use ListUsersAsync(string, EnumerationOptions, CancellationToken) instead.")]
         public async Task<List<UserInfo>> ListUsersAsync(string tenantId, CancellationToken cancellationToken = default)
         {
-            UsersListData data = await MakeRequestAsync<UsersListData>(HttpMethod.Get, $"/v1.0/admin/tenants/{tenantId}/users", null, true, cancellationToken).ConfigureAwait(false);
-            return data.Users ?? new List<UserInfo>();
+            EnumerationResult<UserInfo> result = await ListUsersAsync(tenantId, null, cancellationToken).ConfigureAwait(false);
+            return result.Objects;
+        }
+
+        /// <summary>
+        /// Lists users in a tenant with pagination support.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="options">Pagination options (optional).</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Enumeration result containing users and pagination information.</returns>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<EnumerationResult<UserInfo>> ListUsersAsync(string tenantId, EnumerationOptions? options, CancellationToken cancellationToken = default)
+        {
+            string path = $"/v1.0/tenants/{tenantId}/users";
+            string queryString = options?.ToQueryString() ?? string.Empty;
+            if (!string.IsNullOrEmpty(queryString))
+            {
+                path += "?" + queryString;
+            }
+            return await MakeRequestAsync<EnumerationResult<UserInfo>>(HttpMethod.Get, path, null, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Lists all users in a tenant by iterating through all pages.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Async enumerable of all users.</returns>
+        public async IAsyncEnumerable<UserInfo> ListAllUsersAsync(string tenantId, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            EnumerationOptions options = new EnumerationOptions { MaxResults = 1000 };
+
+            while (true)
+            {
+                EnumerationResult<UserInfo> result = await ListUsersAsync(tenantId, options, cancellationToken).ConfigureAwait(false);
+
+                foreach (UserInfo user in result.Objects)
+                {
+                    yield return user;
+                }
+
+                if (result.EndOfResults || string.IsNullOrEmpty(result.ContinuationToken))
+                {
+                    break;
+                }
+
+                options = result.GetNextPageOptions()!;
+            }
         }
 
         /// <summary>
@@ -1122,10 +1310,58 @@ namespace Verbex.Sdk
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of credential information objects.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        [Obsolete("Use ListCredentialsAsync(string, EnumerationOptions, CancellationToken) instead.")]
         public async Task<List<CredentialInfo>> ListCredentialsAsync(string tenantId, CancellationToken cancellationToken = default)
         {
-            CredentialsListData data = await MakeRequestAsync<CredentialsListData>(HttpMethod.Get, $"/v1.0/admin/tenants/{tenantId}/credentials", null, true, cancellationToken).ConfigureAwait(false);
-            return data.Credentials ?? new List<CredentialInfo>();
+            EnumerationResult<CredentialInfo> result = await ListCredentialsAsync(tenantId, null, cancellationToken).ConfigureAwait(false);
+            return result.Objects;
+        }
+
+        /// <summary>
+        /// Lists credentials in a tenant with pagination support.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="options">Pagination options (optional).</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Enumeration result containing credentials and pagination information.</returns>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<EnumerationResult<CredentialInfo>> ListCredentialsAsync(string tenantId, EnumerationOptions? options, CancellationToken cancellationToken = default)
+        {
+            string path = $"/v1.0/tenants/{tenantId}/credentials";
+            string queryString = options?.ToQueryString() ?? string.Empty;
+            if (!string.IsNullOrEmpty(queryString))
+            {
+                path += "?" + queryString;
+            }
+            return await MakeRequestAsync<EnumerationResult<CredentialInfo>>(HttpMethod.Get, path, null, true, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Lists all credentials in a tenant by iterating through all pages.
+        /// </summary>
+        /// <param name="tenantId">The tenant identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Async enumerable of all credentials.</returns>
+        public async IAsyncEnumerable<CredentialInfo> ListAllCredentialsAsync(string tenantId, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            EnumerationOptions options = new EnumerationOptions { MaxResults = 1000 };
+
+            while (true)
+            {
+                EnumerationResult<CredentialInfo> result = await ListCredentialsAsync(tenantId, options, cancellationToken).ConfigureAwait(false);
+
+                foreach (CredentialInfo credential in result.Objects)
+                {
+                    yield return credential;
+                }
+
+                if (result.EndOfResults || string.IsNullOrEmpty(result.ContinuationToken))
+                {
+                    break;
+                }
+
+                options = result.GetNextPageOptions()!;
+            }
         }
 
         /// <summary>

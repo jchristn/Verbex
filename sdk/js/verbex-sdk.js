@@ -517,6 +517,102 @@ class CredentialInfo {
 }
 
 /**
+ * Enumeration order options.
+ * @readonly
+ * @enum {string}
+ */
+const EnumerationOrder = Object.freeze({
+    CreatedAscending: 'CreatedAscending',
+    CreatedDescending: 'CreatedDescending'
+});
+
+/**
+ * Options for paginated enumeration requests.
+ */
+class EnumerationOptions {
+    /**
+     * Create EnumerationOptions.
+     * @param {object} options - Options
+     * @param {number} [options.maxResults=100] - Maximum results per page (1-1000)
+     * @param {number} [options.skip=0] - Number of records to skip
+     * @param {string} [options.continuationToken] - Continuation token from previous result
+     * @param {string} [options.ordering='CreatedDescending'] - Result ordering
+     */
+    constructor(options = {}) {
+        this.maxResults = options.maxResults || 100;
+        this.skip = options.skip || 0;
+        this.continuationToken = options.continuationToken || null;
+        this.ordering = options.ordering || EnumerationOrder.CreatedDescending;
+    }
+
+    /**
+     * Convert to URL query string.
+     * @returns {string} Query string without leading '?'
+     */
+    toQueryString() {
+        const params = [];
+        if (this.maxResults !== 100) {
+            params.push(`maxResults=${this.maxResults}`);
+        }
+        if (this.skip > 0) {
+            params.push(`skip=${this.skip}`);
+        }
+        if (this.continuationToken) {
+            params.push(`continuationToken=${encodeURIComponent(this.continuationToken)}`);
+        }
+        if (this.ordering !== EnumerationOrder.CreatedDescending) {
+            params.push(`ordering=${this.ordering}`);
+        }
+        return params.join('&');
+    }
+}
+
+/**
+ * Result container for paginated enumeration of collections.
+ */
+class EnumerationResult {
+    /**
+     * Create an EnumerationResult.
+     * @param {object} data - Result data
+     * @param {Function} itemParser - Function to parse each item
+     */
+    constructor(data, itemParser = (x) => x) {
+        this.success = data.success !== false;
+        this.timestamp = data.timestamp || null;
+        this.maxResults = data.maxResults || 100;
+        this.skip = data.skip || 0;
+        this.iterationsRequired = data.iterationsRequired || 1;
+        this.continuationToken = data.continuationToken || null;
+        this.endOfResults = data.endOfResults || false;
+        this.totalRecords = data.totalRecords || 0;
+        this.recordsRemaining = data.recordsRemaining || 0;
+        this.objects = (data.objects || []).map(itemParser);
+    }
+
+    /**
+     * Returns true if there are more records available to fetch.
+     * @returns {boolean}
+     */
+    get hasMore() {
+        return !this.endOfResults && this.continuationToken !== null;
+    }
+
+    /**
+     * Creates EnumerationOptions to fetch the next page.
+     * @returns {EnumerationOptions|null} Options for next page, or null if at end
+     */
+    getNextPageOptions() {
+        if (this.endOfResults || !this.continuationToken) {
+            return null;
+        }
+        return new EnumerationOptions({
+            maxResults: this.maxResults,
+            continuationToken: this.continuationToken
+        });
+    }
+}
+
+/**
  * Verbex SDK Client for JavaScript.
  * Provides methods to interact with all Verbex REST API endpoints.
  * All methods return domain objects directly rather than wrapped responses.
@@ -766,15 +862,42 @@ class VerbexClient {
     // ==================== Index Management Endpoints ====================
 
     /**
-     * List all available indices.
-     * @returns {Promise<IndexInfo[]>} Array of IndexInfo objects
+     * List indices with pagination support.
+     * @param {EnumerationOptions} [options] - Pagination options
+     * @returns {Promise<EnumerationResult>} EnumerationResult containing IndexInfo objects
      */
-    async listIndices() {
-        const data = await this._makeRequest('GET', '/v1.0/indices');
-        if (data?.indices) {
-            return data.indices.map(idx => new IndexInfo(idx));
+    async listIndices(options = null) {
+        let path = '/v1.0/indices';
+        if (options) {
+            const queryString = options.toQueryString();
+            if (queryString) {
+                path += '?' + queryString;
+            }
         }
-        return [];
+        const data = await this._makeRequest('GET', path);
+        return new EnumerationResult(data, (item) => new IndexInfo(item));
+    }
+
+    /**
+     * List all indices by iterating through all pages.
+     * @returns {AsyncGenerator<IndexInfo>} Async generator yielding IndexInfo objects
+     */
+    async *listAllIndices() {
+        let options = new EnumerationOptions({ maxResults: 1000 });
+
+        while (true) {
+            const result = await this.listIndices(options);
+
+            for (const item of result.objects) {
+                yield item;
+            }
+
+            if (result.endOfResults || !result.continuationToken) {
+                break;
+            }
+
+            options = result.getNextPageOptions();
+        }
     }
 
     /**
@@ -897,16 +1020,44 @@ class VerbexClient {
     // ==================== Document Management Endpoints ====================
 
     /**
-     * List all documents in an index.
+     * List documents in an index with pagination support.
      * @param {string} indexId - The index identifier
-     * @returns {Promise<DocumentInfo[]>} Array of DocumentInfo objects
+     * @param {EnumerationOptions} [options] - Pagination options
+     * @returns {Promise<EnumerationResult>} EnumerationResult containing DocumentInfo objects
      */
-    async listDocuments(indexId) {
-        const data = await this._makeRequest('GET', `/v1.0/indices/${indexId}/documents`);
-        if (data?.documents) {
-            return data.documents.map(doc => new DocumentInfo(doc));
+    async listDocuments(indexId, options = null) {
+        let path = `/v1.0/indices/${indexId}/documents`;
+        if (options) {
+            const queryString = options.toQueryString();
+            if (queryString) {
+                path += '?' + queryString;
+            }
         }
-        return [];
+        const data = await this._makeRequest('GET', path);
+        return new EnumerationResult(data, (item) => new DocumentInfo(item));
+    }
+
+    /**
+     * List all documents in an index by iterating through all pages.
+     * @param {string} indexId - The index identifier
+     * @returns {AsyncGenerator<DocumentInfo>} Async generator yielding DocumentInfo objects
+     */
+    async *listAllDocuments(indexId) {
+        let options = new EnumerationOptions({ maxResults: 1000 });
+
+        while (true) {
+            const result = await this.listDocuments(indexId, options);
+
+            for (const item of result.objects) {
+                yield item;
+            }
+
+            if (result.endOfResults || !result.continuationToken) {
+                break;
+            }
+
+            options = result.getNextPageOptions();
+        }
     }
 
     /**
@@ -1233,15 +1384,42 @@ class VerbexClient {
     // ==================== Admin - Tenant Management Endpoints ====================
 
     /**
-     * List all tenants.
-     * @returns {Promise<TenantInfo[]>} Array of TenantInfo objects
+     * List tenants with pagination support.
+     * @param {EnumerationOptions} [options] - Pagination options
+     * @returns {Promise<EnumerationResult>} EnumerationResult containing TenantInfo objects
      */
-    async listTenants() {
-        const data = await this._makeRequest('GET', '/v1.0/admin/tenants');
-        if (data?.tenants) {
-            return data.tenants.map(t => new TenantInfo(t));
+    async listTenants(options = null) {
+        let path = '/v1.0/tenants';
+        if (options) {
+            const queryString = options.toQueryString();
+            if (queryString) {
+                path += '?' + queryString;
+            }
         }
-        return [];
+        const data = await this._makeRequest('GET', path);
+        return new EnumerationResult(data, (item) => new TenantInfo(item));
+    }
+
+    /**
+     * List all tenants by iterating through all pages.
+     * @returns {AsyncGenerator<TenantInfo>} Async generator yielding TenantInfo objects
+     */
+    async *listAllTenants() {
+        let options = new EnumerationOptions({ maxResults: 1000 });
+
+        while (true) {
+            const result = await this.listTenants(options);
+
+            for (const item of result.objects) {
+                yield item;
+            }
+
+            if (result.endOfResults || !result.continuationToken) {
+                break;
+            }
+
+            options = result.getNextPageOptions();
+        }
     }
 
     /**
@@ -1302,16 +1480,44 @@ class VerbexClient {
     // ==================== Admin - User Management Endpoints ====================
 
     /**
-     * List all users in a tenant.
+     * List users in a tenant with pagination support.
      * @param {string} tenantId - The tenant identifier
-     * @returns {Promise<UserInfo[]>} Array of UserInfo objects
+     * @param {EnumerationOptions} [options] - Pagination options
+     * @returns {Promise<EnumerationResult>} EnumerationResult containing UserInfo objects
      */
-    async listUsers(tenantId) {
-        const data = await this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}/users`);
-        if (data?.users) {
-            return data.users.map(u => new UserInfo(u));
+    async listUsers(tenantId, options = null) {
+        let path = `/v1.0/tenants/${tenantId}/users`;
+        if (options) {
+            const queryString = options.toQueryString();
+            if (queryString) {
+                path += '?' + queryString;
+            }
         }
-        return [];
+        const data = await this._makeRequest('GET', path);
+        return new EnumerationResult(data, (item) => new UserInfo(item));
+    }
+
+    /**
+     * List all users in a tenant by iterating through all pages.
+     * @param {string} tenantId - The tenant identifier
+     * @returns {AsyncGenerator<UserInfo>} Async generator yielding UserInfo objects
+     */
+    async *listAllUsers(tenantId) {
+        let options = new EnumerationOptions({ maxResults: 1000 });
+
+        while (true) {
+            const result = await this.listUsers(tenantId, options);
+
+            for (const item of result.objects) {
+                yield item;
+            }
+
+            if (result.endOfResults || !result.continuationToken) {
+                break;
+            }
+
+            options = result.getNextPageOptions();
+        }
     }
 
     /**
@@ -1389,16 +1595,44 @@ class VerbexClient {
     // ==================== Admin - Credential Management Endpoints ====================
 
     /**
-     * List all credentials in a tenant.
+     * List credentials in a tenant with pagination support.
      * @param {string} tenantId - The tenant identifier
-     * @returns {Promise<CredentialInfo[]>} Array of CredentialInfo objects
+     * @param {EnumerationOptions} [options] - Pagination options
+     * @returns {Promise<EnumerationResult>} EnumerationResult containing CredentialInfo objects
      */
-    async listCredentials(tenantId) {
-        const data = await this._makeRequest('GET', `/v1.0/admin/tenants/${tenantId}/credentials`);
-        if (data?.credentials) {
-            return data.credentials.map(c => new CredentialInfo(c));
+    async listCredentials(tenantId, options = null) {
+        let path = `/v1.0/tenants/${tenantId}/credentials`;
+        if (options) {
+            const queryString = options.toQueryString();
+            if (queryString) {
+                path += '?' + queryString;
+            }
         }
-        return [];
+        const data = await this._makeRequest('GET', path);
+        return new EnumerationResult(data, (item) => new CredentialInfo(item));
+    }
+
+    /**
+     * List all credentials in a tenant by iterating through all pages.
+     * @param {string} tenantId - The tenant identifier
+     * @returns {AsyncGenerator<CredentialInfo>} Async generator yielding CredentialInfo objects
+     */
+    async *listAllCredentials(tenantId) {
+        let options = new EnumerationOptions({ maxResults: 1000 });
+
+        while (true) {
+            const result = await this.listCredentials(tenantId, options);
+
+            for (const item of result.objects) {
+                yield item;
+            }
+
+            if (result.endOfResults || !result.continuationToken) {
+                break;
+            }
+
+            options = result.getNextPageOptions();
+        }
     }
 
     /**
@@ -1487,7 +1721,10 @@ if (typeof module !== 'undefined' && module.exports) {
         CredentialInfo,
         CacheConfiguration,
         CacheStats,
-        VerbexCacheStatistics
+        VerbexCacheStatistics,
+        EnumerationOrder,
+        EnumerationOptions,
+        EnumerationResult
     };
 }
 
@@ -1517,4 +1754,7 @@ if (typeof exports !== 'undefined') {
     exports.CacheConfiguration = CacheConfiguration;
     exports.CacheStats = CacheStats;
     exports.VerbexCacheStatistics = VerbexCacheStatistics;
+    exports.EnumerationOrder = EnumerationOrder;
+    exports.EnumerationOptions = EnumerationOptions;
+    exports.EnumerationResult = EnumerationResult;
 }

@@ -154,6 +154,9 @@ namespace Test
                 Console.WriteLine($"--- Concurrency Tests ({modeName}) ---");
                 await ConcurrencyTests.RunAllAsync(runner).ConfigureAwait(false);
 
+                Console.WriteLine($"--- Enumeration Tests ({modeName}) ---");
+                await EnumerationTests.RunAllAsync(runner).ConfigureAwait(false);
+
                 Console.WriteLine();
             }
             finally

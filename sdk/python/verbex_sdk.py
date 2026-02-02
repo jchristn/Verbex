@@ -370,6 +370,63 @@ class CredentialInfo:
     tags: Optional[Dict[str, str]] = None
 
 
+class EnumerationOrder(Enum):
+    """Specifies the ordering for enumeration results."""
+    CREATED_ASCENDING = "CreatedAscending"
+    CREATED_DESCENDING = "CreatedDescending"
+
+
+@dataclass
+class EnumerationOptions:
+    """Options for paginated enumeration requests."""
+    max_results: int = 100
+    skip: int = 0
+    continuation_token: Optional[str] = None
+    ordering: EnumerationOrder = EnumerationOrder.CREATED_DESCENDING
+
+    def to_query_params(self) -> Dict[str, str]:
+        """Convert to query parameters dictionary."""
+        params = {}
+        if self.max_results != 100:
+            params['maxResults'] = str(self.max_results)
+        if self.skip > 0:
+            params['skip'] = str(self.skip)
+        if self.continuation_token:
+            params['continuationToken'] = self.continuation_token
+        if self.ordering != EnumerationOrder.CREATED_DESCENDING:
+            params['ordering'] = self.ordering.value
+        return params
+
+
+@dataclass
+class EnumerationResult:
+    """Result container for paginated enumeration of collections."""
+    success: bool = True
+    timestamp: Optional[str] = None
+    max_results: int = 100
+    skip: int = 0
+    iterations_required: int = 1
+    continuation_token: Optional[str] = None
+    end_of_results: bool = False
+    total_records: int = 0
+    records_remaining: int = 0
+    objects: List[Any] = field(default_factory=list)
+
+    @property
+    def has_more(self) -> bool:
+        """Returns True if there are more records available to fetch."""
+        return not self.end_of_results and self.continuation_token is not None
+
+    def get_next_page_options(self) -> Optional[EnumerationOptions]:
+        """Creates EnumerationOptions to fetch the next page."""
+        if self.end_of_results or not self.continuation_token:
+            return None
+        return EnumerationOptions(
+            max_results=self.max_results,
+            continuation_token=self.continuation_token
+        )
+
+
 class VerbexClient:
     """
     Verbex SDK Client for Python.
@@ -640,17 +697,45 @@ class VerbexClient:
 
     # ==================== Index Management Endpoints ====================
 
-    def list_indices(self) -> List[IndexInfo]:
+    def list_indices(self, options: Optional[EnumerationOptions] = None) -> EnumerationResult:
         """
-        List all available indices.
+        List available indices with pagination support.
+
+        Args:
+            options: Optional pagination options
 
         Returns:
-            List of IndexInfo objects
+            EnumerationResult containing IndexInfo objects and pagination information
         """
-        data = self._make_request('GET', '/v1.0/indices')
-        if data and data.get('indices'):
-            return [self._parse_index_info(idx) for idx in data['indices']]
-        return []
+        path = '/v1.0/indices'
+        if options:
+            params = options.to_query_params()
+            if params:
+                path += '?' + '&'.join(f'{k}={v}' for k, v in params.items())
+
+        data = self._make_request('GET', path)
+        return self._parse_enumeration_result(data, self._parse_index_info)
+
+    def list_all_indices(self) -> List[IndexInfo]:
+        """
+        List all indices by iterating through all pages.
+
+        Returns:
+            List of all IndexInfo objects
+        """
+        all_items = []
+        options = EnumerationOptions(max_results=1000)
+
+        while True:
+            result = self.list_indices(options)
+            all_items.extend(result.objects)
+
+            if result.end_of_results or not result.continuation_token:
+                break
+
+            options = result.get_next_page_options()
+
+        return all_items
 
     def create_index(
         self,
@@ -790,6 +875,29 @@ class VerbexClient:
                                   data={'customMetadata': custom_metadata})
         return self._parse_index_info(data or {})
 
+    def _parse_enumeration_result(self, data: Dict, item_parser) -> EnumerationResult:
+        """Parse dictionary into EnumerationResult."""
+        if not data:
+            return EnumerationResult(objects=[])
+
+        objects = []
+        raw_objects = data.get('objects', [])
+        for obj in raw_objects:
+            objects.append(item_parser(obj))
+
+        return EnumerationResult(
+            success=data.get('success', True),
+            timestamp=data.get('timestamp'),
+            max_results=data.get('max_results', data.get('maxResults', 100)),
+            skip=data.get('skip', 0),
+            iterations_required=data.get('iterations_required', data.get('iterationsRequired', 1)),
+            continuation_token=data.get('continuation_token', data.get('continuationToken')),
+            end_of_results=data.get('end_of_results', data.get('endOfResults', False)),
+            total_records=data.get('total_records', data.get('totalRecords', 0)),
+            records_remaining=data.get('records_remaining', data.get('recordsRemaining', 0)),
+            objects=objects
+        )
+
     def _parse_index_info(self, data: Dict) -> IndexInfo:
         """Parse dictionary into IndexInfo."""
         statistics = None
@@ -897,20 +1005,49 @@ class VerbexClient:
 
     # ==================== Document Management Endpoints ====================
 
-    def list_documents(self, index_id: str) -> List[DocumentInfo]:
+    def list_documents(self, index_id: str, options: Optional[EnumerationOptions] = None) -> EnumerationResult:
         """
-        List all documents in an index.
+        List documents in an index with pagination support.
+
+        Args:
+            index_id: The index identifier
+            options: Optional pagination options
+
+        Returns:
+            EnumerationResult containing DocumentInfo objects and pagination information
+        """
+        path = f'/v1.0/indices/{index_id}/documents'
+        if options:
+            params = options.to_query_params()
+            if params:
+                path += '?' + '&'.join(f'{k}={v}' for k, v in params.items())
+
+        data = self._make_request('GET', path)
+        return self._parse_enumeration_result(data, self._parse_document_info)
+
+    def list_all_documents(self, index_id: str) -> List[DocumentInfo]:
+        """
+        List all documents in an index by iterating through all pages.
 
         Args:
             index_id: The index identifier
 
         Returns:
-            List of DocumentInfo objects
+            List of all DocumentInfo objects
         """
-        data = self._make_request('GET', f'/v1.0/indices/{index_id}/documents')
-        if data and data.get('documents'):
-            return [self._parse_document_info(doc) for doc in data['documents']]
-        return []
+        all_items = []
+        options = EnumerationOptions(max_results=1000)
+
+        while True:
+            result = self.list_documents(index_id, options)
+            all_items.extend(result.objects)
+
+            if result.end_of_results or not result.continuation_token:
+                break
+
+            options = result.get_next_page_options()
+
+        return all_items
 
     def add_document(
         self,
@@ -1426,17 +1563,45 @@ class VerbexClient:
 
     # ==================== Admin - Tenant Management Endpoints ====================
 
-    def list_tenants(self) -> List[TenantInfo]:
+    def list_tenants(self, options: Optional[EnumerationOptions] = None) -> EnumerationResult:
         """
-        List all tenants.
+        List tenants with pagination support.
+
+        Args:
+            options: Optional pagination options
 
         Returns:
-            List of TenantInfo objects
+            EnumerationResult containing TenantInfo objects and pagination information
         """
-        data = self._make_request('GET', '/v1.0/admin/tenants')
-        if data and data.get('tenants'):
-            return [self._parse_tenant_info(t) for t in data['tenants']]
-        return []
+        path = '/v1.0/tenants'
+        if options:
+            params = options.to_query_params()
+            if params:
+                path += '?' + '&'.join(f'{k}={v}' for k, v in params.items())
+
+        data = self._make_request('GET', path)
+        return self._parse_enumeration_result(data, self._parse_tenant_info)
+
+    def list_all_tenants(self) -> List[TenantInfo]:
+        """
+        List all tenants by iterating through all pages.
+
+        Returns:
+            List of all TenantInfo objects
+        """
+        all_items = []
+        options = EnumerationOptions(max_results=1000)
+
+        while True:
+            result = self.list_tenants(options)
+            all_items.extend(result.objects)
+
+            if result.end_of_results or not result.continuation_token:
+                break
+
+            options = result.get_next_page_options()
+
+        return all_items
 
     def get_tenant(self, tenant_id: str) -> TenantInfo:
         """
@@ -1511,20 +1676,49 @@ class VerbexClient:
 
     # ==================== Admin - User Management Endpoints ====================
 
-    def list_users(self, tenant_id: str) -> List[UserInfo]:
+    def list_users(self, tenant_id: str, options: Optional[EnumerationOptions] = None) -> EnumerationResult:
         """
-        List all users in a tenant.
+        List users in a tenant with pagination support.
+
+        Args:
+            tenant_id: The tenant identifier
+            options: Optional pagination options
+
+        Returns:
+            EnumerationResult containing UserInfo objects and pagination information
+        """
+        path = f'/v1.0/tenants/{tenant_id}/users'
+        if options:
+            params = options.to_query_params()
+            if params:
+                path += '?' + '&'.join(f'{k}={v}' for k, v in params.items())
+
+        data = self._make_request('GET', path)
+        return self._parse_enumeration_result(data, self._parse_user_info)
+
+    def list_all_users(self, tenant_id: str) -> List[UserInfo]:
+        """
+        List all users in a tenant by iterating through all pages.
 
         Args:
             tenant_id: The tenant identifier
 
         Returns:
-            List of UserInfo objects
+            List of all UserInfo objects
         """
-        data = self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}/users')
-        if data and data.get('users'):
-            return [self._parse_user_info(u) for u in data['users']]
-        return []
+        all_items = []
+        options = EnumerationOptions(max_results=1000)
+
+        while True:
+            result = self.list_users(tenant_id, options)
+            all_items.extend(result.objects)
+
+            if result.end_of_results or not result.continuation_token:
+                break
+
+            options = result.get_next_page_options()
+
+        return all_items
 
     def get_user(self, tenant_id: str, user_id: str) -> UserInfo:
         """
@@ -1628,20 +1822,49 @@ class VerbexClient:
 
     # ==================== Admin - Credential Management Endpoints ====================
 
-    def list_credentials(self, tenant_id: str) -> List[CredentialInfo]:
+    def list_credentials(self, tenant_id: str, options: Optional[EnumerationOptions] = None) -> EnumerationResult:
         """
-        List all credentials in a tenant.
+        List credentials in a tenant with pagination support.
+
+        Args:
+            tenant_id: The tenant identifier
+            options: Optional pagination options
+
+        Returns:
+            EnumerationResult containing CredentialInfo objects and pagination information
+        """
+        path = f'/v1.0/tenants/{tenant_id}/credentials'
+        if options:
+            params = options.to_query_params()
+            if params:
+                path += '?' + '&'.join(f'{k}={v}' for k, v in params.items())
+
+        data = self._make_request('GET', path)
+        return self._parse_enumeration_result(data, self._parse_credential_info)
+
+    def list_all_credentials(self, tenant_id: str) -> List[CredentialInfo]:
+        """
+        List all credentials in a tenant by iterating through all pages.
 
         Args:
             tenant_id: The tenant identifier
 
         Returns:
-            List of CredentialInfo objects
+            List of all CredentialInfo objects
         """
-        data = self._make_request('GET', f'/v1.0/admin/tenants/{tenant_id}/credentials')
-        if data and data.get('credentials'):
-            return [self._parse_credential_info(c) for c in data['credentials']]
-        return []
+        all_items = []
+        options = EnumerationOptions(max_results=1000)
+
+        while True:
+            result = self.list_credentials(tenant_id, options)
+            all_items.extend(result.objects)
+
+            if result.end_of_results or not result.continuation_token:
+                break
+
+            options = result.get_next_page_options()
+
+        return all_items
 
     def get_credential(self, tenant_id: str, credential_id: str) -> CredentialInfo:
         """

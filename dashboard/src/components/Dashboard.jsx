@@ -59,8 +59,8 @@ function Dashboard() {
 
     setIsLoading(true);
     try {
-      const response = await apiClient.getIndices({ signal });
-      setIndices(response.data?.indices || []);
+      const response = await apiClient.getIndices({ maxResults: 1000, skip: 0, signal });
+      setIndices(response.data?.objects || []);
     } catch (err) {
       if (err.name === 'AbortError') return;
       console.error('Failed to load indices:', err);
@@ -74,8 +74,8 @@ function Dashboard() {
     if (!apiClient) return;
 
     try {
-      const response = await apiClient.getTenants({ signal });
-      setTenants(response.data?.tenants || []);
+      const response = await apiClient.getTenants({ maxResults: 1000, skip: 0, signal });
+      setTenants(response.data?.objects || []);
     } catch (err) {
       if (err.name === 'AbortError') return;
       console.error('Failed to load tenants:', err);

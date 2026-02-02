@@ -137,8 +137,14 @@ class ApiClient {
   }
 
   // Index endpoints
-  async getIndices(options = {}) {
-    return this.get('/v1.0/indices', options);
+  async getIndices({ maxResults, skip, continuationToken, ordering, ...options } = {}) {
+    const params = [];
+    if (maxResults != null) params.push(`maxResults=${maxResults}`);
+    if (skip != null) params.push(`skip=${skip}`);
+    if (continuationToken != null && continuationToken !== '') params.push(`continuationToken=${encodeURIComponent(continuationToken)}`);
+    if (ordering != null) params.push(`ordering=${ordering}`);
+    const queryString = params.length > 0 ? '?' + params.join('&') : '';
+    return this.get(`/v1.0/indices${queryString}`, options);
   }
 
   async getIndex(id, options = {}) {
@@ -379,13 +385,53 @@ class ApiClient {
   }
 
   // Document endpoints
-  async getDocuments(indexId, { limit, offset, ...options } = {}) {
+  async getDocuments(indexId, { maxResults, skip, continuationToken, ordering, ...options } = {}) {
     let endpoint = `/v1.0/indices/${encodeURIComponent(indexId)}/documents`;
     const params = [];
-    if (limit !== undefined) params.push(`limit=${limit}`);
-    if (offset !== undefined) params.push(`offset=${offset}`);
+    if (maxResults != null) params.push(`maxResults=${maxResults}`);
+    if (skip != null) params.push(`skip=${skip}`);
+    if (continuationToken != null && continuationToken !== '') params.push(`continuationToken=${encodeURIComponent(continuationToken)}`);
+    if (ordering != null) params.push(`ordering=${ordering}`);
     if (params.length > 0) endpoint += '?' + params.join('&');
     return this.get(endpoint, options);
+  }
+
+  /**
+   * Get all documents from an index by iterating through all pages.
+   * @param {string} indexId - The index identifier
+   * @param {Object} options - Options including signal for AbortController
+   * @returns {Promise<Array>} - All documents from the index
+   */
+  async getAllDocuments(indexId, options = {}) {
+    const allDocuments = [];
+    let continuationToken = null;
+    let previousToken = null;
+    let endOfResults = false;
+    const maxResults = 1000; // Use maximum page size for efficiency
+
+    do {
+      const response = await this.getDocuments(indexId, {
+        maxResults,
+        continuationToken,
+        ordering: 'CreatedDescending',
+        ...options
+      });
+
+      const data = response.data || response;
+      const objects = data.objects || [];
+      allDocuments.push(...objects);
+
+      previousToken = continuationToken;
+      continuationToken = data.continuationToken;
+      endOfResults = data.endOfResults === true;
+
+      // Safety check: stop if no objects returned or token unchanged (prevents infinite loop)
+      if (objects.length === 0 || (continuationToken && continuationToken === previousToken)) {
+        break;
+      }
+    } while (!endOfResults && continuationToken);
+
+    return allDocuments;
   }
 
   async getDocument(indexId, docId, options = {}) {
@@ -464,8 +510,14 @@ class ApiClient {
   }
 
   // Admin - Tenant endpoints
-  async getTenants(options = {}) {
-    return this.get('/v1.0/tenants', options);
+  async getTenants({ maxResults, skip, continuationToken, ordering, ...options } = {}) {
+    const params = [];
+    if (maxResults != null) params.push(`maxResults=${maxResults}`);
+    if (skip != null) params.push(`skip=${skip}`);
+    if (continuationToken != null && continuationToken !== '') params.push(`continuationToken=${encodeURIComponent(continuationToken)}`);
+    if (ordering != null) params.push(`ordering=${ordering}`);
+    const queryString = params.length > 0 ? '?' + params.join('&') : '';
+    return this.get(`/v1.0/tenants${queryString}`, options);
   }
 
   async getTenant(tenantId, options = {}) {
@@ -499,8 +551,14 @@ class ApiClient {
   }
 
   // Admin - User endpoints
-  async getUsers(tenantId, options = {}) {
-    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/users`, options);
+  async getUsers(tenantId, { maxResults, skip, continuationToken, ordering, ...options } = {}) {
+    const params = [];
+    if (maxResults != null) params.push(`maxResults=${maxResults}`);
+    if (skip != null) params.push(`skip=${skip}`);
+    if (continuationToken != null && continuationToken !== '') params.push(`continuationToken=${encodeURIComponent(continuationToken)}`);
+    if (ordering != null) params.push(`ordering=${ordering}`);
+    const queryString = params.length > 0 ? '?' + params.join('&') : '';
+    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/users${queryString}`, options);
   }
 
   async getUser(tenantId, userId, options = {}) {
@@ -541,8 +599,14 @@ class ApiClient {
   }
 
   // Admin - Credential endpoints
-  async getCredentials(tenantId, options = {}) {
-    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials`, options);
+  async getCredentials(tenantId, { maxResults, skip, continuationToken, ordering, ...options } = {}) {
+    const params = [];
+    if (maxResults != null) params.push(`maxResults=${maxResults}`);
+    if (skip != null) params.push(`skip=${skip}`);
+    if (continuationToken != null && continuationToken !== '') params.push(`continuationToken=${encodeURIComponent(continuationToken)}`);
+    if (ordering != null) params.push(`ordering=${ordering}`);
+    const queryString = params.length > 0 ? '?' + params.join('&') : '';
+    return this.get(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials${queryString}`, options);
   }
 
   async getCredential(tenantId, credentialId, options = {}) {

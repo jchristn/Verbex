@@ -87,11 +87,12 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
     onIndexSelect(newIndex || null);
   };
 
-  // Sorting handler
+  // Sorting handler - only indexedDate is supported server-side
   const handleSort = (column, direction) => {
     setSortColumn(column);
     setSortDirection(direction);
     setCurrentPage(1);
+    // Server-side sorting is triggered by the useEffect dependency on sortDirection
   };
 
   // Filter handler
@@ -165,65 +166,23 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
     }
   };
 
-  // Filter and sort documents
-  const filteredAndSortedDocuments = useMemo(() => {
-    let result = [...documents];
+  // Filter documents (client-side filter on current page only)
+  const filteredDocuments = useMemo(() => {
+    if (!filterDocId) return documents;
 
-    // Apply filter
-    if (filterDocId) {
-      const lowerFilter = filterDocId.toLowerCase();
-      result = result.filter((doc) =>
-        doc.documentId?.toLowerCase().includes(lowerFilter)
-      );
-    }
+    const lowerFilter = filterDocId.toLowerCase();
+    return documents.filter((doc) =>
+      doc.documentId?.toLowerCase().includes(lowerFilter)
+    );
+  }, [documents, filterDocId]);
 
-    // Apply sorting
-    result.sort((a, b) => {
-      let aVal, bVal;
-
-      switch (sortColumn) {
-        case 'documentId':
-          aVal = a.documentId || '';
-          bVal = b.documentId || '';
-          break;
-        case 'documentLength':
-          aVal = a.documentLength || 0;
-          bVal = b.documentLength || 0;
-          break;
-        case 'indexedDate':
-          aVal = new Date(a.indexedDate || 0).getTime();
-          bVal = new Date(b.indexedDate || 0).getTime();
-          break;
-        case 'indexingRuntimeMs':
-          aVal = a.indexingRuntimeMs || 0;
-          bVal = b.indexingRuntimeMs || 0;
-          break;
-        default:
-          aVal = '';
-          bVal = '';
-      }
-
-      if (typeof aVal === 'string') {
-        const comparison = aVal.localeCompare(bVal);
-        return sortDirection === 'asc' ? comparison : -comparison;
-      } else {
-        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
-      }
-    });
-
-    return result;
-  }, [documents, filterDocId, sortColumn, sortDirection]);
-
-  // Pagination calculations
-  // When not filtering, use server's total count for accurate display
-  // When filtering, use filtered list length (client-side filtering)
+  // Pagination calculations - server handles pagination, we display what we get
   const isFiltering = filterDocId.trim() !== '';
-  const totalItems = isFiltering ? filteredAndSortedDocuments.length : totalDocumentCount;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const paginatedDocuments = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filteredAndSortedDocuments.slice(startIndex, startIndex + pageSize);
-  }, [filteredAndSortedDocuments, currentPage, pageSize]);
+  const totalItems = isFiltering ? filteredDocuments.length : totalDocumentCount;
+  const totalPages = Math.ceil(totalDocumentCount / pageSize);
+
+  // When filtering client-side, show filtered results; otherwise show server results directly
+  const paginatedDocuments = isFiltering ? filteredDocuments : documents;
 
   // Reset page when filter changes
   useEffect(() => {
@@ -237,7 +196,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
     }
   }, [indices, selectedIndex, onIndexSelect]);
 
-  const loadDocuments = useCallback(async (signalOrEvent) => {
+  const loadDocuments = useCallback(async (signalOrEvent, page = currentPage, size = pageSize) => {
     if (!selectedIndex || !apiClient) return;
 
     // Handle both AbortSignal (from useEffect) and no signal (from button click)
@@ -247,29 +206,41 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
     setError('');
 
     try {
-      const response = await apiClient.getDocuments(selectedIndex, { limit: 0, signal });
-      setDocuments(response.data?.documents || []);
-      setTotalDocumentCount(response.data?.totalCount ?? response.data?.documents?.length ?? 0);
+      // Use server-side pagination with skip
+      const skip = (page - 1) * size;
+      const ordering = sortDirection === 'asc' ? 'CreatedAscending' : 'CreatedDescending';
+
+      const response = await apiClient.getDocuments(selectedIndex, {
+        maxResults: size,
+        skip,
+        ordering,
+        ...(signal ? { signal } : {})
+      });
+
+      const data = response.data || response;
+      setDocuments(data.objects || []);
+      setTotalDocumentCount(data.totalRecords || 0);
     } catch (err) {
       if (err.name === 'AbortError') return;
       setError(err.message || 'Failed to load documents');
     } finally {
       setIsLoading(false);
     }
-  }, [apiClient, selectedIndex]);
+  }, [apiClient, selectedIndex, currentPage, pageSize, sortDirection]);
 
-  // Load documents when index changes
+  // Load documents when index, page, pageSize, or sort changes
   useEffect(() => {
     if (selectedIndex) {
       const abortController = new AbortController();
-      setSelectedDocIds(new Set()); // Clear selection when index changes
-      loadDocuments(abortController.signal);
+      setSelectedDocIds(new Set()); // Clear selection when data changes
+      loadDocuments(abortController.signal, currentPage, pageSize);
       return () => abortController.abort();
     } else {
       setDocuments([]);
       setSelectedDocIds(new Set());
+      setTotalDocumentCount(0);
     }
-  }, [loadDocuments]);
+  }, [selectedIndex, currentPage, pageSize, sortDirection, apiClient]);
 
   const handleAddDocument = async (e) => {
     e.preventDefault();

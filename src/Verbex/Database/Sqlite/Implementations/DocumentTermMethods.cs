@@ -113,54 +113,87 @@ WHERE dt.term_id IN ({inClause});";
 
             string inClause = string.Join(",", termIdList.Select(id => $"'{Sanitizer.Sanitize(id)}'"));
 
-            // Build label filter subquery if labels are provided
+            // Check if we have any document filters (labels or tags)
             List<string>? labelList = labels?.ToList();
-            string labelFilter = "";
-            if (labelList != null && labelList.Count > 0)
-            {
-                // Documents must have ALL specified labels (AND logic, case-insensitive)
-                List<string> labelConditions = new List<string>();
-                foreach (string label in labelList)
-                {
-                    labelConditions.Add($@"EXISTS (SELECT 1 FROM {prefix}_labels l WHERE l.document_id = d.id AND LOWER(l.label) = LOWER('{Sanitizer.Sanitize(label)}'))");
-                }
-                labelFilter = " AND " + string.Join(" AND ", labelConditions);
-            }
-
-            // Build tag filter subquery if tags are provided
-            string tagFilter = "";
-            if (tags != null && tags.Count > 0)
-            {
-                // Documents must have ALL specified tags with matching values (AND logic, exact match)
-                List<string> tagConditions = new List<string>();
-                foreach (KeyValuePair<string, string> tag in tags)
-                {
-                    tagConditions.Add($@"EXISTS (SELECT 1 FROM {prefix}_tags t WHERE t.document_id = d.id AND t.key = '{Sanitizer.Sanitize(tag.Key)}' AND t.value = '{Sanitizer.Sanitize(tag.Value)}')");
-                }
-                tagFilter = " AND " + string.Join(" AND ", tagConditions);
-            }
+            bool hasLabelFilter = labelList != null && labelList.Count > 0;
+            bool hasTagFilter = tags != null && tags.Count > 0;
+            bool hasDocumentFilter = hasLabelFilter || hasTagFilter;
 
             string query;
-            if (useAndLogic)
+
+            if (hasDocumentFilter)
             {
+                // When filtering by labels/tags, use INNER JOIN with derived table to help
+                // SQLite's query planner filter documents FIRST before scanning document_terms.
+
+                // Build filtered documents subquery - start with first filter
+                string baseFilter;
+                int filterIndex = 0;
+
+                if (hasTagFilter)
+                {
+                    KeyValuePair<string, string> firstTag = tags!.First();
+                    baseFilter = $"SELECT document_id FROM {prefix}_tags WHERE key = '{Sanitizer.Sanitize(firstTag.Key)}' AND value = '{Sanitizer.Sanitize(firstTag.Value)}'";
+                    filterIndex = 1;
+                }
+                else
+                {
+                    baseFilter = $"SELECT document_id FROM {prefix}_labels WHERE label = '{Sanitizer.Sanitize(labelList![0])}' COLLATE NOCASE";
+                    filterIndex = 1;
+                }
+
+                // Build additional filters as nested subqueries for AND logic
+                StringBuilder filteredDocsQuery = new StringBuilder(baseFilter);
+
+                // Add remaining tag filters
+                if (hasTagFilter)
+                {
+                    foreach (KeyValuePair<string, string> tag in tags!.Skip(1))
+                    {
+                        string currentQuery = filteredDocsQuery.ToString();
+                        filteredDocsQuery.Clear();
+                        filteredDocsQuery.Append($"SELECT document_id FROM ({currentQuery}) AS tf{filterIndex} WHERE document_id IN (SELECT document_id FROM {prefix}_tags WHERE key = '{Sanitizer.Sanitize(tag.Key)}' AND value = '{Sanitizer.Sanitize(tag.Value)}')");
+                        filterIndex++;
+                    }
+                }
+
+                // Add label filters
+                if (hasLabelFilter)
+                {
+                    int startIdx = hasTagFilter ? 0 : 1;
+                    foreach (string label in labelList!.Skip(startIdx))
+                    {
+                        string currentQuery = filteredDocsQuery.ToString();
+                        filteredDocsQuery.Clear();
+                        filteredDocsQuery.Append($"SELECT document_id FROM ({currentQuery}) AS lf{filterIndex} WHERE document_id IN (SELECT document_id FROM {prefix}_labels WHERE label = '{Sanitizer.Sanitize(label)}' COLLATE NOCASE)");
+                        filterIndex++;
+                    }
+                }
+
+                // Build main query with JOIN to force filter-first execution
+                string havingClause = useAndLogic ? $"HAVING COUNT(DISTINCT dt.term_id) = {termIdList.Count}" : "";
+
                 query = $@"
 SELECT dt.document_id, SUM(dt.term_frequency) as total_frequency, COUNT(DISTINCT dt.term_id) as term_count
-FROM {prefix}_document_terms dt
-JOIN {prefix}_documents d ON dt.document_id = d.id
-WHERE dt.term_id IN ({inClause}){labelFilter}{tagFilter}
+FROM ({filteredDocsQuery}) AS filtered
+INNER JOIN {prefix}_document_terms dt ON dt.document_id = filtered.document_id
+WHERE dt.term_id IN ({inClause})
 GROUP BY dt.document_id
-HAVING COUNT(DISTINCT dt.term_id) = {termIdList.Count}
+{havingClause}
 ORDER BY total_frequency DESC
 LIMIT {limit};";
             }
             else
             {
+                // No document filters - simple query on document_terms
+                string havingClause = useAndLogic ? $"HAVING COUNT(DISTINCT dt.term_id) = {termIdList.Count}" : "";
+
                 query = $@"
 SELECT dt.document_id, SUM(dt.term_frequency) as total_frequency, COUNT(DISTINCT dt.term_id) as term_count
 FROM {prefix}_document_terms dt
-JOIN {prefix}_documents d ON dt.document_id = d.id
-WHERE dt.term_id IN ({inClause}){labelFilter}{tagFilter}
+WHERE dt.term_id IN ({inClause})
 GROUP BY dt.document_id
+{havingClause}
 ORDER BY total_frequency DESC
 LIMIT {limit};";
             }
@@ -201,9 +234,10 @@ LIMIT {limit};";
             string docInClause = string.Join(",", docIdList.Select(id => $"'{Sanitizer.Sanitize(id)}'"));
             string termInClause = string.Join(",", termIdList.Select(id => $"'{Sanitizer.Sanitize(id)}'"));
 
+            // Use INDEXED BY to ensure SQLite uses the composite index for this lookup
             string query = $@"
 SELECT dt.id, dt.document_id, dt.term_id, dt.term_frequency, dt.character_positions, dt.term_positions, dt.last_update_utc, dt.created_utc, t.term
-FROM {prefix}_document_terms dt
+FROM {prefix}_document_terms dt INDEXED BY idx_{prefix}_docterms_doc_term
 JOIN {prefix}_terms t ON dt.term_id = t.id
 WHERE dt.document_id IN ({docInClause}) AND dt.term_id IN ({termInClause});";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);

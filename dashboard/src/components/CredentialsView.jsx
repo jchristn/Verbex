@@ -78,8 +78,8 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiClient.getCredentials(selectedTenant, signal ? { signal } : {});
-      setCredentials(response.data?.credentials || []);
+      const response = await apiClient.getCredentials(selectedTenant, { maxResults: 1000, skip: 0, ...(signal ? { signal } : {}) });
+      setCredentials(response.data?.objects || []);
     } catch (err) {
       if (err.name === 'AbortError') return;
       console.error('Failed to load credentials:', err);

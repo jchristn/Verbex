@@ -5,6 +5,7 @@ This document describes the REST API endpoints available in the Verbex inverted 
 ## Table of Contents
 
 - [Authentication](#authentication)
+- [Pagination](#pagination)
 - [Data Structures](#data-structures)
 - [API Endpoints Overview](#api-endpoints-overview)
 - [Health and Status](#health-and-status)
@@ -30,6 +31,72 @@ Authorization: Bearer <token>
 
 ### Getting an Authentication Token
 Use the `/v1.0/auth/login` endpoint to obtain a token by providing valid credentials.
+
+## Pagination
+
+Collection endpoints (list indices, list documents, list tenants, list users, list credentials) support standardized pagination using `EnumerationQuery` parameters and return `EnumerationResult` responses.
+
+### Query Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `maxResults` | integer | 100 | Maximum results per page (1-1000) |
+| `skip` | integer | 0 | Number of records to skip |
+| `continuationToken` | string | null | Opaque token from previous response for pagination |
+| `ordering` | string | CreatedDescending | Sort order: `CreatedAscending` or `CreatedDescending` |
+
+### EnumerationResult Response
+
+```json
+{
+  "Success": true,
+  "Timestamp": { "DateTime": "2024-01-15T10:30:00Z", "UnixTimestamp": 1705314600000 },
+  "MaxResults": 100,
+  "Skip": 0,
+  "IterationsRequired": 1,
+  "ContinuationToken": "c2tpcDoxMDA=",
+  "EndOfResults": false,
+  "TotalRecords": 250,
+  "RecordsRemaining": 150,
+  "Objects": [...]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| Success | boolean | Always true for successful requests |
+| Timestamp | object | When the result was generated |
+| MaxResults | integer | Echoed from request |
+| Skip | integer | Echoed from request |
+| IterationsRequired | integer | Always 1 for simple queries |
+| ContinuationToken | string | Token for fetching next page (null when EndOfResults is true) |
+| EndOfResults | boolean | True when this is the last page |
+| TotalRecords | long | Total count of records before pagination |
+| RecordsRemaining | long | Records remaining after this page |
+| Objects | array | The paginated items |
+
+### Pagination Example
+
+```bash
+# First page
+curl -X GET "http://localhost:8080/v1.0/indices?maxResults=10" \
+  -H "Authorization: Bearer <token>"
+
+# Next page using continuation token
+curl -X GET "http://localhost:8080/v1.0/indices?maxResults=10&continuationToken=c2tpcDoxMA==" \
+  -H "Authorization: Bearer <token>"
+
+# With ordering
+curl -X GET "http://localhost:8080/v1.0/indices?maxResults=50&ordering=CreatedAscending" \
+  -H "Authorization: Bearer <token>"
+```
+
+### Breaking Changes from Previous API
+
+- The `limit=0` pattern (return all documents) is no longer supported
+- `maxResults` must be between 1 and 1000
+- Collection endpoints now return `EnumerationResult` wrapper instead of direct arrays
+- Response structure has changed: items are in `Objects` array, not `Indices`, `Documents`, etc.
 
 ## Data Structures
 
