@@ -7,7 +7,7 @@
   ![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg)
   ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-  **A high-performance inverted index library for .NET 8.0 with SQLite storage and full-text search.**
+  **A high-performance inverted index library for full-text search.**
 
   **Verbex is in ALPHA** - we welcome your feedback, improvements, and bugfixes
 </div>
