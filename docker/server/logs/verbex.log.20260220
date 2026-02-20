@@ -1,0 +1,54 @@
+2026-02-20 23:39:48 9b6c3238def9 Debug [VerbexServer] initialized logging
+2026-02-20 23:39:48 9b6c3238def9 Info [VerbexServer] database driver initialized (Sqlite)
+2026-02-20 23:39:48 9b6c3238def9 Info [VerbexServer] database already has records, skipping default record creation
+2026-02-20 23:39:48 9b6c3238def9 Info [VerbexServer] discovering indices for 1 tenant(s)
+2026-02-20 23:39:48 9b6c3238def9 Info [IndexManager] found 1 indices for tenant 'default'
+2026-02-20 23:39:48 9b6c3238def9 Debug [IndexManager] InitializeIndexAsync: ensured prefixed tables exist for default
+2026-02-20 23:39:48 9b6c3238def9 Debug [IndexManager] InitializeIndexAsync: default opened successfully using shared database driver
+2026-02-20 23:39:48 9b6c3238def9 Info [IndexManager] initialized index 'default' (Default Index)
+2026-02-20 23:39:48 9b6c3238def9 Info [IndexManager] index discovery complete for tenant 'default', 1 indices loaded
+2026-02-20 23:39:48 9b6c3238def9 Info [VerbexServer] index discovery complete
+2026-02-20 23:39:49 9b6c3238def9 Info [RestServiceHandler] started on http://*:8080
+2026-02-20 23:39:49 9b6c3238def9 Info [VerbexServer] started at 02/20/2026 23:39:49 using process ID 1
+2026-02-20 23:40:11 3ccee37043bc Debug [VerbexServer] initialized logging
+2026-02-20 23:40:11 3ccee37043bc Info [VerbexServer] database driver initialized (Sqlite)
+2026-02-20 23:40:11 3ccee37043bc Info [VerbexServer] database already has records, skipping default record creation
+2026-02-20 23:40:11 3ccee37043bc Info [VerbexServer] discovering indices for 1 tenant(s)
+2026-02-20 23:40:11 3ccee37043bc Info [IndexManager] found 1 indices for tenant 'default'
+2026-02-20 23:40:11 3ccee37043bc Debug [IndexManager] InitializeIndexAsync: ensured prefixed tables exist for default
+2026-02-20 23:40:11 3ccee37043bc Debug [IndexManager] InitializeIndexAsync: default opened successfully using shared database driver
+2026-02-20 23:40:11 3ccee37043bc Info [IndexManager] initialized index 'default' (Default Index)
+2026-02-20 23:40:11 3ccee37043bc Info [IndexManager] index discovery complete for tenant 'default', 1 indices loaded
+2026-02-20 23:40:11 3ccee37043bc Info [VerbexServer] index discovery complete
+2026-02-20 23:40:11 3ccee37043bc Info [RestServiceHandler] started on http://*:8080
+2026-02-20 23:40:11 3ccee37043bc Info [VerbexServer] started at 02/20/2026 23:40:11 using process ID 1
+2026-02-20 23:40:15 3ccee37043bc Debug [RestServiceHandler] OPTIONS /v1.0/auth/validate 200 (7.76ms)
+2026-02-20 23:40:15 3ccee37043bc Debug [RestServiceHandler] GET /v1.0/auth/validate 200 (20.71ms)
+2026-02-20 23:40:15 3ccee37043bc Debug [RestServiceHandler] OPTIONS /v1.0/indices?maxResults=1000&skip=0 200 (0.42ms)
+2026-02-20 23:40:15 3ccee37043bc Debug [RestServiceHandler] OPTIONS /v1.0/tenants?maxResults=1000&skip=0 200 (0.34ms)
+2026-02-20 23:40:15 3ccee37043bc Debug [RestServiceHandler] GET /v1.0/tenants?maxResults=1000&skip=0 200 (25.24ms)
+2026-02-20 23:40:15 3ccee37043bc Debug [RestServiceHandler] GET /v1.0/indices?maxResults=1000&skip=0 200 (30.67ms)
+2026-02-20 23:42:43 ba0ae16566d9 Debug [VerbexServer] initialized logging
+2026-02-20 23:42:43 ba0ae16566d9 Info [VerbexServer] database driver initialized (Sqlite)
+2026-02-20 23:42:43 ba0ae16566d9 Info [VerbexServer] database already has records, skipping default record creation
+2026-02-20 23:42:43 ba0ae16566d9 Info [VerbexServer] discovering indices for 1 tenant(s)
+2026-02-20 23:42:43 ba0ae16566d9 Info [IndexManager] found 1 indices for tenant 'default'
+2026-02-20 23:42:43 ba0ae16566d9 Debug [IndexManager] InitializeIndexAsync: ensured prefixed tables exist for default
+2026-02-20 23:42:43 ba0ae16566d9 Debug [IndexManager] InitializeIndexAsync: default opened successfully using shared database driver
+2026-02-20 23:42:43 ba0ae16566d9 Info [IndexManager] initialized index 'default' (Default Index)
+2026-02-20 23:42:43 ba0ae16566d9 Info [IndexManager] index discovery complete for tenant 'default', 1 indices loaded
+2026-02-20 23:42:43 ba0ae16566d9 Info [VerbexServer] index discovery complete
+2026-02-20 23:42:43 ba0ae16566d9 Info [RestServiceHandler] started on http://*:8080
+2026-02-20 23:42:43 ba0ae16566d9 Info [VerbexServer] started at 02/20/2026 23:42:43 using process ID 1
+2026-02-20 23:43:42 607c58305a36 Debug [VerbexServer] initialized logging
+2026-02-20 23:43:43 607c58305a36 Info [VerbexServer] database driver initialized (Sqlite)
+2026-02-20 23:43:43 607c58305a36 Info [VerbexServer] database already has records, skipping default record creation
+2026-02-20 23:43:43 607c58305a36 Info [VerbexServer] discovering indices for 1 tenant(s)
+2026-02-20 23:43:43 607c58305a36 Info [IndexManager] found 1 indices for tenant 'default'
+2026-02-20 23:43:43 607c58305a36 Debug [IndexManager] InitializeIndexAsync: ensured prefixed tables exist for default
+2026-02-20 23:43:43 607c58305a36 Debug [IndexManager] InitializeIndexAsync: default opened successfully using shared database driver
+2026-02-20 23:43:43 607c58305a36 Info [IndexManager] initialized index 'default' (Default Index)
+2026-02-20 23:43:43 607c58305a36 Info [IndexManager] index discovery complete for tenant 'default', 1 indices loaded
+2026-02-20 23:43:43 607c58305a36 Info [VerbexServer] index discovery complete
+2026-02-20 23:43:43 607c58305a36 Info [RestServiceHandler] started on http://*:8080
+2026-02-20 23:43:43 607c58305a36 Info [VerbexServer] started at 02/20/2026 23:43:43 using process ID 1

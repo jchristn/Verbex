@@ -6,4 +6,6 @@ services:
       - "8200:8200"
     volumes:
       - ./dashboard/logs:/app/logs
+    environment:
+      - VERBEX_SERVER_URL=http://verbex-server:8080
     restart: unless-stopped

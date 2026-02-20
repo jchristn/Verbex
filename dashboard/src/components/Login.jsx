@@ -7,9 +7,13 @@ function Login() {
   const navigate = useNavigate();
   const { login, theme, toggleTheme } = useAuth();
 
-  const [serverUrl, setServerUrl] = useState(__DEFAULT_SERVER_URL__);
+  const [serverUrl, setServerUrl] = useState(
+    window.__ENV__?.VERBEX_SERVER_URL || __DEFAULT_SERVER_URL__
+  );
   const [authMode, setAuthMode] = useState('token');
-  const [token, setToken] = useState(__DEFAULT_API_KEY__);
+  const [token, setToken] = useState(
+    window.__ENV__?.VERBEX_API_KEY || __DEFAULT_API_KEY__
+  );
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');

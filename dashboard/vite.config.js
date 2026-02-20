@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   define: {
-    __DEFAULT_SERVER_URL__: JSON.stringify(process.env.VERBEX_SERVER_URL || 'http://localhost:8080'),
+    __DEFAULT_SERVER_URL__: JSON.stringify(process.env.VERBEX_SERVER_URL || 'http://verbex-server:8080'),
     __DEFAULT_API_KEY__: JSON.stringify(process.env.VERBEX_API_KEY || 'verbexadmin')
   },
   server: {
