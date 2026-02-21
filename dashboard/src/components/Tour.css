@@ -1,0 +1,137 @@
+.tour-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2000;
+  pointer-events: none;
+}
+
+.tour-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: auto;
+}
+
+.tour-spotlight {
+  position: fixed;
+  border-radius: 8px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+  transition: top 0.3s ease, left 0.3s ease, width 0.3s ease, height 0.3s ease;
+  pointer-events: none;
+  z-index: 2001;
+}
+
+.tour-tooltip {
+  position: fixed;
+  background: var(--bg-primary);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  padding: 20px;
+  width: 320px;
+  z-index: 2002;
+  pointer-events: auto;
+  animation: tourTooltipIn 0.25s ease-out;
+  transition: top 0.3s ease, left 0.3s ease;
+}
+
+@keyframes tourTooltipIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tour-tooltip-center {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg-primary);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  padding: 32px;
+  width: 400px;
+  z-index: 2002;
+  pointer-events: auto;
+  animation: tourTooltipIn 0.25s ease-out;
+  text-align: center;
+}
+
+.tour-tooltip-arrow {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--bg-primary);
+  transform: rotate(45deg);
+}
+
+.tour-tooltip-arrow-top {
+  top: -6px;
+  left: 24px;
+}
+
+.tour-tooltip-arrow-left {
+  left: -6px;
+  top: 20px;
+}
+
+.tour-tooltip-title {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tour-tooltip-desc {
+  margin: 0 0 16px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.tour-tooltip-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tour-step-indicators {
+  display: flex;
+  gap: 6px;
+}
+
+.tour-step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-color);
+  transition: background 0.2s;
+}
+
+.tour-step-dot.active {
+  background: var(--color-primary);
+}
+
+.tour-tooltip-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.tour-tooltip-actions .btn {
+  padding: 6px 14px;
+  font-size: 0.825rem;
+}
+
+.tour-finish-icon {
+  font-size: 2.5rem;
+  margin-bottom: 12px;
+}

@@ -1,0 +1,268 @@
+.wizard-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px 20px;
+  gap: 0;
+}
+
+.wizard-progress-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.wizard-progress-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 2px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  transition: all 0.3s ease;
+  z-index: 1;
+}
+
+.wizard-progress-circle.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: white;
+}
+
+.wizard-progress-circle.completed {
+  border-color: var(--color-success);
+  background: var(--color-success);
+  color: white;
+}
+
+.wizard-progress-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  white-space: nowrap;
+}
+
+.wizard-progress-label.active {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.wizard-progress-line {
+  width: 60px;
+  height: 2px;
+  background: var(--border-color);
+  align-self: flex-start;
+  margin-top: 16px;
+  transition: background 0.3s ease;
+}
+
+.wizard-progress-line.completed {
+  background: var(--color-success);
+}
+
+.wizard-content {
+  min-height: 280px;
+}
+
+.wizard-intro-text {
+  font-size: 0.925rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0 0 16px;
+}
+
+.wizard-step-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wizard-step-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+}
+
+.wizard-step-number {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.wizard-step-text {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.wizard-section-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+
+.wizard-section-desc {
+  font-size: 0.825rem;
+  color: var(--text-secondary);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.wizard-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+  margin-top: 16px;
+}
+
+.wizard-footer-left,
+.wizard-footer-right {
+  display: flex;
+  gap: 8px;
+}
+
+.wizard-footer .btn {
+  padding: 8px 18px;
+  font-size: 0.875rem;
+}
+
+.wizard-results {
+  margin-top: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.wizard-results-header {
+  padding: 10px 16px;
+  background: var(--bg-secondary);
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.wizard-result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  font-size: 0.825rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.wizard-result-row:last-child {
+  border-bottom: none;
+}
+
+.wizard-result-rank {
+  width: 40px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.wizard-result-name {
+  flex: 1;
+  color: var(--text-primary);
+}
+
+.wizard-result-score {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.wizard-result-terms {
+  color: var(--text-secondary);
+  margin-left: 12px;
+  font-size: 0.75rem;
+}
+
+.wizard-complete-icon {
+  font-size: 3rem;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.wizard-complete-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+  margin: 0 0 12px;
+}
+
+.wizard-complete-text {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+
+.wizard-next-steps {
+  list-style: disc;
+  padding-left: 20px;
+  margin: 0 0 20px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+
+.wizard-complete-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.wizard-complete-actions .btn {
+  padding: 10px 24px;
+}
+
+.wizard-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.wizard-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.wizard-checkbox label {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.wizard-sample-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-style: italic;
+}

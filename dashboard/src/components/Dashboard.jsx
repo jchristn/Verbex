@@ -3,6 +3,9 @@ import { useAuth } from '../context/AuthContext';
 import Topbar from './Topbar';
 import Sidebar from './Sidebar';
 import Workspace from './Workspace';
+import WelcomeModal from './WelcomeModal';
+import Tour from './Tour';
+import SetupWizard from './SetupWizard';
 import './Dashboard.css';
 
 function Dashboard() {
@@ -140,6 +143,9 @@ function Dashboard() {
           onTenantSelectAndNavigate={handleTenantSelectAndNavigate}
         />
       </div>
+      <WelcomeModal />
+      <Tour />
+      <SetupWizard onNavigate={handleViewChange} />
     </div>
   );
 }

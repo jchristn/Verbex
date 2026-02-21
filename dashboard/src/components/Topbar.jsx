@@ -13,11 +13,11 @@ function Topbar() {
 
   return (
     <header className="topbar">
-      <div className="topbar-brand">
+      <div className="topbar-brand" data-tour-id="topbar-logo">
         <img src="/logo.png" alt="Verbex" className="topbar-logo" />
       </div>
 
-      <div className="topbar-server">
+      <div className="topbar-server" data-tour-id="topbar-server">
         <span className="server-label">Server:</span>
         <span className="server-url">{serverUrl}</span>
       </div>
@@ -27,6 +27,7 @@ function Topbar() {
           className="topbar-btn"
           onClick={toggleTheme}
           title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+          data-tour-id="topbar-theme"
         >
           {theme === 'light' ? '🌙' : '☀️'}
         </button>
@@ -34,6 +35,7 @@ function Topbar() {
           className="topbar-btn logout-btn"
           onClick={handleLogout}
           title="Logout"
+          data-tour-id="topbar-logout"
         >
           Logout
         </button>

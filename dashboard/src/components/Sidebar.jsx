@@ -1,16 +1,19 @@
+import { useOnboarding } from '../context/OnboardingContext';
 import './Sidebar.css';
 
 function Sidebar({ activeView, onViewChange, indices, isAdmin }) {
+  const { startTour, startWizard } = useOnboarding();
+
   const navItems = [
-    { id: 'indices', label: 'Indices', icon: '📚' },
-    { id: 'documents', label: 'Documents', icon: '📄' },
-    { id: 'search', label: 'Search', icon: '🔍' }
+    { id: 'indices', label: 'Indices', icon: '📚', tourId: 'nav-indices' },
+    { id: 'documents', label: 'Documents', icon: '📄', tourId: 'nav-documents' },
+    { id: 'search', label: 'Search', icon: '🔍', tourId: 'nav-search' }
   ];
 
   const adminItems = [
-    { id: 'tenants', label: 'Tenants', icon: '🏢' },
-    { id: 'users', label: 'Users', icon: '👤' },
-    { id: 'credentials', label: 'Credentials', icon: '🔑' }
+    { id: 'tenants', label: 'Tenants', icon: '🏢', tourId: 'nav-tenants' },
+    { id: 'users', label: 'Users', icon: '👤', tourId: 'nav-users' },
+    { id: 'credentials', label: 'Credentials', icon: '🔑', tourId: 'nav-credentials' }
   ];
 
   return (
@@ -23,6 +26,7 @@ function Sidebar({ activeView, onViewChange, indices, isAdmin }) {
               key={item.id}
               className={`nav-item ${activeView === item.id ? 'active' : ''}`}
               onClick={() => onViewChange(item.id)}
+              data-tour-id={item.tourId}
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="nav-label">{item.label}</span>
@@ -37,6 +41,7 @@ function Sidebar({ activeView, onViewChange, indices, isAdmin }) {
                 key={item.id}
                 className={`nav-item ${activeView === item.id ? 'active' : ''}`}
                 onClick={() => onViewChange(item.id)}
+                data-tour-id={item.tourId}
               >
                 <span className="nav-icon">{item.icon}</span>
                 <span className="nav-label">{item.label}</span>
@@ -50,6 +55,15 @@ function Sidebar({ activeView, onViewChange, indices, isAdmin }) {
         <div className="sidebar-info">
           <span className="info-label">Total Indices</span>
           <span className="info-value">{indices.length}</span>
+        </div>
+        <div className="sidebar-onboarding-links">
+          <button className="sidebar-link" onClick={startTour}>
+            Take Tour
+          </button>
+          <span className="sidebar-link-separator">|</span>
+          <button className="sidebar-link" onClick={startWizard}>
+            Setup Wizard
+          </button>
         </div>
       </div>
     </aside>
