@@ -1200,6 +1200,16 @@
             <param name="token">Cancellation token.</param>
             <returns>List of documents.</returns>
         </member>
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetByIdsWithMetadataAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Gets multiple documents by IDs with all metadata (labels, tags) populated.
+            Uses batch queries for efficient retrieval.
+            </summary>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+            <param name="ids">Document IDs.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of documents with populated labels and tags.</returns>
+        </member>
         <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetCountAsync(System.String,System.Threading.CancellationToken)">
             <summary>
             Gets the total number of documents.
@@ -2502,6 +2512,9 @@
         <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetByIdsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetByIdsWithMetadataAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
         <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetCountAsync(System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
@@ -3042,6 +3055,9 @@
         <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetByIdsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetByIdsWithMetadataAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
         <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetCountAsync(System.String,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
@@ -3579,6 +3595,9 @@
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetByIdsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetByIdsWithMetadataAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetCountAsync(System.String,System.Threading.CancellationToken)">
@@ -4218,6 +4237,9 @@
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetByIdsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetByIdsWithMetadataAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetCountAsync(System.String,System.Threading.CancellationToken)">

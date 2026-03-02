@@ -191,6 +191,52 @@ WHERE id IN ({inClause});";
         }
 
         /// <inheritdoc />
+        public async Task<List<DocumentMetadata>> GetByIdsWithMetadataAsync(string tablePrefix, IEnumerable<string> ids, CancellationToken token = default)
+        {
+            List<DocumentMetadata> docs = await GetByIdsAsync(tablePrefix, ids, token).ConfigureAwait(false);
+            if (docs.Count == 0)
+            {
+                return docs;
+            }
+
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            List<string> idList = docs.ConvertAll(d => d.DocumentId);
+            string inClause = string.Join(",", idList.ConvertAll(id => $"'{Sanitizer.Sanitize(id)}'"));
+
+            string labelsQuery = $"SELECT document_id, label FROM {prefix}_labels WHERE document_id IN ({inClause});";
+            DataTable labelsResult = await _Driver.ExecuteQueryAsync(labelsQuery, false, token).ConfigureAwait(false);
+
+            string tagsQuery = $"SELECT document_id, key, value FROM {prefix}_tags WHERE document_id IN ({inClause});";
+            DataTable tagsResult = await _Driver.ExecuteQueryAsync(tagsQuery, false, token).ConfigureAwait(false);
+
+            Dictionary<string, DocumentMetadata> docLookup = new Dictionary<string, DocumentMetadata>();
+            foreach (DocumentMetadata doc in docs)
+            {
+                docLookup[doc.DocumentId] = doc;
+            }
+
+            foreach (DataRow row in labelsResult.Rows)
+            {
+                string docId = row["document_id"]?.ToString() ?? string.Empty;
+                if (docLookup.TryGetValue(docId, out DocumentMetadata? doc))
+                {
+                    doc.AddLabel(row["label"]?.ToString() ?? string.Empty);
+                }
+            }
+
+            foreach (DataRow row in tagsResult.Rows)
+            {
+                string docId = row["document_id"]?.ToString() ?? string.Empty;
+                if (docLookup.TryGetValue(docId, out DocumentMetadata? doc))
+                {
+                    doc.SetTag(row["key"]?.ToString() ?? string.Empty, row["value"]?.ToString() ?? string.Empty);
+                }
+            }
+
+            return docs;
+        }
+
+        /// <inheritdoc />
         public async Task<long> GetCountAsync(string tablePrefix, CancellationToken token = default)
         {
             string prefix = TablePrefixValidator.Validate(tablePrefix);

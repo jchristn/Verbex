@@ -107,6 +107,16 @@ namespace Verbex.Database.Interfaces
         Task<List<DocumentMetadata>> GetByIdsAsync(string tablePrefix, IEnumerable<string> ids, CancellationToken token = default);
 
         /// <summary>
+        /// Gets multiple documents by IDs with all metadata (labels, tags) populated.
+        /// Uses batch queries for efficient retrieval.
+        /// </summary>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+        /// <param name="ids">Document IDs.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>List of documents with populated labels and tags.</returns>
+        Task<List<DocumentMetadata>> GetByIdsWithMetadataAsync(string tablePrefix, IEnumerable<string> ids, CancellationToken token = default);
+
+        /// <summary>
         /// Gets the total number of documents.
         /// </summary>
         /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>

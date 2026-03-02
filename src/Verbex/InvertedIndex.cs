@@ -1048,7 +1048,7 @@ namespace Verbex
                 }
             }
 
-            List<DocumentMetadata> documents = await _Driver.Documents.GetByIdsAsync(_TablePrefix, docIds, token).ConfigureAwait(false);
+            List<DocumentMetadata> documents = await _Driver.Documents.GetByIdsWithMetadataAsync(_TablePrefix, docIds, token).ConfigureAwait(false);
 
             timingInfo.DocumentMetadataMs = sw.ElapsedMilliseconds;
             timingInfo.DocumentsFetched = documents.Count;
