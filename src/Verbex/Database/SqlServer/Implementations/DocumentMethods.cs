@@ -3,6 +3,8 @@ namespace Verbex.Database.SqlServer.Implementations
     using System;
     using System.Collections.Generic;
     using System.Data;
+    using System.Linq;
+    using System.Text;
     using System.Text.Json;
     using System.Threading;
     using System.Threading.Tasks;
@@ -341,6 +343,103 @@ WHERE id IN ({deleteInClause});";
             await _Driver.ExecuteQueryAsync(deleteQuery, true, token).ConfigureAwait(false);
 
             return existingIds;
+        }
+
+        /// <inheritdoc />
+        public async Task<List<DocumentMetadata>> GetAllFilteredAsync(string tablePrefix, int limit, int offset, IEnumerable<string>? labels, IDictionary<string, string>? tags, CancellationToken token = default)
+        {
+            List<string>? labelList = labels?.ToList();
+            bool hasLabelFilter = labelList != null && labelList.Count > 0;
+            bool hasTagFilter = tags != null && tags.Count > 0;
+
+            if (!hasLabelFilter && !hasTagFilter)
+            {
+                return await GetAllAsync(tablePrefix, limit, offset, token).ConfigureAwait(false);
+            }
+
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            string filteredDocsSubquery = BuildFilteredDocumentsSubquery(prefix, labelList, hasLabelFilter, tags, hasTagFilter);
+
+            string query = $@"
+SELECT d.id, d.name, d.content_sha256, d.document_length, d.term_count, d.custom_metadata, d.indexing_runtime_ms, d.indexed_utc, d.last_update_utc, d.created_utc
+FROM ({filteredDocsSubquery}) AS filtered
+INNER JOIN {prefix}_documents d ON d.id = filtered.document_id
+ORDER BY d.created_utc DESC
+OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY;";
+
+            DataTable result = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
+            List<DocumentMetadata> docs = new List<DocumentMetadata>();
+            foreach (DataRow row in result.Rows)
+            {
+                docs.Add(MapRowToDocument(row));
+            }
+            return docs;
+        }
+
+        /// <inheritdoc />
+        public async Task<long> GetFilteredCountAsync(string tablePrefix, IEnumerable<string>? labels, IDictionary<string, string>? tags, CancellationToken token = default)
+        {
+            List<string>? labelList = labels?.ToList();
+            bool hasLabelFilter = labelList != null && labelList.Count > 0;
+            bool hasTagFilter = tags != null && tags.Count > 0;
+
+            if (!hasLabelFilter && !hasTagFilter)
+            {
+                return await GetCountAsync(tablePrefix, token).ConfigureAwait(false);
+            }
+
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            string filteredDocsSubquery = BuildFilteredDocumentsSubquery(prefix, labelList, hasLabelFilter, tags, hasTagFilter);
+
+            string query = $"SELECT COUNT(*) FROM ({filteredDocsSubquery}) AS filtered;";
+
+            DataTable result = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
+            return result.Rows.Count > 0 ? Convert.ToInt64(result.Rows[0][0]) : 0;
+        }
+
+        private static string BuildFilteredDocumentsSubquery(string prefix, List<string>? labelList, bool hasLabelFilter, IDictionary<string, string>? tags, bool hasTagFilter)
+        {
+            string baseFilter;
+            int filterIndex = 0;
+
+            if (hasTagFilter)
+            {
+                KeyValuePair<string, string> firstTag = tags!.First();
+                baseFilter = $"SELECT document_id FROM {prefix}_tags WHERE [key] = '{Sanitizer.Sanitize(firstTag.Key)}' AND [value] = '{Sanitizer.Sanitize(firstTag.Value)}'";
+                filterIndex = 1;
+            }
+            else
+            {
+                baseFilter = $"SELECT document_id FROM {prefix}_labels WHERE label = '{Sanitizer.Sanitize(labelList![0])}'";
+                filterIndex = 1;
+            }
+
+            StringBuilder filteredDocsQuery = new StringBuilder(baseFilter);
+
+            if (hasTagFilter)
+            {
+                foreach (KeyValuePair<string, string> tag in tags!.Skip(1))
+                {
+                    string currentQuery = filteredDocsQuery.ToString();
+                    filteredDocsQuery.Clear();
+                    filteredDocsQuery.Append($"SELECT document_id FROM ({currentQuery}) AS tf{filterIndex} WHERE document_id IN (SELECT document_id FROM {prefix}_tags WHERE [key] = '{Sanitizer.Sanitize(tag.Key)}' AND [value] = '{Sanitizer.Sanitize(tag.Value)}')");
+                    filterIndex++;
+                }
+            }
+
+            if (hasLabelFilter)
+            {
+                int startIdx = hasTagFilter ? 0 : 1;
+                foreach (string label in labelList!.Skip(startIdx))
+                {
+                    string currentQuery = filteredDocsQuery.ToString();
+                    filteredDocsQuery.Clear();
+                    filteredDocsQuery.Append($"SELECT document_id FROM ({currentQuery}) AS lf{filterIndex} WHERE document_id IN (SELECT document_id FROM {prefix}_labels WHERE label = '{Sanitizer.Sanitize(label)}')");
+                    filterIndex++;
+                }
+            }
+
+            return filteredDocsQuery.ToString();
         }
 
         private static DocumentMetadata MapRowToDocument(DataRow row)

@@ -12,6 +12,8 @@ namespace Verbex.Sdk
 
         /// <summary>
         /// Search query string.
+        /// Use <c>"*"</c> as a wildcard to return all documents (optionally filtered by labels/tags)
+        /// without term matching. Wildcard results have a score of 0.
         /// </summary>
         public string Query
         {

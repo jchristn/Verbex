@@ -414,7 +414,6 @@ namespace Verbex.Sdk
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of index information objects.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        [Obsolete("Use ListIndicesAsync(EnumerationOptions, CancellationToken) instead.")]
         public async Task<List<IndexInfo>> ListIndicesAsync(CancellationToken cancellationToken = default)
         {
             EnumerationResult<IndexInfo> result = await ListIndicesAsync(null, cancellationToken).ConfigureAwait(false);
@@ -586,7 +585,6 @@ namespace Verbex.Sdk
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of document information objects.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        [Obsolete("Use ListDocumentsAsync(string, EnumerationOptions, CancellationToken) instead.")]
         public async Task<List<DocumentInfo>> ListDocumentsAsync(string indexId, CancellationToken cancellationToken = default)
         {
             EnumerationResult<DocumentInfo> result = await ListDocumentsAsync(indexId, null, cancellationToken).ConfigureAwait(false);
@@ -1094,7 +1092,6 @@ namespace Verbex.Sdk
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of tenant information objects.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        [Obsolete("Use ListTenantsAsync(EnumerationOptions, CancellationToken) instead.")]
         public async Task<List<TenantInfo>> ListTenantsAsync(CancellationToken cancellationToken = default)
         {
             EnumerationResult<TenantInfo> result = await ListTenantsAsync(null, cancellationToken).ConfigureAwait(false);
@@ -1196,7 +1193,6 @@ namespace Verbex.Sdk
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of user information objects.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        [Obsolete("Use ListUsersAsync(string, EnumerationOptions, CancellationToken) instead.")]
         public async Task<List<UserInfo>> ListUsersAsync(string tenantId, CancellationToken cancellationToken = default)
         {
             EnumerationResult<UserInfo> result = await ListUsersAsync(tenantId, null, cancellationToken).ConfigureAwait(false);
@@ -1310,7 +1306,6 @@ namespace Verbex.Sdk
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of credential information objects.</returns>
         /// <exception cref="VerbexException">Thrown when the request fails.</exception>
-        [Obsolete("Use ListCredentialsAsync(string, EnumerationOptions, CancellationToken) instead.")]
         public async Task<List<CredentialInfo>> ListCredentialsAsync(string tenantId, CancellationToken cancellationToken = default)
         {
             EnumerationResult<CredentialInfo> result = await ListCredentialsAsync(tenantId, null, cancellationToken).ConfigureAwait(false);

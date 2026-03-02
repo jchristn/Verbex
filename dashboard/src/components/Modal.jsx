@@ -33,7 +33,7 @@ function Modal({ isOpen, onClose, title, children, size = 'medium', headerAction
             <h3 className="modal-title">{title}</h3>
             {headerAction}
           </div>
-          <button className="modal-close" onClick={onClose}>
+          <button className="modal-close" onClick={onClose} title="Close dialog">
             &times;
           </button>
         </div>

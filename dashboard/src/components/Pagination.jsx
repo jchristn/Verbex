@@ -34,6 +34,7 @@ function Pagination({
           <select
             value={pageSize}
             onChange={(e) => onPageSizeChange(parseInt(e.target.value, 10))}
+            title="Items per page"
           >
             {pageSizeOptions.map(size => (
               <option key={size} value={size}>{size}</option>
@@ -99,6 +100,7 @@ function Pagination({
             max={totalPages}
             placeholder="#"
             onKeyDown={handlePageInput}
+            title="Jump to page number"
           />
         </div>
       </div>

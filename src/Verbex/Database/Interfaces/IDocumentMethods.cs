@@ -74,6 +74,30 @@ namespace Verbex.Database.Interfaces
         Task<List<DocumentMetadata>> GetAllAsync(string tablePrefix, int limit = 100, int offset = 0, CancellationToken token = default);
 
         /// <summary>
+        /// Gets all documents with pagination and optional label/tag filtering.
+        /// Documents must have ALL specified labels and ALL specified tags to match (AND logic).
+        /// </summary>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+        /// <param name="limit">Maximum number of documents to return.</param>
+        /// <param name="offset">Number of documents to skip.</param>
+        /// <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
+        /// <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>List of matching documents.</returns>
+        Task<List<DocumentMetadata>> GetAllFilteredAsync(string tablePrefix, int limit, int offset, IEnumerable<string>? labels, IDictionary<string, string>? tags, CancellationToken token = default);
+
+        /// <summary>
+        /// Gets the count of documents matching optional label/tag filters.
+        /// Documents must have ALL specified labels and ALL specified tags to match (AND logic).
+        /// </summary>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+        /// <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
+        /// <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Count of matching documents.</returns>
+        Task<long> GetFilteredCountAsync(string tablePrefix, IEnumerable<string>? labels, IDictionary<string, string>? tags, CancellationToken token = default);
+
+        /// <summary>
         /// Gets multiple documents by IDs.
         /// </summary>
         /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>

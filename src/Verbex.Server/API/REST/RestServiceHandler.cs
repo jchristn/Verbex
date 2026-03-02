@@ -1821,12 +1821,34 @@ namespace Verbex.Server.API.REST
                     }
                     else
                     {
+                        // Parse tag.* query parameters for filtering
+                        Dictionary<string, string>? tagParams = null;
+                        NameValueCollection? queryElements = ctx.Request.Query?.Elements;
+                        if (queryElements != null)
+                        {
+                            foreach (string? key in queryElements.AllKeys)
+                            {
+                                if (key != null && key.StartsWith("tag.", StringComparison.OrdinalIgnoreCase) && key.Length > 4)
+                                {
+                                    string tagKey = key.Substring(4);
+                                    string? tagValue = queryElements[key];
+                                    if (tagValue != null)
+                                    {
+                                        tagParams ??= new Dictionary<string, string>();
+                                        tagParams[tagKey] = tagValue;
+                                    }
+                                }
+                            }
+                        }
+
                         // Paginated list behavior using EnumerationQuery
                         EnumerationQuery query = EnumerationQuery.Parse(
                             ctx.Request.Query?.Elements?["maxResults"],
                             ctx.Request.Query?.Elements?["skip"],
                             ctx.Request.Query?.Elements?["continuationToken"],
-                            ctx.Request.Query?.Elements?["ordering"]
+                            ctx.Request.Query?.Elements?["ordering"],
+                            ctx.Request.Query?.Elements?["labels"],
+                            tagParams
                         );
 
                         // Handle continuation token if provided
@@ -1836,7 +1858,18 @@ namespace Verbex.Server.API.REST
                             query.Skip = tokenSkip;
                         }
 
-                        long totalCount = await index.GetDocumentCountAsync().ConfigureAwait(false);
+                        bool hasFilters = (query.Labels != null && query.Labels.Count > 0) ||
+                                          (query.Tags != null && query.Tags.Count > 0);
+
+                        long totalCount;
+                        if (hasFilters)
+                        {
+                            totalCount = await index.GetDocumentCountAsync(query.Labels, query.Tags).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            totalCount = await index.GetDocumentCountAsync().ConfigureAwait(false);
+                        }
 
                         // Use database-level pagination for efficiency
                         // Database orders by created_utc DESC by default
@@ -1850,10 +1883,22 @@ namespace Verbex.Server.API.REST
                             int actualLimit = Math.Min(query.MaxResults, availableFromEnd);
                             int ascendingOffset = (int)Math.Max(0, totalCount - query.Skip - actualLimit);
 
-                            pagedDocuments = await index.GetDocumentsAsync(
-                                limit: actualLimit,
-                                offset: ascendingOffset
-                            ).ConfigureAwait(false);
+                            if (hasFilters)
+                            {
+                                pagedDocuments = await index.GetDocumentsAsync(
+                                    limit: actualLimit,
+                                    offset: ascendingOffset,
+                                    labels: query.Labels,
+                                    tags: query.Tags
+                                ).ConfigureAwait(false);
+                            }
+                            else
+                            {
+                                pagedDocuments = await index.GetDocumentsAsync(
+                                    limit: actualLimit,
+                                    offset: ascendingOffset
+                                ).ConfigureAwait(false);
+                            }
 
                             // Reverse to get ascending order
                             pagedDocuments.Reverse();
@@ -1861,10 +1906,22 @@ namespace Verbex.Server.API.REST
                         else
                         {
                             // Descending order - use database directly
-                            pagedDocuments = await index.GetDocumentsAsync(
-                                limit: query.MaxResults,
-                                offset: query.Skip
-                            ).ConfigureAwait(false);
+                            if (hasFilters)
+                            {
+                                pagedDocuments = await index.GetDocumentsAsync(
+                                    limit: query.MaxResults,
+                                    offset: query.Skip,
+                                    labels: query.Labels,
+                                    tags: query.Tags
+                                ).ConfigureAwait(false);
+                            }
+                            else
+                            {
+                                pagedDocuments = await index.GetDocumentsAsync(
+                                    limit: query.MaxResults,
+                                    offset: query.Skip
+                                ).ConfigureAwait(false);
+                            }
                         }
 
                         EnumerationResult<DocumentMetadata> result = new EnumerationResult<DocumentMetadata>(query, pagedDocuments, totalCount);

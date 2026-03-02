@@ -494,8 +494,11 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
     <div className="indices-view">
       <div className="workspace-header">
         <div className="workspace-title">
-          <h2>Indices</h2>
-          <span className="count-badge">{filteredAndSortedIndices.length}</span>
+          <div className="workspace-title-row">
+            <h2>Indices</h2>
+            <span className="count-badge">{filteredAndSortedIndices.length}</span>
+          </div>
+          <p className="workspace-subtitle">Create, configure, and manage your search indices</p>
         </div>
         <div className="workspace-actions">
           <button className="btn btn-icon" onClick={onRefresh} title="Refresh">
@@ -505,10 +508,10 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
             </svg>
           </button>
-          <button className="btn btn-secondary" onClick={() => setShowRestoreModal(true)}>
+          <button className="btn btn-secondary" onClick={() => setShowRestoreModal(true)} title="Restore an index from a backup file">
             Restore Backup
           </button>
-          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
+          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} title="Create a new index">
             Create Index
           </button>
         </div>
@@ -522,7 +525,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
             <p className="empty-state-description">
               Create your first index to start indexing and searching documents.
             </p>
-            <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
+            <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} title="Create a new index">
               Create Index
             </button>
           </div>
@@ -683,7 +686,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
               <div className="section-header">
                 <h4>General Information</h4>
                 {!editingDetails && (
-                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditDetails}>
+                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditDetails} title="Edit index details">
                     Edit
                   </button>
                 )}
@@ -698,6 +701,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
                       placeholder="Index name"
+                      title="Index name"
                     />
                   </div>
                   <div className="form-group">
@@ -708,6 +712,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                       onChange={(e) => setEditDescription(e.target.value)}
                       placeholder="Index description"
                       rows={3}
+                      title="Index description"
                     />
                   </div>
                   <div className="form-group">
@@ -716,6 +721,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                         type="checkbox"
                         checked={editEnabled}
                         onChange={(e) => setEditEnabled(e.target.checked)}
+                        title="Enable or disable this index"
                       />
                       <span>Enabled</span>
                     </label>
@@ -725,6 +731,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                       className="btn btn-sm btn-primary"
                       onClick={handleSaveDetails}
                       disabled={isSavingDetails}
+                      title="Save changes"
                     >
                       {isSavingDetails ? 'Saving...' : 'Save'}
                     </button>
@@ -732,6 +739,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                       className="btn btn-sm btn-secondary"
                       onClick={handleCancelEditDetails}
                       disabled={isSavingDetails}
+                      title="Cancel editing"
                     >
                       Cancel
                     </button>
@@ -803,7 +811,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                 <h4>Cache Configuration</h4>
                 {!editingCacheSettings && (
                   <div className="section-actions">
-                    <button className="btn btn-sm btn-secondary" onClick={handleStartEditCacheSettings}>
+                    <button className="btn btn-sm btn-secondary" onClick={handleStartEditCacheSettings} title="Edit cache settings">
                       Edit
                     </button>
                     {indexDetails.cacheConfiguration?.enabled && (
@@ -811,6 +819,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                         className="btn btn-sm btn-secondary"
                         onClick={handleClearCache}
                         disabled={isClearingCache}
+                        title="Clear all cached data"
                       >
                         {isClearingCache ? 'Clearing...' : 'Clear Cache'}
                       </button>
@@ -829,6 +838,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                           name="enabled"
                           checked={editCacheConfig?.enabled || false}
                           onChange={handleCacheConfigChange}
+                          title="Enable or disable caching"
                         />
                         Enable Caching
                       </label>
@@ -845,6 +855,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                                 name="enableTermCache"
                                 checked={editCacheConfig?.enableTermCache || false}
                                 onChange={handleCacheConfigChange}
+                                title="Enable or disable term cache"
                               />
                               Enable
                             </label>
@@ -859,6 +870,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                                   value={editCacheConfig?.termCacheCapacity || 10000}
                                   onChange={handleCacheConfigChange}
                                   min={1}
+                                  title="Term cache capacity"
                                 />
                               </div>
                               <div className="form-group">
@@ -869,6 +881,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                                   value={editCacheConfig?.termCacheTtlSeconds || 300}
                                   onChange={handleCacheConfigChange}
                                   min={1}
+                                  title="Term cache TTL in seconds"
                                 />
                               </div>
                             </div>
@@ -884,6 +897,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                                 name="enableDocumentCache"
                                 checked={editCacheConfig?.enableDocumentCache || false}
                                 onChange={handleCacheConfigChange}
+                                title="Enable or disable document cache"
                               />
                               Enable
                             </label>
@@ -898,6 +912,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                                   value={editCacheConfig?.documentCacheCapacity || 5000}
                                   onChange={handleCacheConfigChange}
                                   min={1}
+                                  title="Document cache capacity"
                                 />
                               </div>
                               <div className="form-group">
@@ -908,6 +923,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                                   value={editCacheConfig?.documentCacheTtlSeconds || 600}
                                   onChange={handleCacheConfigChange}
                                   min={1}
+                                  title="Document cache TTL in seconds"
                                 />
                               </div>
                             </div>
@@ -923,6 +939,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                                 name="enableStatisticsCache"
                                 checked={editCacheConfig?.enableStatisticsCache || false}
                                 onChange={handleCacheConfigChange}
+                                title="Enable or disable statistics cache"
                               />
                               Enable
                             </label>
@@ -937,6 +954,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                                   value={editCacheConfig?.statisticsCacheTtlSeconds || 60}
                                   onChange={handleCacheConfigChange}
                                   min={1}
+                                  title="Statistics cache TTL in seconds"
                                 />
                               </div>
                             </div>
@@ -950,6 +968,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                       className="btn btn-sm btn-primary"
                       onClick={handleSaveCacheSettings}
                       disabled={isSavingCacheSettings}
+                      title="Save cache settings"
                     >
                       {isSavingCacheSettings ? 'Saving...' : 'Save'}
                     </button>
@@ -957,6 +976,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                       className="btn btn-sm btn-secondary"
                       onClick={handleCancelEditCacheSettings}
                       disabled={isSavingCacheSettings}
+                      title="Cancel editing"
                     >
                       Cancel
                     </button>
@@ -1070,7 +1090,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
               <div className="section-header">
                 <h4>Labels</h4>
                 {!editingLabels && (
-                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditLabels}>
+                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditLabels} title="Edit labels">
                     Edit
                   </button>
                 )}
@@ -1087,6 +1107,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                       className="btn btn-sm btn-primary"
                       onClick={handleSaveLabels}
                       disabled={isSavingLabels}
+                      title="Save labels"
                     >
                       {isSavingLabels ? 'Saving...' : 'Save'}
                     </button>
@@ -1094,6 +1115,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                       className="btn btn-sm btn-secondary"
                       onClick={handleCancelEditLabels}
                       disabled={isSavingLabels}
+                      title="Cancel editing"
                     >
                       Cancel
                     </button>
@@ -1114,7 +1136,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
               <div className="section-header">
                 <h4>Tags</h4>
                 {!editingTags && (
-                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditTags}>
+                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditTags} title="Edit tags">
                     Edit
                   </button>
                 )}
@@ -1132,6 +1154,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                       className="btn btn-sm btn-primary"
                       onClick={handleSaveTags}
                       disabled={isSavingTags}
+                      title="Save tags"
                     >
                       {isSavingTags ? 'Saving...' : 'Save'}
                     </button>
@@ -1139,6 +1162,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                       className="btn btn-sm btn-secondary"
                       onClick={handleCancelEditTags}
                       disabled={isSavingTags}
+                      title="Cancel editing"
                     >
                       Cancel
                     </button>
@@ -1163,7 +1187,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
               <div className="section-header">
                 <h4>Custom Metadata</h4>
                 {!editingCustomMetadata && (
-                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditCustomMetadata}>
+                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditCustomMetadata} title="Edit custom metadata">
                     Edit
                   </button>
                 )}
@@ -1181,6 +1205,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                       className="btn btn-sm btn-primary"
                       onClick={handleSaveCustomMetadata}
                       disabled={isSavingCustomMetadata}
+                      title="Save custom metadata"
                     >
                       {isSavingCustomMetadata ? 'Saving...' : 'Save'}
                     </button>
@@ -1188,6 +1213,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                       className="btn btn-sm btn-secondary"
                       onClick={handleCancelEditCustomMetadata}
                       disabled={isSavingCustomMetadata}
+                      title="Cancel editing"
                     >
                       Cancel
                     </button>
@@ -1204,6 +1230,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
               <button
                 className="btn btn-danger"
                 onClick={() => handleDelete({ identifier: indexDetails.identifier, name: indexDetails.name })}
+                title="Permanently delete this index"
               >
                 Delete Index
               </button>
@@ -1215,6 +1242,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                   setIndexDetails(null);
                   setEditingDetails(false);
                 }}
+                title="Close this dialog"
               >
                 Close
               </button>
@@ -1300,6 +1328,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                 id="restore-file-input"
                 className="file-input-hidden"
                 accept=".vbx,.zip"
+                title="Select a backup file to restore"
                 onChange={(e) => {
                   const file = e.target.files[0];
                   setRestoreFile(file);
@@ -1323,6 +1352,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
               value={restoreName}
               onChange={(e) => setRestoreName(e.target.value)}
               placeholder="Leave empty to use original name"
+              title="Name for the restored index (optional)"
             />
           </div>
           <div className="modal-actions">
@@ -1330,6 +1360,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
               className="btn btn-primary"
               onClick={handleRestore}
               disabled={!restoreFile || isRestoring}
+              title="Restore the backup as a new index"
             >
               {isRestoring ? 'Restoring...' : 'Restore'}
             </button>
@@ -1343,6 +1374,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                 setRestoreError(null);
               }}
               disabled={isRestoring}
+              title="Cancel"
             >
               Cancel
             </button>
@@ -1379,6 +1411,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                 id="restore-replace-file-input"
                 className="file-input-hidden"
                 accept=".vbx,.zip"
+                title="Select a backup file to restore"
                 onChange={(e) => {
                   const file = e.target.files[0];
                   setRestoreReplaceFile(file);
@@ -1399,6 +1432,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
               className="btn btn-danger"
               onClick={handleRestoreReplace}
               disabled={!restoreReplaceFile || isRestoringReplace}
+              title="Replace index data with backup contents"
             >
               {isRestoringReplace ? 'Restoring...' : 'Replace Index'}
             </button>
@@ -1412,6 +1446,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                 setRestoreReplaceError(null);
               }}
               disabled={isRestoringReplace}
+              title="Cancel"
             >
               Cancel
             </button>
@@ -1463,6 +1498,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                 setTopTermsData(null);
                 setTopTermsError(null);
               }}
+              title="Close this dialog"
             >
               Close
             </button>

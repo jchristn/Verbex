@@ -27,6 +27,7 @@ function Sidebar({ activeView, onViewChange, indices, isAdmin }) {
               className={`nav-item ${activeView === item.id ? 'active' : ''}`}
               onClick={() => onViewChange(item.id)}
               data-tour-id={item.tourId}
+              title={item.label}
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="nav-label">{item.label}</span>
@@ -42,6 +43,7 @@ function Sidebar({ activeView, onViewChange, indices, isAdmin }) {
                 className={`nav-item ${activeView === item.id ? 'active' : ''}`}
                 onClick={() => onViewChange(item.id)}
                 data-tour-id={item.tourId}
+                title={item.label}
               >
                 <span className="nav-icon">{item.icon}</span>
                 <span className="nav-label">{item.label}</span>
@@ -57,11 +59,11 @@ function Sidebar({ activeView, onViewChange, indices, isAdmin }) {
           <span className="info-value">{indices.length}</span>
         </div>
         <div className="sidebar-onboarding-links">
-          <button className="sidebar-link" onClick={startTour}>
+          <button className="sidebar-link" onClick={startTour} title="Start the guided dashboard tour">
             Take Tour
           </button>
           <span className="sidebar-link-separator">|</span>
-          <button className="sidebar-link" onClick={startWizard}>
+          <button className="sidebar-link" onClick={startWizard} title="Open the setup wizard">
             Setup Wizard
           </button>
         </div>

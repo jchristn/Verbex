@@ -16,12 +16,20 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
   const [error, setError] = useState('');
   const [searchTime, setSearchTime] = useState(null);
 
-  // Advanced search options
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  // Search options
   const [searchMode, setSearchMode] = useState('any'); // 'any' (OR), 'all' (AND)
-  const [minScore, setMinScore] = useState(0);
+
+  // Min score (inline search option, not part of filter apply)
+  const [minScore, setMinScore] = useState('');
+
+  // Filter bar state (input fields)
+  const [showFilters, setShowFilters] = useState(false);
   const [filterLabels, setFilterLabels] = useState('');
   const [filterTags, setFilterTags] = useState('');
+
+  // Applied filter state (only updated on Apply)
+  const [appliedLabels, setAppliedLabels] = useState(null);
+  const [appliedTags, setAppliedTags] = useState(null);
 
   // Sorting state
   const [sortColumn, setSortColumn] = useState('rank');
@@ -35,9 +43,15 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
   const handleIndexChange = (e) => {
     const newIndex = e.target.value;
     onIndexSelect(newIndex || null);
-    // Clear results when index changes
+    // Clear results and filters when index changes
     setResults(null);
     setError('');
+    setFilterLabels('');
+    setFilterTags('');
+    setMinScore('');
+    setAppliedLabels(null);
+    setAppliedTags(null);
+    setShowFilters(false);
   };
 
   // Auto-select if only one index available
@@ -46,6 +60,54 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
       onIndexSelect(indices[0].identifier);
     }
   }, [indices, selectedIndex, onIndexSelect]);
+
+  // Filter parsing helpers
+  const parseLabels = (str) => {
+    if (!str || !str.trim()) return null;
+    const parsed = str.split(',').map(l => l.trim()).filter(l => l.length > 0);
+    return parsed.length > 0 ? parsed : null;
+  };
+
+  const parseTags = (str) => {
+    if (!str || !str.trim()) return null;
+    const tags = {};
+    str.split(',').forEach(pair => {
+      const eqIdx = pair.indexOf('=');
+      if (eqIdx > 0) {
+        const key = pair.substring(0, eqIdx).trim();
+        const value = pair.substring(eqIdx + 1).trim();
+        if (key) tags[key] = value;
+      }
+    });
+    return Object.keys(tags).length > 0 ? tags : null;
+  };
+
+  const parseMinScore = (str) => {
+    if (!str || !str.trim()) return 0;
+    const val = parseFloat(str);
+    return isNaN(val) ? 0 : val;
+  };
+
+  const handleApplyFilters = () => {
+    setAppliedLabels(parseLabels(filterLabels));
+    setAppliedTags(parseTags(filterTags));
+  };
+
+  const handleClearFilters = () => {
+    setFilterLabels('');
+    setFilterTags('');
+    setAppliedLabels(null);
+    setAppliedTags(null);
+  };
+
+  const hasAppliedFilters = appliedLabels !== null || appliedTags !== null;
+
+  const filtersAreDirty = useMemo(() => {
+    const pendingLabels = parseLabels(filterLabels);
+    const pendingTags = parseTags(filterTags);
+    return JSON.stringify(pendingLabels) !== JSON.stringify(appliedLabels) ||
+           JSON.stringify(pendingTags) !== JSON.stringify(appliedTags);
+  }, [filterLabels, filterTags, appliedLabels, appliedTags]);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -65,37 +127,19 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
     setResults(null);
 
     try {
-      // Build search query based on mode
       let searchQuery = query.trim();
 
-      // Parse labels filter (comma-separated)
-      const labels = filterLabels.trim()
-        ? filterLabels.split(',').map(l => l.trim()).filter(l => l)
-        : null;
-
-      // Parse tags filter (key=value pairs, comma-separated)
-      let tags = null;
-      if (filterTags.trim()) {
-        tags = {};
-        filterTags.split(',').forEach(pair => {
-          const [key, value] = pair.split('=').map(s => s.trim());
-          if (key && value !== undefined) {
-            tags[key] = value;
-          }
-        });
-        if (Object.keys(tags).length === 0) tags = null;
-      }
-
       const useAndLogic = searchMode === 'all';
-      const response = await apiClient.search(selectedIndex, searchQuery, maxResults, labels, tags, useAndLogic);
+      const response = await apiClient.search(selectedIndex, searchQuery, maxResults, appliedLabels, appliedTags, useAndLogic);
 
       // Filter results by minimum score if specified
       let filteredResults = response.data;
-      if (minScore > 0 && filteredResults?.results) {
+      const effectiveMinScore = parseMinScore(minScore);
+      if (effectiveMinScore > 0 && filteredResults?.results) {
         filteredResults = {
           ...filteredResults,
-          results: filteredResults.results.filter(r => (r.score || 0) >= minScore),
-          totalCount: filteredResults.results.filter(r => (r.score || 0) >= minScore).length
+          results: filteredResults.results.filter(r => (r.score || 0) >= effectiveMinScore),
+          totalCount: filteredResults.results.filter(r => (r.score || 0) >= effectiveMinScore).length
         };
       }
 
@@ -202,6 +246,7 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
       <div className="workspace-header">
         <div className="workspace-title">
           <h2>Search</h2>
+          <p className="workspace-subtitle">Query your indices and explore search results</p>
         </div>
         <div className="workspace-actions">
           <div className="index-selector-inline">
@@ -210,6 +255,7 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
               id="search-index-select"
               value={selectedIndex || ''}
               onChange={handleIndexChange}
+              title="Select an index to search"
             >
               <option value="">Select an index...</option>
               {indices.map((index) => (
@@ -223,7 +269,70 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
       </div>
 
       {/* Search Form */}
-      <div className="workspace-card search-form-card">
+      <div className="workspace-card">
+        <div className="doc-filter-bar">
+          <button
+            className="doc-filter-toggle"
+            onClick={() => setShowFilters(!showFilters)}
+            title="Show or hide label and tag filters"
+          >
+            {showFilters ? '\u25BC Hide Filters' : '\u25B6 Filter by Labels/Tags'}
+          </button>
+          {hasAppliedFilters && !showFilters && (
+            <span className="doc-filter-active-badge">Filters active</span>
+          )}
+          {showFilters && (
+            <div className="doc-filter-panel">
+              <div className="doc-filter-row">
+                <div className="doc-filter-field">
+                  <label htmlFor="searchFilterLabels">Labels</label>
+                  <input
+                    type="text"
+                    id="searchFilterLabels"
+                    placeholder="important, reviewed"
+                    value={filterLabels}
+                    onChange={(e) => setFilterLabels(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleApplyFilters(); } }}
+                    title="Filter results by labels (comma-separated)"
+                  />
+                  <span className="doc-filter-hint">Comma-separated, AND logic</span>
+                </div>
+                <div className="doc-filter-field">
+                  <label htmlFor="searchFilterTags">Tags</label>
+                  <input
+                    type="text"
+                    id="searchFilterTags"
+                    placeholder="category=tech, status=published"
+                    value={filterTags}
+                    onChange={(e) => setFilterTags(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleApplyFilters(); } }}
+                    title="Filter results by tags (key=value, comma-separated)"
+                  />
+                  <span className="doc-filter-hint">key=value pairs, comma-separated, AND logic</span>
+                </div>
+              </div>
+              <div className="doc-filter-actions">
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={handleApplyFilters}
+                  disabled={!filtersAreDirty}
+                  title="Apply the current label and tag filters"
+                >
+                  Apply Filters
+                </button>
+                {hasAppliedFilters && (
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={handleClearFilters}
+                    title="Remove all active filters"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
         <form className="search-form" onSubmit={handleSearch}>
           <div className="search-input-wrapper">
             <input
@@ -232,8 +341,9 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Enter search terms..."
+              placeholder="Enter search terms or * for all documents..."
               autoFocus
+              title="Enter search terms or * for all documents"
             />
             {query && (
               <button
@@ -247,6 +357,9 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
             )}
           </div>
 
+          <div className="search-hint">
+            Use <strong>*</strong> as a catch-all to return all documents. Combine with label/tag filters to browse matching documents.
+          </div>
           <div className="search-controls">
             <div className="search-options">
               <div className="search-option">
@@ -255,6 +368,7 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
                   id="searchMode"
                   value={searchMode}
                   onChange={(e) => setSearchMode(e.target.value)}
+                  title="Choose how search terms are matched"
                 >
                   <option value="any">Any term (OR)</option>
                   <option value="all">All terms (AND)</option>
@@ -267,6 +381,7 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
                   id="maxResults"
                   value={maxResults}
                   onChange={(e) => setMaxResults(parseInt(e.target.value, 10))}
+                  title="Maximum number of results to return"
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
@@ -276,63 +391,29 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
                 </select>
               </div>
 
-              <button
-                type="button"
-                className="advanced-toggle-btn"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-              >
-                {showAdvanced ? '▼ Less options' : '▶ More options'}
-              </button>
-            </div>
-
-            {showAdvanced && (
-              <div className="advanced-options">
-                <div className="search-option">
-                  <label htmlFor="minScore">Min Score:</label>
-                  <input
-                    type="number"
-                    id="minScore"
-                    value={minScore}
-                    onChange={(e) => setMinScore(parseFloat(e.target.value) || 0)}
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    className="score-input"
-                  />
-                  <span className="option-hint">0-1 (0 = all results)</span>
-                </div>
-                <div className="search-option filter-option">
-                  <label htmlFor="filterLabels">Filter by Labels:</label>
-                  <input
-                    type="text"
-                    id="filterLabels"
-                    value={filterLabels}
-                    onChange={(e) => setFilterLabels(e.target.value)}
-                    placeholder="important, reviewed"
-                    className="filter-input"
-                  />
-                  <span className="option-hint">Comma-separated (AND logic)</span>
-                </div>
-                <div className="search-option filter-option">
-                  <label htmlFor="filterTags">Filter by Tags:</label>
-                  <input
-                    type="text"
-                    id="filterTags"
-                    value={filterTags}
-                    onChange={(e) => setFilterTags(e.target.value)}
-                    placeholder="category=tech, status=published"
-                    className="filter-input"
-                  />
-                  <span className="option-hint">key=value pairs, comma-separated (AND logic)</span>
-                </div>
+              <div className="search-option">
+                <label htmlFor="minScore">Min Score:</label>
+                <input
+                  type="number"
+                  id="minScore"
+                  value={minScore}
+                  onChange={(e) => setMinScore(e.target.value)}
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  className="score-input"
+                  placeholder="0"
+                  title="Minimum relevance score (0-1, 0 shows all results)"
+                />
               </div>
-            )}
+            </div>
 
             <div className="search-actions">
               <button
                 type="submit"
                 className="btn btn-primary"
                 disabled={isSearching || !query.trim() || !selectedIndex}
+                title="Execute the search"
               >
                 {isSearching ? 'Searching...' : 'Search'}
               </button>
@@ -607,6 +688,7 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
                   setShowDetailModal(false);
                   setSelectedResult(null);
                 }}
+                title="Close this dialog"
               >
                 Close
               </button>

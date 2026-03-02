@@ -189,10 +189,12 @@ Removes a specific document from the index.
 
 #### `vbx doc ls`
 
-Lists all documents in the current index.
+Lists all documents in the current index, optionally filtered by labels and/or tags.
 
 **Options:**
 - `--index <name>`, `-i` - Target index (uses active index if not specified)
+- `--label <label>`, `-L` - Filter by label (can be repeated)
+- `--tag <key>=<value>`, `-t` - Filter by tag key-value pair (can be repeated)
 
 **Output Columns:**
 - `Name` - Document identifier
@@ -219,7 +221,8 @@ Performs full-text search on the current index.
 
 **Options:**
 - `--and` - Use AND logic (all terms must match). Default is OR logic
-- `--filter <key>=<value>`, `-f` - Metadata filter (can be repeated, filters combined with AND)
+- `--filter <key>=<value>`, `-f` - Tag filter (can be repeated, filters combined with AND)
+- `--label <label>`, `-L` - Label filter (can be repeated)
 - `--limit <n>`, `-l` - Maximum number of results (default: 10)
 - `--index <name>`, `-i` - Index to search (uses active index if not specified)
 
@@ -239,14 +242,26 @@ vbx search "machine learning" --and
 # Limit results
 vbx search "technology" --limit 5
 
-# Search with metadata filter
+# Wildcard search (return all documents)
+vbx search "*"
+
+# Wildcard search filtered by label
+vbx search "*" --label research
+
+# Wildcard search filtered by tag
+vbx search "*" --filter category=nlp
+
+# Search with label filter
+vbx search "learning" --label research
+
+# Search with tag filter
 vbx search "learning" --filter category=tech
 
-# Multiple metadata filters (AND logic)
+# Multiple tag filters (AND logic)
 vbx search "neural networks" --filter category=tech --filter author=Alice
 
-# Combined options
-vbx search "deep learning" --and --filter year=2024 --limit 20
+# Combined label and tag filters
+vbx search "deep learning" --label research --filter year=2024 --limit 20
 ```
 
 ### Statistics & Analytics
@@ -491,6 +506,24 @@ vbx search "neural network"
 vbx search "learning" --filter category=nlp
 vbx search "learning" --filter author=Smith
 vbx search "learning" --filter author=Smith --filter year=2024
+
+# Search by content + label
+vbx search "learning" --label research
+
+# Wildcard: list all documents with a specific label
+vbx search "*" --label research
+
+# Wildcard: list all documents with a specific tag
+vbx search "*" --filter author=Smith
+
+# List documents filtered by label
+vbx doc ls --label research
+
+# List documents filtered by tag
+vbx doc ls --tag author=Smith
+
+# List documents filtered by both label and tag
+vbx doc ls --label research --tag year=2024
 ```
 
 ### Performance Analysis

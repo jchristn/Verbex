@@ -318,8 +318,11 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
     <div className="users-view">
       <div className="workspace-header">
         <div className="workspace-title">
-          <h2>Users</h2>
-          {selectedTenant && <span className="count-badge">{filteredAndSortedUsers.length}</span>}
+          <div className="workspace-title-row">
+            <h2>Users</h2>
+            {selectedTenant && <span className="count-badge">{filteredAndSortedUsers.length}</span>}
+          </div>
+          <p className="workspace-subtitle">Create and manage user accounts within a tenant</p>
         </div>
         <div className="workspace-actions">
           {selectedTenant && (
@@ -331,7 +334,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
                   <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
                 </svg>
               </button>
-              <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
+              <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} title="Create a new user">
                 Create User
               </button>
             </>
@@ -347,6 +350,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
           value={selectedTenant || ''}
           onChange={(e) => onTenantSelect && onTenantSelect(e.target.value || null)}
           className="tenant-select"
+          title="Select a tenant to manage users"
         >
           <option value="">-- Select a tenant --</option>
           {tenants?.map((tenant) => (
@@ -383,7 +387,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
             <p className="empty-state-description">
               Create your first user for tenant "{selectedTenantData?.name || selectedTenant}".
             </p>
-            <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
+            <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} title="Create a new user">
               Create User
             </button>
           </div>
@@ -531,6 +535,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
               placeholder="user@example.com"
               disabled={isCreating}
               autoFocus
+              title="User email address"
             />
           </div>
           <div className="form-group">
@@ -542,6 +547,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
               onChange={(e) => setCreatePassword(e.target.value)}
               placeholder="At least 6 characters"
               disabled={isCreating}
+              title="Set a password (min 6 characters)"
             />
           </div>
           <div className="form-row">
@@ -554,6 +560,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
                 onChange={(e) => setCreateFirstName(e.target.value)}
                 placeholder="Optional"
                 disabled={isCreating}
+                title="User first name (optional)"
               />
             </div>
             <div className="form-group">
@@ -565,6 +572,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
                 onChange={(e) => setCreateLastName(e.target.value)}
                 placeholder="Optional"
                 disabled={isCreating}
+                title="User last name (optional)"
               />
             </div>
           </div>
@@ -575,6 +583,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
                 checked={createIsAdmin}
                 onChange={(e) => setCreateIsAdmin(e.target.checked)}
                 disabled={isCreating}
+                title="Grant tenant administrator privileges"
               />
               <span>Tenant Administrator</span>
             </label>
@@ -585,6 +594,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
               className="btn btn-secondary"
               onClick={handleCloseCreateModal}
               disabled={isCreating}
+              title="Cancel"
             >
               Cancel
             </button>
@@ -592,6 +602,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
               type="submit"
               className="btn btn-primary"
               disabled={isCreating}
+              title="Create the user"
             >
               {isCreating ? 'Creating...' : 'Create User'}
             </button>
@@ -656,6 +667,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
               <button
                 className="btn btn-danger"
                 onClick={() => handleDelete(selectedUser)}
+                title="Permanently delete this user"
               >
                 Delete User
               </button>
@@ -665,6 +677,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
                   setShowDetailModal(false);
                   setSelectedUser(null);
                 }}
+                title="Close this dialog"
               >
                 Close
               </button>
@@ -710,6 +723,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
               placeholder="user@example.com"
               disabled={isEditingUser}
               autoFocus
+              title="User email address"
             />
           </div>
           <div className="form-group">
@@ -721,6 +735,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
               onChange={(e) => setEditPassword(e.target.value)}
               placeholder="Leave blank to keep current password"
               disabled={isEditingUser}
+              title="Set a new password (min 6 characters)"
             />
             <span className="form-hint">Leave blank to keep current password</span>
           </div>
@@ -734,6 +749,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
                 onChange={(e) => setEditFirstName(e.target.value)}
                 placeholder="Optional"
                 disabled={isEditingUser}
+                title="User first name (optional)"
               />
             </div>
             <div className="form-group">
@@ -745,6 +761,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
                 onChange={(e) => setEditLastName(e.target.value)}
                 placeholder="Optional"
                 disabled={isEditingUser}
+                title="User last name (optional)"
               />
             </div>
           </div>
@@ -755,6 +772,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
                 checked={editIsAdmin}
                 onChange={(e) => setEditIsAdmin(e.target.checked)}
                 disabled={isEditingUser}
+                title="Grant tenant administrator privileges"
               />
               <span>Tenant Administrator</span>
             </label>
@@ -766,6 +784,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
                 checked={editActive}
                 onChange={(e) => setEditActive(e.target.checked)}
                 disabled={isEditingUser}
+                title="Enable or disable this user"
               />
               <span>Active</span>
             </label>
@@ -791,6 +810,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
               className="btn btn-secondary"
               onClick={handleCloseEditModal}
               disabled={isEditingUser}
+              title="Cancel"
             >
               Cancel
             </button>
@@ -798,6 +818,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
               type="submit"
               className="btn btn-primary"
               disabled={isEditingUser}
+              title="Save changes"
             >
               {isEditingUser ? 'Saving...' : 'Save Changes'}
             </button>

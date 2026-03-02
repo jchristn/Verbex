@@ -57,6 +57,7 @@ const AlertModal = ({
           <button
             className={`btn btn-alert btn-alert-${variant}`}
             onClick={onClose}
+            title="Dismiss this alert"
           >
             {buttonLabel}
           </button>

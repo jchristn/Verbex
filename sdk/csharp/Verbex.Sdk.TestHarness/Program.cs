@@ -213,8 +213,8 @@ namespace Verbex.Sdk.TestHarness
 
         private async Task TestListIndicesInitialAsync()
         {
-            List<IndexInfo> indices = await _Client!.ListIndicesAsync().ConfigureAwait(false);
-            AssertNotNull(indices, "indices");
+            EnumerationResult<IndexInfo> result = await _Client!.ListIndicesAsync(null).ConfigureAwait(false);
+            AssertNotNull(result, "indices");
         }
 
         private async Task TestCreateIndexAsync()
@@ -275,8 +275,8 @@ namespace Verbex.Sdk.TestHarness
 
         private async Task TestListIndicesAfterCreateAsync()
         {
-            List<IndexInfo> indices = await _Client!.ListIndicesAsync().ConfigureAwait(false);
-            bool found = indices.Exists(idx => idx.Identifier == _TestIndexId);
+            EnumerationResult<IndexInfo> result = await _Client!.ListIndicesAsync(null).ConfigureAwait(false);
+            bool found = result.Objects.Exists(idx => idx.Identifier == _TestIndexId);
             AssertTrue(found, "test index should be in list");
         }
 
@@ -363,9 +363,9 @@ namespace Verbex.Sdk.TestHarness
 
         private async Task TestListDocumentsEmptyAsync()
         {
-            List<DocumentInfo> documents = await _Client!.ListDocumentsAsync(_TestIndexId).ConfigureAwait(false);
+            EnumerationResult<DocumentInfo> documents = await _Client!.ListDocumentsAsync(_TestIndexId, null).ConfigureAwait(false);
             AssertNotNull(documents, "documents");
-            AssertEquals(documents.Count, 0, "documents.Count");
+            AssertEquals(documents.Objects.Count, 0, "documents.Count");
         }
 
         private async Task TestAddDocumentAsync()
@@ -412,10 +412,10 @@ namespace Verbex.Sdk.TestHarness
 
         private async Task TestListDocumentsAfterAddAsync()
         {
-            List<DocumentInfo> documents = await _Client!.ListDocumentsAsync(_TestIndexId).ConfigureAwait(false);
+            EnumerationResult<DocumentInfo> documents = await _Client!.ListDocumentsAsync(_TestIndexId, null).ConfigureAwait(false);
             AssertNotNull(documents, "documents");
-            AssertEquals(documents.Count, _TestDocuments.Count, "documents.Count");
-            foreach (DocumentInfo doc in documents)
+            AssertEquals(documents.Objects.Count, _TestDocuments.Count, "documents.Count");
+            foreach (DocumentInfo doc in documents.Objects)
             {
                 AssertNotNull(doc.Id, "document.Id");
             }
@@ -807,6 +807,136 @@ namespace Verbex.Sdk.TestHarness
             AssertGreaterThan(searchResult.Results.Count, 0, "should find documents matching both label and tag");
         }
 
+        // ==================== Filtered Enumeration Tests ====================
+
+        private async Task TestListDocumentsWithLabelFilterAsync()
+        {
+            // Add 3 documents, 2 with a specific label
+            AddDocumentData doc1Result = await _Client!.AddDocumentAsync(
+                _TestIndexId,
+                "First labeled document for enumeration filter testing.",
+                null,
+                new List<string> { "enumfilter" },
+                null
+            ).ConfigureAwait(false);
+            _TestDocuments.Add(doc1Result.DocumentId!);
+
+            AddDocumentData doc2Result = await _Client!.AddDocumentAsync(
+                _TestIndexId,
+                "Second labeled document for enumeration filter testing.",
+                null,
+                new List<string> { "enumfilter" },
+                null
+            ).ConfigureAwait(false);
+            _TestDocuments.Add(doc2Result.DocumentId!);
+
+            AddDocumentData doc3Result = await _Client!.AddDocumentAsync(
+                _TestIndexId,
+                "Third document without the filter label."
+            ).ConfigureAwait(false);
+            _TestDocuments.Add(doc3Result.DocumentId!);
+
+            // List documents with label filter
+            EnumerationOptions options = new EnumerationOptions
+            {
+                Labels = new List<string> { "enumfilter" }
+            };
+            EnumerationResult<DocumentInfo> result = await _Client!.ListDocumentsAsync(_TestIndexId, options).ConfigureAwait(false);
+            AssertNotNull(result, "result");
+            AssertEquals(result.Objects.Count, 2, "filtered documents count");
+        }
+
+        private async Task TestListDocumentsWithTagFilterAsync()
+        {
+            // Add 3 documents, 2 with a specific tag
+            AddDocumentData doc1Result = await _Client!.AddDocumentAsync(
+                _TestIndexId,
+                "First tagged document for enumeration tag filter testing.",
+                null,
+                null,
+                new Dictionary<string, string> { { "enumtag", "yes" } }
+            ).ConfigureAwait(false);
+            _TestDocuments.Add(doc1Result.DocumentId!);
+
+            AddDocumentData doc2Result = await _Client!.AddDocumentAsync(
+                _TestIndexId,
+                "Second tagged document for enumeration tag filter testing.",
+                null,
+                null,
+                new Dictionary<string, string> { { "enumtag", "yes" } }
+            ).ConfigureAwait(false);
+            _TestDocuments.Add(doc2Result.DocumentId!);
+
+            AddDocumentData doc3Result = await _Client!.AddDocumentAsync(
+                _TestIndexId,
+                "Third document without the filter tag."
+            ).ConfigureAwait(false);
+            _TestDocuments.Add(doc3Result.DocumentId!);
+
+            // List documents with tag filter
+            EnumerationOptions options = new EnumerationOptions
+            {
+                Tags = new Dictionary<string, string> { { "enumtag", "yes" } }
+            };
+            EnumerationResult<DocumentInfo> result = await _Client!.ListDocumentsAsync(_TestIndexId, options).ConfigureAwait(false);
+            AssertNotNull(result, "result");
+            AssertEquals(result.Objects.Count, 2, "filtered documents count");
+        }
+
+        // ==================== Wildcard Search Tests ====================
+
+        private async Task TestWildcardSearchAsync()
+        {
+            // Search with wildcard query "*"
+            SearchData searchResult = await _Client!.SearchAsync(_TestIndexId, "*").ConfigureAwait(false);
+            AssertNotNull(searchResult, "searchResult");
+            AssertNotNull(searchResult.Results, "searchResult.Results");
+            AssertGreaterThan(searchResult.Results.Count, 0, "wildcard results count");
+
+            // All wildcard results should have a score of 0
+            foreach (SearchResult result in searchResult.Results)
+            {
+                AssertNotNull(result.DocumentId, "result.DocumentId");
+                AssertEquals(result.Score, 0.0, "wildcard result score should be 0");
+            }
+        }
+
+        private async Task TestWildcardSearchWithFiltersAsync()
+        {
+            // Add a document with a unique label for wildcard filter test
+            string docId = Guid.NewGuid().ToString();
+            List<string> labels = new List<string> { "wildcardfilter" };
+            await _Client!.AddDocumentAsync(
+                _TestIndexId,
+                "Document specifically for wildcard filter testing.",
+                docId,
+                labels,
+                null
+            ).ConfigureAwait(false);
+            _TestDocuments.Add(docId);
+
+            // Wildcard search with label filter
+            SearchData searchResult = await _Client!.SearchAsync(
+                _TestIndexId,
+                "*",
+                100,
+                new List<string> { "wildcardfilter" },
+                null
+            ).ConfigureAwait(false);
+            AssertNotNull(searchResult, "searchResult");
+            AssertGreaterThan(searchResult.Results.Count, 0, "wildcard filtered results count");
+
+            // All results should have the matching document
+            bool found = searchResult.Results.Exists(r => r.DocumentId == docId);
+            AssertTrue(found, "wildcard filter should return the labeled document");
+
+            // All wildcard results should have a score of 0
+            foreach (SearchResult result in searchResult.Results)
+            {
+                AssertEquals(result.Score, 0.0, "wildcard filtered result score should be 0");
+            }
+        }
+
         // ==================== Document Deletion Tests ====================
 
         private async Task TestDeleteDocumentAsync()
@@ -964,6 +1094,16 @@ namespace Verbex.Sdk.TestHarness
                 await RunTestAsync("Search with label filter", TestSearchWithLabelFilterAsync).ConfigureAwait(false);
                 await RunTestAsync("Search with tag filter", TestSearchWithTagFilterAsync).ConfigureAwait(false);
                 await RunTestAsync("Search with labels and tags", TestSearchWithLabelsAndTagsAsync).ConfigureAwait(false);
+
+                // Filtered Enumeration Tests
+                PrintSubheader("Filtered Enumeration");
+                await RunTestAsync("List documents with label filter", TestListDocumentsWithLabelFilterAsync).ConfigureAwait(false);
+                await RunTestAsync("List documents with tag filter", TestListDocumentsWithTagFilterAsync).ConfigureAwait(false);
+
+                // Wildcard Search Tests
+                PrintSubheader("Wildcard Search");
+                await RunTestAsync("Wildcard search", TestWildcardSearchAsync).ConfigureAwait(false);
+                await RunTestAsync("Wildcard search with filters", TestWildcardSearchWithFiltersAsync).ConfigureAwait(false);
 
                 // Cleanup Tests
                 PrintSubheader("Cleanup");

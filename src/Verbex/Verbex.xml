@@ -1167,6 +1167,30 @@
             <param name="token">Cancellation token.</param>
             <returns>List of documents.</returns>
         </member>
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetAllFilteredAsync(System.String,System.Int32,System.Int32,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Gets all documents with pagination and optional label/tag filtering.
+            Documents must have ALL specified labels and ALL specified tags to match (AND logic).
+            </summary>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+            <param name="limit">Maximum number of documents to return.</param>
+            <param name="offset">Number of documents to skip.</param>
+            <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
+            <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of matching documents.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetFilteredCountAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Gets the count of documents matching optional label/tag filters.
+            Documents must have ALL specified labels and ALL specified tags to match (AND logic).
+            </summary>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+            <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
+            <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Count of matching documents.</returns>
+        </member>
         <member name="M:Verbex.Database.Interfaces.IDocumentMethods.GetByIdsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <summary>
             Gets multiple documents by IDs.
@@ -2505,6 +2529,12 @@
         <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.DeleteBatchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetAllFilteredAsync(System.String,System.Int32,System.Int32,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Mysql.Implementations.DocumentMethods.GetFilteredCountAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
         <member name="T:Verbex.Database.Mysql.Implementations.DocumentTermMethods">
             <summary>
             MySQL implementation of document-term methods using prefixed tables.
@@ -3039,6 +3069,12 @@
         <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.DeleteBatchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetAllFilteredAsync(System.String,System.Int32,System.Int32,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Postgresql.Implementations.DocumentMethods.GetFilteredCountAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
         <member name="T:Verbex.Database.Postgresql.Implementations.DocumentTermMethods">
             <summary>
             PostgreSQL implementation of document-term methods using prefixed tables.
@@ -3570,6 +3606,12 @@
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.DeleteBatchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetAllFilteredAsync(System.String,System.Int32,System.Int32,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Sqlite.Implementations.DocumentMethods.GetFilteredCountAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="T:Verbex.Database.Sqlite.Implementations.DocumentTermMethods">
@@ -4203,6 +4245,12 @@
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.DeleteBatchAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetAllFilteredAsync(System.String,System.Int32,System.Int32,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.SqlServer.Implementations.DocumentMethods.GetFilteredCountAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="T:Verbex.Database.SqlServer.Implementations.DocumentTermMethods">
@@ -5668,6 +5716,28 @@
             <param name="token">Cancellation token.</param>
             <returns>List of documents.</returns>
         </member>
+        <member name="M:Verbex.InvertedIndex.GetDocumentsAsync(System.Int32,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Gets documents with pagination and optional label/tag filtering.
+            Documents must have ALL specified labels and ALL specified tags to match (AND logic).
+            </summary>
+            <param name="limit">Maximum number of documents.</param>
+            <param name="offset">Number of documents to skip.</param>
+            <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
+            <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of matching documents.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.GetDocumentCountAsync(System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Gets the count of documents matching optional label/tag filters.
+            Documents must have ALL specified labels and ALL specified tags to match (AND logic).
+            </summary>
+            <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
+            <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Count of matching documents.</returns>
+        </member>
         <member name="M:Verbex.InvertedIndex.GetDocumentsWithMetadataAsync(System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <summary>
             Gets multiple documents by their IDs with full metadata (labels, tags, custom metadata) populated.
@@ -5753,14 +5823,26 @@
         <member name="M:Verbex.InvertedIndex.SearchAsync(System.String,System.Nullable{System.Int32},System.Boolean,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
             <summary>
             Searches the index for documents matching the query with optional label and tag filtering.
+            Use <c>"*"</c> as the query to return all documents (optionally filtered by labels/tags) without term matching.
             </summary>
-            <param name="query">Search query string.</param>
+            <param name="query">Search query string. Use <c>"*"</c> for wildcard (all documents).</param>
             <param name="maxResults">Maximum number of results.</param>
             <param name="useAndLogic">If true, documents must contain all terms. If false, any term.</param>
             <param name="labels">Optional list of labels to filter by (documents must have ALL labels).</param>
             <param name="tags">Optional dictionary of tags to filter by (documents must have ALL tags).</param>
             <param name="token">Cancellation token.</param>
             <returns>Search results.</returns>
+        </member>
+        <member name="M:Verbex.InvertedIndex.WildcardSearchAsync(System.Nullable{System.Int32},System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>
+            Performs a wildcard search returning all documents, optionally filtered by labels/tags.
+            All results have a score of 0 and are ordered by creation date.
+            </summary>
+            <param name="maxResults">Maximum number of results.</param>
+            <param name="labels">Optional labels to filter by.</param>
+            <param name="tags">Optional tags to filter by.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Search results with score 0 for all documents.</returns>
         </member>
         <member name="M:Verbex.InvertedIndex.TermExistsAsync(System.String,System.Threading.CancellationToken)">
             <summary>

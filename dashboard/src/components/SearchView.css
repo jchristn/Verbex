@@ -11,14 +11,11 @@
   font-weight: 500;
 }
 
-.search-form-card {
-  padding: 24px;
-}
-
 .search-form {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  padding: 20px;
 }
 
 .search-input-wrapper {
@@ -115,27 +112,9 @@
   color: var(--text-muted);
 }
 
-.advanced-toggle-btn {
-  background: none;
-  border: none;
+.search-hint {
+  font-size: 0.75rem;
   color: var(--text-secondary);
-  font-size: 0.875rem;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: background 0.2s, color 0.2s;
-}
-
-.advanced-toggle-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.advanced-options {
-  padding: 16px;
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
 }
 
 .search-actions {

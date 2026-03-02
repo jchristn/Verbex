@@ -477,22 +477,71 @@ namespace VerbexCli.Infrastructure
         }
 
         /// <summary>
+        /// Lists documents in the specified index filtered by labels and/or tags
+        /// </summary>
+        /// <param name="indexName">Name of the index</param>
+        /// <param name="labels">Optional list of labels to filter by</param>
+        /// <param name="tags">Optional dictionary of tag key-value pairs to filter by</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Array of document info objects</returns>
+        public async Task<object[]> ListDocumentsAsync(string indexName, List<string>? labels, Dictionary<string, string>? tags, CancellationToken cancellationToken = default)
+        {
+            if (labels == null && tags == null)
+            {
+                return await ListDocumentsAsync(indexName, cancellationToken).ConfigureAwait(false);
+            }
+
+            InvertedIndex index = await GetIndexAsync(indexName, cancellationToken).ConfigureAwait(false);
+
+            List<DocumentMetadata> filteredDocs = await index.GetDocumentsAsync(1000, 0, labels, tags, cancellationToken).ConfigureAwait(false);
+
+            // Build a reverse lookup from document ID to name
+            Dictionary<string, string> idToName = new Dictionary<string, string>();
+            foreach (KeyValuePair<string, string> kvp in _DocumentMaps[indexName])
+            {
+                idToName[kvp.Value] = kvp.Key;
+            }
+
+            List<object> documents = new List<object>();
+            foreach (DocumentMetadata metadata in filteredDocs)
+            {
+                string docName = idToName.TryGetValue(metadata.DocumentId, out string? name) ? name : metadata.DocumentPath;
+                documents.Add(new
+                {
+                    Name = docName,
+                    Size = $"{metadata.DocumentLength} chars",
+                    Terms = metadata.Terms.Count,
+                    Added = metadata.IndexedDate
+                });
+            }
+
+            return documents.ToArray();
+        }
+
+        /// <summary>
         /// Searches documents in the specified index
         /// </summary>
         public async Task<object[]> SearchAsync(string indexName, string query, bool useAndLogic, int limit, CancellationToken cancellationToken = default)
         {
-            return await SearchAsync(indexName, query, useAndLogic, limit, null, cancellationToken).ConfigureAwait(false);
+            return await SearchAsync(indexName, query, useAndLogic, limit, null, null, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
-        /// Searches documents in the specified index with optional metadata filters
+        /// Searches documents in the specified index with optional label and tag filters
         /// </summary>
-        public async Task<object[]> SearchAsync(string indexName, string query, bool useAndLogic, int limit, Dictionary<string, object>? metadataFilters, CancellationToken cancellationToken = default)
+        /// <param name="indexName">Name of the index to search</param>
+        /// <param name="query">Search query string</param>
+        /// <param name="useAndLogic">Whether to use AND logic for term matching</param>
+        /// <param name="limit">Maximum number of results to return</param>
+        /// <param name="labels">Optional list of labels to filter by</param>
+        /// <param name="tags">Optional dictionary of tag key-value pairs to filter by</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Array of search result objects</returns>
+        public async Task<object[]> SearchAsync(string indexName, string query, bool useAndLogic, int limit, List<string>? labels, Dictionary<string, string>? tags, CancellationToken cancellationToken = default)
         {
             InvertedIndex index = await GetIndexAsync(indexName, cancellationToken).ConfigureAwait(false);
 
-            // Note: Label/tag filtering is not currently supported in the new API
-            SearchResults results = await index.SearchAsync(query, limit, useAndLogic, cancellationToken).ConfigureAwait(false);
+            SearchResults results = await index.SearchAsync(query, limit, useAndLogic, labels, tags, cancellationToken).ConfigureAwait(false);
 
             return results.Results.Select(result => new
             {

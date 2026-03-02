@@ -143,12 +143,30 @@ namespace VerbexCli.Commands
                 IsRequired = false
             };
 
-            listCommand.AddOption(indexOption);
-
-            listCommand.SetHandler(async (string? index) =>
+            Option<string[]> labelOption = new Option<string[]>(
+                aliases: new[] { "--label", "-L" },
+                description: "Filter by label (can be specified multiple times)")
             {
-                await HandleDocumentListAsync(index).ConfigureAwait(false);
-            }, indexOption);
+                IsRequired = false,
+                AllowMultipleArgumentsPerToken = true
+            };
+
+            Option<string[]> tagOption = new Option<string[]>(
+                aliases: new[] { "--tag", "-t" },
+                description: "Filter by tag in key=value format (can be specified multiple times)")
+            {
+                IsRequired = false,
+                AllowMultipleArgumentsPerToken = true
+            };
+
+            listCommand.AddOption(indexOption);
+            listCommand.AddOption(labelOption);
+            listCommand.AddOption(tagOption);
+
+            listCommand.SetHandler(async (string? index, string[]? labels, string[]? tags) =>
+            {
+                await HandleDocumentListAsync(index, labels, tags).ConfigureAwait(false);
+            }, indexOption, labelOption, tagOption);
 
             return listCommand;
         }
@@ -338,14 +356,50 @@ namespace VerbexCli.Commands
         /// <summary>
         /// Handles the document list command
         /// </summary>
-        private static async Task HandleDocumentListAsync(string? index)
+        private static async Task HandleDocumentListAsync(string? index, string[]? labels, string[]? tags)
         {
             try
             {
                 string actualIndex = index ?? IndexManager.Instance.CurrentIndexName ?? throw new InvalidOperationException("No index specified and no active index set. Use 'vbx index use <name>' to set an active index.");
                 OutputManager.WriteVerbose($"Listing documents in index '{actualIndex}'");
 
-                object[] documents = await IndexManager.Instance.ListDocumentsAsync(actualIndex).ConfigureAwait(false);
+                // Parse labels
+                List<string>? labelsList = null;
+                if (labels != null && labels.Length > 0)
+                {
+                    labelsList = labels.Select(l => l.Trim().ToLowerInvariant()).ToList();
+                }
+
+                // Parse tag filters
+                Dictionary<string, string>? tagFilters = null;
+                if (tags != null && tags.Length > 0)
+                {
+                    tagFilters = new Dictionary<string, string>();
+                    foreach (string tag in tags)
+                    {
+                        int equalsIndex = tag.IndexOf('=');
+                        if (equalsIndex <= 0 || equalsIndex >= tag.Length - 1)
+                        {
+                            OutputManager.WriteError($"Invalid tag format: '{tag}'. Expected key=value");
+                            return;
+                        }
+
+                        string key = tag.Substring(0, equalsIndex);
+                        string value = tag.Substring(equalsIndex + 1);
+                        tagFilters[key] = value;
+                    }
+                }
+
+                object[] documents;
+                if (labelsList != null || tagFilters != null)
+                {
+                    documents = await IndexManager.Instance.ListDocumentsAsync(actualIndex, labelsList, tagFilters).ConfigureAwait(false);
+                }
+                else
+                {
+                    documents = await IndexManager.Instance.ListDocumentsAsync(actualIndex).ConfigureAwait(false);
+                }
+
                 OutputManager.WriteData(documents);
             }
             catch (Exception ex)

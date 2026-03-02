@@ -1220,6 +1220,22 @@
             Default is CreatedDescending (newest first).
             </summary>
         </member>
+        <member name="P:Verbex.Sdk.EnumerationOptions.Labels">
+            <summary>
+            Optional list of labels to filter by.
+            Documents must have ALL specified labels to be included (AND logic).
+            Label matching is case-insensitive.
+            If null or empty, no label filtering is applied.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.EnumerationOptions.Tags">
+            <summary>
+            Optional dictionary of tags (key-value pairs) to filter by.
+            Documents must have ALL specified tags with matching values to be included (AND logic).
+            Tag matching is exact (case-sensitive for both key and value).
+            If null or empty, no tag filtering is applied.
+            </summary>
+        </member>
         <member name="M:Verbex.Sdk.EnumerationOptions.#ctor">
             <summary>
             Instantiate with default values.
@@ -1685,6 +1701,8 @@
         <member name="P:Verbex.Sdk.SearchRequest.Query">
             <summary>
             Search query string.
+            Use <c>"*"</c> as a wildcard to return all documents (optionally filtered by labels/tags)
+            without term matching. Wildcard results have a score of 0.
             </summary>
         </member>
         <member name="P:Verbex.Sdk.SearchRequest.MaxResults">

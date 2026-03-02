@@ -1,6 +1,8 @@
 namespace Verbex.Server.Classes
 {
     using System;
+    using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Query parameters for paginated enumeration of collections.
@@ -57,12 +59,38 @@ namespace Verbex.Server.Classes
         /// </summary>
         public EnumerationOrderEnum Ordering { get; set; } = EnumerationOrderEnum.CreatedDescending;
 
+        /// <summary>
+        /// Optional list of labels to filter by.
+        /// Documents must have ALL specified labels to be included (AND logic).
+        /// Label matching is case-insensitive.
+        /// If null or empty, no label filtering is applied.
+        /// </summary>
+        public List<string>? Labels
+        {
+            get { return _Labels; }
+            set { _Labels = value; }
+        }
+
+        /// <summary>
+        /// Optional dictionary of tags (key-value pairs) to filter by.
+        /// Documents must have ALL specified tags with matching values to be included (AND logic).
+        /// Tag matching is exact (case-sensitive for both key and value).
+        /// If null or empty, no tag filtering is applied.
+        /// </summary>
+        public Dictionary<string, string>? Tags
+        {
+            get { return _Tags; }
+            set { _Tags = value; }
+        }
+
         #endregion
 
         #region Private-Members
 
         private int _MaxResults = 100;
         private int _Skip = 0;
+        private List<string>? _Labels = null;
+        private Dictionary<string, string>? _Tags = null;
 
         #endregion
 
@@ -98,9 +126,11 @@ namespace Verbex.Server.Classes
         /// <param name="skip">String value for skip parameter.</param>
         /// <param name="continuationToken">String value for continuationToken parameter.</param>
         /// <param name="ordering">String value for ordering parameter.</param>
+        /// <param name="labels">Comma-separated labels string for filtering.</param>
+        /// <param name="tags">Dictionary of tag key-value pairs for filtering.</param>
         /// <returns>Parsed EnumerationQuery with validated values.</returns>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when parsed values are out of valid range.</exception>
-        public static EnumerationQuery Parse(string? maxResults, string? skip, string? continuationToken, string? ordering)
+        public static EnumerationQuery Parse(string? maxResults, string? skip, string? continuationToken, string? ordering, string? labels = null, Dictionary<string, string>? tags = null)
         {
             EnumerationQuery query = new EnumerationQuery();
 
@@ -145,6 +175,28 @@ namespace Verbex.Server.Classes
                 {
                     query.Ordering = EnumerationOrderEnum.CreatedDescending;
                 }
+            }
+
+            // Parse Labels (comma-separated)
+            if (!String.IsNullOrEmpty(labels))
+            {
+                List<string> parsedLabels = labels
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(l => l.Trim())
+                    .Where(l => l.Length > 0)
+                    .Distinct()
+                    .ToList();
+
+                if (parsedLabels.Count > 0)
+                {
+                    query.Labels = parsedLabels;
+                }
+            }
+
+            // Parse Tags
+            if (tags != null && tags.Count > 0)
+            {
+                query.Tags = tags;
             }
 
             return query;

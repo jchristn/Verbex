@@ -65,6 +65,7 @@ function Login() {
               onChange={(e) => setServerUrl(e.target.value)}
               placeholder="http://localhost:8080"
               required
+              title="URL of the Verbex server to connect to"
             />
           </div>
 
@@ -75,6 +76,7 @@ function Login() {
                 type="button"
                 className={`auth-mode-btn ${authMode === 'token' ? 'active' : ''}`}
                 onClick={() => setAuthMode('token')}
+                title="Authenticate using an API token"
               >
                 API Token
               </button>
@@ -82,6 +84,7 @@ function Login() {
                 type="button"
                 className={`auth-mode-btn ${authMode === 'credentials' ? 'active' : ''}`}
                 onClick={() => setAuthMode('credentials')}
+                title="Authenticate using username and password"
               >
                 Credentials
               </button>
@@ -99,6 +102,7 @@ function Login() {
                   onChange={(e) => setToken(e.target.value)}
                   placeholder="Enter your API token"
                   required
+                  title="Enter your API bearer token"
                 />
                 <button
                   type="button"
@@ -131,6 +135,7 @@ function Login() {
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Enter username"
                   required
+                  title="Enter your username"
                 />
               </div>
               <div className="form-group">
@@ -143,6 +148,7 @@ function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter password"
                     required
+                    title="Enter your password"
                   />
                   <button
                     type="button"
@@ -173,6 +179,7 @@ function Login() {
             type="submit"
             className="btn btn-primary login-btn"
             disabled={isLoading}
+            title="Connect to the Verbex server"
           >
             {isLoading ? 'Connecting...' : 'Connect'}
           </button>

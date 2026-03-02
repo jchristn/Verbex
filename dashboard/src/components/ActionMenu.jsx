@@ -59,6 +59,7 @@ function ActionMenu({ actions }) {
         onClick={handleToggle}
         aria-haspopup="true"
         aria-expanded={isOpen}
+        title="Actions menu"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <circle cx="12" cy="5" r="2" />
@@ -78,6 +79,7 @@ function ActionMenu({ actions }) {
               className={`action-menu-item ${action.variant === 'danger' ? 'danger' : ''}`}
               onClick={() => handleActionClick(action)}
               disabled={action.disabled}
+              title={action.label}
             >
               {action.icon && <span className="action-menu-icon">{action.icon}</span>}
               <span className="action-menu-label">{action.label}</span>

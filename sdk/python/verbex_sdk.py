@@ -383,6 +383,8 @@ class EnumerationOptions:
     skip: int = 0
     continuation_token: Optional[str] = None
     ordering: EnumerationOrder = EnumerationOrder.CREATED_DESCENDING
+    labels: Optional[List[str]] = None
+    tags: Optional[Dict[str, str]] = None
 
     def to_query_params(self) -> Dict[str, str]:
         """Convert to query parameters dictionary."""
@@ -395,6 +397,11 @@ class EnumerationOptions:
             params['continuationToken'] = self.continuation_token
         if self.ordering != EnumerationOrder.CREATED_DESCENDING:
             params['ordering'] = self.ordering.value
+        if self.labels:
+            params['labels'] = ','.join(self.labels)
+        if self.tags:
+            for key, value in self.tags.items():
+                params[f'tag.{key}'] = value
         return params
 
 
@@ -411,6 +418,14 @@ class EnumerationResult:
     total_records: int = 0
     records_remaining: int = 0
     objects: List[Any] = field(default_factory=list)
+
+    def __iter__(self):
+        """Iterate over the objects in this result."""
+        return iter(self.objects)
+
+    def __len__(self) -> int:
+        """Return the number of objects in this result page."""
+        return len(self.objects)
 
     @property
     def has_more(self) -> bool:
@@ -749,7 +764,8 @@ class VerbexClient:
         labels: Optional[List[str]] = None,
         tags: Optional[Dict[str, str]] = None,
         custom_metadata: Optional[Any] = None,
-        cache_configuration: Optional[CacheConfiguration] = None
+        cache_configuration: Optional[CacheConfiguration] = None,
+        tenant_id: Optional[str] = None
     ) -> IndexInfo:
         """
         Create a new index.
@@ -766,6 +782,7 @@ class VerbexClient:
             tags: Optional key-value tags to associate with the index
             custom_metadata: Optional custom metadata to associate with the index
             cache_configuration: Optional cache configuration for the index
+            tenant_id: Tenant ID (required for global admin users, optional for tenant users)
 
         Returns:
             Created IndexInfo
@@ -778,6 +795,8 @@ class VerbexClient:
             'MinTokenLength': min_token_length,
             'MaxTokenLength': max_token_length
         }
+        if tenant_id:
+            request_data['TenantId'] = tenant_id
         if description:
             request_data['Description'] = description
         if labels:
@@ -1339,9 +1358,12 @@ class VerbexClient:
         """
         Search documents in an index with optional label and tag filters.
 
+        Use "*" as the query to return all documents (optionally filtered by labels/tags)
+        without term matching. Wildcard results have a score of 0.
+
         Args:
             index_id: The index identifier
-            query: The search query
+            query: The search query. Use "*" for wildcard (all documents).
             max_results: Maximum number of results to return
             labels: Optional list of labels to filter by (AND logic, case-insensitive)
             tags: Optional dict of tags to filter by (AND logic, exact match)

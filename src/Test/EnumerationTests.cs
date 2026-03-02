@@ -2,6 +2,7 @@ namespace Test
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Threading.Tasks;
     using Verbex.Server.Classes;
 
@@ -28,6 +29,9 @@ namespace Test
             runner.RunTest("EnumerationResult_ContinuationToken", TestEnumerationResultContinuationToken);
             runner.RunTest("EnumerationResult_EndOfResults", TestEnumerationResultEndOfResults);
             runner.RunTest("EnumerationResult_Empty", TestEnumerationResultEmpty);
+            runner.RunTest("EnumerationQuery_ParseLabels", TestEnumerationQueryParseLabels);
+            runner.RunTest("EnumerationQuery_ParseTags", TestEnumerationQueryParseTags);
+            runner.RunTest("EnumerationQuery_LabelsAndTagsDefaults", TestEnumerationQueryLabelsAndTagsDefaults);
         }
 
         private static void TestEnumerationQueryDefaults()
@@ -236,6 +240,59 @@ namespace Test
             TestAssert.AreEqual(0, result.Objects.Count);
             TestAssert.IsTrue(result.EndOfResults);
             TestAssert.IsNull(result.ContinuationToken);
+        }
+        private static void TestEnumerationQueryParseLabels()
+        {
+            // Parse comma-separated labels
+            EnumerationQuery query = EnumerationQuery.Parse(null, null, null, null, "important, reviewed, active");
+            TestAssert.IsNotNull(query.Labels, "Labels should not be null");
+            TestAssert.AreEqual(3, query.Labels!.Count, "Should have 3 labels");
+            TestAssert.IsTrue(query.Labels.Contains("important"), "Should contain 'important'");
+            TestAssert.IsTrue(query.Labels.Contains("reviewed"), "Should contain 'reviewed'");
+            TestAssert.IsTrue(query.Labels.Contains("active"), "Should contain 'active'");
+
+            // Null labels
+            query = EnumerationQuery.Parse(null, null, null, null, null);
+            TestAssert.IsNull(query.Labels, "Labels should be null when not provided");
+
+            // Empty labels
+            query = EnumerationQuery.Parse(null, null, null, null, "");
+            TestAssert.IsNull(query.Labels, "Labels should be null when empty string provided");
+
+            // Labels with extra commas/spaces
+            query = EnumerationQuery.Parse(null, null, null, null, " , foo , , bar , ");
+            TestAssert.IsNotNull(query.Labels, "Labels should not be null");
+            TestAssert.AreEqual(2, query.Labels!.Count, "Should have 2 labels after filtering empty entries");
+        }
+
+        private static void TestEnumerationQueryParseTags()
+        {
+            // Parse tags dictionary
+            Dictionary<string, string> tags = new Dictionary<string, string>
+            {
+                { "category", "tech" },
+                { "status", "published" }
+            };
+            EnumerationQuery query = EnumerationQuery.Parse(null, null, null, null, null, tags);
+            TestAssert.IsNotNull(query.Tags, "Tags should not be null");
+            TestAssert.AreEqual(2, query.Tags!.Count, "Should have 2 tags");
+            TestAssert.AreEqual("tech", query.Tags["category"]);
+            TestAssert.AreEqual("published", query.Tags["status"]);
+
+            // Null tags
+            query = EnumerationQuery.Parse(null, null, null, null, null, null);
+            TestAssert.IsNull(query.Tags, "Tags should be null when not provided");
+
+            // Empty tags
+            query = EnumerationQuery.Parse(null, null, null, null, null, new Dictionary<string, string>());
+            TestAssert.IsNull(query.Tags, "Tags should be null when empty dictionary provided");
+        }
+
+        private static void TestEnumerationQueryLabelsAndTagsDefaults()
+        {
+            EnumerationQuery query = new EnumerationQuery();
+            TestAssert.IsNull(query.Labels, "Default Labels should be null");
+            TestAssert.IsNull(query.Tags, "Default Tags should be null");
         }
     }
 }

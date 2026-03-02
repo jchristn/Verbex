@@ -61,6 +61,7 @@ const ConfirmModal = ({
             className="btn btn-secondary"
             onClick={onClose}
             disabled={isLoading}
+            title="Cancel this action"
           >
             {cancelLabel}
           </button>
@@ -68,6 +69,7 @@ const ConfirmModal = ({
             className={`btn btn-confirm btn-confirm-${variant}`}
             onClick={onConfirm}
             disabled={isLoading}
+            title={confirmLabel}
           >
             {isLoading ? 'Processing...' : confirmLabel}
           </button>

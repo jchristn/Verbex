@@ -46,7 +46,15 @@ namespace VerbexCli.Commands
 
             Option<string[]> filterOption = new Option<string[]>(
                 aliases: new[] { "--filter", "-f" },
-                description: "Metadata filters in key=value format (can be specified multiple times)")
+                description: "Tag filters in key=value format (can be specified multiple times)")
+            {
+                IsRequired = false,
+                AllowMultipleArgumentsPerToken = true
+            };
+
+            Option<string[]> labelOption = new Option<string[]>(
+                aliases: new[] { "--label", "-L" },
+                description: "Label filters (can be specified multiple times)")
             {
                 IsRequired = false,
                 AllowMultipleArgumentsPerToken = true
@@ -57,11 +65,12 @@ namespace VerbexCli.Commands
             searchCommand.AddOption(andOption);
             searchCommand.AddOption(limitOption);
             searchCommand.AddOption(filterOption);
+            searchCommand.AddOption(labelOption);
 
-            searchCommand.SetHandler(async (string query, string? index, bool useAnd, int limit, string[]? filters) =>
+            searchCommand.SetHandler(async (string query, string? index, bool useAnd, int limit, string[]? filters, string[]? labels) =>
             {
-                await HandleSearchAsync(index, query, useAnd, limit, filters).ConfigureAwait(false);
-            }, queryArgument, indexOption, andOption, limitOption, filterOption);
+                await HandleSearchAsync(index, query, useAnd, limit, filters, labels).ConfigureAwait(false);
+            }, queryArgument, indexOption, andOption, limitOption, filterOption, labelOption);
 
             return searchCommand;
         }
@@ -69,18 +78,18 @@ namespace VerbexCli.Commands
         /// <summary>
         /// Handles the search command
         /// </summary>
-        private static async Task HandleSearchAsync(string? index, string query, bool useAnd, int limit, string[]? filters)
+        private static async Task HandleSearchAsync(string? index, string query, bool useAnd, int limit, string[]? filters, string[]? labels)
         {
             try
             {
                 string actualIndex = index ?? IndexManager.Instance.CurrentIndexName ?? throw new InvalidOperationException("No index specified and no active index set. Use 'vbx index use <name>' to set an active index.");
                 string logic = useAnd ? "AND" : "OR";
 
-                // Parse metadata filters
-                Dictionary<string, object>? metadataFilters = null;
+                // Parse tag filters
+                Dictionary<string, string>? tagFilters = null;
                 if (filters != null && filters.Length > 0)
                 {
-                    metadataFilters = new Dictionary<string, object>();
+                    tagFilters = new Dictionary<string, string>();
                     foreach (string filter in filters)
                     {
                         int equalsIndex = filter.IndexOf('=');
@@ -92,37 +101,33 @@ namespace VerbexCli.Commands
 
                         string key = filter.Substring(0, equalsIndex);
                         string value = filter.Substring(equalsIndex + 1);
-
-                        // Try to parse as number if possible, otherwise keep as string
-                        object parsedValue;
-                        if (int.TryParse(value, out int intValue))
-                        {
-                            parsedValue = intValue;
-                        }
-                        else if (double.TryParse(value, out double doubleValue))
-                        {
-                            parsedValue = doubleValue;
-                        }
-                        else if (bool.TryParse(value, out bool boolValue))
-                        {
-                            parsedValue = boolValue;
-                        }
-                        else
-                        {
-                            parsedValue = value;
-                        }
-
-                        metadataFilters[key] = parsedValue;
+                        tagFilters[key] = value;
                     }
                 }
 
-                string filterDescription = metadataFilters != null
-                    ? $" with filters: {string.Join(", ", metadataFilters.Select(kvp => $"{kvp.Key}={kvp.Value}"))}"
+                // Parse labels
+                List<string>? labelsList = null;
+                if (labels != null && labels.Length > 0)
+                {
+                    labelsList = labels.Select(l => l.Trim().ToLowerInvariant()).ToList();
+                }
+
+                List<string> filterParts = new List<string>();
+                if (tagFilters != null)
+                {
+                    filterParts.Add($"tags: {string.Join(", ", tagFilters.Select(kvp => $"{kvp.Key}={kvp.Value}"))}");
+                }
+                if (labelsList != null)
+                {
+                    filterParts.Add($"labels: {string.Join(", ", labelsList)}");
+                }
+                string filterDescription = filterParts.Count > 0
+                    ? $" with {string.Join(" and ", filterParts)}"
                     : "";
 
                 OutputManager.WriteVerbose($"Searching index '{actualIndex}' for '{query}' using {logic} logic (limit: {limit}){filterDescription}");
 
-                object[] results = await IndexManager.Instance.SearchAsync(actualIndex, query, useAnd, limit, metadataFilters).ConfigureAwait(false);
+                object[] results = await IndexManager.Instance.SearchAsync(actualIndex, query, useAnd, limit, labelsList, tagFilters).ConfigureAwait(false);
 
                 OutputManager.WriteInfo($"Found {results.Length} result(s) for query '{query}' using {logic} logic{filterDescription}");
                 OutputManager.WriteData(results);

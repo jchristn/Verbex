@@ -17,7 +17,7 @@ import uuid
 import time
 from datetime import datetime
 from typing import Callable, Optional, Any
-from verbex_sdk import VerbexClient, VerbexError, LoginResult, AuthenticationResult, AuthorizationResult
+from verbex_sdk import VerbexClient, VerbexError, LoginResult, AuthenticationResult, AuthorizationResult, EnumerationOptions
 
 
 class TestResult:
@@ -196,7 +196,8 @@ class TestHarness:
         index = self._client.create_index(
             name="Test Index",
             description="A test index for SDK validation",
-            in_memory=True
+            in_memory=True,
+            tenant_id="default"
         )
         self._assert_not_none(index, "index")
         self._assert_not_none(index.identifier, "index.identifier")
@@ -209,7 +210,7 @@ class TestHarness:
         # Creating an index with the same name should fail with 409 Conflict
         # The server enforces unique index names within a tenant
         try:
-            self._client.create_index(name="Test Index", description="Duplicate name index", in_memory=True)
+            self._client.create_index(name="Test Index", description="Duplicate name index", in_memory=True, tenant_id="default")
             self._assert(False, "Should have thrown VerbexError for duplicate name")
         except VerbexError as e:
             self._assert_equals(e.status_code, 409, "error.status_code")
@@ -245,7 +246,8 @@ class TestHarness:
             description="An index with labels and tags",
             in_memory=True,
             labels=labels,
-            tags=tags
+            tags=tags,
+            tenant_id="default"
         )
         self._assert_not_none(index, "index")
         # Clean up using the returned identifier
@@ -261,7 +263,8 @@ class TestHarness:
             name="Get Labeled Index",
             in_memory=True,
             labels=labels,
-            tags=tags
+            tags=tags,
+            tenant_id="default"
         )
         index_id = created_index.identifier
         self._assert_not_none(index_id, "created index identifier")
@@ -685,6 +688,114 @@ class TestHarness:
         )
         self._assert_not_none(search_result, "search_result")
         self._assert_greater_than(len(search_result.results), 0, "should find documents matching both label and tag")
+
+    # ==================== Filtered Enumeration Tests ====================
+
+    def test_list_documents_with_label_filter(self):
+        """Test listing documents filtered by label."""
+        # Add 3 documents, 2 with a specific label
+        doc1 = self._client.add_document(
+            self._test_index_id,
+            "First labeled document for enumeration filter testing.",
+            labels=["enumfilter"]
+        )
+        self._test_documents.append(doc1.document_id)
+
+        doc2 = self._client.add_document(
+            self._test_index_id,
+            "Second labeled document for enumeration filter testing.",
+            labels=["enumfilter"]
+        )
+        self._test_documents.append(doc2.document_id)
+
+        doc3 = self._client.add_document(
+            self._test_index_id,
+            "Third document without the filter label."
+        )
+        self._test_documents.append(doc3.document_id)
+
+        # List documents with label filter
+        options = EnumerationOptions(labels=["enumfilter"])
+        result = self._client.list_documents(self._test_index_id, options)
+        self._assert_not_none(result, "result")
+        self._assert_equals(len(result.objects), 2, "filtered documents count")
+
+    def test_list_documents_with_tag_filter(self):
+        """Test listing documents filtered by tag."""
+        # Add 3 documents, 2 with a specific tag
+        doc1 = self._client.add_document(
+            self._test_index_id,
+            "First tagged document for enumeration tag filter testing.",
+            tags={"enumtag": "yes"}
+        )
+        self._test_documents.append(doc1.document_id)
+
+        doc2 = self._client.add_document(
+            self._test_index_id,
+            "Second tagged document for enumeration tag filter testing.",
+            tags={"enumtag": "yes"}
+        )
+        self._test_documents.append(doc2.document_id)
+
+        doc3 = self._client.add_document(
+            self._test_index_id,
+            "Third document without the filter tag."
+        )
+        self._test_documents.append(doc3.document_id)
+
+        # List documents with tag filter
+        options = EnumerationOptions(tags={"enumtag": "yes"})
+        result = self._client.list_documents(self._test_index_id, options)
+        self._assert_not_none(result, "result")
+        self._assert_equals(len(result.objects), 2, "filtered documents count")
+
+    # ==================== Wildcard Search Tests ====================
+
+    def test_wildcard_search(self):
+        """Test wildcard search returns all documents with score 0."""
+        # Search with wildcard query "*"
+        search_result = self._client.search(self._test_index_id, "*")
+        self._assert_not_none(search_result, "search_result")
+        self._assert_not_none(search_result.results, "search_result.results")
+        self._assert_greater_than(len(search_result.results), 0, "wildcard results count")
+
+        # All wildcard results should have a score of 0
+        for result in search_result.results:
+            self._assert_not_none(result.document_id, "result.document_id")
+            self._assert_equals(result.score, 0, "wildcard result score should be 0")
+
+    def test_wildcard_search_with_filters(self):
+        """Test wildcard search with label filter returns only matching documents."""
+        # Add a document with a unique label for wildcard filter test
+        doc_id = str(uuid.uuid4())
+        labels = ["wildcardfilter"]
+        self._client.add_document(
+            self._test_index_id,
+            "Document specifically for wildcard filter testing.",
+            doc_id,
+            labels,
+            None
+        )
+        self._test_documents.append(doc_id)
+
+        # Wildcard search with label filter
+        search_result = self._client.search(
+            self._test_index_id,
+            "*",
+            100,
+            labels=["wildcardfilter"],
+            tags=None
+        )
+        self._assert_not_none(search_result, "search_result")
+        self._assert_greater_than(len(search_result.results), 0, "wildcard filtered results count")
+
+        # All results should have the matching document
+        found = any(r.document_id == doc_id for r in search_result.results)
+        self._assert_true(found, "wildcard filter should return the labeled document")
+
+        # All wildcard results should have a score of 0
+        for result in search_result.results:
+            self._assert_equals(result.score, 0, "wildcard filtered result score should be 0")
 
     # ==================== Document Deletion Tests ====================
 

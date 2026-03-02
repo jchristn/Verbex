@@ -271,8 +271,11 @@ function TenantsView({ onTenantSelect }) {
     <div className="tenants-view">
       <div className="workspace-header">
         <div className="workspace-title">
-          <h2>Tenants</h2>
-          <span className="count-badge">{filteredAndSortedTenants.length}</span>
+          <div className="workspace-title-row">
+            <h2>Tenants</h2>
+            <span className="count-badge">{filteredAndSortedTenants.length}</span>
+          </div>
+          <p className="workspace-subtitle">Manage tenant organizations and their settings</p>
         </div>
         <div className="workspace-actions">
           <button className="btn btn-icon" onClick={loadTenants} title="Refresh">
@@ -282,7 +285,7 @@ function TenantsView({ onTenantSelect }) {
               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
             </svg>
           </button>
-          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
+          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} title="Create a new tenant">
             Create Tenant
           </button>
         </div>
@@ -302,7 +305,7 @@ function TenantsView({ onTenantSelect }) {
             <p className="empty-state-description">
               Create your first tenant to start organizing users and credentials.
             </p>
-            <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
+            <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} title="Create a new tenant">
               Create Tenant
             </button>
           </div>
@@ -433,6 +436,7 @@ function TenantsView({ onTenantSelect }) {
               placeholder="Enter tenant name"
               disabled={isCreating}
               autoFocus
+              title="Enter a name for the tenant"
             />
           </div>
           <div className="form-group">
@@ -444,6 +448,7 @@ function TenantsView({ onTenantSelect }) {
               placeholder="Optional description"
               disabled={isCreating}
               rows={3}
+              title="Optional description for the tenant"
             />
           </div>
           <div className="form-actions">
@@ -452,6 +457,7 @@ function TenantsView({ onTenantSelect }) {
               className="btn btn-secondary"
               onClick={handleCloseCreateModal}
               disabled={isCreating}
+              title="Cancel"
             >
               Cancel
             </button>
@@ -459,6 +465,7 @@ function TenantsView({ onTenantSelect }) {
               type="submit"
               className="btn btn-primary"
               disabled={isCreating}
+              title="Create the tenant"
             >
               {isCreating ? 'Creating...' : 'Create Tenant'}
             </button>
@@ -505,6 +512,7 @@ function TenantsView({ onTenantSelect }) {
               <button
                 className="btn btn-danger"
                 onClick={() => handleDelete(selectedTenant)}
+                title="Permanently delete this tenant"
               >
                 Delete Tenant
               </button>
@@ -514,6 +522,7 @@ function TenantsView({ onTenantSelect }) {
                   setShowDetailModal(false);
                   setSelectedTenant(null);
                 }}
+                title="Close this dialog"
               >
                 Close
               </button>
@@ -559,6 +568,7 @@ function TenantsView({ onTenantSelect }) {
               placeholder="Enter tenant name"
               disabled={isEditing}
               autoFocus
+              title="Enter a name for the tenant"
             />
           </div>
           <div className="form-group">
@@ -570,6 +580,7 @@ function TenantsView({ onTenantSelect }) {
               placeholder="Optional description"
               disabled={isEditing}
               rows={3}
+              title="Optional description for the tenant"
             />
           </div>
           <div className="form-group checkbox-group">
@@ -579,6 +590,7 @@ function TenantsView({ onTenantSelect }) {
                 checked={editActive}
                 onChange={(e) => setEditActive(e.target.checked)}
                 disabled={isEditing}
+                title="Enable or disable this tenant"
               />
               <span>Active</span>
             </label>
@@ -604,6 +616,7 @@ function TenantsView({ onTenantSelect }) {
               className="btn btn-secondary"
               onClick={handleCloseEditModal}
               disabled={isEditing}
+              title="Cancel"
             >
               Cancel
             </button>
@@ -611,6 +624,7 @@ function TenantsView({ onTenantSelect }) {
               type="submit"
               className="btn btn-primary"
               disabled={isEditing}
+              title="Save changes"
             >
               {isEditing ? 'Saving...' : 'Save Changes'}
             </button>

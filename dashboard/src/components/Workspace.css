@@ -23,6 +23,12 @@
 
 .workspace-title {
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workspace-title-row {
+  display: flex;
   align-items: center;
   gap: 12px;
 }
@@ -32,6 +38,13 @@
   font-size: 1.5rem;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.workspace-subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 400;
 }
 
 .workspace-title .count-badge {

@@ -385,13 +385,19 @@ class ApiClient {
   }
 
   // Document endpoints
-  async getDocuments(indexId, { maxResults, skip, continuationToken, ordering, ...options } = {}) {
+  async getDocuments(indexId, { maxResults, skip, continuationToken, ordering, labels, tags, ...options } = {}) {
     let endpoint = `/v1.0/indices/${encodeURIComponent(indexId)}/documents`;
     const params = [];
     if (maxResults != null) params.push(`maxResults=${maxResults}`);
     if (skip != null) params.push(`skip=${skip}`);
     if (continuationToken != null && continuationToken !== '') params.push(`continuationToken=${encodeURIComponent(continuationToken)}`);
     if (ordering != null) params.push(`ordering=${ordering}`);
+    if (labels && labels.length > 0) params.push(`labels=${encodeURIComponent(labels.join(','))}`);
+    if (tags && Object.keys(tags).length > 0) {
+      for (const [key, value] of Object.entries(tags)) {
+        params.push(`tag.${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+      }
+    }
     if (params.length > 0) endpoint += '?' + params.join('&');
     return this.get(endpoint, options);
   }

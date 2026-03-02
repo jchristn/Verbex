@@ -1,5 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.1.11312.151 d18.0
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Verbex", "Verbex\Verbex.csproj", "{6788F8CD-9CF6-4CE4-B431-D5EB368AA98C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test", "Test\Test.csproj", "{FFBB31C6-9C3F-4BF8-8FB2-A4513D0D4A97}"
@@ -13,6 +16,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Verbex.Mcp", "Verbex.Mcp\Verbex.Mcp.csproj", "{C2DB7F09-D547-46B5-95D6-E5BF3E4D888B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test.Mcp", "Test.Mcp\Test.Mcp.csproj", "{34F281C5-06ED-452D-8F77-6B882B110D22}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Verbex.Sdk", "..\sdk\csharp\Verbex.Sdk\Verbex.Sdk.csproj", "{9991334D-C75C-55A7-890F-898B9B1B9526}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Verbex.Sdk.TestHarness", "..\sdk\csharp\Verbex.Sdk.TestHarness\Verbex.Sdk.TestHarness.csproj", "{51FAFD9F-5EAB-D88C-BD50-FC498895AE58}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -108,6 +115,30 @@ Global
 		{34F281C5-06ED-452D-8F77-6B882B110D22}.Release|x64.Build.0 = Release|Any CPU
 		{34F281C5-06ED-452D-8F77-6B882B110D22}.Release|x86.ActiveCfg = Release|Any CPU
 		{34F281C5-06ED-452D-8F77-6B882B110D22}.Release|x86.Build.0 = Release|Any CPU
+		{9991334D-C75C-55A7-890F-898B9B1B9526}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9991334D-C75C-55A7-890F-898B9B1B9526}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9991334D-C75C-55A7-890F-898B9B1B9526}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9991334D-C75C-55A7-890F-898B9B1B9526}.Debug|x64.Build.0 = Debug|Any CPU
+		{9991334D-C75C-55A7-890F-898B9B1B9526}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9991334D-C75C-55A7-890F-898B9B1B9526}.Debug|x86.Build.0 = Debug|Any CPU
+		{9991334D-C75C-55A7-890F-898B9B1B9526}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9991334D-C75C-55A7-890F-898B9B1B9526}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9991334D-C75C-55A7-890F-898B9B1B9526}.Release|x64.ActiveCfg = Release|Any CPU
+		{9991334D-C75C-55A7-890F-898B9B1B9526}.Release|x64.Build.0 = Release|Any CPU
+		{9991334D-C75C-55A7-890F-898B9B1B9526}.Release|x86.ActiveCfg = Release|Any CPU
+		{9991334D-C75C-55A7-890F-898B9B1B9526}.Release|x86.Build.0 = Release|Any CPU
+		{51FAFD9F-5EAB-D88C-BD50-FC498895AE58}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{51FAFD9F-5EAB-D88C-BD50-FC498895AE58}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{51FAFD9F-5EAB-D88C-BD50-FC498895AE58}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{51FAFD9F-5EAB-D88C-BD50-FC498895AE58}.Debug|x64.Build.0 = Debug|Any CPU
+		{51FAFD9F-5EAB-D88C-BD50-FC498895AE58}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{51FAFD9F-5EAB-D88C-BD50-FC498895AE58}.Debug|x86.Build.0 = Debug|Any CPU
+		{51FAFD9F-5EAB-D88C-BD50-FC498895AE58}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{51FAFD9F-5EAB-D88C-BD50-FC498895AE58}.Release|Any CPU.Build.0 = Release|Any CPU
+		{51FAFD9F-5EAB-D88C-BD50-FC498895AE58}.Release|x64.ActiveCfg = Release|Any CPU
+		{51FAFD9F-5EAB-D88C-BD50-FC498895AE58}.Release|x64.Build.0 = Release|Any CPU
+		{51FAFD9F-5EAB-D88C-BD50-FC498895AE58}.Release|x86.ActiveCfg = Release|Any CPU
+		{51FAFD9F-5EAB-D88C-BD50-FC498895AE58}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -537,12 +537,18 @@ class EnumerationOptions {
      * @param {number} [options.skip=0] - Number of records to skip
      * @param {string} [options.continuationToken] - Continuation token from previous result
      * @param {string} [options.ordering='CreatedDescending'] - Result ordering
+     * @param {string[]} [options.labels] - Optional labels to filter by (AND logic, case-insensitive)
+     * @param {Object<string, string>} [options.tags] - Optional tags to filter by (AND logic, exact match)
      */
     constructor(options = {}) {
         this.maxResults = options.maxResults || 100;
         this.skip = options.skip || 0;
         this.continuationToken = options.continuationToken || null;
         this.ordering = options.ordering || EnumerationOrder.CreatedDescending;
+        /** @type {string[]|null} */
+        this.labels = options.labels || null;
+        /** @type {Object<string, string>|null} */
+        this.tags = options.tags || null;
     }
 
     /**
@@ -562,6 +568,14 @@ class EnumerationOptions {
         }
         if (this.ordering !== EnumerationOrder.CreatedDescending) {
             params.push(`ordering=${this.ordering}`);
+        }
+        if (this.labels && this.labels.length > 0) {
+            params.push(`labels=${encodeURIComponent(this.labels.join(','))}`);
+        }
+        if (this.tags && Object.keys(this.tags).length > 0) {
+            for (const [key, value] of Object.entries(this.tags)) {
+                params.push(`tag.${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+            }
         }
         return params.join('&');
     }
@@ -925,6 +939,9 @@ class VerbexClient {
             MinTokenLength: options.minTokenLength || 0,
             MaxTokenLength: options.maxTokenLength || 0
         };
+        if (options.tenantId) {
+            requestData.TenantId = options.tenantId;
+        }
         if (options.description) {
             requestData.Description = options.description;
         }
@@ -1226,8 +1243,10 @@ class VerbexClient {
 
     /**
      * Search documents in an index with optional label and tag filters.
+     * Use "*" as the query to return all documents (optionally filtered by labels/tags) without term matching.
+     * Wildcard results have a score of 0.
      * @param {string} indexId - The index identifier
-     * @param {string} query - The search query
+     * @param {string} query - The search query. Use "*" for wildcard (all documents).
      * @param {number} [maxResults=100] - Maximum results to return
      * @param {string[]} [labels=null] - Optional labels to filter by (AND logic, case-insensitive)
      * @param {Object} [tags=null] - Optional tags to filter by (AND logic, exact match)

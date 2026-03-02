@@ -386,3 +386,115 @@
   display: flex;
   gap: 8px;
 }
+
+/* Document Filter Bar */
+.doc-filter-bar {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.doc-filter-toggle {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.doc-filter-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.doc-filter-active-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: var(--color-primary-alpha);
+  color: var(--color-primary);
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  vertical-align: middle;
+}
+
+.doc-filter-panel {
+  margin-top: 12px;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.doc-filter-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .doc-filter-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.doc-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.doc-filter-field label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.doc-filter-field input {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.doc-filter-field input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-alpha);
+}
+
+.doc-filter-field input::placeholder {
+  color: var(--text-muted);
+}
+
+.doc-filter-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.doc-filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Empty state when filters return no results */
+.empty-filter-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary);
+}
+
+.empty-filter-state p {
+  margin: 0 0 12px 0;
+  font-size: 0.9rem;
+}

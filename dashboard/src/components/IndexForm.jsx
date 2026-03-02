@@ -153,6 +153,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
               value={selectedTenantId}
               onChange={(e) => setSelectedTenantId(e.target.value)}
               required
+              title="Select the tenant that will own this index"
             >
               <option value="">-- Select a tenant --</option>
               {tenants.map((tenant) => (
@@ -180,6 +181,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
             value={formData.identifier}
             onChange={handleChange}
             placeholder="my-custom-index-id"
+            title="Custom identifier for this index (optional)"
           />
           <span className="form-hint">Optional. Leave blank to auto-generate a unique identifier</span>
         </div>
@@ -194,6 +196,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
             onChange={handleChange}
             placeholder="My Index"
             required
+            title="Human-readable name for the index"
           />
         </div>
 
@@ -206,6 +209,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
             onChange={handleChange}
             placeholder="Optional description of this index"
             rows={2}
+            title="Optional description of this index"
           />
         </div>
 
@@ -246,6 +250,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
               name="inMemory"
               checked={formData.inMemory}
               onChange={handleChange}
+              title="Store index in memory only (not persisted)"
             />
             In-Memory Storage
           </label>
@@ -260,6 +265,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
                 name="enableLemmatizer"
                 checked={formData.enableLemmatizer}
                 onChange={handleChange}
+                title="Reduce words to their base forms during indexing"
               />
               Enable Lemmatization
             </label>
@@ -273,6 +279,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
                 name="enableStopWordRemover"
                 checked={formData.enableStopWordRemover}
                 onChange={handleChange}
+                title="Filter out common words like 'the' and 'and'"
               />
               Remove Stop Words
             </label>
@@ -291,6 +298,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
               onChange={handleNumberChange}
               min={0}
               max={100}
+              title="Minimum character length for indexed tokens"
             />
           </div>
 
@@ -304,6 +312,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
               onChange={handleNumberChange}
               min={0}
               max={1000}
+              title="Maximum character length for indexed tokens"
             />
           </div>
         </div>
@@ -315,6 +324,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
           type="button"
           className="advanced-toggle"
           onClick={() => setShowCacheSettings(!showCacheSettings)}
+          title="Configure caching settings for this index"
         >
           {showCacheSettings ? '▼' : '▶'} Caching Configuration
         </button>
@@ -328,6 +338,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
                   name="enabled"
                   checked={cacheConfig.enabled}
                   onChange={handleCacheChange}
+                  title="Enable or disable all caching for this index"
                 />
                 Enable Caching
               </label>
@@ -346,6 +357,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
                         name="enableTermCache"
                         checked={cacheConfig.enableTermCache}
                         onChange={handleCacheChange}
+                        title="Cache term records for faster search"
                       />
                       Enable Term Cache
                     </label>
@@ -363,6 +375,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
                           onChange={handleCacheNumberChange}
                           min={1}
                           max={100000}
+                          title="Maximum number of cached term entries"
                         />
                         <span className="form-hint">Max entries (default: 10,000)</span>
                       </div>
@@ -376,6 +389,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
                           onChange={handleCacheNumberChange}
                           min={1}
                           max={86400}
+                          title="Time-to-live for cached terms in seconds"
                         />
                         <span className="form-hint">Time-to-live (default: 300)</span>
                       </div>
@@ -393,6 +407,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
                         name="enableDocumentCache"
                         checked={cacheConfig.enableDocumentCache}
                         onChange={handleCacheChange}
+                        title="Cache document metadata for faster retrieval"
                       />
                       Enable Document Cache
                     </label>
@@ -410,6 +425,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
                           onChange={handleCacheNumberChange}
                           min={1}
                           max={100000}
+                          title="Maximum number of cached document entries"
                         />
                         <span className="form-hint">Max entries (default: 5,000)</span>
                       </div>
@@ -423,6 +439,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
                           onChange={handleCacheNumberChange}
                           min={1}
                           max={86400}
+                          title="Time-to-live for cached documents in seconds"
                         />
                         <span className="form-hint">Time-to-live (default: 600)</span>
                       </div>
@@ -440,6 +457,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
                         name="enableStatisticsCache"
                         checked={cacheConfig.enableStatisticsCache}
                         onChange={handleCacheChange}
+                        title="Cache index statistics"
                       />
                       Enable Statistics Cache
                     </label>
@@ -457,6 +475,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
                           onChange={handleCacheNumberChange}
                           min={1}
                           max={3600}
+                          title="Time-to-live for cached statistics in seconds"
                         />
                         <span className="form-hint">Time-to-live (default: 60)</span>
                       </div>
@@ -477,6 +496,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
           className="btn btn-secondary"
           onClick={onCancel}
           disabled={isSubmitting}
+          title="Cancel index creation"
         >
           Cancel
         </button>
@@ -484,6 +504,7 @@ function IndexForm({ onSuccess, onCancel, tenants = [] }) {
           type="submit"
           className="btn btn-primary"
           disabled={isSubmitting}
+          title="Create the new index"
         >
           {isSubmitting ? 'Creating...' : 'Create Index'}
         </button>

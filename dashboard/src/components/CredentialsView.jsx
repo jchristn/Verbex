@@ -343,8 +343,11 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
     <div className="credentials-view">
       <div className="workspace-header">
         <div className="workspace-title">
-          <h2>Credentials</h2>
-          {selectedTenant && <span className="count-badge">{filteredAndSortedCredentials.length}</span>}
+          <div className="workspace-title-row">
+            <h2>Credentials</h2>
+            {selectedTenant && <span className="count-badge">{filteredAndSortedCredentials.length}</span>}
+          </div>
+          <p className="workspace-subtitle">Generate and manage API access tokens for a tenant</p>
         </div>
         <div className="workspace-actions">
           {selectedTenant && (
@@ -356,7 +359,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
                   <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
                 </svg>
               </button>
-              <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
+              <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} title="Create a new API credential">
                 Create Credential
               </button>
             </>
@@ -372,6 +375,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
           value={selectedTenant || ''}
           onChange={(e) => onTenantSelect && onTenantSelect(e.target.value || null)}
           className="tenant-select"
+          title="Select a tenant to manage credentials"
         >
           <option value="">-- Select a tenant --</option>
           {tenants?.map((tenant) => (
@@ -408,7 +412,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
             <p className="empty-state-description">
               Create your first API credential for tenant "{selectedTenantData?.name || selectedTenant}".
             </p>
-            <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
+            <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} title="Create a new API credential">
               Create Credential
             </button>
           </div>
@@ -548,6 +552,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
               placeholder="Optional description (e.g., 'Production API Key')"
               disabled={isCreating}
               autoFocus
+              title="Optional description for this credential"
             />
           </div>
           <div className="form-actions">
@@ -556,6 +561,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
               className="btn btn-secondary"
               onClick={handleCloseCreateModal}
               disabled={isCreating}
+              title="Cancel"
             >
               Cancel
             </button>
@@ -563,6 +569,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
               type="submit"
               className="btn btn-primary"
               disabled={isCreating}
+              title="Create the credential"
             >
               {isCreating ? 'Creating...' : 'Create Credential'}
             </button>
@@ -586,6 +593,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
               type="button"
               className="btn btn-secondary copy-btn"
               onClick={handleCopyToken}
+              title="Copy API key to clipboard"
             >
               {tokenCopied ? 'Copied!' : 'Copy'}
             </button>
@@ -594,6 +602,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
             <button
               className="btn btn-primary"
               onClick={handleCloseTokenModal}
+              title="Close this dialog"
             >
               Done
             </button>
@@ -653,6 +662,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
                 className="btn btn-danger"
                 onClick={() => handleDelete(selectedCredential)}
                 disabled={isDeleting}
+                title="Permanently delete this credential"
               >
                 Delete Credential
               </button>
@@ -662,6 +672,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
                   setShowDetailModal(false);
                   setSelectedCredential(null);
                 }}
+                title="Close this dialog"
               >
                 Close
               </button>
@@ -746,6 +757,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
               placeholder="Optional description (e.g., 'Production API Key')"
               disabled={isEditingCredential}
               autoFocus
+              title="Name or description for this credential"
             />
           </div>
           <div className="form-group checkbox-group">
@@ -755,6 +767,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
                 checked={editActive}
                 onChange={(e) => setEditActive(e.target.checked)}
                 disabled={isEditingCredential}
+                title="Enable or disable this credential"
               />
               <span>Active</span>
             </label>
@@ -780,6 +793,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
               className="btn btn-secondary"
               onClick={handleCloseEditModal}
               disabled={isEditingCredential}
+              title="Cancel"
             >
               Cancel
             </button>
@@ -787,6 +801,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
               type="submit"
               className="btn btn-primary"
               disabled={isEditingCredential}
+              title="Save changes"
             >
               {isEditingCredential ? 'Saving...' : 'Save Changes'}
             </button>

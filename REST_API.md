@@ -708,6 +708,8 @@ Content-Type: application/json
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | ids | string | No | Comma-separated list of document IDs to retrieve. When provided, returns only the specified documents with full metadata. |
+| labels | string | No | Comma-separated list of labels to filter by. Documents must have ALL specified labels (AND logic). Case-insensitive matching. |
+| tag.{key} | string | No | Tag filter in format `tag.key=value`. Documents must have ALL specified tags with matching values (AND logic). Can specify multiple tag parameters. |
 
 #### List All Documents (Default Behavior)
 
@@ -816,6 +818,38 @@ Authorization: Bearer <token>
 | NotFound | array | List of document IDs that were not found |
 | Count | integer | Number of documents returned |
 | RequestedCount | integer | Total number of document IDs that were requested |
+
+#### Filtered Document Enumeration
+
+Filter the document list by labels and/or tags. When filters are provided, only documents matching ALL specified criteria are returned (AND logic).
+
+**Request:** `GET /v1.0/indices/{id}/documents?labels=important,reviewed`
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Query Parameters:**
+- `labels` (string): Comma-separated list of labels. Documents must have ALL specified labels (case-insensitive).
+- `tag.{key}` (string): Tag filter. Documents must match ALL specified tag key-value pairs. Specify multiple `tag.*` parameters for multiple tags.
+
+**curl Examples:**
+```bash
+# List documents with label filter
+curl -X GET "http://localhost:8000/v1.0/indices/{id}/documents?labels=important,reviewed" \
+  -H "Authorization: Bearer {token}"
+
+# List documents with tag filter
+curl -X GET "http://localhost:8000/v1.0/indices/{id}/documents?tag.category=tech&tag.status=published" \
+  -H "Authorization: Bearer {token}"
+
+# List documents with both label and tag filters
+curl -X GET "http://localhost:8000/v1.0/indices/{id}/documents?labels=important&tag.category=tech" \
+  -H "Authorization: Bearer {token}"
+```
+
+The response format is the same as the default document list response.
 
 #### Batch Document Deletion
 
@@ -1149,6 +1183,29 @@ Content-Type: application/json
 ```
 
 Note: `Labels` and `Tags` are optional filters. When provided, documents must match ALL specified labels (AND logic, case-insensitive) and ALL specified tags (AND logic, exact match). Filtering is performed via SQL JOINs during document retrieval for optimal performance.
+
+#### Wildcard Search
+
+Use `"*"` as the `Query` value to return all documents without term matching. This is useful for browsing documents by metadata filters.
+
+- Wildcard results have a score of 0 and are ordered by creation date
+- Can be combined with `Labels` and `Tags` filters to browse matching documents
+- Respects the `MaxResults` parameter
+
+**curl Examples:**
+```bash
+# Wildcard search - return all documents
+curl -X POST "http://localhost:8000/v1.0/indices/{id}/search" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{"Query": "*"}'
+
+# Wildcard search with filters
+curl -X POST "http://localhost:8000/v1.0/indices/{id}/search" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{"Query": "*", "Labels": ["important"], "Tags": {"category": "tech"}}'
+```
 
 **Response:**
 ```json

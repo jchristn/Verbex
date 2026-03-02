@@ -31,6 +31,22 @@ namespace Verbex.Sdk
         public EnumerationOrderEnum Ordering { get; set; } = EnumerationOrderEnum.CreatedDescending;
 
         /// <summary>
+        /// Optional list of labels to filter by.
+        /// Documents must have ALL specified labels to be included (AND logic).
+        /// Label matching is case-insensitive.
+        /// If null or empty, no label filtering is applied.
+        /// </summary>
+        public System.Collections.Generic.List<string>? Labels { get; set; } = null;
+
+        /// <summary>
+        /// Optional dictionary of tags (key-value pairs) to filter by.
+        /// Documents must have ALL specified tags with matching values to be included (AND logic).
+        /// Tag matching is exact (case-sensitive for both key and value).
+        /// If null or empty, no tag filtering is applied.
+        /// </summary>
+        public System.Collections.Generic.Dictionary<string, string>? Tags { get; set; } = null;
+
+        /// <summary>
         /// Instantiate with default values.
         /// </summary>
         public EnumerationOptions()
@@ -78,6 +94,19 @@ namespace Verbex.Sdk
             if (Ordering != EnumerationOrderEnum.CreatedDescending)
             {
                 parts.Add($"ordering={Ordering}");
+            }
+
+            if (Labels != null && Labels.Count > 0)
+            {
+                parts.Add($"labels={System.Uri.EscapeDataString(string.Join(",", Labels))}");
+            }
+
+            if (Tags != null && Tags.Count > 0)
+            {
+                foreach (System.Collections.Generic.KeyValuePair<string, string> tag in Tags)
+                {
+                    parts.Add($"tag.{System.Uri.EscapeDataString(tag.Key)}={System.Uri.EscapeDataString(tag.Value)}");
+                }
             }
 
             return parts.Count > 0 ? string.Join("&", parts) : string.Empty;

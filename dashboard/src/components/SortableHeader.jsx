@@ -26,7 +26,7 @@ function SortableHeader({
 
   return (
     <th className={`sortable-header ${hasFilters ? 'has-filters' : ''}`}>
-      <button className="sortable-header-btn" onClick={handleSort}>
+      <button className="sortable-header-btn" onClick={handleSort} title={`Sort by ${label}`}>
         <span className="sortable-header-label">{label}</span>
         <span className={`sortable-header-arrows ${isActive ? 'active' : ''}`}>
           <svg
@@ -58,6 +58,7 @@ function SortableHeader({
               value={filterValue}
               onChange={(e) => onFilterChange(sortKey, e.target.value)}
               placeholder={filterPlaceholder}
+              title={filterPlaceholder || `Filter by ${label}`}
               onClick={(e) => e.stopPropagation()}
             />
           ) : (

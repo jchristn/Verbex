@@ -79,6 +79,8 @@ foreach (var result in results)
 - **TF-IDF Scoring**: Relevance-ranked search results
 - **Text Processing**: Lemmatization, stop word removal, token filtering
 - **Metadata Filtering**: Labels and tags for document organization
+- **Filtered Enumeration**: Filter document listings by labels and tags
+- **Wildcard Search**: Use `*` query to return all documents, optionally filtered by metadata
 - **Batch Operations**: Retrieve multiple documents in a single request
 - **Backup & Restore**: Create portable backups and restore indices
 - **Thread-Safe**: Optimized for concurrent read-heavy workloads

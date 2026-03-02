@@ -157,6 +157,12 @@ namespace Test
                 Console.WriteLine($"--- Enumeration Tests ({modeName}) ---");
                 await EnumerationTests.RunAllAsync(runner).ConfigureAwait(false);
 
+                Console.WriteLine($"--- Enumeration Filter Tests ({modeName}) ---");
+                await EnumerationFilterTests.RunAllAsync(runner).ConfigureAwait(false);
+
+                Console.WriteLine($"--- Wildcard Search Tests ({modeName}) ---");
+                await WildcardSearchTests.RunAllAsync(runner).ConfigureAwait(false);
+
                 Console.WriteLine();
             }
             finally

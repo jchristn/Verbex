@@ -67,6 +67,13 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
 
   // Filtering state
   const [filterDocId, setFilterDocId] = useState('');
+  const [filterLabels, setFilterLabels] = useState('');
+  const [filterTags, setFilterTags] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Applied filters — only updated when user clicks Apply
+  const [appliedLabels, setAppliedLabels] = useState(null);
+  const [appliedTags, setAppliedTags] = useState(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -196,6 +203,51 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
     }
   }, [indices, selectedIndex, onIndexSelect]);
 
+  // Parse raw filter strings into arrays/objects
+  const parseLabels = (str) => {
+    if (!str || !str.trim()) return null;
+    const parsed = str.split(',').map(l => l.trim()).filter(l => l.length > 0);
+    return parsed.length > 0 ? parsed : null;
+  };
+
+  const parseTags = (str) => {
+    if (!str || !str.trim()) return null;
+    const tags = {};
+    str.split(',').forEach(pair => {
+      const eqIdx = pair.indexOf('=');
+      if (eqIdx > 0) {
+        const key = pair.substring(0, eqIdx).trim();
+        const value = pair.substring(eqIdx + 1).trim();
+        if (key) tags[key] = value;
+      }
+    });
+    return Object.keys(tags).length > 0 ? tags : null;
+  };
+
+  const handleApplyFilters = () => {
+    setAppliedLabels(parseLabels(filterLabels));
+    setAppliedTags(parseTags(filterTags));
+    setCurrentPage(1);
+  };
+
+  const handleClearFilters = () => {
+    setFilterLabels('');
+    setFilterTags('');
+    setAppliedLabels(null);
+    setAppliedTags(null);
+    setCurrentPage(1);
+  };
+
+  // Check if the input fields differ from what's currently applied
+  const filtersAreDirty = useMemo(() => {
+    const pendingLabels = parseLabels(filterLabels);
+    const pendingTags = parseTags(filterTags);
+    return JSON.stringify(pendingLabels) !== JSON.stringify(appliedLabels) ||
+           JSON.stringify(pendingTags) !== JSON.stringify(appliedTags);
+  }, [filterLabels, filterTags, appliedLabels, appliedTags]);
+
+  const hasAppliedFilters = appliedLabels !== null || appliedTags !== null;
+
   const loadDocuments = useCallback(async (signalOrEvent, page = currentPage, size = pageSize) => {
     if (!selectedIndex || !apiClient) return;
 
@@ -214,6 +266,8 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
         maxResults: size,
         skip,
         ordering,
+        labels: appliedLabels,
+        tags: appliedTags,
         ...(signal ? { signal } : {})
       });
 
@@ -226,9 +280,18 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
     } finally {
       setIsLoading(false);
     }
-  }, [apiClient, selectedIndex, currentPage, pageSize, sortDirection]);
+  }, [apiClient, selectedIndex, currentPage, pageSize, sortDirection, appliedLabels, appliedTags]);
 
-  // Load documents when index, page, pageSize, or sort changes
+  // Clear filters on index change
+  useEffect(() => {
+    setFilterLabels('');
+    setFilterTags('');
+    setAppliedLabels(null);
+    setAppliedTags(null);
+    setShowFilters(false);
+  }, [selectedIndex]);
+
+  // Load documents when index, page, pageSize, sort, or filters change
   useEffect(() => {
     if (selectedIndex) {
       const abortController = new AbortController();
@@ -240,7 +303,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
       setSelectedDocIds(new Set());
       setTotalDocumentCount(0);
     }
-  }, [selectedIndex, currentPage, pageSize, sortDirection, apiClient]);
+  }, [selectedIndex, currentPage, pageSize, sortDirection, appliedLabels, appliedTags, apiClient]);
 
   const handleAddDocument = async (e) => {
     e.preventDefault();
@@ -449,6 +512,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
       <div className="workspace-header">
         <div className="workspace-title">
           <h2>Documents</h2>
+          <p className="workspace-subtitle">Add, view, and manage documents within an index</p>
         </div>
         <div className="workspace-actions">
           <div className="index-selector-inline">
@@ -457,6 +521,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
               id="index-select"
               value={selectedIndex || ''}
               onChange={handleIndexChange}
+              title="Select an index to manage documents"
             >
               <option value="">Select an index...</option>
               {indices.map((index) => (
@@ -475,7 +540,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                   <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
                 </svg>
               </button>
-              <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+              <button className="btn btn-primary" onClick={() => setShowAddModal(true)} title="Add a new document to this index">
                 Add Document
               </button>
             </>
@@ -501,12 +566,12 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
         <div className="workspace-card">
           <div className="error-state">
             <p>{error}</p>
-            <button className="btn btn-secondary" onClick={loadDocuments}>
+            <button className="btn btn-secondary" onClick={loadDocuments} title="Retry loading documents">
               Retry
             </button>
           </div>
         </div>
-      ) : documents.length === 0 ? (
+      ) : documents.length === 0 && !hasAppliedFilters ? (
         <div className="workspace-card">
           <div className="empty-state">
             <div className="empty-state-icon">📄</div>
@@ -514,7 +579,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
             <p className="empty-state-description">
               This index has no documents yet. Add your first document to start indexing.
             </p>
-            <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+            <button className="btn btn-primary" onClick={() => setShowAddModal(true)} title="Add a new document to this index">
               Add Document
             </button>
           </div>
@@ -525,15 +590,78 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
             <div className="bulk-action-bar">
               <span className="bulk-selection-count">{selectedDocIds.size} document(s) selected</span>
               <div className="bulk-actions">
-                <button className="btn btn-secondary btn-sm" onClick={handleClearSelection}>
+                <button className="btn btn-secondary btn-sm" onClick={handleClearSelection} title="Deselect all documents">
                   Clear Selection
                 </button>
-                <button className="btn btn-danger btn-sm" onClick={handleBulkDelete}>
+                <button className="btn btn-danger btn-sm" onClick={handleBulkDelete} title="Delete all selected documents">
                   Delete Selected
                 </button>
               </div>
             </div>
           )}
+          <div className="doc-filter-bar">
+            <button
+              className="doc-filter-toggle"
+              onClick={() => setShowFilters(!showFilters)}
+              title="Show or hide label and tag filters"
+            >
+              {showFilters ? '\u25BC Hide Filters' : '\u25B6 Filter by Labels/Tags'}
+            </button>
+            {hasAppliedFilters && !showFilters && (
+              <span className="doc-filter-active-badge">Filters active</span>
+            )}
+            {showFilters && (
+              <div className="doc-filter-panel">
+                <div className="doc-filter-row">
+                  <div className="doc-filter-field">
+                    <label htmlFor="docFilterLabels">Labels</label>
+                    <input
+                      type="text"
+                      id="docFilterLabels"
+                      placeholder="important, reviewed"
+                      value={filterLabels}
+                      onChange={(e) => setFilterLabels(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleApplyFilters(); }}
+                      title="Filter documents by labels (comma-separated)"
+                    />
+                    <span className="doc-filter-hint">Comma-separated, AND logic</span>
+                  </div>
+                  <div className="doc-filter-field">
+                    <label htmlFor="docFilterTags">Tags</label>
+                    <input
+                      type="text"
+                      id="docFilterTags"
+                      placeholder="category=tech, status=published"
+                      value={filterTags}
+                      onChange={(e) => setFilterTags(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleApplyFilters(); }}
+                      title="Filter documents by tags (key=value, comma-separated)"
+                    />
+                    <span className="doc-filter-hint">key=value pairs, comma-separated, AND logic</span>
+                  </div>
+                </div>
+                <div className="doc-filter-actions">
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={handleApplyFilters}
+                    disabled={!filtersAreDirty}
+                    title="Apply the current label and tag filters"
+                  >
+                    Apply Filters
+                  </button>
+                  {hasAppliedFilters && (
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={handleClearFilters}
+                      title="Remove all active filters"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
@@ -610,6 +738,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                       type="checkbox"
                       checked={selectedDocIds.has(doc.documentId)}
                       onChange={() => handleToggleSelect(doc.documentId)}
+                      title="Select this document"
                     />
                   </td>
                   <td><CopyableId value={doc.documentId} /></td>
@@ -639,6 +768,14 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
               ))}
             </tbody>
           </table>
+          {documents.length === 0 && hasAppliedFilters && (
+            <div className="empty-filter-state">
+              <p>No documents match the current filters.</p>
+              <button className="btn btn-secondary btn-sm" onClick={handleClearFilters} title="Remove all active filters">
+                Clear Filters
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -668,6 +805,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                 onChange={(e) => handleDocIdChange(e.target.value)}
                 placeholder="Leave empty to auto-generate"
                 className={docIdError ? 'input-error' : ''}
+                title="Custom document ID (leave empty to auto-generate)"
               />
             </div>
             {docIdError && <span className="form-error">{docIdError}</span>}
@@ -685,6 +823,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
               placeholder="Enter the document content to be indexed..."
               rows={10}
               required
+              title="Document text content to index"
             />
           </div>
 
@@ -730,6 +869,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                 setDocIdError('');
               }}
               disabled={isAdding}
+              title="Cancel adding document"
             >
               Cancel
             </button>
@@ -737,6 +877,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
               type="submit"
               className="btn btn-primary"
               disabled={isAdding || !newDocContent.trim() || !!docIdError}
+              title="Add the document to the index"
             >
               {isAdding ? 'Adding...' : 'Add Document'}
             </button>
@@ -813,7 +954,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
               <div className="section-header">
                 <h4>Labels</h4>
                 {!editingDocLabels && (
-                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditDocLabels}>
+                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditDocLabels} title="Edit labels">
                     Edit
                   </button>
                 )}
@@ -830,6 +971,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                       className="btn btn-sm btn-primary"
                       onClick={handleSaveDocLabels}
                       disabled={isSavingDocLabels}
+                      title="Save changes"
                     >
                       {isSavingDocLabels ? 'Saving...' : 'Save'}
                     </button>
@@ -837,6 +979,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                       className="btn btn-sm btn-secondary"
                       onClick={handleCancelEditDocLabels}
                       disabled={isSavingDocLabels}
+                      title="Cancel editing"
                     >
                       Cancel
                     </button>
@@ -857,7 +1000,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
               <div className="section-header">
                 <h4>Tags</h4>
                 {!editingDocTags && (
-                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditDocTags}>
+                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditDocTags} title="Edit tags">
                     Edit
                   </button>
                 )}
@@ -875,6 +1018,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                       className="btn btn-sm btn-primary"
                       onClick={handleSaveDocTags}
                       disabled={isSavingDocTags}
+                      title="Save changes"
                     >
                       {isSavingDocTags ? 'Saving...' : 'Save'}
                     </button>
@@ -882,6 +1026,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                       className="btn btn-sm btn-secondary"
                       onClick={handleCancelEditDocTags}
                       disabled={isSavingDocTags}
+                      title="Cancel editing"
                     >
                       Cancel
                     </button>
@@ -906,7 +1051,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
               <div className="section-header">
                 <h4>Custom Metadata</h4>
                 {!editingDocCustomMetadata && (
-                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditDocCustomMetadata}>
+                  <button className="btn btn-sm btn-secondary" onClick={handleStartEditDocCustomMetadata} title="Edit custom metadata">
                     Edit
                   </button>
                 )}
@@ -924,6 +1069,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                       className="btn btn-sm btn-primary"
                       onClick={handleSaveDocCustomMetadata}
                       disabled={isSavingDocCustomMetadata}
+                      title="Save changes"
                     >
                       {isSavingDocCustomMetadata ? 'Saving...' : 'Save'}
                     </button>
@@ -931,6 +1077,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                       className="btn btn-sm btn-secondary"
                       onClick={handleCancelEditDocCustomMetadata}
                       disabled={isSavingDocCustomMetadata}
+                      title="Cancel editing"
                     >
                       Cancel
                     </button>
@@ -960,6 +1107,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
               <button
                 className="btn btn-danger"
                 onClick={() => handleDeleteDocument(viewDocument.documentId)}
+                title="Permanently delete this document"
               >
                 Delete Document
               </button>
@@ -969,6 +1117,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                   setShowViewModal(false);
                   setViewDocument(null);
                 }}
+                title="Close this dialog"
               >
                 Close
               </button>

@@ -12,7 +12,7 @@
  *     node test-harness.js http://localhost:8080 verbexadmin
  */
 
-const { VerbexClient, VerbexError, LoginResult, AuthenticationResult, AuthorizationResult } = require('./verbex-sdk.js');
+const { VerbexClient, VerbexError, LoginResult, AuthenticationResult, AuthorizationResult, EnumerationOptions } = require('./verbex-sdk.js');
 const crypto = require('crypto');
 
 /**
@@ -191,7 +191,8 @@ class TestHarness {
         const index = await this._client.createIndex({
             name: 'Test Index',
             description: 'A test index for SDK validation',
-            inMemory: true
+            inMemory: true,
+            tenantId: 'default'
         });
         this._assertNotNull(index, 'index');
         this._assertNotNull(index.identifier, 'index.identifier');
@@ -204,7 +205,7 @@ class TestHarness {
         // Creating an index with the same name should fail with 409 Conflict
         // The server enforces unique index names within a tenant
         try {
-            await this._client.createIndex({ name: 'Test Index', description: 'Duplicate name index', inMemory: true });
+            await this._client.createIndex({ name: 'Test Index', description: 'Duplicate name index', inMemory: true, tenantId: 'default' });
             this._assert(false, 'Should have thrown VerbexError for duplicate name');
         } catch (error) {
             if (!(error instanceof VerbexError)) throw error;
@@ -232,7 +233,7 @@ class TestHarness {
 
     async testListIndicesAfterCreate() {
         const indices = await this._client.listIndices();
-        const found = indices.some(idx => idx.identifier === this._testIndexId);
+        const found = indices.objects.some(idx => idx.identifier === this._testIndexId);
         this._assertTrue(found, 'test index should be in list');
     }
 
@@ -244,7 +245,8 @@ class TestHarness {
             description: 'An index with labels and tags',
             inMemory: true,
             labels: labels,
-            tags: tags
+            tags: tags,
+            tenantId: 'default'
         });
         this._assertNotNull(index, 'index');
         // Clean up using the returned identifier
@@ -261,7 +263,8 @@ class TestHarness {
             name: 'Get Labeled Index',
             inMemory: true,
             labels: labels,
-            tags: tags
+            tags: tags,
+            tenantId: 'default'
         });
         const indexId = createdIndex.identifier;
         this._assertNotNull(indexId, 'created index identifier');
@@ -307,7 +310,7 @@ class TestHarness {
     async testListDocumentsEmpty() {
         const documents = await this._client.listDocuments(this._testIndexId);
         this._assertNotNull(documents, 'documents');
-        this._assertEquals(documents.length, 0, 'documents.length');
+        this._assertEquals(documents.objects.length, 0, 'documents.length');
     }
 
     async testAddDocument() {
@@ -350,8 +353,8 @@ class TestHarness {
     async testListDocumentsAfterAdd() {
         const documents = await this._client.listDocuments(this._testIndexId);
         this._assertNotNull(documents, 'documents');
-        this._assertEquals(documents.length, this._testDocuments.length, 'documents.length');
-        for (const doc of documents) {
+        this._assertEquals(documents.objects.length, this._testDocuments.length, 'documents.length');
+        for (const doc of documents.objects) {
             this._assertNotNull(doc.id, 'document.id');
         }
     }
@@ -659,6 +662,124 @@ class TestHarness {
         this._assertGreaterThan(searchResult.results.length, 0, 'should find documents matching both label and tag');
     }
 
+    // ==================== Filtered Enumeration Tests ====================
+
+    async testListDocumentsWithLabelFilter() {
+        // Add 3 documents, 2 with a specific label
+        const doc1 = await this._client.addDocument(
+            this._testIndexId,
+            'First labeled document for enumeration filter testing.',
+            null,
+            ['enumfilter'],
+            null
+        );
+        this._testDocuments.push(doc1.documentId);
+
+        const doc2 = await this._client.addDocument(
+            this._testIndexId,
+            'Second labeled document for enumeration filter testing.',
+            null,
+            ['enumfilter'],
+            null
+        );
+        this._testDocuments.push(doc2.documentId);
+
+        const doc3 = await this._client.addDocument(
+            this._testIndexId,
+            'Third document without the filter label.'
+        );
+        this._testDocuments.push(doc3.documentId);
+
+        // List documents with label filter
+        const options = new EnumerationOptions({ labels: ['enumfilter'] });
+        const result = await this._client.listDocuments(this._testIndexId, options);
+        this._assertNotNull(result, 'result');
+        this._assertEquals(result.objects.length, 2, 'filtered documents count');
+    }
+
+    async testListDocumentsWithTagFilter() {
+        // Add 3 documents, 2 with a specific tag
+        const doc1 = await this._client.addDocument(
+            this._testIndexId,
+            'First tagged document for enumeration tag filter testing.',
+            null,
+            null,
+            { enumtag: 'yes' }
+        );
+        this._testDocuments.push(doc1.documentId);
+
+        const doc2 = await this._client.addDocument(
+            this._testIndexId,
+            'Second tagged document for enumeration tag filter testing.',
+            null,
+            null,
+            { enumtag: 'yes' }
+        );
+        this._testDocuments.push(doc2.documentId);
+
+        const doc3 = await this._client.addDocument(
+            this._testIndexId,
+            'Third document without the filter tag.'
+        );
+        this._testDocuments.push(doc3.documentId);
+
+        // List documents with tag filter
+        const options = new EnumerationOptions({ tags: { enumtag: 'yes' } });
+        const result = await this._client.listDocuments(this._testIndexId, options);
+        this._assertNotNull(result, 'result');
+        this._assertEquals(result.objects.length, 2, 'filtered documents count');
+    }
+
+    // ==================== Wildcard Search Tests ====================
+
+    async testWildcardSearch() {
+        // Search with wildcard query "*"
+        const searchResult = await this._client.search(this._testIndexId, '*');
+        this._assertNotNull(searchResult, 'searchResult');
+        this._assertNotNull(searchResult.results, 'searchResult.results');
+        this._assertGreaterThan(searchResult.results.length, 0, 'wildcard results count');
+
+        // All wildcard results should have a score of 0
+        for (const result of searchResult.results) {
+            this._assertNotNull(result.documentId, 'result.documentId');
+            this._assertEquals(result.score, 0, 'wildcard result score should be 0');
+        }
+    }
+
+    async testWildcardSearchWithFilters() {
+        // Add a document with a unique label for wildcard filter test
+        const docId = crypto.randomUUID();
+        const labels = ['wildcardfilter'];
+        await this._client.addDocument(
+            this._testIndexId,
+            'Document specifically for wildcard filter testing.',
+            docId,
+            labels,
+            null
+        );
+        this._testDocuments.push(docId);
+
+        // Wildcard search with label filter
+        const searchResult = await this._client.search(
+            this._testIndexId,
+            '*',
+            100,
+            ['wildcardfilter'],
+            null
+        );
+        this._assertNotNull(searchResult, 'searchResult');
+        this._assertGreaterThan(searchResult.results.length, 0, 'wildcard filtered results count');
+
+        // All results should have the matching document
+        const found = searchResult.results.some(r => r.documentId === docId);
+        this._assertTrue(found, 'wildcard filter should return the labeled document');
+
+        // All wildcard results should have a score of 0
+        for (const result of searchResult.results) {
+            this._assertEquals(result.score, 0, 'wildcard filtered result score should be 0');
+        }
+    }
+
     // ==================== Document Deletion Tests ====================
 
     async testDeleteDocument() {
@@ -789,6 +910,16 @@ class TestHarness {
             await this._runTest('Search with label filter', () => this.testSearchWithLabelFilter());
             await this._runTest('Search with tag filter', () => this.testSearchWithTagFilter());
             await this._runTest('Search with labels and tags', () => this.testSearchWithLabelsAndTags());
+
+            // Filtered Enumeration Tests
+            this._printSubheader('Filtered Enumeration');
+            await this._runTest('List documents with label filter', () => this.testListDocumentsWithLabelFilter());
+            await this._runTest('List documents with tag filter', () => this.testListDocumentsWithTagFilter());
+
+            // Wildcard Search Tests
+            this._printSubheader('Wildcard Search');
+            await this._runTest('Wildcard search', () => this.testWildcardSearch());
+            await this._runTest('Wildcard search with filters', () => this.testWildcardSearchWithFilters());
 
             // Cleanup Tests
             this._printSubheader('Cleanup');

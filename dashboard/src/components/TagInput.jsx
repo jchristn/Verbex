@@ -43,6 +43,7 @@ function TagInput({ value = [], onChange, placeholder = 'Add a label...' }) {
               className="tag-remove"
               onClick={() => removeTag(index)}
               aria-label={`Remove ${tag}`}
+              title={`Remove ${tag}`}
             >
               &times;
             </button>
@@ -56,6 +57,7 @@ function TagInput({ value = [], onChange, placeholder = 'Add a label...' }) {
           onBlur={handleBlur}
           placeholder={value.length === 0 ? placeholder : ''}
           className="tag-input"
+          title="Type a label and press Enter to add"
         />
       </div>
       <span className="tag-hint">Press Enter or comma to add a label</span>

@@ -44,6 +44,7 @@ function KeyValueEditor({ value = {}, onChange, keyPlaceholder = 'Key', valuePla
                 className="kv-remove"
                 onClick={() => handleRemove(k)}
                 aria-label={`Remove ${k}`}
+                title={`Remove ${k}`}
               >
                 &times;
               </button>
@@ -59,6 +60,7 @@ function KeyValueEditor({ value = {}, onChange, keyPlaceholder = 'Key', valuePla
           onKeyDown={handleKeyDown}
           placeholder={keyPlaceholder}
           className="kv-input kv-key-input"
+          title="Enter tag key"
         />
         <input
           type="text"
@@ -67,12 +69,14 @@ function KeyValueEditor({ value = {}, onChange, keyPlaceholder = 'Key', valuePla
           onKeyDown={handleKeyDown}
           placeholder={valuePlaceholder}
           className="kv-input kv-value-input"
+          title="Enter tag value"
         />
         <button
           type="button"
           className="kv-add-btn"
           onClick={handleAdd}
           disabled={!newKey.trim() || !newValue.trim()}
+          title="Add this key-value pair"
         >
           Add
         </button>

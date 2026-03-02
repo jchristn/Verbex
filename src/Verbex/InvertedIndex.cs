@@ -496,6 +496,40 @@ namespace Verbex
         }
 
         /// <summary>
+        /// Gets documents with pagination and optional label/tag filtering.
+        /// Documents must have ALL specified labels and ALL specified tags to match (AND logic).
+        /// </summary>
+        /// <param name="limit">Maximum number of documents.</param>
+        /// <param name="offset">Number of documents to skip.</param>
+        /// <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
+        /// <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>List of matching documents.</returns>
+        public async Task<List<DocumentMetadata>> GetDocumentsAsync(int limit, int offset, List<string>? labels, Dictionary<string, string>? tags, CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotOpen();
+
+            return await _Driver.Documents.GetAllFilteredAsync(_TablePrefix, limit, offset, labels, tags, token).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Gets the count of documents matching optional label/tag filters.
+        /// Documents must have ALL specified labels and ALL specified tags to match (AND logic).
+        /// </summary>
+        /// <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
+        /// <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Count of matching documents.</returns>
+        public async Task<long> GetDocumentCountAsync(List<string>? labels, Dictionary<string, string>? tags, CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotOpen();
+
+            return await _Driver.Documents.GetFilteredCountAsync(_TablePrefix, labels, tags, token).ConfigureAwait(false);
+        }
+
+        /// <summary>
         /// Gets multiple documents by their IDs with full metadata (labels, tags, custom metadata) populated.
         /// Documents that are not found are silently omitted from the result.
         /// </summary>
@@ -884,8 +918,9 @@ namespace Verbex
 
         /// <summary>
         /// Searches the index for documents matching the query with optional label and tag filtering.
+        /// Use <c>"*"</c> as the query to return all documents (optionally filtered by labels/tags) without term matching.
         /// </summary>
-        /// <param name="query">Search query string.</param>
+        /// <param name="query">Search query string. Use <c>"*"</c> for wildcard (all documents).</param>
         /// <param name="maxResults">Maximum number of results.</param>
         /// <param name="useAndLogic">If true, documents must contain all terms. If false, any term.</param>
         /// <param name="labels">Optional list of labels to filter by (documents must have ALL labels).</param>
@@ -900,6 +935,12 @@ namespace Verbex
             if (string.IsNullOrWhiteSpace(query))
             {
                 return new SearchResults(new List<SearchResult>(), 0, TimeSpan.Zero);
+            }
+
+            // Wildcard search: return all documents (optionally filtered by labels/tags)
+            if (query.Trim() == "*")
+            {
+                return await WildcardSearchAsync(maxResults, labels, tags, token).ConfigureAwait(false);
             }
 
             DateTime startTime = DateTime.UtcNow;
@@ -1037,6 +1078,54 @@ namespace Verbex
 
             TimeSpan searchTime = DateTime.UtcNow - startTime;
             return new SearchResults(results, results.Count, searchTime, timingInfo);
+        }
+
+        /// <summary>
+        /// Performs a wildcard search returning all documents, optionally filtered by labels/tags.
+        /// All results have a score of 0 and are ordered by creation date.
+        /// </summary>
+        /// <param name="maxResults">Maximum number of results.</param>
+        /// <param name="labels">Optional labels to filter by.</param>
+        /// <param name="tags">Optional tags to filter by.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Search results with score 0 for all documents.</returns>
+        private async Task<SearchResults> WildcardSearchAsync(int? maxResults, List<string>? labels, Dictionary<string, string>? tags, CancellationToken token)
+        {
+            DateTime startTime = DateTime.UtcNow;
+            System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
+            SearchTimingInfo timingInfo = new SearchTimingInfo();
+
+            int limit = maxResults ?? _Configuration.DefaultMaxSearchResults;
+
+            bool hasFilters = (labels != null && labels.Count > 0) || (tags != null && tags.Count > 0);
+
+            List<DocumentMetadata> documents;
+            long totalCount;
+
+            if (hasFilters)
+            {
+                documents = await GetDocumentsAsync(limit, 0, labels, tags, token).ConfigureAwait(false);
+                totalCount = await GetDocumentCountAsync(labels, tags, token).ConfigureAwait(false);
+            }
+            else
+            {
+                documents = await GetDocumentsAsync(limit, 0, token).ConfigureAwait(false);
+                totalCount = await GetDocumentCountAsync(token).ConfigureAwait(false);
+            }
+
+            timingInfo.MainSearchMs = sw.ElapsedMilliseconds;
+            timingInfo.MatchesFound = documents.Count;
+            timingInfo.DocumentsFetched = documents.Count;
+            timingInfo.TotalDocuments = totalCount;
+
+            List<SearchResult> results = new List<SearchResult>();
+            foreach (DocumentMetadata doc in documents)
+            {
+                results.Add(new SearchResult(doc, 0, 0));
+            }
+
+            TimeSpan searchTime = DateTime.UtcNow - startTime;
+            return new SearchResults(results, (int)Math.Min(totalCount, int.MaxValue), searchTime, timingInfo);
         }
 
         /// <summary>

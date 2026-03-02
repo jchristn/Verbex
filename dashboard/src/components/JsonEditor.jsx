@@ -41,6 +41,7 @@ function JsonEditor({ value, onChange, placeholder = 'Enter JSON...', label = 'C
         placeholder={placeholder}
         className={`json-editor-textarea ${error ? 'json-error' : ''}`}
         rows={4}
+        title="Enter valid JSON"
       />
       {error && <span className="json-error-message">{error}</span>}
       <span className="json-hint">Any valid JSON value (object, array, string, number, boolean, null)</span>
