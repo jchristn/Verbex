@@ -94,6 +94,14 @@
   background: var(--bg-hover);
 }
 
+.github-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  text-decoration: none;
+}
+
 .logout-btn {
   color: var(--text-secondary);
 }
