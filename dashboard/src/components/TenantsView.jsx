@@ -278,13 +278,6 @@ function TenantsView({ onTenantSelect }) {
           <p className="workspace-subtitle">Manage tenant organizations and their settings</p>
         </div>
         <div className="workspace-actions">
-          <button className="btn btn-icon" onClick={loadTenants} title="Refresh">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M23 4v6h-6"></path>
-              <path d="M1 20v-6h6"></path>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-            </svg>
-          </button>
           <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} title="Create a new tenant">
             Create Tenant
           </button>
@@ -319,6 +312,7 @@ function TenantsView({ onTenantSelect }) {
             totalItems={filteredAndSortedTenants.length}
             onPageChange={setCurrentPage}
             onPageSizeChange={setPageSize}
+            onRefresh={loadTenants}
           />
           <table className="data-table">
             <thead>
@@ -366,7 +360,7 @@ function TenantsView({ onTenantSelect }) {
             </thead>
             <tbody>
               {paginatedTenants.map((tenant) => (
-                <tr key={tenant.identifier}>
+                <tr key={tenant.identifier} className="clickable-row" onClick={() => handleOpenEditModal(tenant)}>
                   <td>
                     <span className={`status-badge ${tenant.active ? 'enabled' : 'disabled'}`}>
                       {tenant.active ? 'Active' : 'Disabled'}
@@ -375,7 +369,7 @@ function TenantsView({ onTenantSelect }) {
                   <td><CopyableId value={tenant.identifier} /></td>
                   <td>{tenant.name || '-'}</td>
                   <td>{formatDate(tenant.createdUtc)}</td>
-                  <td>
+                  <td onClick={(e) => e.stopPropagation()}>
                     <ActionMenu
                       actions={[
                         {
@@ -395,7 +389,7 @@ function TenantsView({ onTenantSelect }) {
                           onClick: () => onTenantSelect && onTenantSelect(tenant.identifier, 'credentials')
                         },
                         {
-                          label: 'View Metadata',
+                          label: 'View JSON',
                           onClick: () => {
                             setMetadataTenant(tenant);
                             setShowMetadataModal(true);

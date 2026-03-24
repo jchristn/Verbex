@@ -487,7 +487,7 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
                 </thead>
                 <tbody>
                   {sortedResults.map((result) => (
-                    <tr key={result.documentId || result.rank}>
+                    <tr key={result.documentId || result.rank} className="clickable-row" onClick={() => handleViewDetails(result)}>
                       <td className="rank-column">{result.rank}</td>
                       <td className="score-column">
                         <div className="score-cell">
@@ -514,7 +514,7 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
                           <span className="no-terms">-</span>
                         )}
                       </td>
-                      <td className="actions-column">
+                      <td className="actions-column" onClick={(e) => e.stopPropagation()}>
                         <ActionMenu
                           actions={[
                             {
@@ -545,7 +545,7 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
           setSelectedResult(null);
         }}
         title="Search Result Details"
-        size="large"
+        size="fullscreen"
       >
         {selectedResult && (
           <div className="search-result-details">
@@ -606,7 +606,9 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
                   <>
                     <div className="detail-item">
                       <span className="detail-label">Document Path</span>
-                      <span className="detail-value">{selectedResult.document.documentPath || 'N/A'}</span>
+                      <span className="detail-value">
+                        {selectedResult.document.documentPath ? <CopyableId value={selectedResult.document.documentPath} /> : 'N/A'}
+                      </span>
                     </div>
                     <div className="detail-item">
                       <span className="detail-label">Length</span>
@@ -625,7 +627,9 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
                     {selectedResult.document.contentSha256 && (
                       <div className="detail-item">
                         <span className="detail-label">Content Hash</span>
-                        <span className="detail-value hash-value">{selectedResult.document.contentSha256}</span>
+                        <span className="detail-value">
+                          <CopyableId value={selectedResult.document.contentSha256} />
+                        </span>
                       </div>
                     )}
                   </>
@@ -654,7 +658,7 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
                     <div key={i} className="tag-item">
                       <span className="tag-key">{key}</span>
                       <span className="tag-separator">=</span>
-                      <span className="tag-value">{value}</span>
+                      <span className="tag-value"><CopyableId value={String(value)} /></span>
                     </div>
                   ))}
                 </div>

@@ -2,7 +2,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 8px 12px;
   border-top: 1px solid var(--border-color);
   background: var(--bg-primary);
   font-size: 0.875rem;
@@ -15,7 +15,7 @@
 .pagination-controls {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 14px;
 }
 
 .pagination-size {

@@ -326,18 +326,9 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
         </div>
         <div className="workspace-actions">
           {selectedTenant && (
-            <>
-              <button className="btn btn-icon" onClick={loadUsers} title="Refresh">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M23 4v6h-6"></path>
-                  <path d="M1 20v-6h6"></path>
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                </svg>
-              </button>
-              <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} title="Create a new user">
-                Create User
-              </button>
-            </>
+            <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} title="Create a new user">
+              Create User
+            </button>
           )}
         </div>
       </div>
@@ -401,6 +392,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
             totalItems={filteredAndSortedUsers.length}
             onPageChange={setCurrentPage}
             onPageSizeChange={setPageSize}
+            onRefresh={loadUsers}
           />
           <table className="data-table">
             <thead>
@@ -467,7 +459,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
             </thead>
             <tbody>
               {paginatedUsers.map((user) => (
-                <tr key={user.identifier}>
+                <tr key={user.identifier} className="clickable-row" onClick={() => handleOpenEditModal(user)}>
                   <td>
                     <span className={`status-badge ${user.active ? 'enabled' : 'disabled'}`}>
                       {user.active ? 'Active' : 'Disabled'}
@@ -482,7 +474,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
                     </span>
                   </td>
                   <td>{formatDate(user.createdUtc)}</td>
-                  <td>
+                  <td onClick={(e) => e.stopPropagation()}>
                     <ActionMenu
                       actions={[
                         {
@@ -494,7 +486,7 @@ function UsersView({ selectedTenant, tenants, onTenantSelect }) {
                           onClick: () => handleOpenEditModal(user)
                         },
                         {
-                          label: 'View Metadata',
+                          label: 'View JSON',
                           onClick: () => {
                             setMetadataUser(user);
                             setShowMetadataModal(true);

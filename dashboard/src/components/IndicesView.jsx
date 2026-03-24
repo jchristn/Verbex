@@ -501,13 +501,6 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
           <p className="workspace-subtitle">Create, configure, and manage your search indices</p>
         </div>
         <div className="workspace-actions">
-          <button className="btn btn-icon" onClick={onRefresh} title="Refresh">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M23 4v6h-6"></path>
-              <path d="M1 20v-6h6"></path>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-            </svg>
-          </button>
           <button className="btn btn-secondary" onClick={() => setShowRestoreModal(true)} title="Restore an index from a backup file">
             Restore Backup
           </button>
@@ -539,6 +532,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
             totalItems={filteredAndSortedIndices.length}
             onPageChange={setCurrentPage}
             onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+            onRefresh={onRefresh}
           />
           <table className="data-table">
             <thead>
@@ -594,7 +588,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
             </thead>
             <tbody>
               {paginatedIndices.map((index) => (
-                <tr key={index.identifier}>
+                <tr key={index.identifier} className="clickable-row" onClick={() => handleViewDetails(index)}>
                   <td>
                     <span className={`status-badge ${index.enabled ? 'enabled' : 'disabled'}`}>
                       {index.enabled ? 'Active' : 'Disabled'}
@@ -604,7 +598,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                   <td>{index.name || '-'}</td>
                   <td>{index.inMemory ? 'Memory' : 'Disk'}</td>
                   <td>{formatDate(index.createdUtc)}</td>
-                  <td>
+                  <td onClick={(e) => e.stopPropagation()}>
                     <ActionMenu
                       actions={[
                         {
@@ -616,7 +610,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                           onClick: () => onIndexSelectAndNavigate(index.identifier)
                         },
                         {
-                          label: 'View Metadata',
+                          label: 'View JSON',
                           onClick: () => {
                             setMetadataIndex(index);
                             setShowMetadataModal(true);
@@ -633,7 +627,7 @@ function IndicesView({ indices, isLoading, onRefresh, onIndexSelectAndNavigate, 
                             disabled: isBackingUp === index.identifier
                           },
                           {
-                            label: 'Restore from Backup',
+                            label: 'Restore',
                             onClick: () => {
                               setRestoreReplaceIndex(index);
                               setShowRestoreReplaceModal(true);

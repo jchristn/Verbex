@@ -351,18 +351,9 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
         </div>
         <div className="workspace-actions">
           {selectedTenant && (
-            <>
-              <button className="btn btn-icon" onClick={loadCredentials} title="Refresh">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M23 4v6h-6"></path>
-                  <path d="M1 20v-6h6"></path>
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                </svg>
-              </button>
-              <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} title="Create a new API credential">
-                Create Credential
-              </button>
-            </>
+            <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} title="Create a new API credential">
+              Create Credential
+            </button>
           )}
         </div>
       </div>
@@ -426,6 +417,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
             totalItems={filteredAndSortedCredentials.length}
             onPageChange={setCurrentPage}
             onPageSizeChange={setPageSize}
+            onRefresh={loadCredentials}
           />
           <table className="data-table">
             <thead>
@@ -481,7 +473,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
             </thead>
             <tbody>
               {paginatedCredentials.map((credential) => (
-                <tr key={credential.identifier}>
+                <tr key={credential.identifier} className="clickable-row" onClick={() => handleOpenEditModal(credential)}>
                   <td>
                     <span className={`status-badge ${credential.active ? 'enabled' : 'disabled'}`}>
                       {credential.active ? 'Active' : 'Disabled'}
@@ -491,7 +483,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
                   <td>{credential.name || '-'}</td>
                   <td className="credential-token">{formatTokenPreview(credential.tokenPreview)}</td>
                   <td>{formatDate(credential.createdUtc)}</td>
-                  <td>
+                  <td onClick={(e) => e.stopPropagation()}>
                     <ActionMenu
                       actions={[
                         {
@@ -508,7 +500,7 @@ function CredentialsView({ selectedTenant, tenants, onTenantSelect }) {
                           disabled: isToggling
                         },
                         {
-                          label: 'View Metadata',
+                          label: 'View JSON',
                           onClick: () => {
                             setMetadataCredential(credential);
                             setShowMetadataModal(true);

@@ -2,8 +2,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
-  height: 60px;
+  padding: 0 16px;
+  height: 48px;
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
@@ -47,25 +47,26 @@
 .topbar-server-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 999px;
-  font-size: 0.75rem;
+  gap: 5px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  font-size: 0.7rem;
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
+  transition: color 0.2s;
   user-select: none;
 }
 
 .topbar-server-badge:hover {
-  background: var(--bg-hover);
-  border-color: var(--text-secondary);
+  background: none;
+  border-color: transparent;
 }
 
 .topbar-server-badge .server-url {
-  color: var(--text-primary);
+  color: var(--text-muted);
   font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.7rem;
 }
 
 .topbar-server-badge .copy-icon {
@@ -80,26 +81,39 @@
 }
 
 .topbar-btn {
-  padding: 8px 12px;
+  padding: 6px 10px;
   border: none;
   border-radius: 6px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: transparent;
+  color: var(--text-secondary);
   font-size: 0.875rem;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, color 0.2s;
 }
 
 .topbar-btn:hover {
   background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .github-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
+  padding: 6px;
   text-decoration: none;
+  color: var(--text-secondary);
+}
+
+.github-btn:hover {
+  color: var(--text-primary);
+}
+
+.theme-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
 }
 
 .logout-btn {

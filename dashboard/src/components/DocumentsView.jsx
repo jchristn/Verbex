@@ -532,18 +532,9 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
             </select>
           </div>
           {selectedIndex && (
-            <>
-              <button className="btn btn-icon" onClick={loadDocuments} title="Refresh">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M23 4v6h-6"></path>
-                  <path d="M1 20v-6h6"></path>
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                </svg>
-              </button>
-              <button className="btn btn-primary" onClick={() => setShowAddModal(true)} title="Add a new document to this index">
-                Add Document
-              </button>
-            </>
+            <button className="btn btn-primary" onClick={() => setShowAddModal(true)} title="Add a new document to this index">
+              Add Document
+            </button>
           )}
         </div>
       </div>
@@ -672,6 +663,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
               setPageSize(size);
               setCurrentPage(1);
             }}
+            onRefresh={loadDocuments}
           />
           <table className="data-table documents-table">
             <thead>
@@ -732,8 +724,8 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
             </thead>
             <tbody>
               {paginatedDocuments.map((doc) => (
-                <tr key={doc.documentId} className={selectedDocIds.has(doc.documentId) ? 'selected' : ''}>
-                  <td className="checkbox-column">
+                <tr key={doc.documentId} className={`clickable-row ${selectedDocIds.has(doc.documentId) ? 'selected' : ''}`} onClick={() => handleViewDocument(doc.documentId)}>
+                  <td className="checkbox-column" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={selectedDocIds.has(doc.documentId)}
@@ -745,7 +737,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                   <td>{doc.documentLength?.toLocaleString() || 'N/A'}</td>
                   <td>{formatDate(doc.indexedDate)}</td>
                   <td>{doc.indexingRuntimeMs != null ? `${doc.indexingRuntimeMs.toFixed(2)} ms` : 'N/A'}</td>
-                  <td>
+                  <td onClick={(e) => e.stopPropagation()}>
                     <ActionMenu
                       actions={[
                         {
@@ -753,7 +745,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                           onClick: () => handleViewDocument(doc.documentId)
                         },
                         {
-                          label: 'View Metadata',
+                          label: 'View JSON',
                           onClick: () => handleViewMetadata(doc.documentId)
                         },
                         {
@@ -893,7 +885,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
           setViewDocument(null);
         }}
         title="Document Details"
-        size="large"
+        size="fullscreen"
       >
         {isLoadingDoc ? (
           <div className="loading-spinner">Loading document...</div>
@@ -916,7 +908,9 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Document Path</span>
-                  <span className="detail-value">{viewDocument.documentPath || 'N/A'}</span>
+                  <span className="detail-value">
+                    {viewDocument.documentPath ? <CopyableId value={viewDocument.documentPath} /> : 'N/A'}
+                  </span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Length</span>
@@ -936,7 +930,9 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Content Hash (SHA256)</span>
-                  <span className="detail-value">{viewDocument.contentSha256 || 'N/A'}</span>
+                  <span className="detail-value">
+                    {viewDocument.contentSha256 ? <CopyableId value={viewDocument.contentSha256} /> : 'N/A'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1038,7 +1034,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
                     <div key={i} className="tag-item">
                       <span className="tag-key">{key}</span>
                       <span className="tag-separator">=</span>
-                      <span className="tag-value">{value}</span>
+                      <span className="tag-value"><CopyableId value={String(value)} /></span>
                     </div>
                   ))}
                 </div>
@@ -1133,7 +1129,7 @@ function DocumentsView({ selectedIndex, indices, onRefresh, onIndexSelect }) {
           setShowMetadataModal(false);
           setMetadataDoc(null);
         }}
-        title="Document Metadata"
+        title="Document JSON"
         data={metadataDoc}
         isLoading={isLoadingMetadata}
       />
