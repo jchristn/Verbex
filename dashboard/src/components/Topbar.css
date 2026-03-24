@@ -47,31 +47,12 @@
 .topbar-server-badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 0;
-  background: none;
-  border: none;
-  border-radius: 0;
-  font-size: 0.7rem;
-  cursor: pointer;
-  transition: color 0.2s;
-  user-select: none;
 }
 
-.topbar-server-badge:hover {
-  background: none;
-  border-color: transparent;
-}
-
-.topbar-server-badge .server-url {
+.topbar-server-badge .copyable-id-value {
   color: var(--text-muted);
   font-family: 'Consolas', 'Monaco', monospace;
   font-size: 0.7rem;
-}
-
-.topbar-server-badge .copy-icon {
-  color: var(--text-secondary);
-  flex-shrink: 0;
 }
 
 .topbar-actions {
