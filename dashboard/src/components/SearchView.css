@@ -345,6 +345,22 @@
   font-weight: 600;
 }
 
+/* Indexed Terms */
+.search-result-details .document-terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.search-result-details .term-badge {
+  background: var(--color-primary-alpha);
+  color: var(--color-primary);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
 /* Details Grid */
 .search-result-details .details-grid {
   display: grid;

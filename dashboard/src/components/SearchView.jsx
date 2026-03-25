@@ -143,11 +143,12 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
         };
       }
 
-      // Add rank to each result
+      // Add rank and derive matchedTerms from termScores keys
       if (filteredResults?.results) {
         filteredResults.results = filteredResults.results.map((r, i) => ({
           ...r,
-          rank: i + 1
+          rank: i + 1,
+          matchedTerms: r.matchedTerms || (r.termScores ? Object.keys(r.termScores) : [])
         }));
       }
 
@@ -587,6 +588,18 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
                         <span className="term-freq">x{selectedResult.termFrequencies[term]}</span>
                       )}
                     </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Indexed Terms Section */}
+            {selectedResult.document?.terms && selectedResult.document.terms.length > 0 && (
+              <div className="details-section">
+                <h4>Indexed Terms ({selectedResult.document.terms.length})</h4>
+                <div className="document-terms">
+                  {selectedResult.document.terms.map((term, i) => (
+                    <span key={i} className="term-badge">{term}</span>
                   ))}
                 </div>
               </div>
