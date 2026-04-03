@@ -180,7 +180,7 @@ INNER JOIN {prefix}_document_terms dt ON dt.document_id = filtered.document_id
 WHERE dt.term_id IN ({inClause})
 GROUP BY dt.document_id
 {havingClause}
-ORDER BY total_frequency DESC
+ORDER BY term_count DESC, total_frequency DESC
 LIMIT {limit};";
             }
             else
@@ -194,7 +194,7 @@ FROM {prefix}_document_terms dt
 WHERE dt.term_id IN ({inClause})
 GROUP BY dt.document_id
 {havingClause}
-ORDER BY total_frequency DESC
+ORDER BY term_count DESC, total_frequency DESC
 LIMIT {limit};";
             }
 

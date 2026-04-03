@@ -65,10 +65,17 @@ namespace Verbex.Database.Postgresql
 
                 await CreateSchemaAsync(token).ConfigureAwait(false);
                 await CreateIndexesAsync(token).ConfigureAwait(false);
-
-                InitializeMethodImplementations();
-
                 _IsOpen = true;
+                try
+                {
+                    await EnsureRequestHistorySchemaAsync(token).ConfigureAwait(false);
+                    InitializeMethodImplementations();
+                }
+                catch
+                {
+                    _IsOpen = false;
+                    throw;
+                }
             }
             finally
             {
@@ -370,6 +377,53 @@ namespace Verbex.Database.Postgresql
                 cmd.CommandTimeout = UnlimitedCommandTimeout;
                 await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
             }
+        }
+
+        private async Task EnsureRequestHistorySchemaAsync(CancellationToken token)
+        {
+            await ExecuteNonQueryAsync(RequestHistorySchema.GetCreateTableQuery(Settings.Type), false, UnlimitedCommandTimeout, token).ConfigureAwait(false);
+            await ExecuteNonQueryAsync(RequestHistorySchema.GetCreateDetailTableQuery(Settings.Type), false, UnlimitedCommandTimeout, token).ConfigureAwait(false);
+
+            await EnsureRequestHistoryColumnsAsync("request_history", RequestHistorySchema.RequestHistoryColumns, token).ConfigureAwait(false);
+            await EnsureRequestHistoryColumnsAsync("request_history_detail", RequestHistorySchema.RequestHistoryDetailColumns, token).ConfigureAwait(false);
+
+            foreach (string indexQuery in RequestHistorySchema.GetCreateIndexQueries(Settings.Type))
+            {
+                await ExecuteNonQueryAsync(indexQuery, false, UnlimitedCommandTimeout, token).ConfigureAwait(false);
+            }
+        }
+
+        private async Task EnsureRequestHistoryColumnsAsync(string tableName, IReadOnlyList<RequestHistorySchema.RequestHistoryColumnDefinition> columns, CancellationToken token)
+        {
+            HashSet<string> existingColumns = await GetExistingRequestHistoryColumnsAsync(tableName, token).ConfigureAwait(false);
+
+            foreach (RequestHistorySchema.RequestHistoryColumnDefinition column in columns)
+            {
+                if (existingColumns.Contains(column.Name))
+                {
+                    continue;
+                }
+
+                await ExecuteNonQueryAsync(RequestHistorySchema.GetAddColumnQuery(Settings.Type, tableName, column), false, UnlimitedCommandTimeout, token).ConfigureAwait(false);
+                existingColumns.Add(column.Name);
+            }
+        }
+
+        private async Task<HashSet<string>> GetExistingRequestHistoryColumnsAsync(string tableName, CancellationToken token)
+        {
+            DataTable result = await ExecuteQueryAsync(RequestHistorySchema.GetExistingColumnsQuery(Settings, tableName), false, token).ConfigureAwait(false);
+            HashSet<string> columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (DataRow row in result.Rows)
+            {
+                string? columnName = RequestHistorySchema.GetColumnName(row);
+                if (!String.IsNullOrWhiteSpace(columnName))
+                {
+                    columns.Add(columnName);
+                }
+            }
+
+            return columns;
         }
 
         /// <summary>

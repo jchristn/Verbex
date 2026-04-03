@@ -255,6 +255,8 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
         /// </summary>
         public static readonly string DropTables = @"
 DROP TABLE IF EXISTS schema_metadata CASCADE;
+DROP TABLE IF EXISTS request_history_detail CASCADE;
+DROP TABLE IF EXISTS request_history CASCADE;
 DROP TABLE IF EXISTS tags CASCADE;
 DROP TABLE IF EXISTS labels CASCADE;
 DROP TABLE IF EXISTS document_terms CASCADE;

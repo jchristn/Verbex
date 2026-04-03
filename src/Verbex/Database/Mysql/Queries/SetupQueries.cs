@@ -280,6 +280,8 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
         public static readonly string DropTables = @"
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS schema_metadata;
+DROP TABLE IF EXISTS request_history_detail;
+DROP TABLE IF EXISTS request_history;
 DROP TABLE IF EXISTS tags;
 DROP TABLE IF EXISTS labels;
 DROP TABLE IF EXISTS document_terms;

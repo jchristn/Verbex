@@ -428,6 +428,8 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_credential_key')
         /// </summary>
         public static readonly string DropTables = @"
 DROP TABLE IF EXISTS schema_metadata;
+DROP TABLE IF EXISTS request_history_detail;
+DROP TABLE IF EXISTS request_history;
 DROP TABLE IF EXISTS tags;
 DROP TABLE IF EXISTS labels;
 DROP TABLE IF EXISTS document_terms;

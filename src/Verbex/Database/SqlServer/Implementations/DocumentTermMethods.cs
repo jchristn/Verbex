@@ -180,7 +180,7 @@ INNER JOIN {prefix}_document_terms dt WITH (INDEX(idx_{prefix}_docterms_search))
 WHERE dt.term_id IN ({inClause})
 GROUP BY dt.document_id
 {havingClause}
-ORDER BY total_frequency DESC
+ORDER BY term_count DESC, total_frequency DESC
 OPTION (FORCE ORDER);";
             }
             else
@@ -194,7 +194,7 @@ FROM {prefix}_document_terms dt WITH (INDEX(idx_{prefix}_docterms_search))
 WHERE dt.term_id IN ({inClause})
 GROUP BY dt.document_id
 {havingClause}
-ORDER BY total_frequency DESC;";
+ORDER BY term_count DESC, total_frequency DESC;";
             }
 
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);

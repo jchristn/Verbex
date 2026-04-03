@@ -2210,7 +2210,7 @@ namespace Verbex
 
         private double CalculateScore(SearchMatch match, Dictionary<string, TermRecord> termRecords, long totalDocs)
         {
-            double score = 0.0;
+            double tfIdfScore = 0.0;
 
             // Calculate TF-IDF for each term that this document actually contains
             // Formula: score = Σ log(1 + TF) × log((N + 1) / (df + 1))
@@ -2232,14 +2232,23 @@ namespace Verbex
                     double idf = Math.Log((totalDocs + 1.0) / (term.DocumentFrequency + 1.0));
 
                     // Accumulate TF-IDF for this term
-                    score += tf * idf;
+                    tfIdfScore += tf * idf;
                 }
             }
 
-            // Apply sigmoid normalization to map score to 0-1 range
-            score = 1.0 / (1.0 + Math.Exp(-score / _Configuration.SigmoidNormalizationDivisor));
+            double normalizedTfIdf = 1.0 / (1.0 + Math.Exp(-tfIdfScore / _Configuration.SigmoidNormalizationDivisor));
+            int totalQueryTerms = Math.Max(termRecords.Count, 1);
+            int matchedTermCount = match.TermFrequencies.Count > 0 ? match.TermFrequencies.Count : match.MatchedTermCount;
+            matchedTermCount = Math.Clamp(matchedTermCount, 0, totalQueryTerms);
 
-            return score;
+            if (totalQueryTerms == 1)
+            {
+                return normalizedTfIdf;
+            }
+
+            // Reserve a distinct score band for each match-count bucket so broader OR matches
+            // always outrank narrower matches, while TF-IDF breaks ties inside the same bucket.
+            return ((matchedTermCount - 1) + normalizedTfIdf) / totalQueryTerms;
         }
 
         #endregion

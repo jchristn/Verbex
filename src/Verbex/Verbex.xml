@@ -2797,6 +2797,11 @@
             Executes a query without acquiring the semaphore (internal use only).
             </summary>
         </member>
+        <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.ExecuteNonQueryAsync(System.String,System.Boolean,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Executes a non-query script with an optional transaction and command timeout override.
+            </summary>
+        </member>
         <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.Dispose(System.Boolean)">
             <inheritdoc />
         </member>
@@ -3339,6 +3344,11 @@
             Executes a query without acquiring the semaphore (internal use only).
             </summary>
         </member>
+        <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.ExecuteNonQueryAsync(System.String,System.Boolean,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Executes a non-query script with an optional transaction and command timeout override.
+            </summary>
+        </member>
         <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.Dispose(System.Boolean)">
             <inheritdoc />
         </member>
@@ -3473,6 +3483,11 @@
             </summary>
             <param name="value">The value to format.</param>
             <returns>"NULL" or the decimal as a string.</returns>
+        </member>
+        <member name="T:Verbex.Database.RequestHistorySchema">
+            <summary>
+            Shared request history schema definitions used by core database drivers.
+            </summary>
         </member>
         <member name="T:Verbex.Database.Sqlite.Implementations.AdministratorMethods">
             <summary>
@@ -4644,6 +4659,11 @@
         <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.ExecuteQueryInternalAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
             <summary>
             Executes a query without acquiring the semaphore (internal use only).
+            </summary>
+        </member>
+        <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.ExecuteNonQueryAsync(System.String,System.Boolean,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Executes a non-query script with an optional transaction and command timeout override.
             </summary>
         </member>
         <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.Dispose(System.Boolean)">

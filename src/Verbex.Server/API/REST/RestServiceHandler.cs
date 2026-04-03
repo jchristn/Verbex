@@ -2,8 +2,10 @@ namespace Verbex.Server.API.REST
 {
     using SyslogLogging;
     using System;
+    using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Collections.Specialized;
+    using System.Diagnostics;
     using System.IO;
     using System.IO.Compression;
     using System.Linq;
@@ -55,6 +57,7 @@ namespace Verbex.Server.API.REST
         private BackupService? _BackupService = null;
         private RequestHistoryService? _RequestHistory = null;
         private readonly ConditionalWeakTable<HttpContextBase, RequestHistoryCaptureContext> _RequestHistoryContexts = new ConditionalWeakTable<HttpContextBase, RequestHistoryCaptureContext>();
+        private readonly ConcurrentDictionary<string, RequestTimingContext> _RequestTimingContexts = new ConcurrentDictionary<string, RequestTimingContext>();
         private readonly string _Header = "[RestServiceHandler] ";
 
         #endregion
@@ -140,6 +143,7 @@ namespace Verbex.Server.API.REST
             }
 
             _Webserver = new Webserver(webserverSettings, DefaultRoute);
+            _Webserver.Events.RequestReceived += HandleRequestReceived;
 
             if (_Settings.Rest.EnableOpenApi)
             {
@@ -907,20 +911,29 @@ namespace Verbex.Server.API.REST
         /// <returns>Task.</returns>
         private async Task PostRoutingRoute(HttpContextBase ctx)
         {
-            _Logging.Debug(
-                _Header
-                + ctx.Request.Method + " " + ctx.Request.Url.RawWithQuery + " "
-                + ctx.Response.StatusCode + " "
-                + "(" + ctx.Timestamp.TotalMs.Value.ToString("F2") + "ms)");
+            double durationMs = GetRequestDurationMs(ctx);
 
-            string method = ctx.Request.Method.ToString();
-            if (String.Equals(method, "OPTIONS", StringComparison.OrdinalIgnoreCase)
-                || String.Equals(method, "HEAD", StringComparison.OrdinalIgnoreCase))
+            try
             {
-                return;
-            }
+                _Logging.Debug(
+                    _Header
+                    + ctx.Request.Method + " " + ctx.Request.Url.RawWithQuery + " "
+                    + ctx.Response.StatusCode + " "
+                    + "(" + durationMs.ToString("F2") + "ms)");
 
-            await PersistRequestHistoryAsync(ctx).ConfigureAwait(false);
+                string method = ctx.Request.Method.ToString();
+                if (String.Equals(method, "OPTIONS", StringComparison.OrdinalIgnoreCase)
+                    || String.Equals(method, "HEAD", StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                await PersistRequestHistoryAsync(ctx, durationMs).ConfigureAwait(false);
+            }
+            finally
+            {
+                RemoveRequestTiming(ctx);
+            }
         }
 
         /// <summary>
@@ -4344,6 +4357,12 @@ namespace Verbex.Server.API.REST
             public double DurationMs { get; set; }
         }
 
+        private sealed class RequestTimingContext
+        {
+            public DateTime StartedUtc { get; set; } = DateTime.UtcNow;
+            public Stopwatch Stopwatch { get; set; } = Stopwatch.StartNew();
+        }
+
         private RequestHistoryCaptureContext GetOrCreateRequestHistoryCapture(HttpContextBase ctx)
         {
             return _RequestHistoryContexts.GetValue(ctx, CreateRequestHistoryCapture);
@@ -4354,7 +4373,7 @@ namespace Verbex.Server.API.REST
             return new RequestHistoryCaptureContext
             {
                 Id = Guid.NewGuid().ToString(),
-                CreatedUtc = DateTime.UtcNow,
+                CreatedUtc = GetRequestStartUtc(ctx),
                 RequestType = RequestTypeEnum.Unknown,
                 HttpMethod = ctx.Request.Method.ToString(),
                 RequestUrl = ctx.Request.Url.Full,
@@ -4368,7 +4387,7 @@ namespace Verbex.Server.API.REST
             };
         }
 
-        private async Task PersistRequestHistoryAsync(HttpContextBase ctx)
+        private async Task PersistRequestHistoryAsync(HttpContextBase ctx, double durationMs)
         {
             if (_RequestHistory == null || !_RequestHistory.Enabled)
             {
@@ -4387,7 +4406,7 @@ namespace Verbex.Server.API.REST
                 capture.RouteTemplate = NormalizeRouteTemplate(ctx);
                 capture.RouteParameters = GetRouteParameters(ctx);
                 capture.QueryParameters = GetQueryParameters(ctx);
-                capture.DurationMs = ctx.Timestamp.TotalMs.HasValue ? ctx.Timestamp.TotalMs.Value : 0;
+                capture.DurationMs = durationMs;
 
                 AuthContext? auth = null;
                 if (!String.IsNullOrWhiteSpace(capture.AuthToken))
@@ -4579,6 +4598,56 @@ namespace Verbex.Server.API.REST
             }
 
             return ret;
+        }
+
+        private void HandleRequestReceived(object? sender, RequestEventArgs args)
+        {
+            string key = GetRequestTimingKey(args.ConnectionId, args.StreamId);
+            _RequestTimingContexts[key] = new RequestTimingContext
+            {
+                StartedUtc = DateTime.UtcNow,
+                Stopwatch = Stopwatch.StartNew()
+            };
+        }
+
+        private DateTime GetRequestStartUtc(HttpContextBase ctx)
+        {
+            if (_RequestTimingContexts.TryGetValue(GetRequestTimingKey(ctx), out RequestTimingContext? timing))
+            {
+                return timing.StartedUtc;
+            }
+
+            return DateTime.UtcNow;
+        }
+
+        private double GetRequestDurationMs(HttpContextBase ctx)
+        {
+            if (_RequestTimingContexts.TryGetValue(GetRequestTimingKey(ctx), out RequestTimingContext? timing))
+            {
+                return timing.Stopwatch.Elapsed.TotalMilliseconds;
+            }
+
+            if (ctx.Timestamp.TotalMs.HasValue && ctx.Timestamp.TotalMs.Value > 0)
+            {
+                return ctx.Timestamp.TotalMs.Value;
+            }
+
+            return 0;
+        }
+
+        private void RemoveRequestTiming(HttpContextBase ctx)
+        {
+            _RequestTimingContexts.TryRemove(GetRequestTimingKey(ctx), out _);
+        }
+
+        private static string GetRequestTimingKey(HttpContextBase ctx)
+        {
+            return GetRequestTimingKey(ctx.Connection.Guid, ctx.Stream.Guid);
+        }
+
+        private static string GetRequestTimingKey(Guid connectionId, Guid streamId)
+        {
+            return connectionId.ToString("N") + ":" + streamId.ToString("N");
         }
 
         private static Dictionary<string, string> SanitizeHeaders(NameValueCollection? headers)

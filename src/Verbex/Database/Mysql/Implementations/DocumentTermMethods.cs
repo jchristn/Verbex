@@ -185,7 +185,7 @@ STRAIGHT_JOIN {prefix}_document_terms dt FORCE INDEX (idx_{prefix}_docterms_sear
 WHERE dt.term_id IN ({inClause})
 GROUP BY dt.document_id
 {havingClause}
-ORDER BY total_frequency DESC
+ORDER BY term_count DESC, total_frequency DESC
 LIMIT {limit};";
             }
             else
@@ -199,7 +199,7 @@ FROM {prefix}_document_terms dt FORCE INDEX (idx_{prefix}_docterms_search)
 WHERE dt.term_id IN ({inClause})
 GROUP BY dt.document_id
 {havingClause}
-ORDER BY total_frequency DESC
+ORDER BY term_count DESC, total_frequency DESC
 LIMIT {limit};";
             }
 

@@ -72,10 +72,17 @@ namespace Verbex.Database.Sqlite
 
                 await ApplyPragmasAsync(token).ConfigureAwait(false);
                 await CreateSchemaAsync(token).ConfigureAwait(false);
-
-                InitializeMethodImplementations();
-
                 _IsOpen = true;
+                try
+                {
+                    await EnsureRequestHistorySchemaAsync(token).ConfigureAwait(false);
+                    InitializeMethodImplementations();
+                }
+                catch
+                {
+                    _IsOpen = false;
+                    throw;
+                }
             }
             finally
             {
@@ -602,6 +609,68 @@ namespace Verbex.Database.Sqlite
             await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
 
             cmd.CommandText = SetupQueries.CreateIndices();
+            await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+        }
+
+        private async Task EnsureRequestHistorySchemaAsync(CancellationToken token)
+        {
+            await ExecuteSqliteNonQueryAsync(RequestHistorySchema.GetCreateTableQuery(Settings.Type), token).ConfigureAwait(false);
+            await ExecuteSqliteNonQueryAsync(RequestHistorySchema.GetCreateDetailTableQuery(Settings.Type), token).ConfigureAwait(false);
+
+            await EnsureRequestHistoryColumnsAsync("request_history", RequestHistorySchema.RequestHistoryColumns, token).ConfigureAwait(false);
+            await EnsureRequestHistoryColumnsAsync("request_history_detail", RequestHistorySchema.RequestHistoryDetailColumns, token).ConfigureAwait(false);
+
+            foreach (string indexQuery in RequestHistorySchema.GetCreateIndexQueries(Settings.Type))
+            {
+                await ExecuteSqliteNonQueryAsync(indexQuery, token).ConfigureAwait(false);
+            }
+        }
+
+        private async Task EnsureRequestHistoryColumnsAsync(string tableName, IReadOnlyList<RequestHistorySchema.RequestHistoryColumnDefinition> columns, CancellationToken token)
+        {
+            HashSet<string> existingColumns = await GetExistingRequestHistoryColumnsAsync(tableName, token).ConfigureAwait(false);
+
+            foreach (RequestHistorySchema.RequestHistoryColumnDefinition column in columns)
+            {
+                if (existingColumns.Contains(column.Name))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    await ExecuteSqliteNonQueryAsync(RequestHistorySchema.GetAddColumnQuery(Settings.Type, tableName, column), token).ConfigureAwait(false);
+                    existingColumns.Add(column.Name);
+                }
+                catch (SqliteException ex) when (RequestHistorySchema.CanIgnoreDuplicateColumnException(ex))
+                {
+                    existingColumns.Add(column.Name);
+                }
+            }
+        }
+
+        private async Task<HashSet<string>> GetExistingRequestHistoryColumnsAsync(string tableName, CancellationToken token)
+        {
+            DataTable result = await ExecuteQueryAsync(RequestHistorySchema.GetExistingColumnsQuery(Settings, tableName), false, token).ConfigureAwait(false);
+            HashSet<string> columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (DataRow row in result.Rows)
+            {
+                string? columnName = RequestHistorySchema.GetColumnName(row);
+                if (!String.IsNullOrWhiteSpace(columnName))
+                {
+                    columns.Add(columnName);
+                }
+            }
+
+            return columns;
+        }
+
+        private async Task ExecuteSqliteNonQueryAsync(string query, CancellationToken token)
+        {
+            using SqliteCommand cmd = _WriteConnection!.CreateCommand();
+            cmd.CommandText = query;
+            cmd.CommandTimeout = 0;
             await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
         }
 
