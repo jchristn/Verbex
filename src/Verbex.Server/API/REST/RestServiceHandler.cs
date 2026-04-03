@@ -907,13 +907,11 @@ namespace Verbex.Server.API.REST
         /// <returns>Task.</returns>
         private async Task PostRoutingRoute(HttpContextBase ctx)
         {
-            ctx.Response.Timestamp.End = DateTime.UtcNow;
-
             _Logging.Debug(
                 _Header
                 + ctx.Request.Method + " " + ctx.Request.Url.RawWithQuery + " "
                 + ctx.Response.StatusCode + " "
-                + "(" + ctx.Response.Timestamp.TotalMs.Value.ToString("F2") + "ms)");
+                + "(" + ctx.Timestamp.TotalMs.Value.ToString("F2") + "ms)");
 
             string method = ctx.Request.Method.ToString();
             if (String.Equals(method, "OPTIONS", StringComparison.OrdinalIgnoreCase)
@@ -4389,7 +4387,7 @@ namespace Verbex.Server.API.REST
                 capture.RouteTemplate = NormalizeRouteTemplate(ctx);
                 capture.RouteParameters = GetRouteParameters(ctx);
                 capture.QueryParameters = GetQueryParameters(ctx);
-                capture.DurationMs = ctx.Response.Timestamp.TotalMs.HasValue ? ctx.Response.Timestamp.TotalMs.Value : 0;
+                capture.DurationMs = ctx.Timestamp.TotalMs.HasValue ? ctx.Timestamp.TotalMs.Value : 0;
 
                 AuthContext? auth = null;
                 if (!String.IsNullOrWhiteSpace(capture.AuthToken))

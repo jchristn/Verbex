@@ -95,24 +95,11 @@ WHERE name = '{Sanitizer.Sanitize(name)}';";
         public async Task<DocumentMetadata?> GetWithMetadataAsync(string tablePrefix, string id, CancellationToken token = default)
         {
             string prefix = TablePrefixValidator.Validate(tablePrefix);
-            DocumentMetadata? doc = await GetAsync(tablePrefix, id, token).ConfigureAwait(false);
+            List<DocumentMetadata> docs = await GetByIdsWithMetadataAsync(tablePrefix, new[] { id }, token).ConfigureAwait(false);
+            DocumentMetadata? doc = docs.Count > 0 ? docs[0] : null;
             if (doc == null)
             {
                 return null;
-            }
-
-            string labelsQuery = $"SELECT label FROM {prefix}_labels WHERE document_id = '{Sanitizer.Sanitize(id)}';";
-            DataTable labelsResult = await _Driver.ExecuteQueryAsync(labelsQuery, false, token).ConfigureAwait(false);
-            foreach (DataRow row in labelsResult.Rows)
-            {
-                doc.AddLabel(row["label"]?.ToString() ?? string.Empty);
-            }
-
-            string tagsQuery = $"SELECT `key`, value FROM {prefix}_tags WHERE document_id = '{Sanitizer.Sanitize(id)}';";
-            DataTable tagsResult = await _Driver.ExecuteQueryAsync(tagsQuery, false, token).ConfigureAwait(false);
-            foreach (DataRow row in tagsResult.Rows)
-            {
-                doc.SetTag(row["key"]?.ToString() ?? string.Empty, row["value"]?.ToString() ?? string.Empty);
             }
 
             string termsQuery = $@"
@@ -204,11 +191,18 @@ WHERE id IN ({inClause});";
             List<string> idList = docs.ConvertAll(d => d.DocumentId);
             string inClause = string.Join(",", idList.ConvertAll(id => $"'{Sanitizer.Sanitize(id)}'"));
 
-            string labelsQuery = $"SELECT document_id, label FROM {prefix}_labels WHERE document_id IN ({inClause});";
-            DataTable labelsResult = await _Driver.ExecuteQueryAsync(labelsQuery, false, token).ConfigureAwait(false);
-
-            string tagsQuery = $"SELECT document_id, `key`, value FROM {prefix}_tags WHERE document_id IN ({inClause});";
-            DataTable tagsResult = await _Driver.ExecuteQueryAsync(tagsQuery, false, token).ConfigureAwait(false);
+            string metadataQuery = $@"
+SELECT document_id, metadata_type, metadata_key, metadata_value
+FROM (
+    SELECT document_id, 'label' AS metadata_type, label AS metadata_key, NULL AS metadata_value
+    FROM {prefix}_labels
+    WHERE document_id IN ({inClause})
+    UNION ALL
+    SELECT document_id, 'tag' AS metadata_type, `key` AS metadata_key, value AS metadata_value
+    FROM {prefix}_tags
+    WHERE document_id IN ({inClause})
+) AS metadata;";
+            DataTable metadataResult = await _Driver.ExecuteQueryAsync(metadataQuery, false, token).ConfigureAwait(false);
 
             Dictionary<string, DocumentMetadata> docLookup = new Dictionary<string, DocumentMetadata>();
             foreach (DocumentMetadata doc in docs)
@@ -216,21 +210,20 @@ WHERE id IN ({inClause});";
                 docLookup[doc.DocumentId] = doc;
             }
 
-            foreach (DataRow row in labelsResult.Rows)
+            foreach (DataRow row in metadataResult.Rows)
             {
                 string docId = row["document_id"]?.ToString() ?? string.Empty;
                 if (docLookup.TryGetValue(docId, out DocumentMetadata? doc))
                 {
-                    doc.AddLabel(row["label"]?.ToString() ?? string.Empty);
-                }
-            }
-
-            foreach (DataRow row in tagsResult.Rows)
-            {
-                string docId = row["document_id"]?.ToString() ?? string.Empty;
-                if (docLookup.TryGetValue(docId, out DocumentMetadata? doc))
-                {
-                    doc.SetTag(row["key"]?.ToString() ?? string.Empty, row["value"]?.ToString() ?? string.Empty);
+                    string metadataType = row["metadata_type"]?.ToString() ?? string.Empty;
+                    if (string.Equals(metadataType, "label", StringComparison.Ordinal))
+                    {
+                        doc.AddLabel(row["metadata_key"]?.ToString() ?? string.Empty);
+                    }
+                    else if (string.Equals(metadataType, "tag", StringComparison.Ordinal))
+                    {
+                        doc.SetTag(row["metadata_key"]?.ToString() ?? string.Empty, row["metadata_value"]?.ToString() ?? string.Empty);
+                    }
                 }
             }
 

@@ -194,13 +194,8 @@ VALUES ('{Sanitizer.Sanitize(id)}', {Sanitizer.FormatNullableString(documentId)}
 
         public async Task ReplaceAsync(string tablePrefix, string documentId, IDictionary<string, string> tags, CancellationToken token = default)
         {
-            string prefix = TablePrefixValidator.Validate(tablePrefix);
             await RemoveAllAsync(tablePrefix, documentId, token).ConfigureAwait(false);
-            foreach (KeyValuePair<string, string> kvp in tags)
-            {
-                string id = IdGenerator.GenerateTagId();
-                await SetAsync(tablePrefix, id, documentId, kvp.Key, kvp.Value, token).ConfigureAwait(false);
-            }
+            await InsertDocumentTagsAsync(tablePrefix, documentId, tags, token).ConfigureAwait(false);
         }
 
         public async Task<long> DeleteAllAsync(string tablePrefix, CancellationToken token = default)
@@ -234,15 +229,7 @@ VALUES ('{Sanitizer.Sanitize(id)}', {Sanitizer.FormatNullableString(documentId)}
         public async Task ReplaceTenantTagsAsync(string tenantId, IDictionary<string, string> tags, CancellationToken token = default)
         {
             await DeleteAllTenantTagsAsync(tenantId, token).ConfigureAwait(false);
-            DateTime now = DateTime.UtcNow;
-            foreach (KeyValuePair<string, string> kvp in tags)
-            {
-                string id = IdGenerator.GenerateTagId();
-                string query = $@"
-INSERT INTO tags (id, tenant_id, key, value, last_update_utc, created_utc)
-VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(tenantId)}', '{Sanitizer.Sanitize(kvp.Key)}', {Sanitizer.FormatNullableString(kvp.Value)}, '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
-                await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
-            }
+            await InsertScopedTagsAsync("tenant_id", tenantId, tags, token).ConfigureAwait(false);
         }
 
         public async Task<long> DeleteAllTenantTagsAsync(string tenantId, CancellationToken token = default)
@@ -277,15 +264,7 @@ VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(tenantId)}', '{Sanitize
         public async Task ReplaceUserTagsAsync(string tenantId, string userId, IDictionary<string, string> tags, CancellationToken token = default)
         {
             await DeleteAllUserTagsAsync(tenantId, userId, token).ConfigureAwait(false);
-            DateTime now = DateTime.UtcNow;
-            foreach (KeyValuePair<string, string> kvp in tags)
-            {
-                string id = IdGenerator.GenerateTagId();
-                string query = $@"
-INSERT INTO tags (id, user_id, key, value, last_update_utc, created_utc)
-VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(userId)}', '{Sanitizer.Sanitize(kvp.Key)}', {Sanitizer.FormatNullableString(kvp.Value)}, '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
-                await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
-            }
+            await InsertScopedTagsAsync("user_id", userId, tags, token).ConfigureAwait(false);
         }
 
         public async Task<long> DeleteAllUserTagsAsync(string tenantId, string userId, CancellationToken token = default)
@@ -320,15 +299,7 @@ VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(userId)}', '{Sanitizer.
         public async Task ReplaceCredentialTagsAsync(string tenantId, string credentialId, IDictionary<string, string> tags, CancellationToken token = default)
         {
             await DeleteAllCredentialTagsAsync(tenantId, credentialId, token).ConfigureAwait(false);
-            DateTime now = DateTime.UtcNow;
-            foreach (KeyValuePair<string, string> kvp in tags)
-            {
-                string id = IdGenerator.GenerateTagId();
-                string query = $@"
-INSERT INTO tags (id, credential_id, key, value, last_update_utc, created_utc)
-VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(credentialId)}', '{Sanitizer.Sanitize(kvp.Key)}', {Sanitizer.FormatNullableString(kvp.Value)}, '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
-                await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
-            }
+            await InsertScopedTagsAsync("credential_id", credentialId, tags, token).ConfigureAwait(false);
         }
 
         public async Task<long> DeleteAllCredentialTagsAsync(string tenantId, string credentialId, CancellationToken token = default)
@@ -340,6 +311,71 @@ VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(credentialId)}', '{Sani
             string query = $"DELETE FROM tags WHERE credential_id = '{Sanitizer.Sanitize(credentialId)}';";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
             return count;
+        }
+
+        private async Task InsertDocumentTagsAsync(string tablePrefix, string documentId, IDictionary<string, string> tags, CancellationToken token)
+        {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            List<KeyValuePair<string, string>> tagList = tags.ToList();
+            if (tagList.Count == 0)
+            {
+                return;
+            }
+
+            const int ChunkSize = 200;
+            DateTime now = DateTime.UtcNow;
+            string nowFormatted = Sanitizer.FormatDateTime(now);
+            string sanitizedDocumentId = Sanitizer.Sanitize(documentId);
+
+            for (int i = 0; i < tagList.Count; i += ChunkSize)
+            {
+                List<KeyValuePair<string, string>> chunk = tagList.Skip(i).Take(ChunkSize).ToList();
+                StringBuilder sb = new StringBuilder();
+                sb.Append($"INSERT INTO {prefix}_tags (id, document_id, key, value, last_update_utc, created_utc) VALUES ");
+
+                List<string> valuesClauses = new List<string>();
+                foreach (KeyValuePair<string, string> kvp in chunk)
+                {
+                    valuesClauses.Add($"('{Sanitizer.Sanitize(IdGenerator.GenerateTagId())}', '{sanitizedDocumentId}', '{Sanitizer.Sanitize(kvp.Key)}', {Sanitizer.FormatNullableString(kvp.Value)}, '{nowFormatted}', '{nowFormatted}')");
+                }
+
+                sb.Append(string.Join(", ", valuesClauses));
+                sb.Append(';');
+
+                await _Driver.ExecuteQueryAsync(sb.ToString(), true, token).ConfigureAwait(false);
+            }
+        }
+
+        private async Task InsertScopedTagsAsync(string scopeColumn, string scopeValue, IDictionary<string, string> tags, CancellationToken token)
+        {
+            List<KeyValuePair<string, string>> tagList = tags.ToList();
+            if (tagList.Count == 0)
+            {
+                return;
+            }
+
+            const int ChunkSize = 200;
+            DateTime now = DateTime.UtcNow;
+            string nowFormatted = Sanitizer.FormatDateTime(now);
+            string sanitizedScopeValue = Sanitizer.Sanitize(scopeValue);
+
+            for (int i = 0; i < tagList.Count; i += ChunkSize)
+            {
+                List<KeyValuePair<string, string>> chunk = tagList.Skip(i).Take(ChunkSize).ToList();
+                StringBuilder sb = new StringBuilder();
+                sb.Append($"INSERT INTO tags (id, {scopeColumn}, key, value, last_update_utc, created_utc) VALUES ");
+
+                List<string> valuesClauses = new List<string>();
+                foreach (KeyValuePair<string, string> kvp in chunk)
+                {
+                    valuesClauses.Add($"('{Sanitizer.Sanitize(IdGenerator.GenerateTagId())}', '{sanitizedScopeValue}', '{Sanitizer.Sanitize(kvp.Key)}', {Sanitizer.FormatNullableString(kvp.Value)}, '{nowFormatted}', '{nowFormatted}')");
+                }
+
+                sb.Append(string.Join(", ", valuesClauses));
+                sb.Append(';');
+
+                await _Driver.ExecuteQueryAsync(sb.ToString(), true, token).ConfigureAwait(false);
+            }
         }
 
         #endregion

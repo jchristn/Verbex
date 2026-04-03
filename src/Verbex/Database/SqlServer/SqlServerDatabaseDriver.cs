@@ -19,17 +19,18 @@ namespace Verbex.Database.SqlServer
     /// </remarks>
     public class SqlServerDatabaseDriver : DatabaseDriverBase
     {
+        private const int UnlimitedCommandTimeout = 0;
         private readonly SemaphoreSlim _Semaphore = new SemaphoreSlim(1, 1);
         private string? _ConnectionString;
-        private SqlConnection? _ActiveConnection;
-        private SqlTransaction? _ActiveTransaction;
+        private readonly AsyncLocal<SqlConnection?> _ActiveConnection = new AsyncLocal<SqlConnection?>();
+        private readonly AsyncLocal<SqlTransaction?> _ActiveTransaction = new AsyncLocal<SqlTransaction?>();
         private bool _IsOpen = false;
 
         /// <inheritdoc />
         public override bool IsOpen => _IsOpen;
 
         /// <inheritdoc />
-        public override bool IsTransactionActive => _ActiveTransaction != null;
+        public override bool IsTransactionActive => _ActiveTransaction.Value != null;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SqlServerDatabaseDriver"/> class.
@@ -80,20 +81,12 @@ namespace Verbex.Database.SqlServer
             ThrowIfNotOpen();
 
             string createTablesQuery = Queries.SetupQueries.CreateIndexTables(tablePrefix);
-            await ExecuteQueryAsync(createTablesQuery, true, token).ConfigureAwait(false);
+            await ExecuteNonQueryAsync(createTablesQuery, false, UnlimitedCommandTimeout, token).ConfigureAwait(false);
 
             List<string> indexQueries = Queries.SetupQueries.CreateIndexTableIndexes(tablePrefix);
             foreach (string indexQuery in indexQueries)
             {
-                try
-                {
-                    await ExecuteQueryAsync(indexQuery, true, token).ConfigureAwait(false);
-                }
-                catch
-                {
-                    // Index creation may fail on large tables due to command timeout.
-                    // This is non-fatal; the index will be created on a subsequent restart.
-                }
+                await ExecuteNonQueryAsync(indexQuery, false, UnlimitedCommandTimeout, token).ConfigureAwait(false);
             }
         }
 
@@ -118,15 +111,7 @@ namespace Verbex.Database.SqlServer
                 throw new ArgumentNullException(nameof(query));
             }
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
-            try
-            {
-                return await ExecuteQueryInternalAsync(query, isTransaction, token).ConfigureAwait(false);
-            }
-            finally
-            {
-                _Semaphore.Release();
-            }
+            return await ExecuteQueryInternalAsync(query, isTransaction, token).ConfigureAwait(false);
         }
 
         /// <inheritdoc />
@@ -140,18 +125,24 @@ namespace Verbex.Database.SqlServer
                 throw new ArgumentNullException(nameof(queries));
             }
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            DataTable result = new DataTable();
+            SqlConnection? activeConnection = _ActiveConnection.Value;
+            SqlTransaction? activeTransaction = _ActiveTransaction.Value;
+            bool useActiveTransaction = activeTransaction != null && activeConnection != null;
+            SqlConnection? connection = activeConnection;
+            SqlTransaction? localTransaction = null;
+
             try
             {
-                DataTable result = new DataTable();
-
-                await using SqlConnection connection = new SqlConnection(_ConnectionString);
-                await connection.OpenAsync(token).ConfigureAwait(false);
-                SqlTransaction? transaction = null;
-
-                if (isTransaction)
+                if (!useActiveTransaction)
                 {
-                    transaction = connection.BeginTransaction();
+                    connection = new SqlConnection(_ConnectionString);
+                    await connection.OpenAsync(token).ConfigureAwait(false);
+
+                    if (isTransaction)
+                    {
+                        localTransaction = connection.BeginTransaction();
+                    }
                 }
 
                 try
@@ -165,59 +156,70 @@ namespace Verbex.Database.SqlServer
 
                         token.ThrowIfCancellationRequested();
 
-                        await using SqlCommand cmd = new SqlCommand(query, connection, transaction);
+                        await using SqlCommand cmd = new SqlCommand(query, connection, useActiveTransaction ? activeTransaction : localTransaction);
                         cmd.CommandTimeout = Settings.CommandTimeout;
 
                         await using SqlDataReader reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
                         result = await LoadDataTableWithoutConstraintsAsync(reader, token).ConfigureAwait(false);
                     }
 
-                    if (transaction != null)
+                    if (localTransaction != null)
                     {
-                        await transaction.CommitAsync(token).ConfigureAwait(false);
+                        await localTransaction.CommitAsync(token).ConfigureAwait(false);
                     }
                 }
                 catch
                 {
-                    if (transaction != null)
+                    if (localTransaction != null)
                     {
-                        await transaction.RollbackAsync(token).ConfigureAwait(false);
+                        await localTransaction.RollbackAsync(token).ConfigureAwait(false);
                     }
                     throw;
                 }
                 finally
                 {
-                    if (transaction != null)
+                    if (localTransaction != null)
                     {
-                        await transaction.DisposeAsync().ConfigureAwait(false);
+                        await localTransaction.DisposeAsync().ConfigureAwait(false);
                     }
                 }
-
-                return result;
             }
             finally
             {
-                _Semaphore.Release();
+                if (!useActiveTransaction && connection != null)
+                {
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                }
             }
+
+            return result;
         }
 
         /// <inheritdoc />
         public override async Task CloseAsync(CancellationToken token = default)
         {
-            if (_ActiveTransaction != null)
+            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            try
             {
-                await _ActiveTransaction.DisposeAsync().ConfigureAwait(false);
-                _ActiveTransaction = null;
-            }
+                if (_ActiveTransaction.Value != null)
+                {
+                    await _ActiveTransaction.Value.DisposeAsync().ConfigureAwait(false);
+                    _ActiveTransaction.Value = null;
+                }
 
-            if (_ActiveConnection != null)
+                if (_ActiveConnection.Value != null)
+                {
+                    await _ActiveConnection.Value.DisposeAsync().ConfigureAwait(false);
+                    _ActiveConnection.Value = null;
+                }
+
+                _IsOpen = false;
+                _ConnectionString = null;
+            }
+            finally
             {
-                await _ActiveConnection.DisposeAsync().ConfigureAwait(false);
-                _ActiveConnection = null;
+                _Semaphore.Release();
             }
-
-            _IsOpen = false;
-            _ConnectionString = null;
         }
 
         /// <inheritdoc />
@@ -226,21 +228,24 @@ namespace Verbex.Database.SqlServer
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            if (_ActiveTransaction.Value != null)
+            {
+                throw new InvalidOperationException("A transaction is already active.");
+            }
+
+            SqlConnection connection = new SqlConnection(_ConnectionString);
+            await connection.OpenAsync(token).ConfigureAwait(false);
+
             try
             {
-                if (_ActiveTransaction != null)
-                {
-                    throw new InvalidOperationException("A transaction is already active.");
-                }
-
-                _ActiveConnection = new SqlConnection(_ConnectionString);
-                await _ActiveConnection.OpenAsync(token).ConfigureAwait(false);
-                _ActiveTransaction = _ActiveConnection.BeginTransaction();
+                SqlTransaction transaction = connection.BeginTransaction();
+                _ActiveConnection.Value = connection;
+                _ActiveTransaction.Value = transaction;
             }
-            finally
+            catch
             {
-                _Semaphore.Release();
+                await connection.DisposeAsync().ConfigureAwait(false);
+                throw;
             }
         }
 
@@ -250,24 +255,23 @@ namespace Verbex.Database.SqlServer
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            SqlTransaction? transaction = _ActiveTransaction.Value;
+            SqlConnection? connection = _ActiveConnection.Value;
+            if (transaction == null || connection == null)
+            {
+                throw new InvalidOperationException("No transaction is active.");
+            }
+
             try
             {
-                if (_ActiveTransaction == null)
-                {
-                    throw new InvalidOperationException("No transaction is active.");
-                }
-
-                await _ActiveTransaction.CommitAsync(token).ConfigureAwait(false);
-                await _ActiveTransaction.DisposeAsync().ConfigureAwait(false);
-                _ActiveTransaction = null;
-
-                await _ActiveConnection!.DisposeAsync().ConfigureAwait(false);
-                _ActiveConnection = null;
+                await transaction.CommitAsync(token).ConfigureAwait(false);
             }
             finally
             {
-                _Semaphore.Release();
+                await transaction.DisposeAsync().ConfigureAwait(false);
+                await connection.DisposeAsync().ConfigureAwait(false);
+                _ActiveTransaction.Value = null;
+                _ActiveConnection.Value = null;
             }
         }
 
@@ -277,24 +281,23 @@ namespace Verbex.Database.SqlServer
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            SqlTransaction? transaction = _ActiveTransaction.Value;
+            SqlConnection? connection = _ActiveConnection.Value;
+            if (transaction == null || connection == null)
+            {
+                throw new InvalidOperationException("No transaction is active.");
+            }
+
             try
             {
-                if (_ActiveTransaction == null)
-                {
-                    throw new InvalidOperationException("No transaction is active.");
-                }
-
-                await _ActiveTransaction.RollbackAsync(token).ConfigureAwait(false);
-                await _ActiveTransaction.DisposeAsync().ConfigureAwait(false);
-                _ActiveTransaction = null;
-
-                await _ActiveConnection!.DisposeAsync().ConfigureAwait(false);
-                _ActiveConnection = null;
+                await transaction.RollbackAsync(token).ConfigureAwait(false);
             }
             finally
             {
-                _Semaphore.Release();
+                await transaction.DisposeAsync().ConfigureAwait(false);
+                await connection.DisposeAsync().ConfigureAwait(false);
+                _ActiveTransaction.Value = null;
+                _ActiveConnection.Value = null;
             }
         }
 
@@ -343,12 +346,7 @@ namespace Verbex.Database.SqlServer
         /// <param name="token">Cancellation token.</param>
         private async Task CreateSchemaAsync(CancellationToken token)
         {
-            await using SqlConnection connection = new SqlConnection(_ConnectionString);
-            await connection.OpenAsync(token).ConfigureAwait(false);
-
-            await using SqlCommand cmd = new SqlCommand(SetupQueries.CreateTables, connection);
-            cmd.CommandTimeout = Settings.CommandTimeout;
-            await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            await ExecuteNonQueryAsync(SetupQueries.CreateTables, false, UnlimitedCommandTimeout, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -360,12 +358,7 @@ namespace Verbex.Database.SqlServer
         /// </remarks>
         private async Task CreateIndexesAsync(CancellationToken token)
         {
-            await using SqlConnection connection = new SqlConnection(_ConnectionString);
-            await connection.OpenAsync(token).ConfigureAwait(false);
-
-            await using SqlCommand cmd = new SqlCommand(SetupQueries.CreateIndexes, connection);
-            cmd.CommandTimeout = Settings.CommandTimeout;
-            await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            await ExecuteNonQueryAsync(SetupQueries.CreateIndexes, false, UnlimitedCommandTimeout, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -432,12 +425,13 @@ namespace Verbex.Database.SqlServer
         {
             DataTable result = new DataTable();
 
-            // Use active transaction connection if one exists
-            bool useActiveTransaction = _ActiveTransaction != null && _ActiveConnection != null;
+            SqlConnection? activeConnection = _ActiveConnection.Value;
+            SqlTransaction? activeTransaction = _ActiveTransaction.Value;
+            bool useActiveTransaction = activeTransaction != null && activeConnection != null;
 
             if (useActiveTransaction)
             {
-                await using SqlCommand cmd = new SqlCommand(query, _ActiveConnection, _ActiveTransaction);
+                await using SqlCommand cmd = new SqlCommand(query, activeConnection, activeTransaction);
                 cmd.CommandTimeout = Settings.CommandTimeout;
 
                 await using SqlDataReader reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
@@ -485,6 +479,61 @@ namespace Verbex.Database.SqlServer
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Executes a non-query script with an optional transaction and command timeout override.
+        /// </summary>
+        private async Task ExecuteNonQueryAsync(string query, bool isTransaction, int commandTimeout, CancellationToken token)
+        {
+            SqlConnection? activeConnection = _ActiveConnection.Value;
+            SqlTransaction? activeTransaction = _ActiveTransaction.Value;
+            bool useActiveTransaction = activeTransaction != null && activeConnection != null;
+
+            if (useActiveTransaction)
+            {
+                await using SqlCommand cmd = new SqlCommand(query, activeConnection, activeTransaction);
+                cmd.CommandTimeout = commandTimeout;
+                await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                return;
+            }
+
+            await using SqlConnection connection = new SqlConnection(_ConnectionString);
+            await connection.OpenAsync(token).ConfigureAwait(false);
+            SqlTransaction? transaction = null;
+
+            if (isTransaction)
+            {
+                transaction = connection.BeginTransaction();
+            }
+
+            try
+            {
+                await using SqlCommand cmd = new SqlCommand(query, connection, transaction);
+                cmd.CommandTimeout = commandTimeout;
+                await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync(token).ConfigureAwait(false);
+                }
+            }
+            catch
+            {
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync(token).ConfigureAwait(false);
+                }
+
+                throw;
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync().ConfigureAwait(false);
+                }
+            }
         }
 
         /// <inheritdoc />

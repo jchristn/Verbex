@@ -88,9 +88,10 @@ FROM {prefix}_terms WHERE term IN ({inClause});";
         public async Task<List<TermRecord>> GetByPrefixAsync(string tablePrefix, string termPrefix, int limit = 100, CancellationToken token = default)
         {
             string prefix = TablePrefixValidator.Validate(tablePrefix);
+            string normalizedPrefix = termPrefix.ToLowerInvariant();
 
             string query = $@"SELECT id, term, document_frequency, total_frequency, last_update_utc, created_utc
-FROM {prefix}_terms WHERE term ILIKE '{Sanitizer.EscapeLikePattern(termPrefix)}%' ESCAPE '\' LIMIT {limit};";
+FROM {prefix}_terms WHERE term LIKE '{Sanitizer.EscapeLikePattern(normalizedPrefix)}%' ESCAPE '\' LIMIT {limit};";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             List<TermRecord> list = new List<TermRecord>();
             foreach (DataRow row in dt.Rows) list.Add(MapRowToTerm(row));

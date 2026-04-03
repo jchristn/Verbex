@@ -142,10 +142,19 @@ VALUES ('{Sanitizer.Sanitize(id)}', {Sanitizer.FormatNullableString(documentId)}
         public async Task ReplaceAsync(string tablePrefix, string documentId, IEnumerable<string> labels, CancellationToken token = default)
         {
             await RemoveAllAsync(tablePrefix, documentId, token).ConfigureAwait(false);
-            foreach (string label in labels)
+            List<LabelRecord> records = labels
+                .Where(label => !string.IsNullOrWhiteSpace(label))
+                .Select(label => new LabelRecord
+                {
+                    Id = IdGenerator.GenerateLabelId(),
+                    DocumentId = documentId,
+                    Label = label
+                })
+                .ToList();
+
+            if (records.Count > 0)
             {
-                string id = IdGenerator.GenerateLabelId();
-                await AddAsync(tablePrefix, id, documentId, label, token).ConfigureAwait(false);
+                await AddBatchAsync(tablePrefix, records, token).ConfigureAwait(false);
             }
         }
 
@@ -173,15 +182,7 @@ VALUES ('{Sanitizer.Sanitize(id)}', {Sanitizer.FormatNullableString(documentId)}
         public async Task ReplaceTenantLabelsAsync(string tenantId, IEnumerable<string> labels, CancellationToken token = default)
         {
             await DeleteAllTenantLabelsAsync(tenantId, token).ConfigureAwait(false);
-            DateTime now = DateTime.UtcNow;
-            foreach (string label in labels)
-            {
-                string id = IdGenerator.GenerateLabelId();
-                string query = $@"
-INSERT INTO labels (id, tenant_id, label, last_update_utc, created_utc)
-VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(tenantId)}', '{Sanitizer.Sanitize(label)}', '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
-                await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
-            }
+            await InsertScopedLabelsAsync("tenant_id", tenantId, labels, token).ConfigureAwait(false);
         }
 
         public async Task<long> DeleteAllTenantLabelsAsync(string tenantId, CancellationToken token = default)
@@ -209,15 +210,7 @@ VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(tenantId)}', '{Sanitize
         public async Task ReplaceUserLabelsAsync(string tenantId, string userId, IEnumerable<string> labels, CancellationToken token = default)
         {
             await DeleteAllUserLabelsAsync(tenantId, userId, token).ConfigureAwait(false);
-            DateTime now = DateTime.UtcNow;
-            foreach (string label in labels)
-            {
-                string id = IdGenerator.GenerateLabelId();
-                string query = $@"
-INSERT INTO labels (id, user_id, label, last_update_utc, created_utc)
-VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(userId)}', '{Sanitizer.Sanitize(label)}', '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
-                await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
-            }
+            await InsertScopedLabelsAsync("user_id", userId, labels, token).ConfigureAwait(false);
         }
 
         public async Task<long> DeleteAllUserLabelsAsync(string tenantId, string userId, CancellationToken token = default)
@@ -245,15 +238,7 @@ VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(userId)}', '{Sanitizer.
         public async Task ReplaceCredentialLabelsAsync(string tenantId, string credentialId, IEnumerable<string> labels, CancellationToken token = default)
         {
             await DeleteAllCredentialLabelsAsync(tenantId, credentialId, token).ConfigureAwait(false);
-            DateTime now = DateTime.UtcNow;
-            foreach (string label in labels)
-            {
-                string id = IdGenerator.GenerateLabelId();
-                string query = $@"
-INSERT INTO labels (id, credential_id, label, last_update_utc, created_utc)
-VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(credentialId)}', '{Sanitizer.Sanitize(label)}', '{Sanitizer.FormatDateTime(now)}', '{Sanitizer.FormatDateTime(now)}');";
-                await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
-            }
+            await InsertScopedLabelsAsync("credential_id", credentialId, labels, token).ConfigureAwait(false);
         }
 
         public async Task<long> DeleteAllCredentialLabelsAsync(string tenantId, string credentialId, CancellationToken token = default)
@@ -265,6 +250,41 @@ VALUES ('{Sanitizer.Sanitize(id)}', '{Sanitizer.Sanitize(credentialId)}', '{Sani
             string query = $"DELETE FROM labels WHERE credential_id = '{Sanitizer.Sanitize(credentialId)}';";
             await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
             return count;
+        }
+
+        private async Task InsertScopedLabelsAsync(string scopeColumn, string scopeValue, IEnumerable<string> labels, CancellationToken token)
+        {
+            List<string> labelList = labels
+                .Where(label => !string.IsNullOrWhiteSpace(label))
+                .ToList();
+
+            if (labelList.Count == 0)
+            {
+                return;
+            }
+
+            const int ChunkSize = 200;
+            DateTime now = DateTime.UtcNow;
+            string nowFormatted = Sanitizer.FormatDateTime(now);
+            string sanitizedScopeValue = Sanitizer.Sanitize(scopeValue);
+
+            for (int i = 0; i < labelList.Count; i += ChunkSize)
+            {
+                List<string> chunk = labelList.Skip(i).Take(ChunkSize).ToList();
+                StringBuilder sb = new StringBuilder();
+                sb.Append($"INSERT INTO labels (id, {scopeColumn}, label, last_update_utc, created_utc) VALUES ");
+
+                List<string> valuesClauses = new List<string>();
+                foreach (string label in chunk)
+                {
+                    valuesClauses.Add($"('{Sanitizer.Sanitize(IdGenerator.GenerateLabelId())}', '{sanitizedScopeValue}', '{Sanitizer.Sanitize(label)}', '{nowFormatted}', '{nowFormatted}')");
+                }
+
+                sb.Append(string.Join(", ", valuesClauses));
+                sb.Append(';');
+
+                await _Driver.ExecuteQueryAsync(sb.ToString(), true, token).ConfigureAwait(false);
+            }
         }
 
         #endregion

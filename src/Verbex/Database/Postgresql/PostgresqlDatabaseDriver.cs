@@ -19,17 +19,18 @@ namespace Verbex.Database.Postgresql
     /// </remarks>
     public class PostgresqlDatabaseDriver : DatabaseDriverBase
     {
+        private const int UnlimitedCommandTimeout = 0;
         private readonly SemaphoreSlim _Semaphore = new SemaphoreSlim(1, 1);
         private NpgsqlDataSource? _DataSource;
-        private NpgsqlConnection? _ActiveConnection;
-        private NpgsqlTransaction? _ActiveTransaction;
+        private readonly AsyncLocal<NpgsqlConnection?> _ActiveConnection = new AsyncLocal<NpgsqlConnection?>();
+        private readonly AsyncLocal<NpgsqlTransaction?> _ActiveTransaction = new AsyncLocal<NpgsqlTransaction?>();
         private bool _IsOpen = false;
 
         /// <inheritdoc />
         public override bool IsOpen => _IsOpen;
 
         /// <inheritdoc />
-        public override bool IsTransactionActive => _ActiveTransaction != null;
+        public override bool IsTransactionActive => _ActiveTransaction.Value != null;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PostgresqlDatabaseDriver"/> class.
@@ -82,20 +83,12 @@ namespace Verbex.Database.Postgresql
             ThrowIfNotOpen();
 
             string createTablesQuery = Queries.SetupQueries.CreateIndexTables(tablePrefix);
-            await ExecuteQueryAsync(createTablesQuery, true, token).ConfigureAwait(false);
+            await ExecuteNonQueryAsync(createTablesQuery, false, UnlimitedCommandTimeout, token).ConfigureAwait(false);
 
             List<string> indexQueries = Queries.SetupQueries.CreateIndexTableIndexes(tablePrefix);
             foreach (string indexQuery in indexQueries)
             {
-                try
-                {
-                    await ExecuteQueryAsync(indexQuery, true, token).ConfigureAwait(false);
-                }
-                catch
-                {
-                    // Index creation may fail on large tables due to command timeout.
-                    // This is non-fatal; the index will be created on a subsequent restart.
-                }
+                await ExecuteNonQueryAsync(indexQuery, false, UnlimitedCommandTimeout, token).ConfigureAwait(false);
             }
         }
 
@@ -120,15 +113,7 @@ namespace Verbex.Database.Postgresql
                 throw new ArgumentNullException(nameof(query));
             }
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
-            try
-            {
-                return await ExecuteQueryInternalAsync(query, isTransaction, token).ConfigureAwait(false);
-            }
-            finally
-            {
-                _Semaphore.Release();
-            }
+            return await ExecuteQueryInternalAsync(query, isTransaction, token).ConfigureAwait(false);
         }
 
         /// <inheritdoc />
@@ -142,17 +127,23 @@ namespace Verbex.Database.Postgresql
                 throw new ArgumentNullException(nameof(queries));
             }
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            DataTable result = new DataTable();
+            NpgsqlConnection? activeConnection = _ActiveConnection.Value;
+            NpgsqlTransaction? activeTransaction = _ActiveTransaction.Value;
+            bool useActiveTransaction = activeTransaction != null && activeConnection != null;
+            NpgsqlConnection? connection = activeConnection;
+            NpgsqlTransaction? localTransaction = null;
+
             try
             {
-                DataTable result = new DataTable();
-
-                await using NpgsqlConnection connection = await _DataSource!.OpenConnectionAsync(token).ConfigureAwait(false);
-                NpgsqlTransaction? transaction = null;
-
-                if (isTransaction)
+                if (!useActiveTransaction)
                 {
-                    transaction = await connection.BeginTransactionAsync(token).ConfigureAwait(false);
+                    connection = await _DataSource!.OpenConnectionAsync(token).ConfigureAwait(false);
+
+                    if (isTransaction)
+                    {
+                        localTransaction = await connection.BeginTransactionAsync(token).ConfigureAwait(false);
+                    }
                 }
 
                 try
@@ -166,40 +157,43 @@ namespace Verbex.Database.Postgresql
 
                         token.ThrowIfCancellationRequested();
 
-                        await using NpgsqlCommand cmd = new NpgsqlCommand(query, connection, transaction);
+                        await using NpgsqlCommand cmd = new NpgsqlCommand(query, connection, useActiveTransaction ? activeTransaction : localTransaction);
                         cmd.CommandTimeout = Settings.CommandTimeout;
 
                         await using NpgsqlDataReader reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
                         result = await LoadDataTableWithoutConstraintsAsync(reader, token).ConfigureAwait(false);
                     }
 
-                    if (transaction != null)
+                    if (localTransaction != null)
                     {
-                        await transaction.CommitAsync(token).ConfigureAwait(false);
+                        await localTransaction.CommitAsync(token).ConfigureAwait(false);
                     }
                 }
                 catch
                 {
-                    if (transaction != null)
+                    if (localTransaction != null)
                     {
-                        await transaction.RollbackAsync(token).ConfigureAwait(false);
+                        await localTransaction.RollbackAsync(token).ConfigureAwait(false);
                     }
                     throw;
                 }
                 finally
                 {
-                    if (transaction != null)
+                    if (localTransaction != null)
                     {
-                        await transaction.DisposeAsync().ConfigureAwait(false);
+                        await localTransaction.DisposeAsync().ConfigureAwait(false);
                     }
                 }
-
-                return result;
             }
             finally
             {
-                _Semaphore.Release();
+                if (!useActiveTransaction && connection != null)
+                {
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                }
             }
+
+            return result;
         }
 
         /// <inheritdoc />
@@ -213,16 +207,16 @@ namespace Verbex.Database.Postgresql
             await _Semaphore.WaitAsync(token).ConfigureAwait(false);
             try
             {
-                if (_ActiveTransaction != null)
+                if (_ActiveTransaction.Value != null)
                 {
-                    await _ActiveTransaction.DisposeAsync().ConfigureAwait(false);
-                    _ActiveTransaction = null;
+                    await _ActiveTransaction.Value.DisposeAsync().ConfigureAwait(false);
+                    _ActiveTransaction.Value = null;
                 }
 
-                if (_ActiveConnection != null)
+                if (_ActiveConnection.Value != null)
                 {
-                    await _ActiveConnection.DisposeAsync().ConfigureAwait(false);
-                    _ActiveConnection = null;
+                    await _ActiveConnection.Value.DisposeAsync().ConfigureAwait(false);
+                    _ActiveConnection.Value = null;
                 }
 
                 await _DataSource.DisposeAsync().ConfigureAwait(false);
@@ -241,20 +235,23 @@ namespace Verbex.Database.Postgresql
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            if (_ActiveTransaction.Value != null)
+            {
+                throw new InvalidOperationException("A transaction is already active.");
+            }
+
+            NpgsqlConnection connection = await _DataSource!.OpenConnectionAsync(token).ConfigureAwait(false);
+
             try
             {
-                if (_ActiveTransaction != null)
-                {
-                    throw new InvalidOperationException("A transaction is already active.");
-                }
-
-                _ActiveConnection = await _DataSource!.OpenConnectionAsync(token).ConfigureAwait(false);
-                _ActiveTransaction = await _ActiveConnection.BeginTransactionAsync(token).ConfigureAwait(false);
+                NpgsqlTransaction transaction = await connection.BeginTransactionAsync(token).ConfigureAwait(false);
+                _ActiveConnection.Value = connection;
+                _ActiveTransaction.Value = transaction;
             }
-            finally
+            catch
             {
-                _Semaphore.Release();
+                await connection.DisposeAsync().ConfigureAwait(false);
+                throw;
             }
         }
 
@@ -264,24 +261,23 @@ namespace Verbex.Database.Postgresql
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            NpgsqlTransaction? transaction = _ActiveTransaction.Value;
+            NpgsqlConnection? connection = _ActiveConnection.Value;
+            if (transaction == null || connection == null)
+            {
+                throw new InvalidOperationException("No transaction is active.");
+            }
+
             try
             {
-                if (_ActiveTransaction == null)
-                {
-                    throw new InvalidOperationException("No transaction is active.");
-                }
-
-                await _ActiveTransaction.CommitAsync(token).ConfigureAwait(false);
-                await _ActiveTransaction.DisposeAsync().ConfigureAwait(false);
-                _ActiveTransaction = null;
-
-                await _ActiveConnection!.DisposeAsync().ConfigureAwait(false);
-                _ActiveConnection = null;
+                await transaction.CommitAsync(token).ConfigureAwait(false);
             }
             finally
             {
-                _Semaphore.Release();
+                await transaction.DisposeAsync().ConfigureAwait(false);
+                await connection.DisposeAsync().ConfigureAwait(false);
+                _ActiveTransaction.Value = null;
+                _ActiveConnection.Value = null;
             }
         }
 
@@ -291,24 +287,23 @@ namespace Verbex.Database.Postgresql
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            NpgsqlTransaction? transaction = _ActiveTransaction.Value;
+            NpgsqlConnection? connection = _ActiveConnection.Value;
+            if (transaction == null || connection == null)
+            {
+                throw new InvalidOperationException("No transaction is active.");
+            }
+
             try
             {
-                if (_ActiveTransaction == null)
-                {
-                    throw new InvalidOperationException("No transaction is active.");
-                }
-
-                await _ActiveTransaction.RollbackAsync(token).ConfigureAwait(false);
-                await _ActiveTransaction.DisposeAsync().ConfigureAwait(false);
-                _ActiveTransaction = null;
-
-                await _ActiveConnection!.DisposeAsync().ConfigureAwait(false);
-                _ActiveConnection = null;
+                await transaction.RollbackAsync(token).ConfigureAwait(false);
             }
             finally
             {
-                _Semaphore.Release();
+                await transaction.DisposeAsync().ConfigureAwait(false);
+                await connection.DisposeAsync().ConfigureAwait(false);
+                _ActiveTransaction.Value = null;
+                _ActiveConnection.Value = null;
             }
         }
 
@@ -352,10 +347,7 @@ namespace Verbex.Database.Postgresql
         /// <param name="token">Cancellation token.</param>
         private async Task CreateSchemaAsync(CancellationToken token)
         {
-            await using NpgsqlConnection connection = await _DataSource!.OpenConnectionAsync(token).ConfigureAwait(false);
-            await using NpgsqlCommand cmd = new NpgsqlCommand(SetupQueries.CreateTables, connection);
-            cmd.CommandTimeout = Settings.CommandTimeout;
-            await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            await ExecuteNonQueryAsync(SetupQueries.CreateTables, false, UnlimitedCommandTimeout, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -375,7 +367,7 @@ namespace Verbex.Database.Postgresql
                 token.ThrowIfCancellationRequested();
 
                 await using NpgsqlCommand cmd = new NpgsqlCommand(indexQuery, connection);
-                cmd.CommandTimeout = Settings.CommandTimeout;
+                cmd.CommandTimeout = UnlimitedCommandTimeout;
                 await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
             }
         }
@@ -444,12 +436,13 @@ namespace Verbex.Database.Postgresql
         {
             DataTable result = new DataTable();
 
-            // Use active transaction connection if one exists
-            bool useActiveTransaction = _ActiveTransaction != null && _ActiveConnection != null;
+            NpgsqlConnection? activeConnection = _ActiveConnection.Value;
+            NpgsqlTransaction? activeTransaction = _ActiveTransaction.Value;
+            bool useActiveTransaction = activeTransaction != null && activeConnection != null;
 
             if (useActiveTransaction)
             {
-                await using NpgsqlCommand cmd = new NpgsqlCommand(query, _ActiveConnection, _ActiveTransaction);
+                await using NpgsqlCommand cmd = new NpgsqlCommand(query, activeConnection, activeTransaction);
                 cmd.CommandTimeout = Settings.CommandTimeout;
 
                 await using NpgsqlDataReader reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
@@ -496,6 +489,60 @@ namespace Verbex.Database.Postgresql
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Executes a non-query script with an optional transaction and command timeout override.
+        /// </summary>
+        private async Task ExecuteNonQueryAsync(string query, bool isTransaction, int commandTimeout, CancellationToken token)
+        {
+            NpgsqlConnection? activeConnection = _ActiveConnection.Value;
+            NpgsqlTransaction? activeTransaction = _ActiveTransaction.Value;
+            bool useActiveTransaction = activeTransaction != null && activeConnection != null;
+
+            if (useActiveTransaction)
+            {
+                await using NpgsqlCommand cmd = new NpgsqlCommand(query, activeConnection, activeTransaction);
+                cmd.CommandTimeout = commandTimeout;
+                await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                return;
+            }
+
+            await using NpgsqlConnection connection = await _DataSource!.OpenConnectionAsync(token).ConfigureAwait(false);
+            NpgsqlTransaction? transaction = null;
+
+            if (isTransaction)
+            {
+                transaction = await connection.BeginTransactionAsync(token).ConfigureAwait(false);
+            }
+
+            try
+            {
+                await using NpgsqlCommand cmd = new NpgsqlCommand(query, connection, transaction);
+                cmd.CommandTimeout = commandTimeout;
+                await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync(token).ConfigureAwait(false);
+                }
+            }
+            catch
+            {
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync(token).ConfigureAwait(false);
+                }
+
+                throw;
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync().ConfigureAwait(false);
+                }
+            }
         }
 
         /// <inheritdoc />

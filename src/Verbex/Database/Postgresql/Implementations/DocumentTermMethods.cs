@@ -138,7 +138,7 @@ WHERE dt.term_id IN ({inClause});";
                 }
                 else
                 {
-                    baseFilter = $"SELECT document_id FROM {prefix}_labels WHERE label ILIKE '{Sanitizer.Sanitize(labelList![0])}'";
+                    baseFilter = $"SELECT document_id FROM {prefix}_labels WHERE label = '{Sanitizer.Sanitize(labelList![0].ToLowerInvariant())}'";
                     filterIndex = 1;
                 }
 
@@ -165,7 +165,7 @@ WHERE dt.term_id IN ({inClause});";
                     {
                         string currentQuery = filteredDocsQuery.ToString();
                         filteredDocsQuery.Clear();
-                        filteredDocsQuery.Append($"SELECT document_id FROM ({currentQuery}) AS lf{filterIndex} WHERE document_id IN (SELECT document_id FROM {prefix}_labels WHERE label ILIKE '{Sanitizer.Sanitize(label)}')");
+                        filteredDocsQuery.Append($"SELECT document_id FROM ({currentQuery}) AS lf{filterIndex} WHERE document_id IN (SELECT document_id FROM {prefix}_labels WHERE label = '{Sanitizer.Sanitize(label.ToLowerInvariant())}')");
                         filterIndex++;
                     }
                 }

@@ -1,6 +1,7 @@
 namespace Verbex.Database.Sqlite.Implementations
 {
     using System;
+    using System.Collections.Generic;
     using System.Data;
     using System.Threading;
     using System.Threading.Tasks;
@@ -85,17 +86,26 @@ WHERE t.term = '{Sanitizer.Sanitize(term)}';";
                 TenantId = tenantId
             };
 
-            string indexCountQuery = $"SELECT COUNT(*) FROM indexes WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}';";
-            DataTable indexResult = await _Driver.ExecuteQueryAsync(indexCountQuery, false, token).ConfigureAwait(false);
-            stats.IndexCount = indexResult.Rows.Count > 0 ? Convert.ToInt64(indexResult.Rows[0][0]) : 0;
+            string indexQuery = $"SELECT identifier FROM indexes WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}';";
+            DataTable indexResult = await _Driver.ExecuteQueryAsync(indexQuery, false, token).ConfigureAwait(false);
+            List<string> indexIds = new List<string>();
+            foreach (DataRow row in indexResult.Rows)
+            {
+                string indexId = row["identifier"]?.ToString() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(indexId))
+                {
+                    indexIds.Add(indexId);
+                }
+            }
 
-            string docCountQuery = $"SELECT COUNT(*) FROM documents WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}';";
-            DataTable docResult = await _Driver.ExecuteQueryAsync(docCountQuery, false, token).ConfigureAwait(false);
-            stats.TotalDocumentCount = docResult.Rows.Count > 0 ? Convert.ToInt64(docResult.Rows[0][0]) : 0;
+            stats.IndexCount = indexIds.Count;
 
-            string termCountQuery = $"SELECT COUNT(*) FROM terms WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}';";
-            DataTable termResult = await _Driver.ExecuteQueryAsync(termCountQuery, false, token).ConfigureAwait(false);
-            stats.TotalTermCount = termResult.Rows.Count > 0 ? Convert.ToInt64(termResult.Rows[0][0]) : 0;
+            foreach (string indexId in indexIds)
+            {
+                string prefix = TablePrefixValidator.FromIndexId(indexId);
+                stats.TotalDocumentCount += await GetTableCountAsync($"{prefix}_documents", token).ConfigureAwait(false);
+                stats.TotalTermCount += await GetTableCountAsync($"{prefix}_terms", token).ConfigureAwait(false);
+            }
 
             string userCountQuery = $"SELECT COUNT(*) FROM users WHERE tenant_id = '{Sanitizer.Sanitize(tenantId)}';";
             DataTable userResult = await _Driver.ExecuteQueryAsync(userCountQuery, false, token).ConfigureAwait(false);
@@ -106,6 +116,12 @@ WHERE t.term = '{Sanitizer.Sanitize(term)}';";
             stats.CredentialCount = credResult.Rows.Count > 0 ? Convert.ToInt64(credResult.Rows[0][0]) : 0;
 
             return stats;
+        }
+
+        private async Task<long> GetTableCountAsync(string tableName, CancellationToken token)
+        {
+            DataTable result = await _Driver.ExecuteQueryAsync($"SELECT COUNT(*) FROM {tableName};", false, token).ConfigureAwait(false);
+            return result.Rows.Count > 0 ? Convert.ToInt64(result.Rows[0][0]) : 0;
         }
     }
 }

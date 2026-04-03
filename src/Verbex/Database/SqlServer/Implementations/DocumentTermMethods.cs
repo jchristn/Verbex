@@ -176,7 +176,7 @@ WHERE dt.term_id IN ({inClause});";
                 query = $@"
 SELECT TOP {limit} dt.document_id, SUM(dt.term_frequency) as total_frequency, COUNT(DISTINCT dt.term_id) as term_count
 FROM ({filteredDocsQuery}) AS filtered
-INNER JOIN {prefix}_document_terms dt ON dt.document_id = filtered.document_id
+INNER JOIN {prefix}_document_terms dt WITH (INDEX(idx_{prefix}_docterms_search)) ON dt.document_id = filtered.document_id
 WHERE dt.term_id IN ({inClause})
 GROUP BY dt.document_id
 {havingClause}
@@ -190,7 +190,7 @@ OPTION (FORCE ORDER);";
 
                 query = $@"
 SELECT TOP {limit} dt.document_id, SUM(dt.term_frequency) as total_frequency, COUNT(DISTINCT dt.term_id) as term_count
-FROM {prefix}_document_terms dt
+FROM {prefix}_document_terms dt WITH (INDEX(idx_{prefix}_docterms_search))
 WHERE dt.term_id IN ({inClause})
 GROUP BY dt.document_id
 {havingClause}

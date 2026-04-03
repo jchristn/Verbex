@@ -92,30 +92,20 @@ namespace Verbex.Database.Sqlite
             string createTablesQuery = Queries.SetupQueries.CreateIndexTables(tablePrefix);
             await ExecuteQueryAsync(createTablesQuery, true, token).ConfigureAwait(false);
 
-            // Create indexes with an extended timeout (10 minutes) since building indexes
-            // on large existing tables can exceed the standard command timeout.
             List<string> indexQueries = Queries.SetupQueries.CreateIndexTableIndexes(tablePrefix);
             foreach (string indexQuery in indexQueries)
             {
+                _Lock.EnterWriteLock();
                 try
                 {
-                    _Lock.EnterWriteLock();
-                    try
-                    {
-                        using SqliteCommand cmd = _WriteConnection!.CreateCommand();
-                        cmd.CommandText = indexQuery;
-                        cmd.CommandTimeout = 600;
-                        await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
-                    }
-                    finally
-                    {
-                        _Lock.ExitWriteLock();
-                    }
+                    using SqliteCommand cmd = _WriteConnection!.CreateCommand();
+                    cmd.CommandText = indexQuery;
+                    cmd.CommandTimeout = 0;
+                    await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                 }
-                catch
+                finally
                 {
-                    // Non-fatal: index may already exist or creation may time out on large tables.
-                    // Failure to create an index does not affect existing data or other indexes.
+                    _Lock.ExitWriteLock();
                 }
             }
         }

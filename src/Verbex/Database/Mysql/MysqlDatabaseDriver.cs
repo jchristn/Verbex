@@ -19,17 +19,18 @@ namespace Verbex.Database.Mysql
     /// </remarks>
     public class MysqlDatabaseDriver : DatabaseDriverBase
     {
+        private const int UnlimitedCommandTimeout = 0;
         private readonly SemaphoreSlim _Semaphore = new SemaphoreSlim(1, 1);
         private string? _ConnectionString;
-        private MySqlConnection? _ActiveConnection;
-        private MySqlTransaction? _ActiveTransaction;
+        private readonly AsyncLocal<MySqlConnection?> _ActiveConnection = new AsyncLocal<MySqlConnection?>();
+        private readonly AsyncLocal<MySqlTransaction?> _ActiveTransaction = new AsyncLocal<MySqlTransaction?>();
         private bool _IsOpen = false;
 
         /// <inheritdoc />
         public override bool IsOpen => _IsOpen;
 
         /// <inheritdoc />
-        public override bool IsTransactionActive => _ActiveTransaction != null;
+        public override bool IsTransactionActive => _ActiveTransaction.Value != null;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MysqlDatabaseDriver"/> class.
@@ -80,10 +81,8 @@ namespace Verbex.Database.Mysql
             ThrowIfNotOpen();
 
             string createTablesQuery = Queries.SetupQueries.CreateIndexTables(tablePrefix);
-            await ExecuteQueryAsync(createTablesQuery, true, token).ConfigureAwait(false);
+            await ExecuteNonQueryAsync(createTablesQuery, false, UnlimitedCommandTimeout, token).ConfigureAwait(false);
 
-            // Create indexes individually, catching duplicate key errors (MySQL error 1061)
-            // since the indexes may already exist if the index tables were previously created
             List<string> indexQueries = Queries.SetupQueries.CreateIndexTableIndexes(tablePrefix);
             await using MySqlConnection connection = new MySqlConnection(_ConnectionString);
             await connection.OpenAsync(token).ConfigureAwait(false);
@@ -95,13 +94,12 @@ namespace Verbex.Database.Mysql
                 try
                 {
                     await using MySqlCommand cmd = new MySqlCommand(indexQuery, connection);
-                    cmd.CommandTimeout = Settings.CommandTimeout;
+                    cmd.CommandTimeout = UnlimitedCommandTimeout;
                     await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                 }
-                catch
+                catch (MySqlException ex) when (ex.Number == 1061)
                 {
-                    // Index creation may fail due to duplicate key (error 1061) or command timeout
-                    // on large tables. This is non-fatal; the index will be created on a subsequent restart.
+                    // Duplicate key name, index already exists.
                 }
             }
         }
@@ -127,15 +125,7 @@ namespace Verbex.Database.Mysql
                 throw new ArgumentNullException(nameof(query));
             }
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
-            try
-            {
-                return await ExecuteQueryInternalAsync(query, isTransaction, token).ConfigureAwait(false);
-            }
-            finally
-            {
-                _Semaphore.Release();
-            }
+            return await ExecuteQueryInternalAsync(query, isTransaction, token).ConfigureAwait(false);
         }
 
         /// <inheritdoc />
@@ -149,18 +139,24 @@ namespace Verbex.Database.Mysql
                 throw new ArgumentNullException(nameof(queries));
             }
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            DataTable result = new DataTable();
+            MySqlConnection? activeConnection = _ActiveConnection.Value;
+            MySqlTransaction? activeTransaction = _ActiveTransaction.Value;
+            bool useActiveTransaction = activeTransaction != null && activeConnection != null;
+            MySqlConnection? connection = activeConnection;
+            MySqlTransaction? localTransaction = null;
+
             try
             {
-                DataTable result = new DataTable();
-
-                await using MySqlConnection connection = new MySqlConnection(_ConnectionString);
-                await connection.OpenAsync(token).ConfigureAwait(false);
-                MySqlTransaction? transaction = null;
-
-                if (isTransaction)
+                if (!useActiveTransaction)
                 {
-                    transaction = await connection.BeginTransactionAsync(token).ConfigureAwait(false);
+                    connection = new MySqlConnection(_ConnectionString);
+                    await connection.OpenAsync(token).ConfigureAwait(false);
+
+                    if (isTransaction)
+                    {
+                        localTransaction = await connection.BeginTransactionAsync(token).ConfigureAwait(false);
+                    }
                 }
 
                 try
@@ -174,59 +170,70 @@ namespace Verbex.Database.Mysql
 
                         token.ThrowIfCancellationRequested();
 
-                        await using MySqlCommand cmd = new MySqlCommand(query, connection, transaction);
+                        await using MySqlCommand cmd = new MySqlCommand(query, connection, useActiveTransaction ? activeTransaction : localTransaction);
                         cmd.CommandTimeout = Settings.CommandTimeout;
 
                         await using MySqlDataReader reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
                         result = await LoadDataTableWithoutConstraintsAsync(reader, token).ConfigureAwait(false);
                     }
 
-                    if (transaction != null)
+                    if (localTransaction != null)
                     {
-                        await transaction.CommitAsync(token).ConfigureAwait(false);
+                        await localTransaction.CommitAsync(token).ConfigureAwait(false);
                     }
                 }
                 catch
                 {
-                    if (transaction != null)
+                    if (localTransaction != null)
                     {
-                        await transaction.RollbackAsync(token).ConfigureAwait(false);
+                        await localTransaction.RollbackAsync(token).ConfigureAwait(false);
                     }
                     throw;
                 }
                 finally
                 {
-                    if (transaction != null)
+                    if (localTransaction != null)
                     {
-                        await transaction.DisposeAsync().ConfigureAwait(false);
+                        await localTransaction.DisposeAsync().ConfigureAwait(false);
                     }
                 }
-
-                return result;
             }
             finally
             {
-                _Semaphore.Release();
+                if (!useActiveTransaction && connection != null)
+                {
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                }
             }
+
+            return result;
         }
 
         /// <inheritdoc />
         public override async Task CloseAsync(CancellationToken token = default)
         {
-            if (_ActiveTransaction != null)
+            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            try
             {
-                await _ActiveTransaction.DisposeAsync().ConfigureAwait(false);
-                _ActiveTransaction = null;
-            }
+                if (_ActiveTransaction.Value != null)
+                {
+                    await _ActiveTransaction.Value.DisposeAsync().ConfigureAwait(false);
+                    _ActiveTransaction.Value = null;
+                }
 
-            if (_ActiveConnection != null)
+                if (_ActiveConnection.Value != null)
+                {
+                    await _ActiveConnection.Value.DisposeAsync().ConfigureAwait(false);
+                    _ActiveConnection.Value = null;
+                }
+
+                _IsOpen = false;
+                _ConnectionString = null;
+            }
+            finally
             {
-                await _ActiveConnection.DisposeAsync().ConfigureAwait(false);
-                _ActiveConnection = null;
+                _Semaphore.Release();
             }
-
-            _IsOpen = false;
-            _ConnectionString = null;
         }
 
         /// <inheritdoc />
@@ -235,21 +242,24 @@ namespace Verbex.Database.Mysql
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            if (_ActiveTransaction.Value != null)
+            {
+                throw new InvalidOperationException("A transaction is already active.");
+            }
+
+            MySqlConnection connection = new MySqlConnection(_ConnectionString);
+            await connection.OpenAsync(token).ConfigureAwait(false);
+
             try
             {
-                if (_ActiveTransaction != null)
-                {
-                    throw new InvalidOperationException("A transaction is already active.");
-                }
-
-                _ActiveConnection = new MySqlConnection(_ConnectionString);
-                await _ActiveConnection.OpenAsync(token).ConfigureAwait(false);
-                _ActiveTransaction = await _ActiveConnection.BeginTransactionAsync(token).ConfigureAwait(false);
+                MySqlTransaction transaction = await connection.BeginTransactionAsync(token).ConfigureAwait(false);
+                _ActiveConnection.Value = connection;
+                _ActiveTransaction.Value = transaction;
             }
-            finally
+            catch
             {
-                _Semaphore.Release();
+                await connection.DisposeAsync().ConfigureAwait(false);
+                throw;
             }
         }
 
@@ -259,24 +269,23 @@ namespace Verbex.Database.Mysql
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            MySqlTransaction? transaction = _ActiveTransaction.Value;
+            MySqlConnection? connection = _ActiveConnection.Value;
+            if (transaction == null || connection == null)
+            {
+                throw new InvalidOperationException("No transaction is active.");
+            }
+
             try
             {
-                if (_ActiveTransaction == null)
-                {
-                    throw new InvalidOperationException("No transaction is active.");
-                }
-
-                await _ActiveTransaction.CommitAsync(token).ConfigureAwait(false);
-                await _ActiveTransaction.DisposeAsync().ConfigureAwait(false);
-                _ActiveTransaction = null;
-
-                await _ActiveConnection!.DisposeAsync().ConfigureAwait(false);
-                _ActiveConnection = null;
+                await transaction.CommitAsync(token).ConfigureAwait(false);
             }
             finally
             {
-                _Semaphore.Release();
+                await transaction.DisposeAsync().ConfigureAwait(false);
+                await connection.DisposeAsync().ConfigureAwait(false);
+                _ActiveTransaction.Value = null;
+                _ActiveConnection.Value = null;
             }
         }
 
@@ -286,24 +295,23 @@ namespace Verbex.Database.Mysql
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            await _Semaphore.WaitAsync(token).ConfigureAwait(false);
+            MySqlTransaction? transaction = _ActiveTransaction.Value;
+            MySqlConnection? connection = _ActiveConnection.Value;
+            if (transaction == null || connection == null)
+            {
+                throw new InvalidOperationException("No transaction is active.");
+            }
+
             try
             {
-                if (_ActiveTransaction == null)
-                {
-                    throw new InvalidOperationException("No transaction is active.");
-                }
-
-                await _ActiveTransaction.RollbackAsync(token).ConfigureAwait(false);
-                await _ActiveTransaction.DisposeAsync().ConfigureAwait(false);
-                _ActiveTransaction = null;
-
-                await _ActiveConnection!.DisposeAsync().ConfigureAwait(false);
-                _ActiveConnection = null;
+                await transaction.RollbackAsync(token).ConfigureAwait(false);
             }
             finally
             {
-                _Semaphore.Release();
+                await transaction.DisposeAsync().ConfigureAwait(false);
+                await connection.DisposeAsync().ConfigureAwait(false);
+                _ActiveTransaction.Value = null;
+                _ActiveConnection.Value = null;
             }
         }
 
@@ -348,12 +356,7 @@ namespace Verbex.Database.Mysql
         /// <param name="token">Cancellation token.</param>
         private async Task CreateSchemaAsync(CancellationToken token)
         {
-            await using MySqlConnection connection = new MySqlConnection(_ConnectionString);
-            await connection.OpenAsync(token).ConfigureAwait(false);
-
-            await using MySqlCommand cmd = new MySqlCommand(SetupQueries.CreateTables, connection);
-            cmd.CommandTimeout = Settings.CommandTimeout;
-            await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            await ExecuteNonQueryAsync(SetupQueries.CreateTables, false, UnlimitedCommandTimeout, token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -377,7 +380,7 @@ namespace Verbex.Database.Mysql
                 try
                 {
                     await using MySqlCommand cmd = new MySqlCommand(indexQuery, connection);
-                    cmd.CommandTimeout = Settings.CommandTimeout;
+                    cmd.CommandTimeout = UnlimitedCommandTimeout;
                     await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                 }
                 catch (MySqlException ex) when (ex.Number == 1061)
@@ -451,12 +454,13 @@ namespace Verbex.Database.Mysql
         {
             DataTable result = new DataTable();
 
-            // Use active transaction connection if one exists
-            bool useActiveTransaction = _ActiveTransaction != null && _ActiveConnection != null;
+            MySqlConnection? activeConnection = _ActiveConnection.Value;
+            MySqlTransaction? activeTransaction = _ActiveTransaction.Value;
+            bool useActiveTransaction = activeTransaction != null && activeConnection != null;
 
             if (useActiveTransaction)
             {
-                await using MySqlCommand cmd = new MySqlCommand(query, _ActiveConnection, _ActiveTransaction);
+                await using MySqlCommand cmd = new MySqlCommand(query, activeConnection, activeTransaction);
                 cmd.CommandTimeout = Settings.CommandTimeout;
 
                 await using MySqlDataReader reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
@@ -504,6 +508,61 @@ namespace Verbex.Database.Mysql
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Executes a non-query script with an optional transaction and command timeout override.
+        /// </summary>
+        private async Task ExecuteNonQueryAsync(string query, bool isTransaction, int commandTimeout, CancellationToken token)
+        {
+            MySqlConnection? activeConnection = _ActiveConnection.Value;
+            MySqlTransaction? activeTransaction = _ActiveTransaction.Value;
+            bool useActiveTransaction = activeTransaction != null && activeConnection != null;
+
+            if (useActiveTransaction)
+            {
+                await using MySqlCommand cmd = new MySqlCommand(query, activeConnection, activeTransaction);
+                cmd.CommandTimeout = commandTimeout;
+                await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                return;
+            }
+
+            await using MySqlConnection connection = new MySqlConnection(_ConnectionString);
+            await connection.OpenAsync(token).ConfigureAwait(false);
+            MySqlTransaction? transaction = null;
+
+            if (isTransaction)
+            {
+                transaction = await connection.BeginTransactionAsync(token).ConfigureAwait(false);
+            }
+
+            try
+            {
+                await using MySqlCommand cmd = new MySqlCommand(query, connection, transaction);
+                cmd.CommandTimeout = commandTimeout;
+                await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync(token).ConfigureAwait(false);
+                }
+            }
+            catch
+            {
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync(token).ConfigureAwait(false);
+                }
+
+                throw;
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync().ConfigureAwait(false);
+                }
+            }
         }
 
         /// <inheritdoc />

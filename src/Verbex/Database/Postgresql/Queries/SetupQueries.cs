@@ -224,6 +224,7 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
             "CREATE INDEX IF NOT EXISTS idx_labels_document ON labels(document_id)",
             "CREATE INDEX IF NOT EXISTS idx_labels_index ON labels(index_id)",
             "CREATE INDEX IF NOT EXISTS idx_labels_label ON labels(label)",
+            "CREATE INDEX IF NOT EXISTS idx_labels_label_document ON labels(label, document_id)",
             "CREATE INDEX IF NOT EXISTS idx_labels_document_label ON labels(document_id, label)",
             "CREATE INDEX IF NOT EXISTS idx_labels_index_label ON labels(index_id, label)",
             "CREATE INDEX IF NOT EXISTS idx_labels_tenant ON labels(tenant_id)",
@@ -240,6 +241,7 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
             "CREATE INDEX IF NOT EXISTS idx_tags_document_key ON tags(document_id, key)",
             "CREATE INDEX IF NOT EXISTS idx_tags_index_key ON tags(index_id, key)",
             "CREATE INDEX IF NOT EXISTS idx_tags_key_value ON tags(key, value)",
+            "CREATE INDEX IF NOT EXISTS idx_tags_key_value_document ON tags(key, value, document_id)",
             "CREATE INDEX IF NOT EXISTS idx_tags_tenant ON tags(tenant_id)",
             "CREATE INDEX IF NOT EXISTS idx_tags_tenant_key ON tags(tenant_id, key)",
             "CREATE INDEX IF NOT EXISTS idx_tags_user ON tags(user_id)",
@@ -424,13 +426,15 @@ DROP TABLE IF EXISTS {prefix}_documents CASCADE;
                 // Label indexes
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_labels_doc ON {prefix}_labels(document_id)",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_labels_label ON {prefix}_labels(label)",
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_labels_label_doc ON {prefix}_labels(label, document_id)",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_labels_doc_label ON {prefix}_labels(document_id, label)",
 
                 // Tag indexes
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_doc ON {prefix}_tags(document_id)",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_key ON {prefix}_tags(key)",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_doc_key ON {prefix}_tags(document_id, key)",
-                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_key_value ON {prefix}_tags(key, value)"
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_key_value ON {prefix}_tags(key, value)",
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_key_value_doc ON {prefix}_tags(key, value, document_id)"
             };
         }
     }

@@ -167,7 +167,7 @@ CREATE TABLE tags (
     document_id NVARCHAR(48),
     index_id NVARCHAR(48),
     [key] NVARCHAR(256) NOT NULL,
-    value NVARCHAR(MAX),
+    value NVARCHAR(1024),
     last_update_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
     created_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
     CONSTRAINT fk_tags_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(identifier) ON DELETE NO ACTION,
@@ -340,6 +340,9 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_labels_index')
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_labels_label')
     CREATE INDEX idx_labels_label ON labels(label);
 
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_labels_label_document')
+    CREATE INDEX idx_labels_label_document ON labels(label, document_id);
+
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_labels_document_label')
     CREATE INDEX idx_labels_document_label ON labels(document_id, label);
 
@@ -365,6 +368,21 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_labels_credential_lab
     CREATE INDEX idx_labels_credential_label ON labels(credential_id, label);
 
 -- Tag indexes (for filtering by key-value pairs)
+IF EXISTS (
+    SELECT *
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID('tags')
+      AND name = 'value'
+      AND max_length = -1
+)
+BEGIN
+    UPDATE tags
+    SET value = LEFT(value, 1024)
+    WHERE LEN(value) > 1024;
+
+    ALTER TABLE tags ALTER COLUMN value NVARCHAR(1024) NULL;
+END
+
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_document')
     CREATE INDEX idx_tags_document ON tags(document_id);
 
@@ -382,6 +400,9 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_index_key')
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_key_value')
     CREATE INDEX idx_tags_key_value ON tags([key], value);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_key_value_document')
+    CREATE INDEX idx_tags_key_value_document ON tags([key], value, document_id);
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_tenant')
     CREATE INDEX idx_tags_tenant ON tags(tenant_id);
@@ -526,7 +547,7 @@ CREATE TABLE {prefix}_tags (
     id NVARCHAR(48) PRIMARY KEY,
     document_id NVARCHAR(48),
     [key] NVARCHAR(256) NOT NULL,
-    value NVARCHAR(MAX),
+    value NVARCHAR(1024),
     last_update_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
     created_utc DATETIME2 NOT NULL DEFAULT GETUTCDATE()
 );
@@ -586,13 +607,29 @@ DROP TABLE IF EXISTS {prefix}_documents;
                 // Label indexes
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_labels_doc') CREATE INDEX idx_{prefix}_labels_doc ON {prefix}_labels(document_id)",
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_labels_label') CREATE INDEX idx_{prefix}_labels_label ON {prefix}_labels(label)",
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_labels_label_doc') CREATE INDEX idx_{prefix}_labels_label_doc ON {prefix}_labels(label, document_id)",
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_labels_doc_label') CREATE INDEX idx_{prefix}_labels_doc_label ON {prefix}_labels(document_id, label)",
 
                 // Tag indexes
+                $@"IF EXISTS (
+    SELECT *
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID('{prefix}_tags')
+      AND name = 'value'
+      AND max_length = -1
+)
+BEGIN
+    UPDATE {prefix}_tags
+    SET value = LEFT(value, 1024)
+    WHERE LEN(value) > 1024;
+
+    ALTER TABLE {prefix}_tags ALTER COLUMN value NVARCHAR(1024) NULL;
+END",
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_doc') CREATE INDEX idx_{prefix}_tags_doc ON {prefix}_tags(document_id)",
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_key') CREATE INDEX idx_{prefix}_tags_key ON {prefix}_tags([key])",
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_doc_key') CREATE INDEX idx_{prefix}_tags_doc_key ON {prefix}_tags(document_id, [key])",
-                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_key_value') CREATE INDEX idx_{prefix}_tags_key_value ON {prefix}_tags([key], value)"
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_key_value') CREATE INDEX idx_{prefix}_tags_key_value ON {prefix}_tags([key], value)",
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_key_value_doc') CREATE INDEX idx_{prefix}_tags_key_value_doc ON {prefix}_tags([key], value, document_id)"
             };
         }
     }

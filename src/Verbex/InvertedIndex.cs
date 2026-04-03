@@ -543,21 +543,17 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentIds);
 
-            List<DocumentMetadata> results = new List<DocumentMetadata>();
-            foreach (string docId in documentIds.Distinct())
-            {
-                if (string.IsNullOrWhiteSpace(docId))
-                {
-                    continue;
-                }
+            List<string> ids = documentIds
+                .Where(docId => !string.IsNullOrWhiteSpace(docId))
+                .Distinct()
+                .ToList();
 
-                DocumentMetadata? doc = await GetDocumentWithMetadataAsync(docId, token).ConfigureAwait(false);
-                if (doc != null)
-                {
-                    results.Add(doc);
-                }
+            if (ids.Count == 0)
+            {
+                return new List<DocumentMetadata>();
             }
-            return results;
+
+            return await _Driver.Documents.GetByIdsWithMetadataAsync(_TablePrefix, ids, token).ConfigureAwait(false);
         }
 
         /// <summary>
