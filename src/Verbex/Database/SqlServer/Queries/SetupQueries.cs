@@ -580,6 +580,7 @@ DROP TABLE IF EXISTS {prefix}_documents;
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_docterms_term') CREATE INDEX idx_{prefix}_docterms_term ON {prefix}_document_terms(term_id)",
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_docterms_freq') CREATE INDEX idx_{prefix}_docterms_freq ON {prefix}_document_terms(term_frequency DESC)",
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_docterms_term_doc') CREATE INDEX idx_{prefix}_docterms_term_doc ON {prefix}_document_terms(term_id, document_id)",
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_docterms_search') CREATE INDEX idx_{prefix}_docterms_search ON {prefix}_document_terms(term_id, document_id, term_frequency)",
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_docterms_doc_term') CREATE INDEX idx_{prefix}_docterms_doc_term ON {prefix}_document_terms(document_id, term_id)",
 
                 // Label indexes

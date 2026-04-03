@@ -439,6 +439,7 @@ SET FOREIGN_KEY_CHECKS = 1;
                 $"CREATE INDEX idx_{prefix}_docterms_term ON {prefix}_document_terms(term_id)",
                 $"CREATE INDEX idx_{prefix}_docterms_freq ON {prefix}_document_terms(term_frequency DESC)",
                 $"CREATE INDEX idx_{prefix}_docterms_term_doc ON {prefix}_document_terms(term_id, document_id)",
+                $"CREATE INDEX idx_{prefix}_docterms_search ON {prefix}_document_terms(term_id, document_id, term_frequency)",
                 $"CREATE INDEX idx_{prefix}_docterms_doc_term ON {prefix}_document_terms(document_id, term_id)",
 
                 // Label indexes
