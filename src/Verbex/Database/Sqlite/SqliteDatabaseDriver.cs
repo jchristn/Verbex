@@ -114,8 +114,8 @@ namespace Verbex.Database.Sqlite
                 }
                 catch
                 {
-                    // Index creation may fail due to IF NOT EXISTS semantics or other issues.
-                    // This is non-fatal; existing indexes are unaffected.
+                    // Non-fatal: index may already exist or creation may time out on large tables.
+                    // Failure to create an index does not affect existing data or other indexes.
                 }
             }
         }
