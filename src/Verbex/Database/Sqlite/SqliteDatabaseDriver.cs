@@ -95,7 +95,16 @@ namespace Verbex.Database.Sqlite
             List<string> indexQueries = Queries.SetupQueries.CreateIndexTableIndexes(tablePrefix);
             foreach (string indexQuery in indexQueries)
             {
-                await ExecuteQueryAsync(indexQuery, true, token).ConfigureAwait(false);
+                try
+                {
+                    await ExecuteQueryAsync(indexQuery, true, token).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Index creation may fail on large tables due to command timeout.
+                    // This is non-fatal; the index will be created on a subsequent restart
+                    // once the operation completes within the timeout window.
+                }
             }
         }
 

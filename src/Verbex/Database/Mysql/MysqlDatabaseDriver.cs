@@ -98,9 +98,10 @@ namespace Verbex.Database.Mysql
                     cmd.CommandTimeout = Settings.CommandTimeout;
                     await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                 }
-                catch (MySqlException ex) when (ex.Number == 1061)
+                catch
                 {
-                    // Error 1061: Duplicate key name - index already exists, continue silently
+                    // Index creation may fail due to duplicate key (error 1061) or command timeout
+                    // on large tables. This is non-fatal; the index will be created on a subsequent restart.
                 }
             }
         }

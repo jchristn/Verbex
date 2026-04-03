@@ -54,7 +54,6 @@ namespace Verbex.Server.API.REST
         private Webserver? _Webserver = null;
         private BackupService? _BackupService = null;
         private RequestHistoryService? _RequestHistory = null;
-        private DatabaseDriverBase? _RequestHistoryDatabase = null;
         private readonly ConditionalWeakTable<HttpContextBase, RequestHistoryCaptureContext> _RequestHistoryContexts = new ConditionalWeakTable<HttpContextBase, RequestHistoryCaptureContext>();
         private readonly string _Header = "[RestServiceHandler] ";
 
@@ -81,12 +80,7 @@ namespace Verbex.Server.API.REST
 
             // Initialize backup service
             _BackupService = new BackupService(indexManager, settings.DataDirectory, logging);
-
-            // Create a dedicated database driver for request history to avoid
-            // write lock contention with the main application database.
-            _RequestHistoryDatabase = DatabaseDriverFactory.CreateAndInitializeAsync(
-                settings.Database.Clone()).GetAwaiter().GetResult();
-            _RequestHistory = new RequestHistoryService(settings.RequestHistory, _RequestHistoryDatabase, logging);
+            _RequestHistory = new RequestHistoryService(settings.RequestHistory, database, logging);
             _RequestHistory.InitializeAsync().GetAwaiter().GetResult();
 
             InitializeWebserver();
@@ -113,7 +107,6 @@ namespace Verbex.Server.API.REST
         {
             _Webserver?.Stop();
             _RequestHistory?.Dispose();
-            _RequestHistoryDatabase?.Dispose();
             _Logging?.Info(_Header + "stopped");
         }
 
