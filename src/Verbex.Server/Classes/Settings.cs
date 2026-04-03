@@ -100,6 +100,22 @@ namespace Verbex.Server.Classes
         }
 
         /// <summary>
+        /// Request history settings.
+        /// </summary>
+        public RequestHistorySettings RequestHistory
+        {
+            get
+            {
+                return _RequestHistory;
+            }
+            set
+            {
+                if (value == null) _RequestHistory = new RequestHistorySettings();
+                else _RequestHistory = value;
+            }
+        }
+
+        /// <summary>
         /// Debug settings.
         /// </summary>
         public DebugSettings Debug
@@ -124,6 +140,7 @@ namespace Verbex.Server.Classes
         private DatabaseSettings _Database = new DatabaseSettings();
         private string _DataDirectory = "./data";
         private string _AdminBearerToken = "verbexadmin";
+        private RequestHistorySettings _RequestHistory = new RequestHistorySettings();
         private DebugSettings _Debug = new DebugSettings();
 
         #endregion

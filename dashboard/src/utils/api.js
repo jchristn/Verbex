@@ -7,7 +7,7 @@
  * Keys whose values are user-provided dictionaries and should NOT have their
  * nested keys transformed (e.g., tags, customMetadata).
  */
-const PRESERVE_NESTED_KEYS = new Set(['tags', 'custommetadata']);
+const PRESERVE_NESTED_KEYS = new Set(['tags', 'custommetadata', 'termscores', 'termfrequencies']);
 
 /**
  * Convert PascalCase keys to camelCase recursively.
@@ -39,6 +39,14 @@ function toCamelCase(obj) {
   }
 
   return obj;
+}
+
+function buildQueryString(params = {}) {
+  const query = Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+
+  return query.length > 0 ? `?${query.join('&')}` : '';
 }
 
 class ApiClient {
@@ -641,6 +649,31 @@ class ApiClient {
 
   async updateCredentialTags(tenantId, credentialId, tags) {
     return this.put(`/v1.0/tenants/${encodeURIComponent(tenantId)}/credentials/${encodeURIComponent(credentialId)}/tags`, { Tags: tags || {} });
+  }
+
+  // Request history endpoints
+  async getRequestHistory(params = {}, options = {}) {
+    return this.get(`/v1.0/requesthistory${buildQueryString(params)}`, options);
+  }
+
+  async getRequestHistorySummary(params = {}, options = {}) {
+    return this.get(`/v1.0/requesthistory/summary${buildQueryString(params)}`, options);
+  }
+
+  async getRequestHistoryEntry(id, options = {}) {
+    return this.get(`/v1.0/requesthistory/${encodeURIComponent(id)}`, options);
+  }
+
+  async getRequestHistoryDetail(id, options = {}) {
+    return this.get(`/v1.0/requesthistory/${encodeURIComponent(id)}/detail`, options);
+  }
+
+  async deleteRequestHistoryEntry(id, options = {}) {
+    return this.delete(`/v1.0/requesthistory/${encodeURIComponent(id)}`, options);
+  }
+
+  async bulkDeleteRequestHistory(params = {}, options = {}) {
+    return this.delete(`/v1.0/requesthistory/bulk${buildQueryString(params)}`, options);
   }
 }
 

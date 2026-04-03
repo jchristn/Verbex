@@ -9,10 +9,12 @@ namespace Verbex.Server.API.REST
     using System.Linq;
     using System.Net;
     using System.Reflection.PortableExecutable;
+    using System.Runtime.CompilerServices;
     using System.Text;
     using System.Text.Json;
     using System.Text.Json.Serialization;
     using System.Text.RegularExpressions;
+    using System.Threading;
     using System.Threading.Tasks;
     using Verbex;
     using Verbex.Database;
@@ -51,6 +53,8 @@ namespace Verbex.Server.API.REST
         private LoggingModule? _Logging = null;
         private Webserver? _Webserver = null;
         private BackupService? _BackupService = null;
+        private RequestHistoryService? _RequestHistory = null;
+        private readonly ConditionalWeakTable<HttpContextBase, RequestHistoryCaptureContext> _RequestHistoryContexts = new ConditionalWeakTable<HttpContextBase, RequestHistoryCaptureContext>();
         private readonly string _Header = "[RestServiceHandler] ";
 
         #endregion
@@ -76,6 +80,8 @@ namespace Verbex.Server.API.REST
 
             // Initialize backup service
             _BackupService = new BackupService(indexManager, settings.DataDirectory, logging);
+            _RequestHistory = new RequestHistoryService(settings.RequestHistory, database, logging);
+            _RequestHistory.InitializeAsync().GetAwaiter().GetResult();
 
             InitializeWebserver();
         }
@@ -100,6 +106,7 @@ namespace Verbex.Server.API.REST
         public void Stop()
         {
             _Webserver?.Stop();
+            _RequestHistory?.Dispose();
             _Logging?.Info(_Header + "stopped");
         }
 
@@ -158,6 +165,10 @@ namespace Verbex.Server.API.REST
                 settings.Tags.Add(new OpenApiTag { Name = "Indices", Description = "Index management operations" });
                 settings.Tags.Add(new OpenApiTag { Name = "Documents", Description = "Document management within indices" });
                 settings.Tags.Add(new OpenApiTag { Name = "Search", Description = "Full-text search operations" });
+                settings.Tags.Add(new OpenApiTag { Name = "Tenants", Description = "Tenant administration operations" });
+                settings.Tags.Add(new OpenApiTag { Name = "Users", Description = "User administration operations" });
+                settings.Tags.Add(new OpenApiTag { Name = "Credentials", Description = "API credential administration operations" });
+                settings.Tags.Add(new OpenApiTag { Name = "Request History", Description = "Request audit and exploration operations" });
 
                 settings.SecuritySchemes.Add("BearerAuth", new OpenApiSecurityScheme
                 {
@@ -771,6 +782,70 @@ namespace Verbex.Server.API.REST
 
             #endregion
 
+            #region Request-History-Routes
+
+            _Webserver.Routes.PostAuthentication.Static.Add(
+                HttpMethod.GET, "/v1.0/requesthistory", GetRequestHistoryRoute,
+                metadata => metadata
+                    .WithTag("Request History")
+                    .WithDescription("Search request history entries visible to the authenticated principal.")
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Request history search results", CreateRequestHistoryListSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Static.Add(
+                HttpMethod.GET, "/v1.0/requesthistory/summary", GetRequestHistorySummaryRoute,
+                metadata => metadata
+                    .WithTag("Request History")
+                    .WithDescription("Get aggregated request history buckets for charting and dashboard summaries.")
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Request history summary", CreateRequestHistorySummarySchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Static.Add(
+                HttpMethod.DELETE, "/v1.0/requesthistory/bulk", DeleteRequestHistoryBulkRoute,
+                metadata => metadata
+                    .WithTag("Request History")
+                    .WithDescription("Delete all request history entries matching the supplied filters.")
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Bulk delete result", CreateRequestHistoryBulkDeleteSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.GET, "/v1.0/requesthistory/{id}", GetRequestHistoryEntryRoute,
+                metadata => metadata
+                    .WithTag("Request History")
+                    .WithDescription("Get a single request history entry by ID.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The request history entry identifier"))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Request history entry", CreateRequestHistoryEntrySchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.GET, "/v1.0/requesthistory/{id}/detail", GetRequestHistoryDetailRoute,
+                metadata => metadata
+                    .WithTag("Request History")
+                    .WithDescription("Get the stored request and response detail for a request history entry.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The request history entry identifier"))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Request history detail", CreateRequestHistoryDetailSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            _Webserver.Routes.PostAuthentication.Parameter.Add(
+                HttpMethod.DELETE, "/v1.0/requesthistory/{id}", DeleteRequestHistoryEntryRoute,
+                metadata => metadata
+                    .WithTag("Request History")
+                    .WithDescription("Delete a request history entry and its stored detail payload.")
+                    .WithParameter(OpenApiParameterMetadata.Path("id", "The request history entry identifier"))
+                    .WithResponse(200, OpenApiResponseMetadata.Json("Delete result", CreateResponseSchema()))
+                    .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
+                    .WithResponse(404, OpenApiResponseMetadata.NotFound()),
+                ExceptionRoute);
+
+            #endregion
+
             #endregion
         }
 
@@ -839,6 +914,8 @@ namespace Verbex.Server.API.REST
                 + ctx.Request.Method + " " + ctx.Request.Url.RawWithQuery + " "
                 + ctx.Response.StatusCode + " "
                 + "(" + ctx.Response.Timestamp.TotalMs.Value.ToString("F2") + "ms)");
+
+            await PersistRequestHistoryAsync(ctx).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -3560,6 +3637,273 @@ namespace Verbex.Server.API.REST
             });
         }
 
+        private async Task GetRequestHistoryRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                if (_RequestHistory == null || !_RequestHistory.Enabled)
+                {
+                    return new ResponseContext(false, 503, "Request history is disabled");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.IsAuthenticated)
+                {
+                    return new ResponseContext(false, 401, "Authentication required");
+                }
+
+                RequestHistoryQuery query = RequestHistoryQuery.Parse(
+                    ctx.Request.Query?.Elements?["page"],
+                    ctx.Request.Query?.Elements?["pageSize"],
+                    ctx.Request.Query?.Elements?["method"],
+                    ctx.Request.Query?.Elements?["route"],
+                    ctx.Request.Query?.Elements?["tenantId"],
+                    ctx.Request.Query?.Elements?["userId"],
+                    ctx.Request.Query?.Elements?["credentialId"],
+                    ctx.Request.Query?.Elements?["indexId"],
+                    ctx.Request.Query?.Elements?["sourceIp"],
+                    ctx.Request.Query?.Elements?["principal"],
+                    ctx.Request.Query?.Elements?["statusCode"],
+                    ctx.Request.Query?.Elements?["fromUtc"],
+                    ctx.Request.Query?.Elements?["toUtc"],
+                    ctx.Request.Query?.Elements?["bucketMinutes"]);
+
+                ApplyRequestHistoryScope(auth, query);
+                (List<RequestHistoryEntry> entries, long totalCount) = await _RequestHistory.SearchAsync(query).ConfigureAwait(false);
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = new
+                    {
+                        Objects = entries,
+                        TotalCount = totalCount,
+                        Page = query.Page,
+                        PageSize = query.PageSize,
+                        TotalPages = (int)Math.Ceiling(totalCount / (double)query.PageSize)
+                    }
+                };
+            });
+        }
+
+        private async Task GetRequestHistorySummaryRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                if (_RequestHistory == null || !_RequestHistory.Enabled)
+                {
+                    return new ResponseContext(false, 503, "Request history is disabled");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.IsAuthenticated)
+                {
+                    return new ResponseContext(false, 401, "Authentication required");
+                }
+
+                RequestHistoryQuery query = RequestHistoryQuery.Parse(
+                    null,
+                    null,
+                    ctx.Request.Query?.Elements?["method"],
+                    ctx.Request.Query?.Elements?["route"],
+                    ctx.Request.Query?.Elements?["tenantId"],
+                    ctx.Request.Query?.Elements?["userId"],
+                    ctx.Request.Query?.Elements?["credentialId"],
+                    ctx.Request.Query?.Elements?["indexId"],
+                    ctx.Request.Query?.Elements?["sourceIp"],
+                    ctx.Request.Query?.Elements?["principal"],
+                    ctx.Request.Query?.Elements?["statusCode"],
+                    ctx.Request.Query?.Elements?["fromUtc"],
+                    ctx.Request.Query?.Elements?["toUtc"],
+                    ctx.Request.Query?.Elements?["bucketMinutes"]);
+
+                ApplyRequestHistoryScope(auth, query);
+                RequestHistorySummary summary = await _RequestHistory.GetSummaryAsync(query).ConfigureAwait(false);
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = summary
+                };
+            });
+        }
+
+        private async Task GetRequestHistoryEntryRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                if (_RequestHistory == null || !_RequestHistory.Enabled)
+                {
+                    return new ResponseContext(false, 503, "Request history is disabled");
+                }
+
+                string? id = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrWhiteSpace(id))
+                {
+                    return new ResponseContext(false, 400, "Entry ID is required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.IsAuthenticated)
+                {
+                    return new ResponseContext(false, 401, "Authentication required");
+                }
+
+                RequestHistoryEntry? entry = await _RequestHistory.GetEntryAsync(id).ConfigureAwait(false);
+                if (entry == null)
+                {
+                    return new ResponseContext(false, 404, "Entry not found");
+                }
+
+                if (!CanAccessRequestHistoryEntry(auth, entry))
+                {
+                    return new ResponseContext(false, 403, "Access denied");
+                }
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = entry
+                };
+            });
+        }
+
+        private async Task GetRequestHistoryDetailRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                if (_RequestHistory == null || !_RequestHistory.Enabled)
+                {
+                    return new ResponseContext(false, 503, "Request history is disabled");
+                }
+
+                string? id = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrWhiteSpace(id))
+                {
+                    return new ResponseContext(false, 400, "Entry ID is required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.IsAuthenticated)
+                {
+                    return new ResponseContext(false, 401, "Authentication required");
+                }
+
+                RequestHistoryEntry? entry = await _RequestHistory.GetEntryAsync(id).ConfigureAwait(false);
+                if (entry == null)
+                {
+                    return new ResponseContext(false, 404, "Entry not found");
+                }
+
+                if (!CanAccessRequestHistoryEntry(auth, entry))
+                {
+                    return new ResponseContext(false, 403, "Access denied");
+                }
+
+                RequestHistoryDetail? detail = await _RequestHistory.GetDetailAsync(id).ConfigureAwait(false);
+                if (detail == null)
+                {
+                    return new ResponseContext(false, 404, "Detail not found");
+                }
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = detail
+                };
+            });
+        }
+
+        private async Task DeleteRequestHistoryEntryRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                if (_RequestHistory == null || !_RequestHistory.Enabled)
+                {
+                    return new ResponseContext(false, 503, "Request history is disabled");
+                }
+
+                string? id = ctx.Request.Url.Parameters["id"];
+                if (String.IsNullOrWhiteSpace(id))
+                {
+                    return new ResponseContext(false, 400, "Entry ID is required");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.IsAuthenticated)
+                {
+                    return new ResponseContext(false, 401, "Authentication required");
+                }
+
+                RequestHistoryEntry? entry = await _RequestHistory.GetEntryAsync(id).ConfigureAwait(false);
+                if (entry == null)
+                {
+                    return new ResponseContext(false, 404, "Entry not found");
+                }
+
+                if (!CanAccessRequestHistoryEntry(auth, entry))
+                {
+                    return new ResponseContext(false, 403, "Access denied");
+                }
+
+                bool deleted = await _RequestHistory.DeleteAsync(id).ConfigureAwait(false);
+                return new ResponseContext
+                {
+                    Success = deleted,
+                    StatusCode = deleted ? 200 : 404,
+                    Data = new { Deleted = deleted, Id = id },
+                    ErrorMessage = deleted ? null : "Entry not found"
+                };
+            });
+        }
+
+        private async Task DeleteRequestHistoryBulkRoute(HttpContextBase ctx)
+        {
+            await WrappedRequestHandler(ctx, RequestTypeEnum.IndexManagement, async (reqCtx) =>
+            {
+                if (_RequestHistory == null || !_RequestHistory.Enabled)
+                {
+                    return new ResponseContext(false, 503, "Request history is disabled");
+                }
+
+                AuthContext? auth = await _Auth!.AuthenticateBearerAsync(GetAuthToken(ctx) ?? "").ConfigureAwait(false);
+                if (auth == null || !auth.IsAuthenticated)
+                {
+                    return new ResponseContext(false, 401, "Authentication required");
+                }
+
+                RequestHistoryQuery query = RequestHistoryQuery.Parse(
+                    null,
+                    null,
+                    ctx.Request.Query?.Elements?["method"],
+                    ctx.Request.Query?.Elements?["route"],
+                    ctx.Request.Query?.Elements?["tenantId"],
+                    ctx.Request.Query?.Elements?["userId"],
+                    ctx.Request.Query?.Elements?["credentialId"],
+                    ctx.Request.Query?.Elements?["indexId"],
+                    ctx.Request.Query?.Elements?["sourceIp"],
+                    ctx.Request.Query?.Elements?["principal"],
+                    ctx.Request.Query?.Elements?["statusCode"],
+                    ctx.Request.Query?.Elements?["fromUtc"],
+                    ctx.Request.Query?.Elements?["toUtc"],
+                    ctx.Request.Query?.Elements?["bucketMinutes"]);
+
+                ApplyRequestHistoryScope(auth, query);
+                RequestHistoryBulkDeleteResult deleteResult = await _RequestHistory.BulkDeleteAsync(query).ConfigureAwait(false);
+
+                return new ResponseContext
+                {
+                    Success = true,
+                    StatusCode = 200,
+                    Data = deleteResult
+                };
+            });
+        }
+
         #region Backup-Restore-Handlers
 
         /// <summary>
@@ -3762,10 +4106,22 @@ namespace Verbex.Server.API.REST
         /// <returns>Task.</returns>
         private async Task SendBinaryResponse(HttpContextBase ctx, Stream stream, string contentType, string filename)
         {
+            RequestHistoryCaptureContext capture = GetOrCreateRequestHistoryCapture(ctx);
             ctx.Response.StatusCode = 200;
             ctx.Response.ContentType = contentType;
             ctx.Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{filename}\"");
             ctx.Response.Headers.Add("Access-Control-Allow-Origin", "*");
+
+            long length = stream.CanSeek ? stream.Length : 0;
+            capture.StatusCode = 200;
+            capture.Success = true;
+            capture.ResponseContentType = contentType;
+            capture.ResponseHeaders = MergeResponseHeaders(ctx.Response.Headers, null);
+            capture.ResponseSizeBytes = length;
+            capture.ResponseBody = $"Binary response ({contentType}, {length} bytes, filename {filename})";
+            capture.ResponseBodyTruncated = false;
+            capture.IsBinaryResponse = true;
+            capture.ResponseFilename = filename;
 
             using (stream)
             {
@@ -3814,6 +4170,14 @@ namespace Verbex.Server.API.REST
                 await ctx.Request.Data.CopyToAsync(ms).ConfigureAwait(false);
                 bodyData = ms.ToArray();
             }
+
+            RequestHistoryCaptureContext capture = GetOrCreateRequestHistoryCapture(ctx);
+            capture.RequestBodyCaptured = true;
+            capture.RequestSizeBytes = bodyData.LongLength;
+            capture.RequestContentType = ctx.Request.ContentType;
+            capture.RawRequestBody = null;
+            capture.RequestBody = $"Multipart form-data request ({bodyData.LongLength} bytes)";
+            capture.RequestBodyTruncated = false;
 
             // Find all boundary positions in raw bytes
             List<int> boundaryPositions = new List<int>();
@@ -3879,6 +4243,7 @@ namespace Verbex.Server.API.REST
                     Array.Copy(bodyData, bodyStart, fileData, 0, bodyLength);
                     result.FileData = fileData;
                     result.FileName = fileName;
+                    capture.RequestBody = $"Multipart form-data request ({bodyData.LongLength} bytes, file {fileName})";
 
                     Match contentTypeMatch = Regex.Match(headers, @"Content-Type:\s*([^\r\n]+)", RegexOptions.IgnoreCase);
                     if (contentTypeMatch.Success)
@@ -3940,6 +4305,346 @@ namespace Verbex.Server.API.REST
             public string? FileContentType { get; set; }
         }
 
+        private class RequestHistoryCaptureContext
+        {
+            public string Id { get; set; } = Guid.NewGuid().ToString();
+            public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
+            public RequestTypeEnum RequestType { get; set; } = RequestTypeEnum.Unknown;
+            public string HttpMethod { get; set; } = "GET";
+            public string RequestUrl { get; set; } = "/";
+            public string RouteTemplate { get; set; } = "/";
+            public string? SourceIp { get; set; }
+            public string? AuthToken { get; set; }
+            public string? RequestContentType { get; set; }
+            public Dictionary<string, string> RequestHeaders { get; set; } = new Dictionary<string, string>();
+            public Dictionary<string, string> RouteParameters { get; set; } = new Dictionary<string, string>();
+            public Dictionary<string, string> QueryParameters { get; set; } = new Dictionary<string, string>();
+            public bool RequestBodyCaptured { get; set; }
+            public string? RawRequestBody { get; set; }
+            public string? RequestBody { get; set; }
+            public long RequestSizeBytes { get; set; }
+            public bool RequestBodyTruncated { get; set; }
+            public int StatusCode { get; set; }
+            public bool Success { get; set; }
+            public string? ResponseContentType { get; set; }
+            public Dictionary<string, string> ResponseHeaders { get; set; } = new Dictionary<string, string>();
+            public string? ResponseBody { get; set; }
+            public long ResponseSizeBytes { get; set; }
+            public bool ResponseBodyTruncated { get; set; }
+            public bool IsBinaryResponse { get; set; }
+            public string? ResponseFilename { get; set; }
+            public double DurationMs { get; set; }
+        }
+
+        private RequestHistoryCaptureContext GetOrCreateRequestHistoryCapture(HttpContextBase ctx)
+        {
+            return _RequestHistoryContexts.GetValue(ctx, CreateRequestHistoryCapture);
+        }
+
+        private RequestHistoryCaptureContext CreateRequestHistoryCapture(HttpContextBase ctx)
+        {
+            return new RequestHistoryCaptureContext
+            {
+                Id = Guid.NewGuid().ToString(),
+                CreatedUtc = DateTime.UtcNow,
+                RequestType = RequestTypeEnum.Unknown,
+                HttpMethod = ctx.Request.Method.ToString(),
+                RequestUrl = ctx.Request.Url.Full,
+                RouteTemplate = NormalizeRouteTemplate(ctx),
+                SourceIp = ctx.Request.Source.IpAddress,
+                AuthToken = GetAuthToken(ctx),
+                RequestContentType = ctx.Request.ContentType,
+                RequestHeaders = SanitizeHeaders(ctx.Request.Headers),
+                RouteParameters = GetRouteParameters(ctx),
+                QueryParameters = GetQueryParameters(ctx)
+            };
+        }
+
+        private async Task PersistRequestHistoryAsync(HttpContextBase ctx)
+        {
+            if (_RequestHistory == null || !_RequestHistory.Enabled)
+            {
+                return;
+            }
+
+            RequestHistoryCaptureContext capture = GetOrCreateRequestHistoryCapture(ctx);
+
+            try
+            {
+                if (!ShouldTrackRequestHistory(capture))
+                {
+                    return;
+                }
+
+                capture.RouteTemplate = NormalizeRouteTemplate(ctx);
+                capture.RouteParameters = GetRouteParameters(ctx);
+                capture.QueryParameters = GetQueryParameters(ctx);
+                capture.DurationMs = ctx.Response.Timestamp.TotalMs.HasValue ? ctx.Response.Timestamp.TotalMs.Value : 0;
+
+                AuthContext? auth = null;
+                if (!String.IsNullOrWhiteSpace(capture.AuthToken))
+                {
+                    auth = await _Auth!.AuthenticateBearerAsync(capture.AuthToken).ConfigureAwait(false);
+                }
+
+                RequestHistoryEntry entry = new RequestHistoryEntry
+                {
+                    Id = capture.Id,
+                    TenantId = auth?.TenantId,
+                    UserId = auth?.UserId,
+                    CredentialId = auth?.CredentialId,
+                    PrincipalType = auth == null
+                        ? null
+                        : auth.IsGlobalAdmin
+                            ? "GlobalAdmin"
+                            : auth.IsTenantAdmin
+                                ? "TenantAdmin"
+                                : "User",
+                    PrincipalName = auth == null
+                        ? null
+                        : !String.IsNullOrWhiteSpace(auth.Email)
+                            ? auth.Email
+                            : auth.IsGlobalAdmin
+                                ? "Global Admin"
+                                : auth.UserId,
+                    RequestType = capture.RequestType.ToString(),
+                    HttpMethod = capture.HttpMethod,
+                    RouteTemplate = capture.RouteTemplate,
+                    RequestUrl = capture.RequestUrl,
+                    SourceIp = capture.SourceIp,
+                    IndexId = capture.RouteParameters.TryGetValue("id", out string? indexId) && capture.RouteTemplate.Contains("/indices/")
+                        ? indexId
+                        : null,
+                    DocumentId = capture.RouteParameters.TryGetValue("docId", out string? docId) ? docId : null,
+                    StatusCode = capture.StatusCode,
+                    Success = capture.Success,
+                    RequestContentType = capture.RequestContentType,
+                    ResponseContentType = capture.ResponseContentType,
+                    RequestSizeBytes = capture.RequestSizeBytes,
+                    ResponseSizeBytes = capture.ResponseSizeBytes,
+                    RequestBodyTruncated = capture.RequestBodyTruncated,
+                    ResponseBodyTruncated = capture.ResponseBodyTruncated,
+                    IsBinaryResponse = capture.IsBinaryResponse,
+                    DurationMs = capture.DurationMs,
+                    CreatedUtc = capture.CreatedUtc,
+                    LastUpdateUtc = DateTime.UtcNow
+                };
+
+                RequestHistoryDetail detail = new RequestHistoryDetail
+                {
+                    Id = capture.Id,
+                    RouteParameters = capture.RouteParameters,
+                    QueryParameters = capture.QueryParameters,
+                    RequestHeaders = capture.RequestHeaders,
+                    RequestBody = capture.RequestBody,
+                    RequestBodyBytes = capture.RequestSizeBytes,
+                    RequestBodyTruncated = capture.RequestBodyTruncated,
+                    ResponseHeaders = capture.ResponseHeaders,
+                    ResponseBody = capture.ResponseBody,
+                    ResponseBodyBytes = capture.ResponseSizeBytes,
+                    ResponseBodyTruncated = capture.ResponseBodyTruncated,
+                    ResponseFilename = capture.ResponseFilename,
+                    Notes = capture.IsBinaryResponse ? "Binary responses are summarized and not stored verbatim." : null
+                };
+
+                await _RequestHistory.RecordAsync(entry, detail).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                _Logging?.Warn(_Header + "request history persistence failed: " + e.Message);
+            }
+            finally
+            {
+                _RequestHistoryContexts.Remove(ctx);
+            }
+        }
+
+        private bool ShouldTrackRequestHistory(RequestHistoryCaptureContext capture)
+        {
+            if (_Settings == null || !_Settings.RequestHistory.Enabled)
+            {
+                return false;
+            }
+
+            string path = capture.RouteTemplate ?? String.Empty;
+            if (String.Equals(capture.HttpMethod, "OPTIONS", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (capture.RequestType == RequestTypeEnum.HealthCheck)
+            {
+                return false;
+            }
+
+            if (path.StartsWith("/openapi.json", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWith("/v1.0/requesthistory", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private void StoreCapturedRequestBody(RequestHistoryCaptureContext capture, string body)
+        {
+            capture.RequestBodyCaptured = true;
+            capture.RawRequestBody = body;
+            capture.RequestSizeBytes = Encoding.UTF8.GetByteCount(body);
+            capture.RequestBody = TruncateText(body, _Settings!.RequestHistory.MaxRequestBodyBytes, out bool truncated);
+            capture.RequestBodyTruncated = truncated;
+        }
+
+        private static string NormalizeRouteTemplate(HttpContextBase ctx)
+        {
+            string raw = ctx.Request.Url.RawWithQuery ?? ctx.Request.Url.Full ?? "/";
+            int queryIndex = raw.IndexOf('?');
+            if (queryIndex >= 0)
+            {
+                raw = raw.Substring(0, queryIndex);
+            }
+
+            Dictionary<string, string> parameters = GetRouteParameters(ctx);
+            if (parameters.Count < 1)
+            {
+                return raw;
+            }
+
+            string[] segments = raw.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < segments.Length; i++)
+            {
+                foreach (KeyValuePair<string, string> parameter in parameters)
+                {
+                    if (String.Equals(segments[i], parameter.Value, StringComparison.Ordinal))
+                    {
+                        segments[i] = "{" + parameter.Key + "}";
+                        break;
+                    }
+                }
+            }
+
+            return "/" + String.Join("/", segments);
+        }
+
+        private static Dictionary<string, string> GetRouteParameters(HttpContextBase ctx)
+        {
+            Dictionary<string, string> ret = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (ctx.Request.Url.Parameters == null)
+            {
+                return ret;
+            }
+
+            foreach (string key in ctx.Request.Url.Parameters.Keys)
+            {
+                if (!String.IsNullOrWhiteSpace(key))
+                {
+                    string? value = ctx.Request.Url.Parameters[key];
+                    if (!String.IsNullOrWhiteSpace(value))
+                    {
+                        ret[key] = value;
+                    }
+                }
+            }
+
+            return ret;
+        }
+
+        private static Dictionary<string, string> GetQueryParameters(HttpContextBase ctx)
+        {
+            Dictionary<string, string> ret = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (ctx.Request.Query?.Elements == null)
+            {
+                return ret;
+            }
+
+            foreach (string key in ctx.Request.Query.Elements.Keys)
+            {
+                if (!String.IsNullOrWhiteSpace(key))
+                {
+                    string? value = ctx.Request.Query.Elements[key];
+                    if (!String.IsNullOrWhiteSpace(value))
+                    {
+                        ret[key] = value;
+                    }
+                }
+            }
+
+            return ret;
+        }
+
+        private static Dictionary<string, string> SanitizeHeaders(NameValueCollection? headers)
+        {
+            Dictionary<string, string> ret = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (headers == null)
+            {
+                return ret;
+            }
+
+            for (int i = 0; i < headers.Count; i++)
+            {
+                string? key = headers.GetKey(i);
+                if (String.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
+                string? value = headers.Get(i);
+                if (String.Equals(key, "Authorization", StringComparison.OrdinalIgnoreCase))
+                {
+                    ret[key] = "(redacted)";
+                }
+                else if (!String.IsNullOrWhiteSpace(value))
+                {
+                    ret[key] = value;
+                }
+            }
+
+            return ret;
+        }
+
+        private static Dictionary<string, string> MergeResponseHeaders(NameValueCollection? responseHeaders, Dictionary<string, string>? extraHeaders)
+        {
+            Dictionary<string, string> ret = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            if (responseHeaders != null)
+            {
+                for (int i = 0; i < responseHeaders.Count; i++)
+                {
+                    string? key = responseHeaders.GetKey(i);
+                    string? value = responseHeaders.Get(i);
+                    if (!String.IsNullOrWhiteSpace(key) && !String.IsNullOrWhiteSpace(value))
+                    {
+                        ret[key] = value;
+                    }
+                }
+            }
+
+            if (extraHeaders != null)
+            {
+                foreach (KeyValuePair<string, string> header in extraHeaders)
+                {
+                    ret[header.Key] = header.Value;
+                }
+            }
+
+            return ret;
+        }
+
+        private static string TruncateText(string text, int maxBytes, out bool truncated)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(text);
+            if (bytes.Length <= maxBytes)
+            {
+                truncated = false;
+                return text;
+            }
+
+            truncated = true;
+            string shortened = Encoding.UTF8.GetString(bytes, 0, maxBytes);
+            return shortened + "\n...(truncated)";
+        }
+
         #endregion
 
         /// <summary>
@@ -3977,16 +4682,62 @@ namespace Verbex.Server.API.REST
         /// <returns>Request context.</returns>
         private RequestContext BuildRequestContext(HttpContextBase ctx, RequestTypeEnum requestType)
         {
+            RequestHistoryCaptureContext capture = GetOrCreateRequestHistoryCapture(ctx);
+            capture.RequestType = requestType;
+            capture.RouteTemplate = NormalizeRouteTemplate(ctx);
+            capture.RouteParameters = GetRouteParameters(ctx);
+            capture.QueryParameters = GetQueryParameters(ctx);
+            capture.RequestHeaders = SanitizeHeaders(ctx.Request.Headers);
+            capture.RequestContentType = ctx.Request.ContentType;
+
             RequestContext requestContext = new RequestContext
             {
                 RequestType = requestType,
                 Method = ctx.Request.Method.ToString(),
                 Url = ctx.Request.Url.Full,
                 IpAddress = ctx.Request.Source.IpAddress,
-                AuthToken = GetAuthToken(ctx)
+                AuthToken = GetAuthToken(ctx),
+                Headers = capture.RequestHeaders
             };
 
             return requestContext;
+        }
+
+        private static void ApplyRequestHistoryScope(AuthContext auth, RequestHistoryQuery query)
+        {
+            if (auth.IsGlobalAdmin)
+            {
+                return;
+            }
+
+            query.TenantId = auth.TenantId;
+
+            if (!auth.HasAdminAccess)
+            {
+                query.UserId = auth.UserId;
+                query.CredentialId = auth.CredentialId;
+            }
+        }
+
+        private static bool CanAccessRequestHistoryEntry(AuthContext auth, RequestHistoryEntry entry)
+        {
+            if (auth.IsGlobalAdmin)
+            {
+                return true;
+            }
+
+            if (!String.Equals(auth.TenantId, entry.TenantId, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (auth.HasAdminAccess)
+            {
+                return true;
+            }
+
+            return String.Equals(auth.UserId, entry.UserId, StringComparison.OrdinalIgnoreCase)
+                || String.Equals(auth.CredentialId, entry.CredentialId, StringComparison.OrdinalIgnoreCase);
         }
 
 
@@ -4016,14 +4767,24 @@ namespace Verbex.Server.API.REST
         /// <returns>Request body as string.</returns>
         private async Task<string> GetRequestBody(HttpContextBase ctx)
         {
+            RequestHistoryCaptureContext capture = GetOrCreateRequestHistoryCapture(ctx);
+            if (capture.RequestBodyCaptured)
+            {
+                return capture.RawRequestBody ?? String.Empty;
+            }
+
             if (ctx.Request.Data != null && ctx.Request.ContentLength > 0)
             {
                 using (StreamReader reader = new StreamReader(ctx.Request.Data, Encoding.UTF8))
                 {
-                    return await reader.ReadToEndAsync();
+                    string body = await reader.ReadToEndAsync().ConfigureAwait(false);
+                    StoreCapturedRequestBody(capture, body);
+                    return body;
                 }
             }
 
+            capture.RequestBodyCaptured = true;
+            capture.RawRequestBody = String.Empty;
             return string.Empty;
         }
 
@@ -4035,6 +4796,7 @@ namespace Verbex.Server.API.REST
         /// <returns>Task.</returns>
         private async Task SendResponse(HttpContextBase ctx, ResponseContext response)
         {
+            RequestHistoryCaptureContext capture = GetOrCreateRequestHistoryCapture(ctx);
             ctx.Response.StatusCode = response.StatusCode;
             ctx.Response.ContentType = "application/json";
 
@@ -4055,6 +4817,14 @@ namespace Verbex.Server.API.REST
                 ResponseContext fallbackResponse = new ResponseContext(false, 500, "Serialization error: " + serializationEx.Message);
                 json = JsonSerializer.Serialize(fallbackResponse, _JsonOptions);
             }
+
+            capture.StatusCode = response.StatusCode;
+            capture.Success = response.Success;
+            capture.ResponseContentType = ctx.Response.ContentType;
+            capture.ResponseHeaders = MergeResponseHeaders(ctx.Response.Headers, response.Headers);
+            capture.ResponseSizeBytes = Encoding.UTF8.GetByteCount(json);
+            capture.ResponseBody = TruncateText(json, _Settings!.RequestHistory.MaxResponseBodyBytes, out bool truncated);
+            capture.ResponseBodyTruncated = truncated;
 
             await ctx.Response.Send(json);
         }
@@ -4733,6 +5503,131 @@ namespace Verbex.Server.API.REST
                     ["IndexId"] = new OpenApiSchemaMetadata { Type = "string", Description = "The restored index ID" },
                     ["Message"] = new OpenApiSchemaMetadata { Type = "string", Description = "Result message" },
                     ["Warnings"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String())
+                }
+            };
+            return response;
+        }
+
+        private OpenApiSchemaMetadata CreateRequestHistoryEntrySchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Id"] = OpenApiSchemaMetadata.String(),
+                    ["TenantId"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true },
+                    ["UserId"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true },
+                    ["CredentialId"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true },
+                    ["PrincipalType"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true },
+                    ["PrincipalName"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true },
+                    ["RequestType"] = OpenApiSchemaMetadata.String(),
+                    ["HttpMethod"] = OpenApiSchemaMetadata.String(),
+                    ["RouteTemplate"] = OpenApiSchemaMetadata.String(),
+                    ["RequestUrl"] = OpenApiSchemaMetadata.String(),
+                    ["SourceIp"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true },
+                    ["IndexId"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true },
+                    ["DocumentId"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true },
+                    ["StatusCode"] = OpenApiSchemaMetadata.Integer(),
+                    ["Success"] = OpenApiSchemaMetadata.Boolean(),
+                    ["RequestContentType"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true },
+                    ["ResponseContentType"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true },
+                    ["RequestSizeBytes"] = OpenApiSchemaMetadata.Integer("int64"),
+                    ["ResponseSizeBytes"] = OpenApiSchemaMetadata.Integer("int64"),
+                    ["RequestBodyTruncated"] = OpenApiSchemaMetadata.Boolean(),
+                    ["ResponseBodyTruncated"] = OpenApiSchemaMetadata.Boolean(),
+                    ["IsBinaryResponse"] = OpenApiSchemaMetadata.Boolean(),
+                    ["DurationMs"] = OpenApiSchemaMetadata.Number("double"),
+                    ["CreatedUtc"] = OpenApiSchemaMetadata.String("date-time"),
+                    ["LastUpdateUtc"] = OpenApiSchemaMetadata.String("date-time")
+                }
+            };
+        }
+
+        private OpenApiSchemaMetadata CreateRequestHistoryListSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Objects"] = OpenApiSchemaMetadata.CreateArray(CreateRequestHistoryEntrySchema()),
+                    ["TotalCount"] = OpenApiSchemaMetadata.Integer("int64"),
+                    ["Page"] = OpenApiSchemaMetadata.Integer(),
+                    ["PageSize"] = OpenApiSchemaMetadata.Integer(),
+                    ["TotalPages"] = OpenApiSchemaMetadata.Integer()
+                }
+            };
+            return response;
+        }
+
+        private OpenApiSchemaMetadata CreateRequestHistoryDetailSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Id"] = OpenApiSchemaMetadata.String(),
+                    ["RouteParameters"] = new OpenApiSchemaMetadata { Type = "object" },
+                    ["QueryParameters"] = new OpenApiSchemaMetadata { Type = "object" },
+                    ["RequestHeaders"] = new OpenApiSchemaMetadata { Type = "object" },
+                    ["RequestBody"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true },
+                    ["RequestBodyBytes"] = OpenApiSchemaMetadata.Integer("int64"),
+                    ["RequestBodyTruncated"] = OpenApiSchemaMetadata.Boolean(),
+                    ["ResponseHeaders"] = new OpenApiSchemaMetadata { Type = "object" },
+                    ["ResponseBody"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true },
+                    ["ResponseBodyBytes"] = OpenApiSchemaMetadata.Integer("int64"),
+                    ["ResponseBodyTruncated"] = OpenApiSchemaMetadata.Boolean(),
+                    ["ResponseFilename"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true },
+                    ["Notes"] = new OpenApiSchemaMetadata { Type = "string", Nullable = true }
+                }
+            };
+            return response;
+        }
+
+        private OpenApiSchemaMetadata CreateRequestHistorySummarySchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Buckets"] = OpenApiSchemaMetadata.CreateArray(new OpenApiSchemaMetadata
+                    {
+                        Type = "object",
+                        Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                        {
+                            ["BucketStartUtc"] = OpenApiSchemaMetadata.String("date-time"),
+                            ["BucketEndUtc"] = OpenApiSchemaMetadata.String("date-time"),
+                            ["TotalCount"] = OpenApiSchemaMetadata.Integer(),
+                            ["SuccessCount"] = OpenApiSchemaMetadata.Integer(),
+                            ["FailureCount"] = OpenApiSchemaMetadata.Integer(),
+                            ["AverageDurationMs"] = OpenApiSchemaMetadata.Number("double")
+                        }
+                    }),
+                    ["TotalCount"] = OpenApiSchemaMetadata.Integer(),
+                    ["SuccessCount"] = OpenApiSchemaMetadata.Integer(),
+                    ["FailureCount"] = OpenApiSchemaMetadata.Integer(),
+                    ["AverageDurationMs"] = OpenApiSchemaMetadata.Number("double")
+                }
+            };
+            return response;
+        }
+
+        private OpenApiSchemaMetadata CreateRequestHistoryBulkDeleteSchema()
+        {
+            OpenApiSchemaMetadata response = CreateResponseSchema();
+            response.Properties!["Data"] = new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["DeletedCount"] = OpenApiSchemaMetadata.Integer(),
+                    ["DeletedIds"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String())
                 }
             };
             return response;

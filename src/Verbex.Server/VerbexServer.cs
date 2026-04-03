@@ -85,7 +85,7 @@ namespace Verbex.Server
             }
             catch (Exception e)
             {
-                ExceptionConsole("Main", "Fatal startup exception", e);
+                ExceptionConsole("Main", "fatal startup exception", e);
                 return 1;
             }
         }

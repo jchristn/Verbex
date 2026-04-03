@@ -4,6 +4,8 @@ import DocumentsView from './DocumentsView';
 import TenantsView from './TenantsView';
 import UsersView from './UsersView';
 import CredentialsView from './CredentialsView';
+import ApiExplorerView from './ApiExplorerView';
+import RequestHistoryView from './RequestHistoryView';
 import './Workspace.css';
 
 function Workspace({
@@ -48,6 +50,10 @@ function Workspace({
             onIndexSelect={onIndexSelect}
           />
         );
+      case 'apiExplorer':
+        return <ApiExplorerView />;
+      case 'requestHistory':
+        return <RequestHistoryView />;
       case 'tenants':
         return (
           <TenantsView

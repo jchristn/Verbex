@@ -163,16 +163,22 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
             // Tenant indexes
             "CREATE INDEX IF NOT EXISTS idx_tenants_name ON tenants(name)",
             "CREATE INDEX IF NOT EXISTS idx_tenants_active ON tenants(active)",
+            "CREATE INDEX IF NOT EXISTS idx_tenants_created_utc ON tenants(created_utc)",
+            "CREATE INDEX IF NOT EXISTS idx_tenants_active_created_utc ON tenants(active, created_utc)",
 
             // Administrator indexes
             "CREATE INDEX IF NOT EXISTS idx_administrators_email ON administrators(email)",
             "CREATE INDEX IF NOT EXISTS idx_administrators_active ON administrators(active)",
+            "CREATE INDEX IF NOT EXISTS idx_administrators_created_utc ON administrators(created_utc)",
+            "CREATE INDEX IF NOT EXISTS idx_administrators_active_created_utc ON administrators(active, created_utc)",
 
             // User indexes
             "CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id)",
             "CREATE INDEX IF NOT EXISTS idx_users_email ON users(tenant_id, email)",
             "CREATE INDEX IF NOT EXISTS idx_users_active ON users(active)",
             "CREATE INDEX IF NOT EXISTS idx_users_tenant_active ON users(tenant_id, active)",
+            "CREATE INDEX IF NOT EXISTS idx_users_tenant_created_utc ON users(tenant_id, created_utc)",
+            "CREATE INDEX IF NOT EXISTS idx_users_tenant_active_created_utc ON users(tenant_id, active, created_utc)",
 
             // Credential indexes
             "CREATE INDEX IF NOT EXISTS idx_credentials_tenant ON credentials(tenant_id)",
@@ -180,10 +186,14 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
             "CREATE INDEX IF NOT EXISTS idx_credentials_bearer ON credentials(bearer_token)",
             "CREATE INDEX IF NOT EXISTS idx_credentials_active ON credentials(active)",
             "CREATE INDEX IF NOT EXISTS idx_credentials_tenant_active ON credentials(tenant_id, active)",
+            "CREATE INDEX IF NOT EXISTS idx_credentials_tenant_created_utc ON credentials(tenant_id, created_utc)",
+            "CREATE INDEX IF NOT EXISTS idx_credentials_tenant_active_created_utc ON credentials(tenant_id, active, created_utc)",
+            "CREATE INDEX IF NOT EXISTS idx_credentials_tenant_user_created_utc ON credentials(tenant_id, user_id, created_utc)",
 
             // Index (search index) indexes
             "CREATE INDEX IF NOT EXISTS idx_indexes_tenant ON indexes(tenant_id)",
             "CREATE INDEX IF NOT EXISTS idx_indexes_name ON indexes(tenant_id, name)",
+            "CREATE INDEX IF NOT EXISTS idx_indexes_tenant_created_utc ON indexes(tenant_id, created_utc)",
 
             // Document indexes
             "CREATE INDEX IF NOT EXISTS idx_documents_tenant ON documents(tenant_id)",
@@ -393,6 +403,7 @@ DROP TABLE IF EXISTS {prefix}_documents CASCADE;
                 // Document indexes
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_docs_name ON {prefix}_documents(name)",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_docs_sha256 ON {prefix}_documents(content_sha256)",
+                $"CREATE INDEX IF NOT EXISTS idx_{prefix}_docs_created_utc ON {prefix}_documents(created_utc)",
 
                 // Term indexes (critical for search performance)
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_terms_term ON {prefix}_terms(term)",

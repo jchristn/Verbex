@@ -20,6 +20,13 @@
   },
   "DataDirectory": "./data",
   "AdminBearerToken": "verbexadmin",
+  "RequestHistory": {
+    "Enabled": true,
+    "RetentionDays": 30,
+    "CleanupIntervalMinutes": 60,
+    "MaxRequestBodyBytes": 131072,
+    "MaxResponseBodyBytes": 131072
+  },
   "Debug": {
     "Authentication": false,
     "Exceptions": true,

@@ -5,15 +5,17 @@ function Sidebar({ activeView, onViewChange, indices, isAdmin }) {
   const { startTour, startWizard } = useOnboarding();
 
   const navItems = [
-    { id: 'indices', label: 'Indices', icon: '📚', tourId: 'nav-indices' },
-    { id: 'documents', label: 'Documents', icon: '📄', tourId: 'nav-documents' },
-    { id: 'search', label: 'Search', icon: '🔍', tourId: 'nav-search' }
+    { id: 'indices', label: 'Indices', icon: '\uD83D\uDCDA', tourId: 'nav-indices' },
+    { id: 'documents', label: 'Documents', icon: '\uD83D\uDCC4', tourId: 'nav-documents' },
+    { id: 'search', label: 'Search', icon: '\uD83D\uDD0D', tourId: 'nav-search' },
+    { id: 'apiExplorer', label: 'API Explorer', icon: '\uD83E\uDDEA', tourId: 'nav-api-explorer' },
+    { id: 'requestHistory', label: 'Request History', icon: '\uD83D\uDD52', tourId: 'nav-request-history' }
   ];
 
   const adminItems = [
-    { id: 'tenants', label: 'Tenants', icon: '🏢', tourId: 'nav-tenants' },
-    { id: 'users', label: 'Users', icon: '👤', tourId: 'nav-users' },
-    { id: 'credentials', label: 'Credentials', icon: '🔑', tourId: 'nav-credentials' }
+    { id: 'tenants', label: 'Tenants', icon: '\uD83C\uDFE2', tourId: 'nav-tenants' },
+    { id: 'users', label: 'Users', icon: '\uD83D\uDC64', tourId: 'nav-users' },
+    { id: 'credentials', label: 'Credentials', icon: '\uD83D\uDD11', tourId: 'nav-credentials' }
   ];
 
   return (

@@ -197,12 +197,24 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tenants_name')
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tenants_active')
     CREATE INDEX idx_tenants_active ON tenants(active);
 
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tenants_created_utc')
+    CREATE INDEX idx_tenants_created_utc ON tenants(created_utc);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tenants_active_created_utc')
+    CREATE INDEX idx_tenants_active_created_utc ON tenants(active, created_utc);
+
 -- Administrator indexes
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_administrators_email')
     CREATE INDEX idx_administrators_email ON administrators(email);
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_administrators_active')
     CREATE INDEX idx_administrators_active ON administrators(active);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_administrators_created_utc')
+    CREATE INDEX idx_administrators_created_utc ON administrators(created_utc);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_administrators_active_created_utc')
+    CREATE INDEX idx_administrators_active_created_utc ON administrators(active, created_utc);
 
 -- User indexes
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_users_tenant')
@@ -216,6 +228,12 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_users_active')
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_users_tenant_active')
     CREATE INDEX idx_users_tenant_active ON users(tenant_id, active);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_users_tenant_created_utc')
+    CREATE INDEX idx_users_tenant_created_utc ON users(tenant_id, created_utc);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_users_tenant_active_created_utc')
+    CREATE INDEX idx_users_tenant_active_created_utc ON users(tenant_id, active, created_utc);
 
 -- Credential indexes
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_credentials_tenant')
@@ -233,12 +251,24 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_credentials_active')
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_credentials_tenant_active')
     CREATE INDEX idx_credentials_tenant_active ON credentials(tenant_id, active);
 
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_credentials_tenant_created_utc')
+    CREATE INDEX idx_credentials_tenant_created_utc ON credentials(tenant_id, created_utc);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_credentials_tenant_active_created_utc')
+    CREATE INDEX idx_credentials_tenant_active_created_utc ON credentials(tenant_id, active, created_utc);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_credentials_tenant_user_created_utc')
+    CREATE INDEX idx_credentials_tenant_user_created_utc ON credentials(tenant_id, user_id, created_utc);
+
 -- Index (search index) indexes
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_indexes_tenant')
     CREATE INDEX idx_indexes_tenant ON indexes(tenant_id);
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_indexes_name')
     CREATE INDEX idx_indexes_name ON indexes(tenant_id, name);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_indexes_tenant_created_utc')
+    CREATE INDEX idx_indexes_tenant_created_utc ON indexes(tenant_id, created_utc);
 
 -- Document indexes
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_documents_tenant')
@@ -526,6 +556,7 @@ DROP TABLE IF EXISTS {prefix}_documents;
                 // Document indexes
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_docs_name') CREATE INDEX idx_{prefix}_docs_name ON {prefix}_documents(name)",
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_docs_sha256') CREATE INDEX idx_{prefix}_docs_sha256 ON {prefix}_documents(content_sha256)",
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_docs_created_utc') CREATE INDEX idx_{prefix}_docs_created_utc ON {prefix}_documents(created_utc)",
 
                 // Term indexes (critical for search performance)
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_terms_term') CREATE INDEX idx_{prefix}_terms_term ON {prefix}_terms(term)",
