@@ -249,11 +249,11 @@
 
 .search-result-details .details-section {
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-color);
 }
 
-.search-result-details .details-section:last-of-type {
-  border-bottom: none;
+.search-result-details .details-section + .details-section {
+  border-top: 1px solid var(--border-color);
+  padding-top: 12px;
 }
 
 .search-result-details h4 {

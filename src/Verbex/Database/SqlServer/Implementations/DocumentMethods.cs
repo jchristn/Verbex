@@ -234,6 +234,21 @@ WHERE id IN ({inClause});";
                 }
             }
 
+            string termsQuery = $@"
+SELECT dt.document_id, t.term
+FROM {prefix}_document_terms dt
+INNER JOIN {prefix}_terms t ON dt.term_id = t.id
+WHERE dt.document_id IN ({inClause});";
+            DataTable termsResult = await _Driver.ExecuteQueryAsync(termsQuery, false, token).ConfigureAwait(false);
+            foreach (DataRow row in termsResult.Rows)
+            {
+                string docId = row["document_id"]?.ToString() ?? string.Empty;
+                if (docLookup.TryGetValue(docId, out DocumentMetadata? doc))
+                {
+                    doc.AddTerm(row["term"]?.ToString() ?? string.Empty);
+                }
+            }
+
             return docs;
         }
 

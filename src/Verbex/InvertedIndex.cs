@@ -1061,6 +1061,13 @@ namespace Verbex
             timingInfo.DocumentCountMs = sw.ElapsedMilliseconds;
             timingInfo.TotalDocuments = totalDocs;
 
+            // Build reverse lookup: term ID -> term text
+            Dictionary<string, string> termIdToText = new Dictionary<string, string>();
+            foreach (KeyValuePair<string, TermRecord> kvp in termRecords)
+            {
+                termIdToText[kvp.Value.Id] = kvp.Key;
+            }
+
             List<SearchResult> results = new List<SearchResult>();
             foreach (SearchMatch match in matches)
             {
@@ -1071,7 +1078,28 @@ namespace Verbex
 
                 double score = CalculateScore(match, termRecords, totalDocs);
 
-                results.Add(new SearchResult(doc, score, match.MatchedTermCount));
+                SearchResult searchResult = new SearchResult(doc, score, match.MatchedTermCount);
+
+                // Populate per-term scores and frequencies
+                foreach (TermRecord term in termRecords.Values)
+                {
+                    if (!match.TermFrequencies.TryGetValue(term.Id, out int termFrequency))
+                    {
+                        continue;
+                    }
+
+                    if (termFrequency > 0 && totalDocs > 0 && termIdToText.TryGetValue(term.Id, out string? termText))
+                    {
+                        double tf = Math.Log(1.0 + termFrequency);
+                        double idf = Math.Log((totalDocs + 1.0) / (term.DocumentFrequency + 1.0));
+                        double termScore = tf * idf;
+                        double normalizedTermScore = 1.0 / (1.0 + Math.Exp(-termScore / _Configuration.SigmoidNormalizationDivisor));
+
+                        searchResult.AddTermScore(termText, normalizedTermScore, termFrequency);
+                    }
+                }
+
+                results.Add(searchResult);
             }
 
             results = results.OrderByDescending(r => r.Score).Take(limit).ToList();
