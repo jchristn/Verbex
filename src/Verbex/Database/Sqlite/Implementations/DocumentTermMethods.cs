@@ -234,15 +234,24 @@ LIMIT {limit};";
             string docInClause = string.Join(",", docIdList.Select(id => $"'{Sanitizer.Sanitize(id)}'"));
             string termInClause = string.Join(",", termIdList.Select(id => $"'{Sanitizer.Sanitize(id)}'"));
 
-            // Use INDEXED BY to ensure SQLite uses the composite index for this lookup
+            // Use INDEXED BY to ensure SQLite uses the composite index for this lookup.
+            // Select only the columns needed for scoring (skip character_positions, term_positions,
+            // and the terms JOIN to avoid transferring large JSON blobs and an extra table lookup).
             string query = $@"
-SELECT dt.id, dt.document_id, dt.term_id, dt.term_frequency, dt.character_positions, dt.term_positions, dt.last_update_utc, dt.created_utc, t.term
+SELECT dt.document_id, dt.term_id, dt.term_frequency
 FROM {prefix}_document_terms dt INDEXED BY idx_{prefix}_docterms_doc_term
-JOIN {prefix}_terms t ON dt.term_id = t.id
 WHERE dt.document_id IN ({docInClause}) AND dt.term_id IN ({termInClause});";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             List<DocumentTermRecord> list = new List<DocumentTermRecord>();
-            foreach (DataRow row in dt.Rows) list.Add(MapRowToDocumentTerm(row));
+            foreach (DataRow row in dt.Rows)
+            {
+                list.Add(new DocumentTermRecord
+                {
+                    DocumentId = row["document_id"]?.ToString() ?? string.Empty,
+                    TermId = row["term_id"]?.ToString() ?? string.Empty,
+                    TermFrequency = Convert.ToInt32(row["term_frequency"])
+                });
+            }
             return list;
         }
 

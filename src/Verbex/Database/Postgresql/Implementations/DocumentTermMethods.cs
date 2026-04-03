@@ -234,18 +234,22 @@ LIMIT {limit};";
             string docInClause = string.Join(",", docIdList.Select(id => $"'{Sanitizer.Sanitize(id)}'"));
             string termInClause = string.Join(",", termIdList.Select(id => $"'{Sanitizer.Sanitize(id)}'"));
 
-            // PostgreSQL's query planner is generally more intelligent than MySQL's and should
-            // use idx_{prefix}_docterms_doc_term automatically given the WHERE clause structure.
-            // If performance issues arise, consider SET enable_seqscan = off for testing,
-            // or install pg_hint_plan extension for explicit index hints.
+            // Select only the columns needed for scoring (skip position data and terms JOIN).
             string query = $@"
-SELECT dt.id, dt.document_id, dt.term_id, dt.term_frequency, dt.character_positions, dt.term_positions, dt.last_update_utc, dt.created_utc, t.term
+SELECT dt.document_id, dt.term_id, dt.term_frequency
 FROM {prefix}_document_terms dt
-JOIN {prefix}_terms t ON dt.term_id = t.id
 WHERE dt.document_id IN ({docInClause}) AND dt.term_id IN ({termInClause});";
             DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
             List<DocumentTermRecord> list = new List<DocumentTermRecord>();
-            foreach (DataRow row in dt.Rows) list.Add(MapRowToDocumentTerm(row));
+            foreach (DataRow row in dt.Rows)
+            {
+                list.Add(new DocumentTermRecord
+                {
+                    DocumentId = row["document_id"]?.ToString() ?? string.Empty,
+                    TermId = row["term_id"]?.ToString() ?? string.Empty,
+                    TermFrequency = Convert.ToInt32(row["term_frequency"])
+                });
+            }
             return list;
         }
 
