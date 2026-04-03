@@ -551,7 +551,9 @@ CREATE TABLE IF NOT EXISTS request_history_detail (
                     "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_request_history_credential_created_utc' AND object_id = OBJECT_ID('request_history')) CREATE INDEX idx_request_history_credential_created_utc ON request_history(credential_id, created_utc);",
                     "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_request_history_index_created_utc' AND object_id = OBJECT_ID('request_history')) CREATE INDEX idx_request_history_index_created_utc ON request_history(index_id, created_utc);",
                     "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_request_history_method_created_utc' AND object_id = OBJECT_ID('request_history')) CREATE INDEX idx_request_history_method_created_utc ON request_history(http_method, created_utc);",
-                    "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_request_history_status_created_utc' AND object_id = OBJECT_ID('request_history')) CREATE INDEX idx_request_history_status_created_utc ON request_history(status_code, created_utc);"
+                    "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_request_history_status_created_utc' AND object_id = OBJECT_ID('request_history')) CREATE INDEX idx_request_history_status_created_utc ON request_history(status_code, created_utc);",
+                    "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_request_history_summary' AND object_id = OBJECT_ID('request_history')) CREATE INDEX idx_request_history_summary ON request_history(created_utc) INCLUDE (success, duration_ms);",
+                    "IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_request_history_tenant_summary' AND object_id = OBJECT_ID('request_history')) CREATE INDEX idx_request_history_tenant_summary ON request_history(tenant_id, created_utc) INCLUDE (success, duration_ms);"
                 };
             }
 
@@ -565,7 +567,9 @@ CREATE TABLE IF NOT EXISTS request_history_detail (
                     "CREATE INDEX idx_request_history_credential_created_utc ON request_history(credential_id, created_utc);",
                     "CREATE INDEX idx_request_history_index_created_utc ON request_history(index_id, created_utc);",
                     "CREATE INDEX idx_request_history_method_created_utc ON request_history(http_method, created_utc);",
-                    "CREATE INDEX idx_request_history_status_created_utc ON request_history(status_code, created_utc);"
+                    "CREATE INDEX idx_request_history_status_created_utc ON request_history(status_code, created_utc);",
+                    "CREATE INDEX idx_request_history_summary ON request_history(created_utc, success, duration_ms);",
+                    "CREATE INDEX idx_request_history_tenant_summary ON request_history(tenant_id, created_utc, success, duration_ms);"
                 };
             }
 
@@ -577,7 +581,9 @@ CREATE TABLE IF NOT EXISTS request_history_detail (
                 "CREATE INDEX IF NOT EXISTS idx_request_history_credential_created_utc ON request_history(credential_id, created_utc);",
                 "CREATE INDEX IF NOT EXISTS idx_request_history_index_created_utc ON request_history(index_id, created_utc);",
                 "CREATE INDEX IF NOT EXISTS idx_request_history_method_created_utc ON request_history(http_method, created_utc);",
-                "CREATE INDEX IF NOT EXISTS idx_request_history_status_created_utc ON request_history(status_code, created_utc);"
+                "CREATE INDEX IF NOT EXISTS idx_request_history_status_created_utc ON request_history(status_code, created_utc);",
+                "CREATE INDEX IF NOT EXISTS idx_request_history_summary ON request_history(created_utc, success, duration_ms);",
+                "CREATE INDEX IF NOT EXISTS idx_request_history_tenant_summary ON request_history(tenant_id, created_utc, success, duration_ms);"
             };
         }
 

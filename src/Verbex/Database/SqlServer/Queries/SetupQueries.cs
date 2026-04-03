@@ -235,6 +235,9 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_users_tenant_created_
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_users_tenant_active_created_utc')
     CREATE INDEX idx_users_tenant_active_created_utc ON users(tenant_id, active, created_utc);
 
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_users_tenant_identifier')
+    CREATE INDEX idx_users_tenant_identifier ON users(tenant_id, identifier);
+
 -- Credential indexes
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_credentials_tenant')
     CREATE INDEX idx_credentials_tenant ON credentials(tenant_id);
@@ -260,6 +263,9 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_credentials_tenant_ac
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_credentials_tenant_user_created_utc')
     CREATE INDEX idx_credentials_tenant_user_created_utc ON credentials(tenant_id, user_id, created_utc);
 
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_credentials_tenant_identifier')
+    CREATE INDEX idx_credentials_tenant_identifier ON credentials(tenant_id, identifier);
+
 -- Index (search index) indexes
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_indexes_tenant')
     CREATE INDEX idx_indexes_tenant ON indexes(tenant_id);
@@ -269,6 +275,9 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_indexes_name')
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_indexes_tenant_created_utc')
     CREATE INDEX idx_indexes_tenant_created_utc ON indexes(tenant_id, created_utc);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_indexes_tenant_identifier')
+    CREATE INDEX idx_indexes_tenant_identifier ON indexes(tenant_id, identifier);
 
 -- Document indexes
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_documents_tenant')
@@ -370,6 +379,9 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_document_key')
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_index_key')
     CREATE INDEX idx_tags_index_key ON tags(index_id, [key]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_key_value')
+    CREATE INDEX idx_tags_key_value ON tags([key], value);
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_tags_tenant')
     CREATE INDEX idx_tags_tenant ON tags(tenant_id);
@@ -578,7 +590,8 @@ DROP TABLE IF EXISTS {prefix}_documents;
                 // Tag indexes
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_doc') CREATE INDEX idx_{prefix}_tags_doc ON {prefix}_tags(document_id)",
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_key') CREATE INDEX idx_{prefix}_tags_key ON {prefix}_tags([key])",
-                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_doc_key') CREATE INDEX idx_{prefix}_tags_doc_key ON {prefix}_tags(document_id, [key])"
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_doc_key') CREATE INDEX idx_{prefix}_tags_doc_key ON {prefix}_tags(document_id, [key])",
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_key_value') CREATE INDEX idx_{prefix}_tags_key_value ON {prefix}_tags([key], value)"
             };
         }
     }

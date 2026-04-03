@@ -203,6 +203,7 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
             "CREATE INDEX idx_users_tenant_active ON users(tenant_id, active)",
             "CREATE INDEX idx_users_tenant_created_utc ON users(tenant_id, created_utc)",
             "CREATE INDEX idx_users_tenant_active_created_utc ON users(tenant_id, active, created_utc)",
+            "CREATE INDEX idx_users_tenant_identifier ON users(tenant_id, identifier)",
 
             // Credential indexes
             "CREATE INDEX idx_credentials_tenant ON credentials(tenant_id)",
@@ -213,11 +214,13 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
             "CREATE INDEX idx_credentials_tenant_created_utc ON credentials(tenant_id, created_utc)",
             "CREATE INDEX idx_credentials_tenant_active_created_utc ON credentials(tenant_id, active, created_utc)",
             "CREATE INDEX idx_credentials_tenant_user_created_utc ON credentials(tenant_id, user_id, created_utc)",
+            "CREATE INDEX idx_credentials_tenant_identifier ON credentials(tenant_id, identifier)",
 
             // Index (search index) indexes
             "CREATE INDEX idx_indexes_tenant ON indexes(tenant_id)",
             "CREATE INDEX idx_indexes_name ON indexes(tenant_id, name)",
             "CREATE INDEX idx_indexes_tenant_created_utc ON indexes(tenant_id, created_utc)",
+            "CREATE INDEX idx_indexes_tenant_identifier ON indexes(tenant_id, identifier)",
 
             // Document indexes
             "CREATE INDEX idx_documents_tenant ON documents(tenant_id)",
