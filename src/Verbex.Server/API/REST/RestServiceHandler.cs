@@ -905,7 +905,7 @@ namespace Verbex.Server.API.REST
         /// </summary>
         /// <param name="ctx">HTTP context.</param>
         /// <returns>Task.</returns>
-        private async Task PostRoutingRoute(HttpContextBase ctx)
+        private Task PostRoutingRoute(HttpContextBase ctx)
         {
             ctx.Response.Timestamp.End = DateTime.UtcNow;
 
@@ -915,7 +915,8 @@ namespace Verbex.Server.API.REST
                 + ctx.Response.StatusCode + " "
                 + "(" + ctx.Response.Timestamp.TotalMs.Value.ToString("F2") + "ms)");
 
-            await PersistRequestHistoryAsync(ctx).ConfigureAwait(false);
+            _ = Task.Run(() => PersistRequestHistoryAsync(ctx));
+            return Task.CompletedTask;
         }
 
         /// <summary>
