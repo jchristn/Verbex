@@ -912,7 +912,7 @@ namespace Verbex.Server.API.REST
         /// </summary>
         /// <param name="ctx">HTTP context.</param>
         /// <returns>Task.</returns>
-        private Task PostRoutingRoute(HttpContextBase ctx)
+        private async Task PostRoutingRoute(HttpContextBase ctx)
         {
             ctx.Response.Timestamp.End = DateTime.UtcNow;
 
@@ -922,20 +922,14 @@ namespace Verbex.Server.API.REST
                 + ctx.Response.StatusCode + " "
                 + "(" + ctx.Response.Timestamp.TotalMs.Value.ToString("F2") + "ms)");
 
-            // Capture all ctx-dependent data synchronously before the context is disposed,
-            // then hand off the self-contained capture to the background task.
-            RequestHistoryCaptureContext capture = GetOrCreateRequestHistoryCapture(ctx);
-            capture.RouteTemplate = NormalizeRouteTemplate(ctx);
-            capture.RouteParameters = GetRouteParameters(ctx);
-            capture.QueryParameters = GetQueryParameters(ctx);
-            capture.DurationMs = ctx.Response.Timestamp.TotalMs.HasValue ? ctx.Response.Timestamp.TotalMs.Value : 0;
-            capture.StatusCode = ctx.Response.StatusCode;
-            capture.ResponseContentType = ctx.Response.ContentType;
-            capture.ResponseHeaders = SanitizeHeaders(ctx.Response.Headers);
-            _RequestHistoryContexts.Remove(ctx);
+            string method = ctx.Request.Method.ToString();
+            if (String.Equals(method, "OPTIONS", StringComparison.OrdinalIgnoreCase)
+                || String.Equals(method, "HEAD", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
 
-            _ = Task.Run(() => PersistRequestHistoryAsync(capture));
-            return Task.CompletedTask;
+            await PersistRequestHistoryAsync(ctx).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -4383,12 +4377,14 @@ namespace Verbex.Server.API.REST
             };
         }
 
-        private async Task PersistRequestHistoryAsync(RequestHistoryCaptureContext capture)
+        private async Task PersistRequestHistoryAsync(HttpContextBase ctx)
         {
             if (_RequestHistory == null || !_RequestHistory.Enabled)
             {
                 return;
             }
+
+            RequestHistoryCaptureContext capture = GetOrCreateRequestHistoryCapture(ctx);
 
             try
             {
@@ -4396,6 +4392,11 @@ namespace Verbex.Server.API.REST
                 {
                     return;
                 }
+
+                capture.RouteTemplate = NormalizeRouteTemplate(ctx);
+                capture.RouteParameters = GetRouteParameters(ctx);
+                capture.QueryParameters = GetQueryParameters(ctx);
+                capture.DurationMs = ctx.Response.Timestamp.TotalMs.HasValue ? ctx.Response.Timestamp.TotalMs.Value : 0;
 
                 AuthContext? auth = null;
                 if (!String.IsNullOrWhiteSpace(capture.AuthToken))
@@ -4468,6 +4469,10 @@ namespace Verbex.Server.API.REST
             catch (Exception e)
             {
                 _Logging?.Warn(_Header + "request history persistence failed: " + e.Message);
+            }
+            finally
+            {
+                _RequestHistoryContexts.Remove(ctx);
             }
         }
 
