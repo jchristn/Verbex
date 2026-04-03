@@ -922,7 +922,19 @@ namespace Verbex.Server.API.REST
                 + ctx.Response.StatusCode + " "
                 + "(" + ctx.Response.Timestamp.TotalMs.Value.ToString("F2") + "ms)");
 
-            _ = Task.Run(() => PersistRequestHistoryAsync(ctx));
+            // Capture all ctx-dependent data synchronously before the context is disposed,
+            // then hand off the self-contained capture to the background task.
+            RequestHistoryCaptureContext capture = GetOrCreateRequestHistoryCapture(ctx);
+            capture.RouteTemplate = NormalizeRouteTemplate(ctx);
+            capture.RouteParameters = GetRouteParameters(ctx);
+            capture.QueryParameters = GetQueryParameters(ctx);
+            capture.DurationMs = ctx.Response.Timestamp.TotalMs.HasValue ? ctx.Response.Timestamp.TotalMs.Value : 0;
+            capture.StatusCode = ctx.Response.StatusCode;
+            capture.ResponseContentType = ctx.Response.ContentType;
+            capture.ResponseHeaders = SanitizeHeaders(ctx.Response.Headers);
+            _RequestHistoryContexts.Remove(ctx);
+
+            _ = Task.Run(() => PersistRequestHistoryAsync(capture));
             return Task.CompletedTask;
         }
 
@@ -4371,14 +4383,12 @@ namespace Verbex.Server.API.REST
             };
         }
 
-        private async Task PersistRequestHistoryAsync(HttpContextBase ctx)
+        private async Task PersistRequestHistoryAsync(RequestHistoryCaptureContext capture)
         {
             if (_RequestHistory == null || !_RequestHistory.Enabled)
             {
                 return;
             }
-
-            RequestHistoryCaptureContext capture = GetOrCreateRequestHistoryCapture(ctx);
 
             try
             {
@@ -4386,11 +4396,6 @@ namespace Verbex.Server.API.REST
                 {
                     return;
                 }
-
-                capture.RouteTemplate = NormalizeRouteTemplate(ctx);
-                capture.RouteParameters = GetRouteParameters(ctx);
-                capture.QueryParameters = GetQueryParameters(ctx);
-                capture.DurationMs = ctx.Response.Timestamp.TotalMs.HasValue ? ctx.Response.Timestamp.TotalMs.Value : 0;
 
                 AuthContext? auth = null;
                 if (!String.IsNullOrWhiteSpace(capture.AuthToken))
@@ -4463,10 +4468,6 @@ namespace Verbex.Server.API.REST
             catch (Exception e)
             {
                 _Logging?.Warn(_Header + "request history persistence failed: " + e.Message);
-            }
-            finally
-            {
-                _RequestHistoryContexts.Remove(ctx);
             }
         }
 
