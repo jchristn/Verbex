@@ -10,11 +10,12 @@ import './ApiExplorerView.css';
 import './RequestHistoryView.css';
 
 const ACTIVITY_RANGE_OPTIONS = [
-  { id: 'lastHour', label: 'Last Hour', bucketMinutes: 1, sliceCount: 60, labelEvery: 5 },
-  { id: 'lastDay', label: 'Last Day', bucketMinutes: 15, sliceCount: 96, labelEvery: 8 },
-  { id: 'lastWeek', label: 'Last Week', bucketMinutes: 60, sliceCount: 168, labelEvery: 12 },
-  { id: 'lastMonth', label: 'Last Month', bucketMinutes: 360, sliceCount: 120, labelEvery: 10 }
+  { id: 'lastHour', label: 'Last Hour', bucketMinutes: 1, sliceCount: 60 },
+  { id: 'lastDay', label: 'Last Day', bucketMinutes: 15, sliceCount: 96 },
+  { id: 'lastWeek', label: 'Last Week', bucketMinutes: 120, sliceCount: 84 },
+  { id: 'lastMonth', label: 'Last Month', bucketMinutes: 720, sliceCount: 60 }
 ];
+const MAX_X_AXIS_LABELS = 8;
 
 function toLocalInputValue(date) {
   const offsetMs = date.getTimezoneOffset() * 60000;
@@ -45,32 +46,102 @@ function getActivityRangeConfig(rangeId) {
   return ACTIVITY_RANGE_OPTIONS.find((option) => option.id === rangeId) || ACTIVITY_RANGE_OPTIONS[1];
 }
 
-function buildActivityRangeParams(rangeId, now = new Date()) {
+function getActivityRangeWindow(rangeId, now = new Date()) {
   const config = getActivityRangeConfig(rangeId);
   const bucketMs = config.bucketMinutes * 60 * 1000;
-  const end = new Date(now);
-  const lastBucketStart = new Date(Math.floor(end.getTime() / bucketMs) * bucketMs);
-  const firstBucketStart = new Date(lastBucketStart.getTime() - ((config.sliceCount - 1) * bucketMs));
+  const endExclusiveMs = Math.floor(now.getTime() / bucketMs) * bucketMs + bucketMs;
+  const startMs = endExclusiveMs - config.sliceCount * bucketMs;
 
   return {
-    bucketMinutes: config.bucketMinutes,
-    fromUtc: firstBucketStart.toISOString(),
-    toUtc: end.toISOString()
+    ...config,
+    bucketMs,
+    startMs,
+    endExclusiveMs,
+    startUtc: new Date(startMs),
+    endUtc: new Date(endExclusiveMs - 1)
   };
+}
+
+function buildActivityRangeParams(rangeId, now = new Date()) {
+  const range = getActivityRangeWindow(rangeId, now);
+  return {
+    bucketMinutes: range.bucketMinutes,
+    fromUtc: range.startUtc.toISOString(),
+    toUtc: range.endUtc.toISOString()
+  };
+}
+
+function floorToBucketTimestamp(value, bucketMs) {
+  return Math.floor(new Date(value).getTime() / bucketMs) * bucketMs;
+}
+
+function normalizeSummaryBuckets(summary, range) {
+  const apiBuckets = new Map(
+    (summary?.buckets || []).map((bucket) => [
+      floorToBucketTimestamp(bucket.bucketStartUtc, range.bucketMs),
+      bucket
+    ])
+  );
+
+  return Array.from({ length: range.sliceCount }, (_, index) => {
+    const bucketStartMs = range.startMs + (index * range.bucketMs);
+    const apiBucket = apiBuckets.get(bucketStartMs);
+
+    return {
+      bucketStartUtc: new Date(bucketStartMs).toISOString(),
+      bucketEndUtc: new Date(bucketStartMs + range.bucketMs).toISOString(),
+      totalCount: apiBucket?.totalCount || 0,
+      successCount: apiBucket?.successCount || 0,
+      failureCount: apiBucket?.failureCount || 0,
+      averageDurationMs: apiBucket?.averageDurationMs || 0
+    };
+  });
 }
 
 function formatChartLabel(value, rangeId) {
   const date = new Date(value);
+
+  if (rangeId === 'lastHour') {
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+
+  if (rangeId === 'lastDay') {
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
 
   if (rangeId === 'lastWeek') {
     return date.toLocaleString([], { weekday: 'short', hour: 'numeric' });
   }
 
   if (rangeId === 'lastMonth') {
-    return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric' });
+    return date.toLocaleString([], { month: 'short', day: 'numeric' });
   }
 
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return date.toLocaleString();
+}
+
+function buildChartLabels(buckets, rangeId) {
+  if (!buckets?.length) return [];
+
+  const labelCount = Math.min(MAX_X_AXIS_LABELS, buckets.length);
+  const labelIndices = new Set();
+
+  if (labelCount === 1) {
+    labelIndices.add(0);
+  } else {
+    for (let index = 0; index < labelCount; index += 1) {
+      labelIndices.add(Math.round((index * (buckets.length - 1)) / (labelCount - 1)));
+    }
+  }
+
+  return Array.from(labelIndices)
+    .sort((left, right) => left - right)
+    .map((index, position, values) => ({
+      bucketStartUtc: buckets[index].bucketStartUtc,
+      label: formatChartLabel(buckets[index].bucketStartUtc, rangeId),
+      left: values.length === 1 ? 0 : (position / (values.length - 1)) * 100,
+      align: position === 0 ? 'start' : position === values.length - 1 ? 'end' : 'center'
+    }));
 }
 
 function getTooltipPosition(clientX, clientY) {
@@ -99,19 +170,28 @@ function getTooltipPosition(clientX, clientY) {
 
 function HistoryChart({ summary, rangeId }) {
   const [tooltipState, setTooltipState] = useState(null);
+  const range = getActivityRangeWindow(rangeId);
+  const buckets = normalizeSummaryBuckets(summary, range);
 
-  if (!summary?.buckets?.length) {
+  if (!summary) {
     return <div className="empty-state compact-empty-state"><p className="empty-state-description">No request history for the selected range.</p></div>;
   }
 
-  const rangeConfig = getActivityRangeConfig(rangeId);
-  const maxCount = Math.max(...summary.buckets.map((bucket) => bucket.totalCount), 1);
+  const maxCount = Math.max(...buckets.map((bucket) => bucket.totalCount), 1);
   const axisTicks = [maxCount, Math.round(maxCount / 2), 0].filter((value, index, values) => values.indexOf(value) === index);
   const tooltipPosition = tooltipState ? getTooltipPosition(tooltipState.clientX, tooltipState.clientY) : null;
+  const xAxisLabels = buildChartLabels(buckets, rangeId);
+  const isDenseChart = buckets.length > 72;
 
   return (
     <>
-      <div className="history-chart-shell">
+      <div
+        className="history-chart-shell"
+        style={{
+          '--history-chart-column-gap': isDenseChart ? '1px' : '2px',
+          '--history-chart-bar-max-width': isDenseChart ? '6px' : '8px'
+        }}
+      >
         <div className="history-chart-axis-label">Requests</div>
         <div className="history-chart-main">
           <div className="history-chart-axis-values">
@@ -120,7 +200,7 @@ function HistoryChart({ summary, rangeId }) {
             ))}
           </div>
           <div className="history-chart-plot">
-            {summary.buckets.map((bucket) => {
+            {buckets.map((bucket) => {
               const totalHeight = `${Math.max((bucket.totalCount / maxCount) * 100, bucket.totalCount > 0 ? 6 : 2)}%`;
               const successHeight = bucket.totalCount > 0 ? `${(bucket.successCount / bucket.totalCount) * 100}%` : '0%';
               const failureHeight = bucket.totalCount > 0 ? `${(bucket.failureCount / bucket.totalCount) * 100}%` : '0%';
@@ -172,11 +252,13 @@ function HistoryChart({ summary, rangeId }) {
           </div>
           <div className="history-chart-spacer" />
           <div className="history-chart-label-row">
-            {summary.buckets.map((bucket, index) => (
-              <span key={bucket.bucketStartUtc} className="history-chart-label">
-                {(index % rangeConfig.labelEvery === 0 || index === summary.buckets.length - 1)
-                  ? formatChartLabel(bucket.bucketStartUtc, rangeId)
-                  : ''}
+            {xAxisLabels.map((label) => (
+              <span
+                key={label.bucketStartUtc}
+                className={`history-chart-label history-chart-label-${label.align}`}
+                style={{ left: `${label.left}%` }}
+              >
+                {label.label}
               </span>
             ))}
           </div>

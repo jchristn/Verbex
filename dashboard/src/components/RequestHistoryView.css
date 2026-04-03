@@ -1,6 +1,8 @@
 .request-history-view {
   width: 100%;
   --history-chart-track-height: 168px;
+  --history-chart-column-gap: 2px;
+  --history-chart-bar-max-width: 8px;
 }
 
 .request-history-top-grid {
@@ -86,6 +88,8 @@
   grid-template-columns: 28px minmax(0, 1fr);
   gap: 10px;
   align-items: stretch;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .history-chart-axis-label {
@@ -107,6 +111,7 @@
   column-gap: 10px;
   row-gap: 8px;
   min-width: 0;
+  overflow: hidden;
 }
 
 .history-chart-axis-values {
@@ -127,10 +132,11 @@
 .history-chart-plot {
   display: flex;
   align-items: flex-end;
-  gap: 2px;
+  gap: var(--history-chart-column-gap);
   width: 100%;
   min-width: 0;
   height: var(--history-chart-track-height);
+  overflow: hidden;
 }
 
 .history-chart-column {
@@ -151,7 +157,7 @@
 .history-chart-track {
   width: 100%;
   min-width: 1px;
-  max-width: 8px;
+  max-width: var(--history-chart-bar-max-width);
   height: 100%;
   display: flex;
   align-items: flex-end;
@@ -188,22 +194,40 @@
 }
 
 .history-chart-label-row {
-  display: flex;
-  gap: 2px;
+  position: relative;
   width: 100%;
   min-width: 0;
+  min-height: 20px;
   padding-top: 4px;
+  overflow: hidden;
 }
 
 .history-chart-label {
-  flex: 1 1 0;
-  min-width: 0;
+  position: absolute;
+  top: 4px;
+  max-width: 84px;
   font-size: 0.72rem;
   color: var(--text-secondary);
   text-align: center;
+  line-height: 1.2;
   white-space: nowrap;
-  transform: rotate(-45deg);
-  transform-origin: top center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.history-chart-label-start {
+  transform: translateX(0);
+  text-align: left;
+}
+
+.history-chart-label-center {
+  transform: translateX(-50%);
+}
+
+.history-chart-label-end {
+  transform: translateX(-100%);
+  text-align: right;
 }
 
 .history-chart-tooltip {

@@ -3652,21 +3652,22 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 401, "Authentication required");
                 }
 
+                Dictionary<string, string> queryParameters = GetQueryParameters(ctx);
                 RequestHistoryQuery query = RequestHistoryQuery.Parse(
-                    ctx.Request.Query?.Elements?["page"],
-                    ctx.Request.Query?.Elements?["pageSize"],
-                    ctx.Request.Query?.Elements?["method"],
-                    ctx.Request.Query?.Elements?["route"],
-                    ctx.Request.Query?.Elements?["tenantId"],
-                    ctx.Request.Query?.Elements?["userId"],
-                    ctx.Request.Query?.Elements?["credentialId"],
-                    ctx.Request.Query?.Elements?["indexId"],
-                    ctx.Request.Query?.Elements?["sourceIp"],
-                    ctx.Request.Query?.Elements?["principal"],
-                    ctx.Request.Query?.Elements?["statusCode"],
-                    ctx.Request.Query?.Elements?["fromUtc"],
-                    ctx.Request.Query?.Elements?["toUtc"],
-                    ctx.Request.Query?.Elements?["bucketMinutes"]);
+                    queryParameters.GetValueOrDefault("page"),
+                    queryParameters.GetValueOrDefault("pageSize"),
+                    queryParameters.GetValueOrDefault("method"),
+                    queryParameters.GetValueOrDefault("route"),
+                    queryParameters.GetValueOrDefault("tenantId"),
+                    queryParameters.GetValueOrDefault("userId"),
+                    queryParameters.GetValueOrDefault("credentialId"),
+                    queryParameters.GetValueOrDefault("indexId"),
+                    queryParameters.GetValueOrDefault("sourceIp"),
+                    queryParameters.GetValueOrDefault("principal"),
+                    queryParameters.GetValueOrDefault("statusCode"),
+                    queryParameters.GetValueOrDefault("fromUtc"),
+                    queryParameters.GetValueOrDefault("toUtc"),
+                    queryParameters.GetValueOrDefault("bucketMinutes"));
 
                 ApplyRequestHistoryScope(auth, query);
                 (List<RequestHistoryEntry> entries, long totalCount) = await _RequestHistory.SearchAsync(query).ConfigureAwait(false);
@@ -3702,21 +3703,22 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 401, "Authentication required");
                 }
 
+                Dictionary<string, string> queryParameters = GetQueryParameters(ctx);
                 RequestHistoryQuery query = RequestHistoryQuery.Parse(
                     null,
                     null,
-                    ctx.Request.Query?.Elements?["method"],
-                    ctx.Request.Query?.Elements?["route"],
-                    ctx.Request.Query?.Elements?["tenantId"],
-                    ctx.Request.Query?.Elements?["userId"],
-                    ctx.Request.Query?.Elements?["credentialId"],
-                    ctx.Request.Query?.Elements?["indexId"],
-                    ctx.Request.Query?.Elements?["sourceIp"],
-                    ctx.Request.Query?.Elements?["principal"],
-                    ctx.Request.Query?.Elements?["statusCode"],
-                    ctx.Request.Query?.Elements?["fromUtc"],
-                    ctx.Request.Query?.Elements?["toUtc"],
-                    ctx.Request.Query?.Elements?["bucketMinutes"]);
+                    queryParameters.GetValueOrDefault("method"),
+                    queryParameters.GetValueOrDefault("route"),
+                    queryParameters.GetValueOrDefault("tenantId"),
+                    queryParameters.GetValueOrDefault("userId"),
+                    queryParameters.GetValueOrDefault("credentialId"),
+                    queryParameters.GetValueOrDefault("indexId"),
+                    queryParameters.GetValueOrDefault("sourceIp"),
+                    queryParameters.GetValueOrDefault("principal"),
+                    queryParameters.GetValueOrDefault("statusCode"),
+                    queryParameters.GetValueOrDefault("fromUtc"),
+                    queryParameters.GetValueOrDefault("toUtc"),
+                    queryParameters.GetValueOrDefault("bucketMinutes"));
 
                 ApplyRequestHistoryScope(auth, query);
                 RequestHistorySummary summary = await _RequestHistory.GetSummaryAsync(query).ConfigureAwait(false);
@@ -3876,21 +3878,22 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 401, "Authentication required");
                 }
 
+                Dictionary<string, string> queryParameters = GetQueryParameters(ctx);
                 RequestHistoryQuery query = RequestHistoryQuery.Parse(
                     null,
                     null,
-                    ctx.Request.Query?.Elements?["method"],
-                    ctx.Request.Query?.Elements?["route"],
-                    ctx.Request.Query?.Elements?["tenantId"],
-                    ctx.Request.Query?.Elements?["userId"],
-                    ctx.Request.Query?.Elements?["credentialId"],
-                    ctx.Request.Query?.Elements?["indexId"],
-                    ctx.Request.Query?.Elements?["sourceIp"],
-                    ctx.Request.Query?.Elements?["principal"],
-                    ctx.Request.Query?.Elements?["statusCode"],
-                    ctx.Request.Query?.Elements?["fromUtc"],
-                    ctx.Request.Query?.Elements?["toUtc"],
-                    ctx.Request.Query?.Elements?["bucketMinutes"]);
+                    queryParameters.GetValueOrDefault("method"),
+                    queryParameters.GetValueOrDefault("route"),
+                    queryParameters.GetValueOrDefault("tenantId"),
+                    queryParameters.GetValueOrDefault("userId"),
+                    queryParameters.GetValueOrDefault("credentialId"),
+                    queryParameters.GetValueOrDefault("indexId"),
+                    queryParameters.GetValueOrDefault("sourceIp"),
+                    queryParameters.GetValueOrDefault("principal"),
+                    queryParameters.GetValueOrDefault("statusCode"),
+                    queryParameters.GetValueOrDefault("fromUtc"),
+                    queryParameters.GetValueOrDefault("toUtc"),
+                    queryParameters.GetValueOrDefault("bucketMinutes"));
 
                 ApplyRequestHistoryScope(auth, query);
                 RequestHistoryBulkDeleteResult deleteResult = await _RequestHistory.BulkDeleteAsync(query).ConfigureAwait(false);

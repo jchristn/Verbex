@@ -83,6 +83,11 @@ namespace Test
             Console.WriteLine($"Using: {TestContext.GetDatabaseDescription()}");
             await DatabaseDriverTests.RunAllAsync(runner).ConfigureAwait(false);
 
+            Console.WriteLine();
+            Console.WriteLine("=== REQUEST HISTORY DATABASE TESTS ===");
+            Console.WriteLine($"Using: {TestContext.GetDatabaseDescription()}");
+            await RequestHistoryServiceTests.RunAllAsync(runner).ConfigureAwait(false);
+
             // Print summary
             runner.PrintSummary();
 
