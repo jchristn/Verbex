@@ -955,7 +955,7 @@ namespace Verbex.Server.API.REST
         /// <returns>Task.</returns>
         private async Task ExceptionRoute(HttpContextBase ctx, Exception e)
         {
-            _Logging?.Error(_Header + "Exception: " + e.Message);
+            _Logging?.Error(_Header + "exception:" + Environment.NewLine + e.ToString());
             ResponseContext response = new ResponseContext(false, 500, e.Message);
             await SendResponse(ctx, response);
         }
@@ -1852,6 +1852,7 @@ namespace Verbex.Server.API.REST
                 }
                 catch (Exception ex)
                 {
+                    _Logging?.Error(_Header + "exception:" + Environment.NewLine + ex.ToString());
                     return new ResponseContext(false, 500, $"Failed to update custom metadata: {ex.Message}");
                 }
             });
@@ -2031,6 +2032,7 @@ namespace Verbex.Server.API.REST
                 }
                 catch (Exception ex)
                 {
+                    _Logging?.Error(_Header + "exception:" + Environment.NewLine + ex.ToString());
                     return new ResponseContext(false, 500, $"Error retrieving documents: {ex.Message}");
                 }
             });
@@ -2135,6 +2137,7 @@ namespace Verbex.Server.API.REST
                 }
                 catch (Exception ex)
                 {
+                    _Logging?.Error(_Header + "exception:" + Environment.NewLine + ex.ToString());
                     return new ResponseContext(false, 500, $"Error adding document: {ex.Message}");
                 }
             });
@@ -2186,6 +2189,7 @@ namespace Verbex.Server.API.REST
                 }
                 catch (Exception ex)
                 {
+                    _Logging?.Error(_Header + "exception:" + Environment.NewLine + ex.ToString());
                     return new ResponseContext(false, 500, $"Error retrieving document: {ex.Message}");
                 }
             });
@@ -2281,6 +2285,7 @@ namespace Verbex.Server.API.REST
                 }
                 catch (Exception ex)
                 {
+                    _Logging?.Error(_Header + "exception:" + Environment.NewLine + ex.ToString());
                     return new ResponseContext(false, 500, $"Error deleting document: {ex.Message}");
                 }
             });
@@ -2339,6 +2344,7 @@ namespace Verbex.Server.API.REST
                 }
                 catch (Exception ex)
                 {
+                    _Logging?.Error(_Header + "exception:" + Environment.NewLine + ex.ToString());
                     return new ResponseContext(false, 500, $"Error deleting documents: {ex.Message}");
                 }
             });
@@ -2397,6 +2403,7 @@ namespace Verbex.Server.API.REST
                 }
                 catch (Exception ex)
                 {
+                    _Logging?.Error(_Header + "exception:" + Environment.NewLine + ex.ToString());
                     return new ResponseContext(false, 500, $"Error adding documents: {ex.Message}");
                 }
             });
@@ -2454,6 +2461,7 @@ namespace Verbex.Server.API.REST
                 }
                 catch (Exception ex)
                 {
+                    _Logging?.Error(_Header + "exception:" + Environment.NewLine + ex.ToString());
                     return new ResponseContext(false, 500, $"Error checking documents: {ex.Message}");
                 }
             });
@@ -2545,6 +2553,7 @@ namespace Verbex.Server.API.REST
                 }
                 catch (Exception ex)
                 {
+                    _Logging?.Error(_Header + "exception:" + Environment.NewLine + ex.ToString());
                     return new ResponseContext(false, 500, $"Error performing search: {ex.Message}");
                 }
             });
@@ -2598,6 +2607,7 @@ namespace Verbex.Server.API.REST
                 }
                 catch (Exception ex)
                 {
+                    _Logging?.Error(_Header + "exception:" + Environment.NewLine + ex.ToString());
                     return new ResponseContext(false, 500, $"Error getting top terms: {ex.Message}");
                 }
             });
@@ -2642,6 +2652,7 @@ namespace Verbex.Server.API.REST
                 }
                 catch (Exception ex)
                 {
+                    _Logging?.Error(_Header + "exception:" + Environment.NewLine + ex.ToString());
                     return new ResponseContext(false, 500, $"Error rebuilding cache: {ex.Message}");
                 }
             });
@@ -3969,7 +3980,7 @@ namespace Verbex.Server.API.REST
             }
             catch (Exception ex)
             {
-                _Logging?.Error(_Header + "backup failed: " + ex.Message);
+                _Logging?.Error(_Header + "exception:" + Environment.NewLine + ex.ToString());
                 await SendResponse(ctx, new ResponseContext(false, 500, "Backup failed: " + ex.Message));
             }
         }
@@ -4032,7 +4043,7 @@ namespace Verbex.Server.API.REST
             }
             catch (Exception ex)
             {
-                _Logging?.Error(_Header + "restore (new) failed: " + ex.Message);
+                _Logging?.Error(_Header + "exception:" + Environment.NewLine + ex.ToString());
                 await SendResponse(ctx, new ResponseContext(false, 500, "Restore failed: " + ex.Message));
             }
         }
@@ -4112,7 +4123,7 @@ namespace Verbex.Server.API.REST
             }
             catch (Exception ex)
             {
-                _Logging?.Error(_Header + "restore (replace) failed: " + ex.Message);
+                _Logging?.Error(_Header + "exception:" + Environment.NewLine + ex.ToString());
                 await SendResponse(ctx, new ResponseContext(false, 500, "Restore failed: " + ex.Message));
             }
         }
@@ -4478,7 +4489,7 @@ namespace Verbex.Server.API.REST
             }
             catch (Exception e)
             {
-                _Logging?.Warn(_Header + "request history persistence failed: " + e.Message);
+                _Logging?.Warn(_Header + "exception:" + Environment.NewLine + e.ToString());
             }
             finally
             {
@@ -4743,7 +4754,7 @@ namespace Verbex.Server.API.REST
             }
             catch (Exception e)
             {
-                _Logging?.Error(_Header + "exception in " + requestType + ": " + e.Message);
+                _Logging?.Error(_Header + "exception:" + Environment.NewLine + e.ToString());
                 responseContext = new ResponseContext(false, 500, e.Message);
             }
 
