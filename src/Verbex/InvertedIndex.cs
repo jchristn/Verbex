@@ -330,18 +330,31 @@ namespace Verbex
                 string documentId = IdGenerator.GenerateDocumentId();
                 string contentSha256 = ComputeContentHash(content);
 
-                await _Driver.Documents.AddAsync(_TablePrefix, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
+                await _Driver.BeginTransactionAsync(token).ConfigureAwait(false);
+                try
+                {
+                    await _Driver.Documents.AddAsync(_TablePrefix, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
 
-                IndexContentResult result = await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
-                result.Metrics.Steps.LockWaitMs = lockWaitMs;
+                    IndexContentResult result = await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
 
-                // Invalidate cache (using terms already computed during indexing)
-                _CacheInvalidator?.OnDocumentAdded(documentId, result.AffectedTerms);
+                    await _Driver.CommitTransactionAsync(token).ConfigureAwait(false);
 
-                // Check if flush is needed (increment counter inside lock, flush outside)
-                shouldFlush = ShouldAutoFlush();
+                    result.Metrics.Steps.LockWaitMs = lockWaitMs;
 
-                addResult = new AddDocumentResult(documentId, result.Metrics);
+                    // Invalidate cache (using terms already computed during indexing)
+                    _CacheInvalidator?.OnDocumentAdded(documentId, result.AffectedTerms);
+
+                    // Check if flush is needed (increment counter inside lock, flush outside)
+                    shouldFlush = ShouldAutoFlush();
+
+                    addResult = new AddDocumentResult(documentId, result.Metrics);
+                }
+                catch
+                {
+                    if (_Driver.IsTransactionActive)
+                        await _Driver.RollbackTransactionAsync(token).ConfigureAwait(false);
+                    throw;
+                }
             }
             finally
             {
@@ -408,18 +421,31 @@ namespace Verbex
             {
                 string contentSha256 = ComputeContentHash(content);
 
-                await _Driver.Documents.AddAsync(_TablePrefix, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
+                await _Driver.BeginTransactionAsync(token).ConfigureAwait(false);
+                try
+                {
+                    await _Driver.Documents.AddAsync(_TablePrefix, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
 
-                IndexContentResult result = await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
-                result.Metrics.Steps.LockWaitMs = lockWaitMs;
+                    IndexContentResult result = await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
 
-                // Invalidate cache (using terms already computed during indexing)
-                _CacheInvalidator?.OnDocumentAdded(documentId, result.AffectedTerms);
+                    await _Driver.CommitTransactionAsync(token).ConfigureAwait(false);
 
-                // Check if flush is needed (increment counter inside lock, flush outside)
-                shouldFlush = ShouldAutoFlush();
+                    result.Metrics.Steps.LockWaitMs = lockWaitMs;
 
-                addResult = new AddDocumentResult(documentId, result.Metrics);
+                    // Invalidate cache (using terms already computed during indexing)
+                    _CacheInvalidator?.OnDocumentAdded(documentId, result.AffectedTerms);
+
+                    // Check if flush is needed (increment counter inside lock, flush outside)
+                    shouldFlush = ShouldAutoFlush();
+
+                    addResult = new AddDocumentResult(documentId, result.Metrics);
+                }
+                catch
+                {
+                    if (_Driver.IsTransactionActive)
+                        await _Driver.RollbackTransactionAsync(token).ConfigureAwait(false);
+                    throw;
+                }
             }
             finally
             {
@@ -756,7 +782,8 @@ namespace Verbex
                 }
                 catch
                 {
-                    await _Driver.RollbackTransactionAsync(token).ConfigureAwait(false);
+                    if (_Driver.IsTransactionActive)
+                        await _Driver.RollbackTransactionAsync(token).ConfigureAwait(false);
                     throw;
                 }
             }
@@ -855,7 +882,8 @@ namespace Verbex
                 }
                 catch
                 {
-                    await _Driver.RollbackTransactionAsync(token).ConfigureAwait(false);
+                    if (_Driver.IsTransactionActive)
+                        await _Driver.RollbackTransactionAsync(token).ConfigureAwait(false);
                     throw;
                 }
             }
@@ -2013,8 +2041,12 @@ namespace Verbex
             int distinctTermCount = termPositions.Count;
             metrics.Counts.UniqueTerms = distinctTermCount;
 
-            // Wrap all database operations in a single transaction for performance
-            await _Driver.BeginTransactionAsync(token).ConfigureAwait(false);
+            // Use existing transaction if one is active (caller manages it), otherwise create our own
+            bool ownTransaction = !_Driver.IsTransactionActive;
+            if (ownTransaction)
+            {
+                await _Driver.BeginTransactionAsync(token).ConfigureAwait(false);
+            }
             try
             {
                 // Step 3: Batch add/get all terms (with cache optimization)
@@ -2135,18 +2167,22 @@ namespace Verbex
                 stepStopwatch.Stop();
                 metrics.Steps.DocumentUpdateMs = stepStopwatch.Elapsed.TotalMilliseconds;
 
-                // Step 8: Commit transaction
-                stepStopwatch.Restart();
-                await _Driver.CommitTransactionAsync(token).ConfigureAwait(false);
-                stepStopwatch.Stop();
-                metrics.Steps.TransactionCommitMs = stepStopwatch.Elapsed.TotalMilliseconds;
+                // Step 8: Commit transaction (only if we own it)
+                if (ownTransaction)
+                {
+                    stepStopwatch.Restart();
+                    await _Driver.CommitTransactionAsync(token).ConfigureAwait(false);
+                    stepStopwatch.Stop();
+                    metrics.Steps.TransactionCommitMs = stepStopwatch.Elapsed.TotalMilliseconds;
+                }
 
                 metrics.TotalMs = totalStopwatch.Elapsed.TotalMilliseconds;
                 return new IndexContentResult(metrics, termList);
             }
             catch
             {
-                await _Driver.RollbackTransactionAsync(token).ConfigureAwait(false);
+                if (ownTransaction && _Driver.IsTransactionActive)
+                    await _Driver.RollbackTransactionAsync(token).ConfigureAwait(false);
                 throw;
             }
         }
