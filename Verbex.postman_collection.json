@@ -726,7 +726,115 @@
 								"search"
 							]
 						},
-						"description": "Search for documents in the specified index using the provided query.\n\nRequired fields:\n- Query: The search query string\n\nOptional fields:\n- MaxResults: Maximum number of results to return (default: 100)"
+						"description": "Search for documents in the specified index using the provided query.\n\nRequired fields:\n- Query: The search query string\n\nOptional fields:\n- MaxResults: Maximum number of results to return (default: 100)\n- IncludeMatchedTerms: Include matched query terms\n- IncludeTermDetails: Include per-term score/frequency details\n- IncludeDocumentTermStats: Include whole-document term statistics"
+					},
+					"response": []
+				},
+				{
+					"name": "Search Index (with Enrichment)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Query\": \"technology software\",\n    \"MaxResults\": 25,\n    \"IncludeMatchedTerms\": true,\n    \"IncludeTermDetails\": true,\n    \"IncludeDocumentTermStats\": true\n}"
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/search",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"search"
+							]
+						},
+						"description": "Search with all optional enrichment fields. Matched terms and term details use existing scoring data; document term stats add one grouped aggregate query."
+					},
+					"response": []
+				},
+				{
+					"name": "Wildcard Search (with Term Stats)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Query\": \"*\",\n    \"MaxResults\": 25,\n    \"IncludeDocumentTermStats\": true\n}"
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/search",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"search"
+							]
+						},
+						"description": "Wildcard search with document term statistics. Wildcard results have empty matched-term enrichment but can include document term stats."
+					},
+					"response": []
+				},
+				{
+					"name": "Search Index (with Labels, Tags, and Enrichment)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Query\": \"technology software\",\n    \"MaxResults\": 25,\n    \"Labels\": [\"important\"],\n    \"Tags\": {\n        \"category\": \"tech\"\n    },\n    \"IncludeMatchedTerms\": true,\n    \"IncludeTermDetails\": true\n}"
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/search",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"indices",
+								"test-index",
+								"search"
+							]
+						},
+						"description": "Search with label and tag filters plus matched-term enrichment. Document term stats are intentionally not requested."
 					},
 					"response": []
 				},

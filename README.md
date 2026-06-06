@@ -58,6 +58,7 @@ dotnet run --project src/TestConsole      # Interactive shell
 
 ```csharp
 using Verbex;
+using System.Linq;
 
 // Create index
 var config = new VerbexConfiguration { StorageMode = StorageMode.InMemory };
@@ -71,6 +72,9 @@ await index.AddDocumentAsync(Guid.NewGuid(), "Machine learning algorithms", "doc
 var results = await index.SearchAsync("fox machine");
 foreach (var result in results)
     Console.WriteLine($"{result.DocumentId}: {result.Score:F4}");
+
+// Optional aggregate term stats for already-limited result sets
+var stats = await index.GetDocumentTermStatsAsync(results.Results.Select(r => r.DocumentId));
 ```
 
 ## Key Features
@@ -81,6 +85,7 @@ foreach (var result in results)
 - **Metadata Filtering**: Labels and tags for document organization
 - **Filtered Enumeration**: Filter document listings by labels and tags
 - **Wildcard Search**: Use `*` query to return all documents, optionally filtered by metadata
+- **Opt-in Search Enrichment**: REST, SDK, MCP, CLI, and dashboard clients can request matched terms, per-term details, and whole-document term counts without changing default responses
 - **Batch Operations**: Retrieve multiple documents in a single request
 - **Backup & Restore**: Create portable backups and restore indices
 - **Thread-Safe**: Optimized for concurrent read-heavy workloads

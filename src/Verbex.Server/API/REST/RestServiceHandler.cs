@@ -2526,28 +2526,53 @@ namespace Verbex.Server.API.REST
                         searchRequest.Labels,
                         tagFilters).ConfigureAwait(false);
 
+                    SearchResultEnrichmentOptions enrichmentOptions = SearchResultEnrichmentOptions.FromRequest(searchRequest);
+                    bool enrichmentRequested = enrichmentOptions.IsEnabled;
+                    Dictionary<string, DocumentTermStats> statsByDocumentId = new Dictionary<string, DocumentTermStats>();
+                    long? documentTermStatsMs = null;
+                    int? documentTermStatsDocuments = null;
+
+                    if (enrichmentOptions.IncludeDocumentTermStats)
+                    {
+                        List<string> documentIds = searchResults.Results
+                            .Select(r => r.DocumentId)
+                            .Where(id => !string.IsNullOrWhiteSpace(id))
+                            .Distinct(StringComparer.Ordinal)
+                            .ToList();
+
+                        documentTermStatsDocuments = documentIds.Count;
+                        Stopwatch statsStopwatch = Stopwatch.StartNew();
+                        statsByDocumentId = await index.GetDocumentTermStatsAsync(documentIds).ConfigureAwait(false);
+                        statsStopwatch.Stop();
+                        documentTermStatsMs = statsStopwatch.ElapsedMilliseconds;
+                    }
+
+                    object resultsPayload = searchResults.Results;
+                    long? resultEnrichmentMs = null;
+
+                    if (enrichmentRequested)
+                    {
+                        Stopwatch enrichmentStopwatch = Stopwatch.StartNew();
+                        resultsPayload = ProjectSearchResults(searchResults.Results, enrichmentOptions, statsByDocumentId);
+                        enrichmentStopwatch.Stop();
+                        resultEnrichmentMs = enrichmentStopwatch.ElapsedMilliseconds;
+                    }
+
                     return new ResponseContext
                     {
                         Success = true,
                         StatusCode = 200,
                         Data = new {
                             Query = searchRequest.Query,
-                            Results = searchResults.Results,
+                            Results = resultsPayload,
                             TotalCount = searchResults.TotalCount,
                             MaxResults = searchRequest.MaxResults,
                             SearchTime = searchResults.SearchTime.TotalMilliseconds,
-                            TimingInfo = searchResults.TimingInfo != null ? new {
-                                TermLookupMs = searchResults.TimingInfo.TermLookupMs,
-                                TermsFound = searchResults.TimingInfo.TermsFound,
-                                MainSearchMs = searchResults.TimingInfo.MainSearchMs,
-                                MatchesFound = searchResults.TimingInfo.MatchesFound,
-                                TermFrequenciesMs = searchResults.TimingInfo.TermFrequenciesMs,
-                                TermFrequencyRecords = searchResults.TimingInfo.TermFrequencyRecords,
-                                DocumentMetadataMs = searchResults.TimingInfo.DocumentMetadataMs,
-                                DocumentsFetched = searchResults.TimingInfo.DocumentsFetched,
-                                DocumentCountMs = searchResults.TimingInfo.DocumentCountMs,
-                                TotalDocuments = searchResults.TimingInfo.TotalDocuments
-                            } : null
+                            TimingInfo = CreateSearchTimingInfo(
+                                searchResults.TimingInfo,
+                                resultEnrichmentMs,
+                                documentTermStatsMs,
+                                documentTermStatsDocuments)
                         }
                     };
                 }
@@ -2557,6 +2582,111 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 500, $"Error performing search: {ex.Message}");
                 }
             });
+        }
+
+        private static Dictionary<string, object>? CreateSearchTimingInfo(
+            SearchTimingInfo? timingInfo,
+            long? resultEnrichmentMs,
+            long? documentTermStatsMs,
+            int? documentTermStatsDocuments)
+        {
+            if (timingInfo == null
+                && resultEnrichmentMs == null
+                && documentTermStatsMs == null
+                && documentTermStatsDocuments == null)
+            {
+                return null;
+            }
+
+            Dictionary<string, object> result = new Dictionary<string, object>();
+
+            if (timingInfo != null)
+            {
+                result["TermLookupMs"] = timingInfo.TermLookupMs;
+                result["TermsFound"] = timingInfo.TermsFound;
+                result["MainSearchMs"] = timingInfo.MainSearchMs;
+                result["MatchesFound"] = timingInfo.MatchesFound;
+                result["TermFrequenciesMs"] = timingInfo.TermFrequenciesMs;
+                result["TermFrequencyRecords"] = timingInfo.TermFrequencyRecords;
+                result["DocumentMetadataMs"] = timingInfo.DocumentMetadataMs;
+                result["DocumentsFetched"] = timingInfo.DocumentsFetched;
+                result["DocumentCountMs"] = timingInfo.DocumentCountMs;
+                result["TotalDocuments"] = timingInfo.TotalDocuments;
+            }
+
+            if (resultEnrichmentMs != null)
+            {
+                result["ResultEnrichmentMs"] = resultEnrichmentMs.Value;
+            }
+
+            if (documentTermStatsMs != null)
+            {
+                result["DocumentTermStatsMs"] = documentTermStatsMs.Value;
+            }
+
+            if (documentTermStatsDocuments != null)
+            {
+                result["DocumentTermStatsDocuments"] = documentTermStatsDocuments.Value;
+            }
+
+            return result;
+        }
+
+        private static List<SearchResultEnrichedView> ProjectSearchResults(
+            IReadOnlyList<SearchResult> results,
+            SearchResultEnrichmentOptions options,
+            IReadOnlyDictionary<string, DocumentTermStats> statsByDocumentId)
+        {
+            List<SearchResultEnrichedView> projected = new List<SearchResultEnrichedView>();
+
+            foreach (SearchResult result in results)
+            {
+                SearchResultEnrichedView view = new SearchResultEnrichedView
+                {
+                    DocumentId = result.DocumentId,
+                    Document = result.Document,
+                    MatchedTermCount = result.MatchedTermCount,
+                    Score = result.Score,
+                    TermScores = result.TermScores.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    TermFrequencies = result.TermFrequencies.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    TotalTermMatches = result.TotalTermMatches
+                };
+
+                if (options.IncludeMatchedTerms || options.IncludeTermDetails)
+                {
+                    view.MatchedTerms = result.TermScores.Keys
+                        .OrderBy(term => term, StringComparer.Ordinal)
+                        .ToList();
+                }
+
+                if (options.IncludeTermDetails)
+                {
+                    view.TermDetails = result.TermScores
+                        .Select(kvp => new SearchResultTermDetail
+                        {
+                            Term = kvp.Key,
+                            Score = kvp.Value,
+                            Frequency = result.TermFrequencies.TryGetValue(kvp.Key, out int frequency) ? frequency : 0
+                        })
+                        .OrderByDescending(detail => detail.Score)
+                        .ThenBy(detail => detail.Term, StringComparer.Ordinal)
+                        .ToList();
+                }
+
+                if (options.IncludeDocumentTermStats
+                    && statsByDocumentId.TryGetValue(result.DocumentId, out DocumentTermStats? stats))
+                {
+                    view.DocumentTermStats = new SearchResultDocumentTermStats
+                    {
+                        UniqueTermCount = stats.UniqueTermCount,
+                        TotalTermOccurrences = stats.TotalTermOccurrences
+                    };
+                }
+
+                projected.Add(view);
+            }
+
+            return projected;
         }
 
         /// <summary>
@@ -4917,6 +5047,66 @@ namespace Verbex.Server.API.REST
             await ctx.Response.Send(json);
         }
 
+        private sealed class SearchResultEnrichmentOptions
+        {
+            public bool IncludeMatchedTerms { get; private set; }
+
+            public bool IncludeTermDetails { get; private set; }
+
+            public bool IncludeDocumentTermStats { get; private set; }
+
+            public bool IsEnabled => IncludeMatchedTerms || IncludeTermDetails || IncludeDocumentTermStats;
+
+            public static SearchResultEnrichmentOptions FromRequest(SearchRequest request)
+            {
+                return new SearchResultEnrichmentOptions
+                {
+                    IncludeMatchedTerms = request.IncludeMatchedTerms,
+                    IncludeTermDetails = request.IncludeTermDetails,
+                    IncludeDocumentTermStats = request.IncludeDocumentTermStats
+                };
+            }
+        }
+
+        private sealed class SearchResultEnrichedView
+        {
+            public string DocumentId { get; set; } = string.Empty;
+
+            public DocumentMetadata? Document { get; set; }
+
+            public int MatchedTermCount { get; set; }
+
+            public double Score { get; set; }
+
+            public Dictionary<string, double> TermScores { get; set; } = new Dictionary<string, double>();
+
+            public Dictionary<string, int> TermFrequencies { get; set; } = new Dictionary<string, int>();
+
+            public int TotalTermMatches { get; set; }
+
+            public List<string>? MatchedTerms { get; set; }
+
+            public List<SearchResultTermDetail>? TermDetails { get; set; }
+
+            public SearchResultDocumentTermStats? DocumentTermStats { get; set; }
+        }
+
+        private sealed class SearchResultTermDetail
+        {
+            public string Term { get; set; } = string.Empty;
+
+            public double Score { get; set; }
+
+            public int Frequency { get; set; }
+        }
+
+        private sealed class SearchResultDocumentTermStats
+        {
+            public long UniqueTermCount { get; set; }
+
+            public long TotalTermOccurrences { get; set; }
+        }
+
         #region OpenAPI-Schema-Helpers
 
         /// <summary>
@@ -5497,7 +5687,10 @@ namespace Verbex.Server.API.REST
                     ["MaxResults"] = new OpenApiSchemaMetadata { Type = "integer", Description = "Maximum number of results (default: 100)", Default = 100 },
                     ["UseAndLogic"] = new OpenApiSchemaMetadata { Type = "boolean", Description = "Use AND logic instead of OR (default: false)", Default = false },
                     ["Labels"] = new OpenApiSchemaMetadata { Type = "array", Items = OpenApiSchemaMetadata.String(), Description = "Filter by labels (AND logic)" },
-                    ["Tags"] = new OpenApiSchemaMetadata { Type = "object", Description = "Filter by tags (AND logic, exact match)" }
+                    ["Tags"] = new OpenApiSchemaMetadata { Type = "object", Description = "Filter by tags (AND logic, exact match)" },
+                    ["IncludeMatchedTerms"] = new OpenApiSchemaMetadata { Type = "boolean", Description = "Optional. Include MatchedTerms on each result. Default: false.", Default = false },
+                    ["IncludeTermDetails"] = new OpenApiSchemaMetadata { Type = "boolean", Description = "Optional. Include per-term score/frequency details on each result. Also includes MatchedTerms. Default: false.", Default = false },
+                    ["IncludeDocumentTermStats"] = new OpenApiSchemaMetadata { Type = "boolean", Description = "Optional. Include whole-document term statistics using one grouped database query. Default: false.", Default = false }
                 },
                 Required = new List<string> { "Query" }
             };
@@ -5517,7 +5710,9 @@ namespace Verbex.Server.API.REST
                     ["Query"] = OpenApiSchemaMetadata.String(),
                     ["Results"] = OpenApiSchemaMetadata.CreateArray(CreateSearchResultItemSchema()),
                     ["TotalCount"] = OpenApiSchemaMetadata.Integer(),
-                    ["SearchTime"] = new OpenApiSchemaMetadata { Type = "number", Format = "double", Description = "Search time in milliseconds" }
+                    ["MaxResults"] = OpenApiSchemaMetadata.Integer(),
+                    ["SearchTime"] = new OpenApiSchemaMetadata { Type = "number", Format = "double", Description = "Core search time in milliseconds" },
+                    ["TimingInfo"] = CreateSearchTimingInfoSchema()
                 }
             };
             return response;
@@ -5533,12 +5728,68 @@ namespace Verbex.Server.API.REST
                 Type = "object",
                 Properties = new Dictionary<string, OpenApiSchemaMetadata>
                 {
-                    ["DocumentId"] = OpenApiSchemaMetadata.String(),
-                    ["DocumentName"] = OpenApiSchemaMetadata.String(),
-                    ["Score"] = OpenApiSchemaMetadata.Number("double"),
-                    ["MatchedTerms"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String()),
-                    ["Labels"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String()),
-                    ["Tags"] = new OpenApiSchemaMetadata { Type = "object" }
+                    ["DocumentId"] = new OpenApiSchemaMetadata { Type = "string", Description = "Document identifier" },
+                    ["Document"] = new OpenApiSchemaMetadata { Type = "object", Nullable = true, Description = "Document metadata" },
+                    ["MatchedTermCount"] = new OpenApiSchemaMetadata { Type = "integer", Description = "Number of query terms matched by this result" },
+                    ["Score"] = new OpenApiSchemaMetadata { Type = "number", Format = "double", Description = "Relevance score" },
+                    ["TermScores"] = new OpenApiSchemaMetadata { Type = "object", Description = "Dictionary of matched query term to term score contribution" },
+                    ["TermFrequencies"] = new OpenApiSchemaMetadata { Type = "object", Description = "Dictionary of matched query term to document frequency" },
+                    ["TotalTermMatches"] = new OpenApiSchemaMetadata { Type = "integer", Description = "Total occurrences across matched query terms" },
+                    ["MatchedTerms"] = new OpenApiSchemaMetadata { Type = "array", Items = OpenApiSchemaMetadata.String(), Description = "Optional. Present when IncludeMatchedTerms or IncludeTermDetails is true." },
+                    ["TermDetails"] = new OpenApiSchemaMetadata { Type = "array", Items = CreateSearchTermDetailSchema(), Description = "Optional. Present when IncludeTermDetails is true." },
+                    ["DocumentTermStats"] = new OpenApiSchemaMetadata { Type = "object", Nullable = true, Description = "Optional. Present when IncludeDocumentTermStats is true and stats are available.", Properties = CreateDocumentTermStatsSchema().Properties }
+                }
+            };
+        }
+
+        private OpenApiSchemaMetadata CreateSearchTermDetailSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["Term"] = new OpenApiSchemaMetadata { Type = "string", Description = "Matched query term" },
+                    ["Score"] = new OpenApiSchemaMetadata { Type = "number", Format = "double", Description = "Term score contribution" },
+                    ["Frequency"] = new OpenApiSchemaMetadata { Type = "integer", Description = "Term frequency in the document" }
+                }
+            };
+        }
+
+        private OpenApiSchemaMetadata CreateDocumentTermStatsSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["UniqueTermCount"] = OpenApiSchemaMetadata.Integer("int64"),
+                    ["TotalTermOccurrences"] = OpenApiSchemaMetadata.Integer("int64")
+                }
+            };
+        }
+
+        private OpenApiSchemaMetadata CreateSearchTimingInfoSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Nullable = true,
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["TermLookupMs"] = OpenApiSchemaMetadata.Integer("int64"),
+                    ["TermsFound"] = OpenApiSchemaMetadata.Integer(),
+                    ["MainSearchMs"] = OpenApiSchemaMetadata.Integer("int64"),
+                    ["MatchesFound"] = OpenApiSchemaMetadata.Integer(),
+                    ["TermFrequenciesMs"] = OpenApiSchemaMetadata.Integer("int64"),
+                    ["TermFrequencyRecords"] = OpenApiSchemaMetadata.Integer(),
+                    ["DocumentMetadataMs"] = OpenApiSchemaMetadata.Integer("int64"),
+                    ["DocumentsFetched"] = OpenApiSchemaMetadata.Integer(),
+                    ["DocumentCountMs"] = OpenApiSchemaMetadata.Integer("int64"),
+                    ["TotalDocuments"] = OpenApiSchemaMetadata.Integer("int64"),
+                    ["ResultEnrichmentMs"] = new OpenApiSchemaMetadata { Type = "integer", Format = "int64", Description = "Optional. In-memory enrichment projection time." },
+                    ["DocumentTermStatsMs"] = new OpenApiSchemaMetadata { Type = "integer", Format = "int64", Description = "Optional. Grouped document term stats query time." },
+                    ["DocumentTermStatsDocuments"] = new OpenApiSchemaMetadata { Type = "integer", Description = "Optional. Number of result documents requested for stats." }
                 }
             };
         }

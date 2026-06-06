@@ -81,6 +81,70 @@ namespace Verbex.Sdk
             }
         }
 
+        /// <summary>
+        /// If true, documents must contain all query terms.
+        /// Default is false.
+        /// </summary>
+        public bool UseAndLogic
+        {
+            get
+            {
+                return _UseAndLogic;
+            }
+            set
+            {
+                _UseAndLogic = value;
+            }
+        }
+
+        /// <summary>
+        /// Include matched query terms on each result.
+        /// Default is false.
+        /// </summary>
+        public bool IncludeMatchedTerms
+        {
+            get
+            {
+                return _IncludeMatchedTerms;
+            }
+            set
+            {
+                _IncludeMatchedTerms = value;
+            }
+        }
+
+        /// <summary>
+        /// Include per-term score and frequency details on each result.
+        /// Default is false.
+        /// </summary>
+        public bool IncludeTermDetails
+        {
+            get
+            {
+                return _IncludeTermDetails;
+            }
+            set
+            {
+                _IncludeTermDetails = value;
+            }
+        }
+
+        /// <summary>
+        /// Include whole-document aggregate term statistics on each result.
+        /// Default is false.
+        /// </summary>
+        public bool IncludeDocumentTermStats
+        {
+            get
+            {
+                return _IncludeDocumentTermStats;
+            }
+            set
+            {
+                _IncludeDocumentTermStats = value;
+            }
+        }
+
         #endregion
 
         #region Private-Members
@@ -89,6 +153,10 @@ namespace Verbex.Sdk
         private int _MaxResults = 100;
         private List<string>? _Labels = null;
         private Dictionary<string, string>? _Tags = null;
+        private bool _UseAndLogic = false;
+        private bool _IncludeMatchedTerms = false;
+        private bool _IncludeTermDetails = false;
+        private bool _IncludeDocumentTermStats = false;
 
         #endregion
 
@@ -108,12 +176,28 @@ namespace Verbex.Sdk
         /// <param name="maxResults">Maximum number of results to return. Default is 100.</param>
         /// <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
         /// <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
-        public SearchRequest(string query, int maxResults = 100, List<string>? labels = null, Dictionary<string, string>? tags = null)
+        /// <param name="useAndLogic">Use AND logic for query terms.</param>
+        /// <param name="includeMatchedTerms">Include matched query terms on each result.</param>
+        /// <param name="includeTermDetails">Include per-term score and frequency details on each result.</param>
+        /// <param name="includeDocumentTermStats">Include whole-document aggregate term statistics on each result.</param>
+        public SearchRequest(
+            string query,
+            int maxResults = 100,
+            List<string>? labels = null,
+            Dictionary<string, string>? tags = null,
+            bool useAndLogic = false,
+            bool includeMatchedTerms = false,
+            bool includeTermDetails = false,
+            bool includeDocumentTermStats = false)
         {
             Query = query;
             MaxResults = maxResults;
             Labels = labels;
             Tags = tags;
+            UseAndLogic = useAndLogic;
+            IncludeMatchedTerms = includeMatchedTerms;
+            IncludeTermDetails = includeTermDetails;
+            IncludeDocumentTermStats = includeDocumentTermStats;
         }
 
         #endregion

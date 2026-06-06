@@ -72,9 +72,14 @@ Search indexed documents using TF-IDF relevance scoring.
   "maxResults": 10,
   "useAndLogic": false,
   "labels": ["category1"],
-  "tags": {"type": "documentation"}
+  "tags": {"type": "documentation"},
+  "includeMatchedTerms": true,
+  "includeTermDetails": true,
+  "includeDocumentTermStats": false
 }
 ```
+
+The enrichment flags are optional and default to `false`. Matched terms and term details use existing search scoring data. Document term stats add one grouped aggregate query for the returned result documents.
 
 ### verbex_add_document
 Add a document to the search index.

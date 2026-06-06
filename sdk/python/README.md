@@ -39,6 +39,15 @@ results = client.search(index.identifier, "fox")
 for result in results.results:
     print(f"Document: {result.document_id}, Score: {result.score}")
 
+# Enriched search
+enriched = client.search(
+    index.identifier,
+    "machine learning",
+    include_matched_terms=True,
+    include_term_details=True,
+    include_document_term_stats=True
+)
+
 # Cleanup
 client.delete_index(index.identifier)
 client.close()
@@ -91,7 +100,7 @@ python test_harness.py http://localhost:8080 verbexadmin
 - `update_document_custom_metadata(index_id, document_id, custom_metadata)` - Returns `DocumentInfo`
 
 #### Search
-- `search(index_id, query, max_results?, labels?, tags?)` - Returns `SearchData`
+- `search(index_id, query, max_results?, labels?, tags?, use_and_logic?, include_matched_terms?, include_term_details?, include_document_term_stats?)` - Returns `SearchData`
 
 #### Admin - Tenant Management
 - `list_tenants()` - Returns `List[TenantInfo]`
@@ -122,6 +131,8 @@ python test_harness.py http://localhost:8080 verbexadmin
 - `AddDocumentData` - Add document response (document_id, message)
 - `SearchData` - Search response with results
 - `SearchResult` - Individual search result
+- `SearchTermDetail` - Optional per-term score/frequency detail
+- `SearchDocumentTermStats` - Optional whole-document term counts
 - `BatchDocumentsResult` - Batch document retrieval result (documents, not_found, count, requested_count)
 - `TenantInfo` - Tenant information
 - `UserInfo` - User information

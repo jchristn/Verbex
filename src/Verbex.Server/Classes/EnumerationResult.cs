@@ -102,10 +102,9 @@ namespace Verbex.Server.Classes
             long recordsFetched = query.Skip + objects.Count;
             RecordsRemaining = Math.Max(0, totalRecords - recordsFetched);
 
-            // Determine if this is the end of results
-            // End of results when: no records remaining OR we received fewer objects than requested
-            // (the latter handles edge cases where count mismatches actual data)
-            EndOfResults = RecordsRemaining == 0 || objects.Count < query.MaxResults;
+            // Determine if this is the end of results. TotalRecords is authoritative for
+            // non-empty pages; an empty page terminates to avoid repeating the same skip.
+            EndOfResults = RecordsRemaining == 0 || objects.Count == 0;
 
             // Generate continuation token only if there are more results
             // Never generate a token if objects is empty (would cause infinite loop with same skip value)

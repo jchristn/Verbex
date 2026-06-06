@@ -311,14 +311,34 @@ class BatchExistenceResult:
 
 
 @dataclass
+class SearchTermDetail:
+    """Per-term search result detail."""
+    term: str = ""
+    score: float = 0.0
+    frequency: int = 0
+
+
+@dataclass
+class SearchDocumentTermStats:
+    """Whole-document term statistics."""
+    unique_term_count: int = 0
+    total_term_occurrences: int = 0
+
+
+@dataclass
 class SearchResult:
     """Search result model."""
     document_id: str = ""
     score: float = 0.0
     content: Optional[str] = None
+    document: Optional[Dict[str, Any]] = None
+    matched_term_count: int = 0
     total_term_matches: int = 0
     term_scores: Optional[Dict[str, float]] = None
     term_frequencies: Optional[Dict[str, int]] = None
+    matched_terms: Optional[List[str]] = None
+    term_details: Optional[List[SearchTermDetail]] = None
+    document_term_stats: Optional[SearchDocumentTermStats] = None
 
 
 @dataclass
@@ -329,6 +349,7 @@ class SearchData:
     total_count: int = 0
     max_results: int = 100
     search_time: float = 0.0
+    timing_info: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -1353,7 +1374,11 @@ class VerbexClient:
         query: str,
         max_results: int = 100,
         labels: Optional[List[str]] = None,
-        tags: Optional[Dict[str, str]] = None
+        tags: Optional[Dict[str, str]] = None,
+        use_and_logic: bool = False,
+        include_matched_terms: bool = False,
+        include_term_details: bool = False,
+        include_document_term_stats: bool = False
     ) -> SearchData:
         """
         Search documents in an index with optional label and tag filters.
@@ -1367,31 +1392,66 @@ class VerbexClient:
             max_results: Maximum number of results to return
             labels: Optional list of labels to filter by (AND logic, case-insensitive)
             tags: Optional dict of tags to filter by (AND logic, exact match)
+            use_and_logic: If True, documents must contain all query terms
+            include_matched_terms: Include matched query terms on each result
+            include_term_details: Include per-term score and frequency details on each result
+            include_document_term_stats: Include whole-document aggregate term statistics on each result
 
         Returns:
             SearchData containing search results
         """
         request_data = {
             'Query': query,
-            'MaxResults': max_results
+            'MaxResults': max_results,
+            'UseAndLogic': use_and_logic
         }
         if labels and len(labels) > 0:
             request_data['Labels'] = labels
         if tags and len(tags) > 0:
             request_data['Tags'] = tags
+        if include_matched_terms:
+            request_data['IncludeMatchedTerms'] = True
+        if include_term_details:
+            request_data['IncludeTermDetails'] = True
+        if include_document_term_stats:
+            request_data['IncludeDocumentTermStats'] = True
 
         data = self._make_request('POST', f'/v1.0/indices/{index_id}/search', data=request_data)
 
         results = []
         if data and data.get('results'):
             for r in data['results']:
+                term_details = None
+                if r.get('term_details'):
+                    term_details = [
+                        SearchTermDetail(
+                            term=d.get('term', ''),
+                            score=d.get('score', 0.0),
+                            frequency=d.get('frequency', 0)
+                        )
+                        for d in r['term_details']
+                    ]
+
+                document_term_stats = None
+                if r.get('document_term_stats'):
+                    stats = r['document_term_stats']
+                    document_term_stats = SearchDocumentTermStats(
+                        unique_term_count=stats.get('unique_term_count', 0),
+                        total_term_occurrences=stats.get('total_term_occurrences', 0)
+                    )
+
                 results.append(SearchResult(
                     document_id=r.get('document_id', ''),
                     score=r.get('score', 0.0),
                     content=r.get('content'),
+                    document=r.get('document'),
+                    matched_term_count=r.get('matched_term_count', 0),
                     total_term_matches=r.get('total_term_matches', 0),
                     term_scores=r.get('term_scores'),
-                    term_frequencies=r.get('term_frequencies')
+                    term_frequencies=r.get('term_frequencies'),
+                    matched_terms=r.get('matched_terms'),
+                    term_details=term_details,
+                    document_term_stats=document_term_stats
                 ))
 
         return SearchData(
@@ -1399,7 +1459,8 @@ class VerbexClient:
             results=results,
             total_count=data.get('total_count', 0) if data else 0,
             max_results=data.get('max_results', 100) if data else 100,
-            search_time=data.get('search_time', 0.0) if data else 0.0
+            search_time=data.get('search_time', 0.0) if data else 0.0,
+            timing_info=data.get('timing_info') if data else None
         )
 
     # ==================== Terms Endpoints ====================

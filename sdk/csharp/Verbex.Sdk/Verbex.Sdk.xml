@@ -1693,6 +1693,51 @@
             Time taken for the search in milliseconds.
             </summary>
         </member>
+        <member name="P:Verbex.Sdk.SearchData.TimingInfo">
+            <summary>
+            Optional detailed search timing information.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.SearchOptions">
+            <summary>
+            Optional search request settings.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchOptions.MaxResults">
+            <summary>
+            Maximum number of results to return.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchOptions.UseAndLogic">
+            <summary>
+            If true, documents must contain all query terms.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchOptions.Labels">
+            <summary>
+            Optional labels to filter by.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchOptions.Tags">
+            <summary>
+            Optional tags to filter by.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchOptions.IncludeMatchedTerms">
+            <summary>
+            Include matched query terms on each result.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchOptions.IncludeTermDetails">
+            <summary>
+            Include per-term score and frequency details on each result.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchOptions.IncludeDocumentTermStats">
+            <summary>
+            Include whole-document aggregate term statistics on each result.
+            </summary>
+        </member>
         <member name="T:Verbex.Sdk.SearchRequest">
             <summary>
             Request body for searching documents in an index with optional label and tag filters.
@@ -1727,12 +1772,36 @@
             If null or empty, no tag filtering is applied.
             </summary>
         </member>
+        <member name="P:Verbex.Sdk.SearchRequest.UseAndLogic">
+            <summary>
+            If true, documents must contain all query terms.
+            Default is false.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchRequest.IncludeMatchedTerms">
+            <summary>
+            Include matched query terms on each result.
+            Default is false.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchRequest.IncludeTermDetails">
+            <summary>
+            Include per-term score and frequency details on each result.
+            Default is false.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchRequest.IncludeDocumentTermStats">
+            <summary>
+            Include whole-document aggregate term statistics on each result.
+            Default is false.
+            </summary>
+        </member>
         <member name="M:Verbex.Sdk.SearchRequest.#ctor">
             <summary>
             Instantiate an empty SearchRequest.
             </summary>
         </member>
-        <member name="M:Verbex.Sdk.SearchRequest.#ctor(System.String,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String})">
+        <member name="M:Verbex.Sdk.SearchRequest.#ctor(System.String,System.Int32,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.Boolean,System.Boolean,System.Boolean,System.Boolean)">
             <summary>
             Instantiate a SearchRequest with query parameters.
             </summary>
@@ -1740,6 +1809,10 @@
             <param name="maxResults">Maximum number of results to return. Default is 100.</param>
             <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
             <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
+            <param name="useAndLogic">Use AND logic for query terms.</param>
+            <param name="includeMatchedTerms">Include matched query terms on each result.</param>
+            <param name="includeTermDetails">Include per-term score and frequency details on each result.</param>
+            <param name="includeDocumentTermStats">Include whole-document aggregate term statistics on each result.</param>
         </member>
         <member name="T:Verbex.Sdk.SearchResult">
             <summary>
@@ -1756,9 +1829,84 @@
             Relevance score for the result.
             </summary>
         </member>
+        <member name="P:Verbex.Sdk.SearchResult.Document">
+            <summary>
+            Document metadata, when returned by the server.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchResult.MatchedTermCount">
+            <summary>
+            Number of query terms matched by this result.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchResult.TermScores">
+            <summary>
+            Term-specific score contributions.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchResult.TermFrequencies">
+            <summary>
+            Term frequencies in the matched document.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchResult.TotalTermMatches">
+            <summary>
+            Total matched term occurrences across all query terms.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchResult.MatchedTerms">
+            <summary>
+            Optional matched query terms, returned when requested.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchResult.TermDetails">
+            <summary>
+            Optional per-term details, returned when requested.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchResult.DocumentTermStats">
+            <summary>
+            Optional whole-document term statistics, returned when requested.
+            </summary>
+        </member>
         <member name="P:Verbex.Sdk.SearchResult.Content">
             <summary>
             Document content or excerpt.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.SearchTermDetail">
+            <summary>
+            Per-term search result detail.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchTermDetail.Term">
+            <summary>
+            Matched query term.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchTermDetail.Score">
+            <summary>
+            Term score contribution.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchTermDetail.Frequency">
+            <summary>
+            Term frequency in the document.
+            </summary>
+        </member>
+        <member name="T:Verbex.Sdk.SearchDocumentTermStats">
+            <summary>
+            Whole-document term statistics.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchDocumentTermStats.UniqueTermCount">
+            <summary>
+            Number of unique terms indexed for the document.
+            </summary>
+        </member>
+        <member name="P:Verbex.Sdk.SearchDocumentTermStats.TotalTermOccurrences">
+            <summary>
+            Total indexed term occurrences for the document.
             </summary>
         </member>
         <member name="T:Verbex.Sdk.ValidationData">
@@ -2128,6 +2276,17 @@
             <param name="maxResults">Maximum number of results to return.</param>
             <param name="labels">Optional labels to filter by (AND logic, case-insensitive).</param>
             <param name="tags">Optional tags to filter by (AND logic, exact match).</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Search data including results and metadata.</returns>
+            <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>
+        </member>
+        <member name="M:Verbex.Sdk.VerbexClient.SearchAsync(System.String,System.String,Verbex.Sdk.SearchOptions,System.Threading.CancellationToken)">
+            <summary>
+            Searches documents in an index with an options object.
+            </summary>
+            <param name="indexId">The index identifier.</param>
+            <param name="query">The search query.</param>
+            <param name="options">Optional search settings and enrichment flags.</param>
             <param name="cancellationToken">Cancellation token.</param>
             <returns>Search data including results and metadata.</returns>
             <exception cref="T:Verbex.Sdk.VerbexException">Thrown when the request fails.</exception>

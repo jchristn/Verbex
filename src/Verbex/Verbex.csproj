@@ -4,10 +4,10 @@
 		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<Version>0.1.9</Version>
+		<Version>0.1.10</Version>
 		<ApplicationIcon>logo.ico</ApplicationIcon>
 		<GenerateDocumentationFile>True</GenerateDocumentationFile>
-		<DocumentationFile>Verbex.xml</DocumentationFile>
+		<DocumentationFile>$(OutputPath)Verbex.xml</DocumentationFile>
 		<Title>Verbex</Title>
 		<Authors>jchristn</Authors>
 		<Description>Verbex is a comprehensive inverted index library that enables fast, scalable full-text search capabilities.</Description>
@@ -51,12 +51,6 @@
 		<PackageReference Include="MySqlConnector" Version="2.4.0" />
 		<PackageReference Include="Npgsql" Version="9.0.3" />
 		<PackageReference Include="PrettyId" Version="2.0.0" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<None Update="Verbex.xml">
-			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</None>
 	</ItemGroup>
 
 </Project>

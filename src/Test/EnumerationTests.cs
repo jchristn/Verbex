@@ -28,6 +28,7 @@ namespace Test
             runner.RunTest("EnumerationResult_Pagination", TestEnumerationResultPagination);
             runner.RunTest("EnumerationResult_ContinuationToken", TestEnumerationResultContinuationToken);
             runner.RunTest("EnumerationResult_EndOfResults", TestEnumerationResultEndOfResults);
+            runner.RunTest("EnumerationResult_EmptyPageTerminates", TestEnumerationResultEmptyPageTerminates);
             runner.RunTest("EnumerationResult_Empty", TestEnumerationResultEmpty);
             runner.RunTest("EnumerationQuery_ParseLabels", TestEnumerationQueryParseLabels);
             runner.RunTest("EnumerationQuery_ParseTags", TestEnumerationQueryParseTags);
@@ -225,6 +226,19 @@ namespace Test
             TestAssert.AreEqual(0L, result.RecordsRemaining);
             TestAssert.IsTrue(result.EndOfResults, "EndOfResults should be true when no more records");
             TestAssert.IsNull(result.ContinuationToken, "ContinuationToken should be null at end of results");
+        }
+
+        private static void TestEnumerationResultEmptyPageTerminates()
+        {
+            EnumerationQuery query = new EnumerationQuery(10, 10);
+            List<string> objects = new List<string>();
+            long totalRecords = 25;
+
+            EnumerationResult<string> result = new EnumerationResult<string>(query, objects, totalRecords);
+
+            TestAssert.AreEqual(15L, result.RecordsRemaining);
+            TestAssert.IsTrue(result.EndOfResults, "Empty pages should terminate even when TotalRecords is stale");
+            TestAssert.IsNull(result.ContinuationToken, "Empty pages should not emit a repeat-skip continuation token");
         }
 
         private static void TestEnumerationResultEmpty()

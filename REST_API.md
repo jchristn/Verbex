@@ -141,7 +141,10 @@ curl -X GET "http://localhost:8080/v1.0/indices?maxResults=50&ordering=CreatedAs
   "MaxResults": "integer (optional, default: 100)",
   "UseAndLogic": "boolean (optional, default: false)",
   "Labels": ["string (optional)"],
-  "Tags": {"key": "value (optional)"}
+  "Tags": {"key": "value (optional)"},
+  "IncludeMatchedTerms": "boolean (optional, default: false)",
+  "IncludeTermDetails": "boolean (optional, default: false)",
+  "IncludeDocumentTermStats": "boolean (optional, default: false)"
 }
 ```
 
@@ -152,6 +155,9 @@ curl -X GET "http://localhost:8080/v1.0/indices?maxResults=50&ordering=CreatedAs
 | UseAndLogic | boolean | No | If true, documents must contain ALL terms (AND). If false, documents can contain ANY term (OR). Default: false |
 | Labels | string[] | No | Filter documents by labels (AND logic, case-insensitive) |
 | Tags | object | No | Filter documents by tags (AND logic, exact match) |
+| IncludeMatchedTerms | boolean | No | Include `MatchedTerms` on each result. Default: false |
+| IncludeTermDetails | boolean | No | Include `TermDetails` on each result and also include `MatchedTerms`. Default: false |
+| IncludeDocumentTermStats | boolean | No | Include whole-document `DocumentTermStats` with one grouped database query. Default: false |
 
 ### AddDocumentRequest
 ```json
@@ -192,7 +198,19 @@ curl -X GET "http://localhost:8080/v1.0/indices?maxResults=50&ordering=CreatedAs
   "MatchedTermCount": "integer",
   "TermScores": {"term": "score"},
   "TermFrequencies": {"term": "count"},
-  "TotalTermMatches": "integer"
+  "TotalTermMatches": "integer",
+  "MatchedTerms": ["string (only when requested)"],
+  "TermDetails": [
+    {
+      "Term": "string",
+      "Score": "number",
+      "Frequency": "integer"
+    }
+  ],
+  "DocumentTermStats": {
+    "UniqueTermCount": "integer",
+    "TotalTermOccurrences": "integer"
+  }
 }
 ```
 
@@ -1184,6 +1202,8 @@ Content-Type: application/json
 
 Note: `Labels` and `Tags` are optional filters. When provided, documents must match ALL specified labels (AND logic, case-insensitive) and ALL specified tags (AND logic, exact match). Filtering is performed via SQL JOINs during document retrieval for optimal performance.
 
+Search enrichment is opt-in and additive. Default search responses preserve the legacy result fields. `IncludeMatchedTerms` and `IncludeTermDetails` use data already collected during scoring and do not add database calls. `IncludeDocumentTermStats` adds at most one grouped query for the result document IDs after `MaxResults` is applied.
+
 #### Wildcard Search
 
 Use `"*"` as the `Query` value to return all documents without term matching. This is useful for browsing documents by metadata filters.
@@ -1191,6 +1211,8 @@ Use `"*"` as the `Query` value to return all documents without term matching. Th
 - Wildcard results have a score of 0 and are ordered by creation date
 - Can be combined with `Labels` and `Tags` filters to browse matching documents
 - Respects the `MaxResults` parameter
+- If requested, `MatchedTerms` and `TermDetails` are empty arrays for wildcard results
+- If requested, `DocumentTermStats` is populated for wildcard results
 
 **curl Examples:**
 ```bash
@@ -1245,12 +1267,67 @@ curl -X POST "http://localhost:8000/v1.0/indices/{id}/search" \
     ],
     "TotalCount": 1,
     "MaxResults": 10,
-    "SearchTime": 12.34
+    "SearchTime": 12.34,
+    "TimingInfo": {
+      "TermLookupMs": 1,
+      "TermsFound": 2,
+      "MainSearchMs": 2,
+      "MatchesFound": 1,
+      "TermFrequenciesMs": 1,
+      "TermFrequencyRecords": 2,
+      "DocumentMetadataMs": 2,
+      "DocumentsFetched": 1,
+      "DocumentCountMs": 1,
+      "TotalDocuments": 100
+    }
   },
   "Headers": {},
   "TotalCount": null,
   "Skip": null,
   "ProcessingTimeMs": 12.34
+}
+```
+
+**Enriched Request:**
+```json
+{
+  "Query": "machine learning algorithms",
+  "MaxResults": 10,
+  "IncludeMatchedTerms": true,
+  "IncludeTermDetails": true,
+  "IncludeDocumentTermStats": true
+}
+```
+
+**Enriched Result Fields:**
+```json
+{
+  "MatchedTerms": ["learning", "machine"],
+  "TermDetails": [
+    {
+      "Term": "learning",
+      "Score": 0.43,
+      "Frequency": 1
+    },
+    {
+      "Term": "machine",
+      "Score": 0.42,
+      "Frequency": 2
+    }
+  ],
+  "DocumentTermStats": {
+    "UniqueTermCount": 1840,
+    "TotalTermOccurrences": 78893
+  }
+}
+```
+
+**Wildcard Stats Request:**
+```json
+{
+  "Query": "*",
+  "MaxResults": 25,
+  "IncludeDocumentTermStats": true
 }
 ```
 

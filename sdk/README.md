@@ -92,6 +92,7 @@ All SDKs cover the complete Verbex REST API:
 
 ### Search
 - `POST /v1.0/indices/{id}/search` - Search documents
+- Optional search enrichment flags are supported across SDKs: matched terms, per-term details, and document term statistics. Defaults preserve the legacy response shape.
 
 ## Test Cases
 

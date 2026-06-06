@@ -890,6 +890,36 @@ namespace Verbex.Sdk
             return await MakeRequestAsync<SearchData>(HttpMethod.Post, $"/v1.0/indices/{indexId}/search", request, true, cancellationToken).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Searches documents in an index with an options object.
+        /// </summary>
+        /// <param name="indexId">The index identifier.</param>
+        /// <param name="query">The search query.</param>
+        /// <param name="options">Optional search settings and enrichment flags.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Search data including results and metadata.</returns>
+        /// <exception cref="VerbexException">Thrown when the request fails.</exception>
+        public async Task<SearchData> SearchAsync(
+            string indexId,
+            string query,
+            SearchOptions? options,
+            CancellationToken cancellationToken = default)
+        {
+            options ??= new SearchOptions();
+
+            SearchRequest request = new SearchRequest(
+                query,
+                options.MaxResults,
+                options.Labels,
+                options.Tags,
+                options.UseAndLogic,
+                options.IncludeMatchedTerms,
+                options.IncludeTermDetails,
+                options.IncludeDocumentTermStats);
+
+            return await MakeRequestAsync<SearchData>(HttpMethod.Post, $"/v1.0/indices/{indexId}/search", request, true, cancellationToken).ConfigureAwait(false);
+        }
+
         // ==================== Terms Endpoints ====================
 
         /// <summary>

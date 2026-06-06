@@ -168,6 +168,9 @@ namespace Test
                 Console.WriteLine($"--- Wildcard Search Tests ({modeName}) ---");
                 await WildcardSearchTests.RunAllAsync(runner).ConfigureAwait(false);
 
+                Console.WriteLine($"--- Search Enrichment Tests ({modeName}) ---");
+                await SearchEnrichmentTests.RunAllAsync(runner).ConfigureAwait(false);
+
                 Console.WriteLine();
             }
             finally

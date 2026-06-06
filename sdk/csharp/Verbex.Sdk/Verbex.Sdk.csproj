@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<Version>0.1.9</Version>
+		<Version>0.1.10</Version>
 		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
@@ -10,7 +10,7 @@
 		<Description>Verbex Inverted Index SDK for .NET</Description>
 		<ApplicationIcon>logo.ico</ApplicationIcon>
 		<GenerateDocumentationFile>True</GenerateDocumentationFile>
-		<DocumentationFile>Verbex.Sdk.xml</DocumentationFile>
+		<DocumentationFile>$(OutputPath)Verbex.Sdk.xml</DocumentationFile>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<Title>SDK for Verbex, an in-process or standalone inverted index server</Title>
 		<Authors>jchristn</Authors>
@@ -45,12 +45,5 @@
 			<PackagePath>\</PackagePath>
 		</None>
 	</ItemGroup>
-
-	<ItemGroup>
-		<None Update="Verbex.Sdk.xml">
-			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</None>
-	</ItemGroup>
-
 
 </Project>

@@ -225,11 +225,17 @@ Performs full-text search on the current index.
 - `--label <label>`, `-L` - Label filter (can be repeated)
 - `--limit <n>`, `-l` - Maximum number of results (default: 10)
 - `--index <name>`, `-i` - Index to search (uses active index if not specified)
+- `--matched-terms` - Include matched query term values
+- `--term-details` - Include per-term score and frequency details
+- `--term-stats` - Include document unique term count and total term occurrences
 
 **Output Columns:**
 - `Document` - Document name
 - `Score` - Relevance score (0.0 - 1.0)
-- `Matches` - Terms that matched in the document
+- `MatchedTerms` - Number of query terms matched in the document
+- `MatchedTermValues` - Matched terms when `--matched-terms` or `--term-details` is used
+- `TermDetails` - Per-term score/frequency summary when `--term-details` is used
+- `UniqueTermCount`, `TotalTermOccurrences` - Document term stats when `--term-stats` is used
 
 **Examples:**
 ```bash
@@ -259,6 +265,12 @@ vbx search "learning" --filter category=tech
 
 # Multiple tag filters (AND logic)
 vbx search "neural networks" --filter category=tech --filter author=Alice
+
+# Include enriched matched terms and per-term details
+vbx search "machine learning" --matched-terms --term-details
+
+# Include document term statistics
+vbx search "*" --term-stats
 
 # Combined label and tag filters
 vbx search "deep learning" --label research --filter year=2024 --limit 20

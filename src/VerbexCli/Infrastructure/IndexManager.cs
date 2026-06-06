@@ -539,15 +539,89 @@ namespace VerbexCli.Infrastructure
         /// <returns>Array of search result objects</returns>
         public async Task<object[]> SearchAsync(string indexName, string query, bool useAndLogic, int limit, List<string>? labels, Dictionary<string, string>? tags, CancellationToken cancellationToken = default)
         {
+            return await SearchAsync(
+                indexName,
+                query,
+                useAndLogic,
+                limit,
+                labels,
+                tags,
+                false,
+                false,
+                false,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Searches documents in the specified index with optional filters and enrichment output
+        /// </summary>
+        /// <param name="indexName">Name of the index to search</param>
+        /// <param name="query">Search query string</param>
+        /// <param name="useAndLogic">Whether to use AND logic for term matching</param>
+        /// <param name="limit">Maximum number of results to return</param>
+        /// <param name="labels">Optional list of labels to filter by</param>
+        /// <param name="tags">Optional dictionary of tag key-value pairs to filter by</param>
+        /// <param name="includeMatchedTerms">Include matched query term values in the output</param>
+        /// <param name="includeTermDetails">Include per-term score and frequency details in the output</param>
+        /// <param name="includeDocumentTermStats">Include whole-document term statistics in the output</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Array of search result objects</returns>
+        public async Task<object[]> SearchAsync(
+            string indexName,
+            string query,
+            bool useAndLogic,
+            int limit,
+            List<string>? labels,
+            Dictionary<string, string>? tags,
+            bool includeMatchedTerms,
+            bool includeTermDetails,
+            bool includeDocumentTermStats,
+            CancellationToken cancellationToken = default)
+        {
             InvertedIndex index = await GetIndexAsync(indexName, cancellationToken).ConfigureAwait(false);
 
             SearchResults results = await index.SearchAsync(query, limit, useAndLogic, labels, tags, cancellationToken).ConfigureAwait(false);
+
+            if (!includeMatchedTerms && !includeTermDetails && !includeDocumentTermStats)
+            {
+                return results.Results.Select(result => new
+                {
+                    Document = GetDocumentName(indexName, result.DocumentId) ?? "Unknown",
+                    Score = Math.Round(result.Score, 4),
+                    MatchedTerms = result.MatchedTermCount
+                }).ToArray();
+            }
+
+            Dictionary<string, Verbex.Models.DocumentTermStats> statsByDocumentId = includeDocumentTermStats
+                ? await index.GetDocumentTermStatsAsync(results.Results.Select(result => result.DocumentId), cancellationToken).ConfigureAwait(false)
+                : new Dictionary<string, Verbex.Models.DocumentTermStats>();
 
             return results.Results.Select(result => new
             {
                 Document = GetDocumentName(indexName, result.DocumentId) ?? "Unknown",
                 Score = Math.Round(result.Score, 4),
-                MatchedTerms = result.MatchedTermCount
+                MatchedTerms = result.MatchedTermCount,
+                MatchedTermValues = (includeMatchedTerms || includeTermDetails)
+                    ? string.Join(", ", result.TermScores.Keys.OrderBy(term => term, StringComparer.Ordinal))
+                    : null,
+                TermDetails = includeTermDetails
+                    ? string.Join(", ", result.TermScores
+                        .Select(kvp => new
+                        {
+                            Term = kvp.Key,
+                            Score = kvp.Value,
+                            Frequency = result.TermFrequencies.TryGetValue(kvp.Key, out int frequency) ? frequency : 0
+                        })
+                        .OrderByDescending(detail => detail.Score)
+                        .ThenBy(detail => detail.Term, StringComparer.Ordinal)
+                        .Select(detail => $"{detail.Term}: score={Math.Round(detail.Score, 4)}, frequency={detail.Frequency}"))
+                    : null,
+                UniqueTermCount = includeDocumentTermStats && statsByDocumentId.TryGetValue(result.DocumentId, out Verbex.Models.DocumentTermStats? stats)
+                    ? stats.UniqueTermCount
+                    : (long?)null,
+                TotalTermOccurrences = includeDocumentTermStats && statsByDocumentId.TryGetValue(result.DocumentId, out stats)
+                    ? stats.TotalTermOccurrences
+                    : (long?)null
             }).ToArray();
         }
 

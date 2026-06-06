@@ -96,6 +96,54 @@ namespace Verbex.Server.Classes
             }
         }
 
+        /// <summary>
+        /// Include the matched query terms for each result.
+        /// Default value is false.
+        /// </summary>
+        public bool IncludeMatchedTerms
+        {
+            get
+            {
+                return _IncludeMatchedTerms;
+            }
+            set
+            {
+                _IncludeMatchedTerms = value;
+            }
+        }
+
+        /// <summary>
+        /// Include per-term score and frequency details for each result.
+        /// Default value is false.
+        /// </summary>
+        public bool IncludeTermDetails
+        {
+            get
+            {
+                return _IncludeTermDetails;
+            }
+            set
+            {
+                _IncludeTermDetails = value;
+            }
+        }
+
+        /// <summary>
+        /// Include whole-document aggregate term statistics for each result.
+        /// Default value is false.
+        /// </summary>
+        public bool IncludeDocumentTermStats
+        {
+            get
+            {
+                return _IncludeDocumentTermStats;
+            }
+            set
+            {
+                _IncludeDocumentTermStats = value;
+            }
+        }
+
         #endregion
 
         #region Private-Members
@@ -105,6 +153,9 @@ namespace Verbex.Server.Classes
         private bool _UseAndLogic = false;
         private List<string>? _Labels = null;
         private Dictionary<string, object>? _Tags = null;
+        private bool _IncludeMatchedTerms = false;
+        private bool _IncludeTermDetails = false;
+        private bool _IncludeDocumentTermStats = false;
 
         #endregion
 

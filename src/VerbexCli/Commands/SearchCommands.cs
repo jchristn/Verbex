@@ -3,6 +3,7 @@ namespace VerbexCli.Commands
     using System;
     using System.Collections.Generic;
     using System.CommandLine;
+    using System.CommandLine.Invocation;
     using System.Linq;
     using System.Threading.Tasks;
     using VerbexCli.Infrastructure;
@@ -60,17 +61,51 @@ namespace VerbexCli.Commands
                 AllowMultipleArgumentsPerToken = true
             };
 
+            Option<bool> matchedTermsOption = new Option<bool>(
+                aliases: new[] { "--matched-terms" },
+                description: "Include matched query term values in the output")
+            {
+                IsRequired = false
+            };
+
+            Option<bool> termDetailsOption = new Option<bool>(
+                aliases: new[] { "--term-details" },
+                description: "Include per-term score and frequency details in the output")
+            {
+                IsRequired = false
+            };
+
+            Option<bool> termStatsOption = new Option<bool>(
+                aliases: new[] { "--term-stats" },
+                description: "Include whole-document unique term and total occurrence statistics")
+            {
+                IsRequired = false
+            };
+
             searchCommand.AddArgument(queryArgument);
             searchCommand.AddOption(indexOption);
             searchCommand.AddOption(andOption);
             searchCommand.AddOption(limitOption);
             searchCommand.AddOption(filterOption);
             searchCommand.AddOption(labelOption);
+            searchCommand.AddOption(matchedTermsOption);
+            searchCommand.AddOption(termDetailsOption);
+            searchCommand.AddOption(termStatsOption);
 
-            searchCommand.SetHandler(async (string query, string? index, bool useAnd, int limit, string[]? filters, string[]? labels) =>
+            searchCommand.SetHandler(async (InvocationContext context) =>
             {
-                await HandleSearchAsync(index, query, useAnd, limit, filters, labels).ConfigureAwait(false);
-            }, queryArgument, indexOption, andOption, limitOption, filterOption, labelOption);
+                string query = context.ParseResult.GetValueForArgument(queryArgument);
+                string? index = context.ParseResult.GetValueForOption(indexOption);
+                bool useAnd = context.ParseResult.GetValueForOption(andOption);
+                int limit = context.ParseResult.GetValueForOption(limitOption);
+                string[]? filters = context.ParseResult.GetValueForOption(filterOption);
+                string[]? labels = context.ParseResult.GetValueForOption(labelOption);
+                bool matchedTerms = context.ParseResult.GetValueForOption(matchedTermsOption);
+                bool termDetails = context.ParseResult.GetValueForOption(termDetailsOption);
+                bool termStats = context.ParseResult.GetValueForOption(termStatsOption);
+
+                await HandleSearchAsync(index, query, useAnd, limit, filters, labels, matchedTerms, termDetails, termStats).ConfigureAwait(false);
+            });
 
             return searchCommand;
         }
@@ -78,7 +113,16 @@ namespace VerbexCli.Commands
         /// <summary>
         /// Handles the search command
         /// </summary>
-        private static async Task HandleSearchAsync(string? index, string query, bool useAnd, int limit, string[]? filters, string[]? labels)
+        private static async Task HandleSearchAsync(
+            string? index,
+            string query,
+            bool useAnd,
+            int limit,
+            string[]? filters,
+            string[]? labels,
+            bool includeMatchedTerms,
+            bool includeTermDetails,
+            bool includeDocumentTermStats)
         {
             try
             {
@@ -127,7 +171,16 @@ namespace VerbexCli.Commands
 
                 OutputManager.WriteVerbose($"Searching index '{actualIndex}' for '{query}' using {logic} logic (limit: {limit}){filterDescription}");
 
-                object[] results = await IndexManager.Instance.SearchAsync(actualIndex, query, useAnd, limit, labelsList, tagFilters).ConfigureAwait(false);
+                object[] results = await IndexManager.Instance.SearchAsync(
+                    actualIndex,
+                    query,
+                    useAnd,
+                    limit,
+                    labelsList,
+                    tagFilters,
+                    includeMatchedTerms,
+                    includeTermDetails,
+                    includeDocumentTermStats).ConfigureAwait(false);
 
                 OutputManager.WriteInfo($"Found {results.Length} result(s) for query '{query}' using {logic} logic{filterDescription}");
                 OutputManager.WriteData(results);

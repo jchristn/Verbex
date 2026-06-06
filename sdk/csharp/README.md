@@ -41,10 +41,18 @@ AddDocumentData doc2 = await client.AddDocumentAsync(index.Identifier, "Machine 
 
 // Search - returns SearchData directly
 SearchData results = await client.SearchAsync(index.Identifier, "fox");
-foreach (SearchResultItem result in results.Results)
+foreach (SearchResult result in results.Results)
 {
     Console.WriteLine($"Document: {result.DocumentId}, Score: {result.Score}");
 }
+
+// Enriched search
+SearchData enriched = await client.SearchAsync(index.Identifier, "machine learning", new SearchOptions
+{
+    IncludeMatchedTerms = true,
+    IncludeTermDetails = true,
+    IncludeDocumentTermStats = true
+});
 
 // Cleanup
 await client.DeleteIndexAsync(index.Identifier);
@@ -99,6 +107,7 @@ dotnet run -- http://localhost:8080 verbexadmin
 
 #### Search
 - `SearchAsync(string indexId, string query, int maxResults, ...)` - Returns `SearchData`
+- `SearchAsync(string indexId, string query, SearchOptions options, ...)` - Returns `SearchData` with optional matched terms, term details, and document term stats
 
 #### Admin - Tenant Management
 - `ListTenantsAsync(CancellationToken)` - Returns `List<TenantInfo>`
@@ -127,7 +136,10 @@ dotnet run -- http://localhost:8080 verbexadmin
 - `DocumentInfo` - Document information
 - `AddDocumentData` - Add document response (DocumentId, Message)
 - `SearchData` - Search response with results
-- `SearchResultItem` - Individual search result
+- `SearchResult` - Individual search result
+- `SearchOptions` - Optional search filters and enrichment flags
+- `SearchTermDetail` - Optional per-term score/frequency detail
+- `SearchDocumentTermStats` - Optional whole-document term counts
 - `BatchDocumentsResult` - Batch document retrieval result (Documents, NotFound, Count, RequestedCount)
 - `TenantInfo` - Tenant information
 - `UserInfo` - User information

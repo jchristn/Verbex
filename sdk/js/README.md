@@ -39,6 +39,13 @@ async function main() {
         console.log(`Document: ${result.documentId}, Score: ${result.score}`);
     }
 
+    // Enriched search
+    const enriched = await client.search(index.identifier, 'machine learning', {
+        includeMatchedTerms: true,
+        includeTermDetails: true,
+        includeDocumentTermStats: true
+    });
+
     // Cleanup
     await client.deleteIndex(index.identifier);
 }
@@ -94,6 +101,7 @@ node test-harness.js http://localhost:8080 verbexadmin
 
 #### Search
 - `search(indexId, query, maxResults?, labels?, tags?)` - Returns `SearchData`
+- `search(indexId, query, options)` - Returns `SearchData` with optional matched terms, term details, and document term stats
 
 #### Admin - Tenant Management
 - `listTenants()` - Returns `TenantInfo[]`
@@ -123,6 +131,8 @@ node test-harness.js http://localhost:8080 verbexadmin
 - `AddDocumentData` - Add document response (documentId, message)
 - `SearchData` - Search response with results
 - `SearchResult` - Individual search result
+- `SearchTermDetail` - Optional per-term score/frequency detail
+- `SearchDocumentTermStats` - Optional whole-document term counts
 - `BatchDocumentsResult` - Batch document retrieval result (documents, notFound, count, requestedCount)
 - `TenantInfo` - Tenant information
 - `UserInfo` - User information

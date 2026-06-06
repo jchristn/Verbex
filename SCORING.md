@@ -268,6 +268,8 @@ DocumentScore = Σ TF-IDF(term, document) for all query terms
 
 Each matching term contributes its TF-IDF score to the document's total.
 
+REST and SDK clients can request `IncludeTermDetails` to receive a `TermDetails` array per result. Each item contains the matched `Term`, its normalized score contribution, and its frequency in that document. This is additive metadata; it does not change scoring.
+
 ### Scoring Example
 
 Consider an index with 1000 documents:

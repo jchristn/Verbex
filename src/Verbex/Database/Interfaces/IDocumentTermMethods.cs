@@ -126,6 +126,18 @@ namespace Verbex.Database.Interfaces
         Task<List<DocumentTermRecord>> GetByDocumentsAsync(string tablePrefix, IEnumerable<string> documentIds, CancellationToken token = default);
 
         /// <summary>
+        /// Gets aggregate term statistics for multiple documents.
+        /// </summary>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+        /// <param name="documentIds">Document IDs.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Dictionary of document IDs to aggregate document term statistics.</returns>
+        Task<Dictionary<string, DocumentTermStats>> GetStatsByDocumentsAsync(
+            string tablePrefix,
+            IEnumerable<string> documentIds,
+            CancellationToken token = default);
+
+        /// <summary>
         /// Deletes all term mappings for multiple documents.
         /// </summary>
         /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>

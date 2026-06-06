@@ -130,7 +130,15 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
       let searchQuery = query.trim();
 
       const useAndLogic = searchMode === 'all';
-      const response = await apiClient.search(selectedIndex, searchQuery, maxResults, appliedLabels, appliedTags, useAndLogic);
+      const response = await apiClient.search(
+        selectedIndex,
+        searchQuery,
+        maxResults,
+        appliedLabels,
+        appliedTags,
+        useAndLogic,
+        { includeMatchedTerms: true }
+      );
 
       // Filter results by minimum score if specified
       let filteredResults = response.data;

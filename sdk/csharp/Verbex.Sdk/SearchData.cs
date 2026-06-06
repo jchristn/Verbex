@@ -1,6 +1,7 @@
 namespace Verbex.Sdk
 {
     using System.Collections.Generic;
+    using System.Text.Json;
 
     /// <summary>
     /// Search response data.
@@ -31,5 +32,10 @@ namespace Verbex.Sdk
         /// Time taken for the search in milliseconds.
         /// </summary>
         public double SearchTime { get; set; }
+
+        /// <summary>
+        /// Optional detailed search timing information.
+        /// </summary>
+        public Dictionary<string, JsonElement>? TimingInfo { get; set; }
     }
 }

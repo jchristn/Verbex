@@ -431,6 +431,30 @@ If database optimizations don't help sufficiently:
 
 ## Expected Results After Optimization
 
+## Search Result Enrichment Cost
+
+The REST enrichment flags are designed to preserve default search performance:
+
+| Request Flags | Extra Database Work | Notes |
+|---------------|---------------------|-------|
+| none | none | Default response shape and database call count are unchanged. |
+| `IncludeMatchedTerms` | none | Uses `TermScores` keys already populated during scoring. |
+| `IncludeTermDetails` | none | Uses `TermScores` and `TermFrequencies` already populated during scoring. |
+| `IncludeDocumentTermStats` | one grouped query | Aggregates only result document IDs after `MaxResults` is applied. |
+
+The document stats query is:
+
+```sql
+SELECT document_id,
+       COUNT(*) AS unique_term_count,
+       COALESCE(SUM(term_frequency), 0) AS total_term_occurrences
+FROM {prefix}_document_terms
+WHERE document_id IN (...)
+GROUP BY document_id;
+```
+
+It uses the existing document-term document ID indexes and does not load position arrays or full term lists.
+
 | Query Step | Before | After |
 |------------|--------|-------|
 | Term lookup | 50-100ms | 5-10ms |

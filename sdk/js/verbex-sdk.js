@@ -294,6 +294,35 @@ class BatchExistenceResult {
 }
 
 /**
+ * Per-term search result detail.
+ */
+class SearchTermDetail {
+    /**
+     * Create a SearchTermDetail.
+     * @param {object} data - Term detail data
+     */
+    constructor(data = {}) {
+        this.term = data.term || '';
+        this.score = data.score || 0;
+        this.frequency = data.frequency || 0;
+    }
+}
+
+/**
+ * Whole-document term statistics.
+ */
+class SearchDocumentTermStats {
+    /**
+     * Create a SearchDocumentTermStats.
+     * @param {object} data - Document term stats data
+     */
+    constructor(data = {}) {
+        this.uniqueTermCount = data.uniqueTermCount || 0;
+        this.totalTermOccurrences = data.totalTermOccurrences || 0;
+    }
+}
+
+/**
  * Search result model.
  */
 class SearchResult {
@@ -305,9 +334,14 @@ class SearchResult {
         this.documentId = data.documentId || '';
         this.score = data.score || 0;
         this.content = data.content || null;
+        this.document = data.document || null;
+        this.matchedTermCount = data.matchedTermCount || 0;
         this.totalTermMatches = data.totalTermMatches || 0;
         this.termScores = data.termScores || null;
         this.termFrequencies = data.termFrequencies || null;
+        this.matchedTerms = data.matchedTerms || null;
+        this.termDetails = data.termDetails ? data.termDetails.map(d => new SearchTermDetail(d)) : null;
+        this.documentTermStats = data.documentTermStats ? new SearchDocumentTermStats(data.documentTermStats) : null;
     }
 }
 
@@ -325,6 +359,7 @@ class SearchData {
         this.totalCount = data.totalCount || 0;
         this.maxResults = data.maxResults || 100;
         this.searchTime = data.searchTime || 0;
+        this.timingInfo = data.timingInfo || null;
     }
 }
 
@@ -1247,19 +1282,44 @@ class VerbexClient {
      * Wildcard results have a score of 0.
      * @param {string} indexId - The index identifier
      * @param {string} query - The search query. Use "*" for wildcard (all documents).
-     * @param {number} [maxResults=100] - Maximum results to return
+     * @param {number|object} [maxResults=100] - Maximum results to return, or an options object
      * @param {string[]} [labels=null] - Optional labels to filter by (AND logic, case-insensitive)
      * @param {Object} [tags=null] - Optional tags to filter by (AND logic, exact match)
+     * @param {boolean} [options.useAndLogic=false] - Use AND logic instead of OR
+     * @param {boolean} [options.includeMatchedTerms=false] - Include matched query terms on each result
+     * @param {boolean} [options.includeTermDetails=false] - Include per-term score and frequency details on each result
+     * @param {boolean} [options.includeDocumentTermStats=false] - Include whole-document term statistics on each result
      * @returns {Promise<SearchData>} Search results
      */
     async search(indexId, query, maxResults = 100, labels = null, tags = null) {
-        const requestData = { Query: query, MaxResults: maxResults };
-        if (labels && labels.length > 0) {
-            requestData.Labels = labels;
+        const options = (maxResults && typeof maxResults === 'object' && !Array.isArray(maxResults))
+            ? maxResults
+            : { maxResults, labels, tags };
+
+        const requestData = {
+            Query: query,
+            MaxResults: options.maxResults ?? 100
+        };
+
+        if (options.useAndLogic !== undefined) {
+            requestData.UseAndLogic = options.useAndLogic;
         }
-        if (tags && Object.keys(tags).length > 0) {
-            requestData.Tags = tags;
+        if (options.labels && options.labels.length > 0) {
+            requestData.Labels = options.labels;
         }
+        if (options.tags && Object.keys(options.tags).length > 0) {
+            requestData.Tags = options.tags;
+        }
+        if (options.includeMatchedTerms) {
+            requestData.IncludeMatchedTerms = true;
+        }
+        if (options.includeTermDetails) {
+            requestData.IncludeTermDetails = true;
+        }
+        if (options.includeDocumentTermStats) {
+            requestData.IncludeDocumentTermStats = true;
+        }
+
         const data = await this._makeRequest('POST', `/v1.0/indices/${indexId}/search`, requestData);
         return new SearchData(data || {});
     }
@@ -1731,6 +1791,8 @@ if (typeof module !== 'undefined' && module.exports) {
         BatchAddResultItem,
         BatchAddResult,
         BatchExistenceResult,
+        SearchTermDetail,
+        SearchDocumentTermStats,
         SearchResult,
         SearchData,
         HealthData,
@@ -1763,6 +1825,8 @@ if (typeof exports !== 'undefined') {
     exports.BatchAddResultItem = BatchAddResultItem;
     exports.BatchAddResult = BatchAddResult;
     exports.BatchExistenceResult = BatchExistenceResult;
+    exports.SearchTermDetail = SearchTermDetail;
+    exports.SearchDocumentTermStats = SearchDocumentTermStats;
     exports.SearchResult = SearchResult;
     exports.SearchData = SearchData;
     exports.HealthData = HealthData;

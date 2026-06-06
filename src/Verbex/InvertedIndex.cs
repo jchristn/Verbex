@@ -1259,6 +1259,30 @@ namespace Verbex
             return await _Driver.DocumentTerms.GetByDocumentAsync(_TablePrefix, documentId, token).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Gets aggregate term statistics for multiple documents.
+        /// </summary>
+        /// <param name="documentIds">Document IDs.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Dictionary of document IDs to aggregate document term statistics.</returns>
+        public async Task<Dictionary<string, DocumentTermStats>> GetDocumentTermStatsAsync(IEnumerable<string> documentIds, CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotOpen();
+            ArgumentNullException.ThrowIfNull(documentIds);
+
+            List<string> requestedIds = documentIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            if (requestedIds.Count == 0)
+            {
+                return new Dictionary<string, DocumentTermStats>();
+            }
+
+            return await _Driver.DocumentTerms.GetStatsByDocumentsAsync(_TablePrefix, requestedIds, token).ConfigureAwait(false);
+        }
+
         #endregion
 
         #region Label Operations

@@ -1405,6 +1405,15 @@
             <param name="token">Cancellation token.</param>
             <returns>List of document-term records for all specified documents.</returns>
         </member>
+        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.GetStatsByDocumentsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Gets aggregate term statistics for multiple documents.
+            </summary>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+            <param name="documentIds">Document IDs.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Dictionary of document IDs to aggregate document term statistics.</returns>
+        </member>
         <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.DeleteByDocumentsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <summary>
             Deletes all term mappings for multiple documents.
@@ -5919,6 +5928,14 @@
             <param name="token">Cancellation token.</param>
             <returns>List of document-term records containing term information.</returns>
         </member>
+        <member name="M:Verbex.InvertedIndex.GetDocumentTermStatsAsync(System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Gets aggregate term statistics for multiple documents.
+            </summary>
+            <param name="documentIds">Document IDs.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Dictionary of document IDs to aggregate document term statistics.</returns>
+        </member>
         <member name="M:Verbex.InvertedIndex.AddLabelAsync(System.String,System.String,System.Threading.CancellationToken)">
             <summary>
             Adds a label to a document.
@@ -7147,6 +7164,26 @@
         </member>
         <member name="P:Verbex.Models.DocumentTermRecord.DocumentName">
             <summary>Document name (joined from documents table).</summary>
+        </member>
+        <member name="T:Verbex.Models.DocumentTermStats">
+            <summary>
+            Aggregate term statistics for a document.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.DocumentTermStats.DocumentId">
+            <summary>
+            Document ID.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.DocumentTermStats.UniqueTermCount">
+            <summary>
+            Number of unique terms indexed for the document.
+            </summary>
+        </member>
+        <member name="P:Verbex.Models.DocumentTermStats.TotalTermOccurrences">
+            <summary>
+            Total indexed term occurrences for the document.
+            </summary>
         </member>
         <member name="T:Verbex.Models.IndexContentResult">
             <summary>

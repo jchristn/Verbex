@@ -285,6 +285,40 @@ WHERE dt.document_id IN ({inClause});";
             return list;
         }
 
+        public async Task<Dictionary<string, DocumentTermStats>> GetStatsByDocumentsAsync(string tablePrefix, IEnumerable<string> documentIds, CancellationToken token = default)
+        {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            List<string> docIdList = documentIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            if (docIdList.Count == 0) return new Dictionary<string, DocumentTermStats>();
+
+            string inClause = string.Join(",", docIdList.Select(id => $"'{Sanitizer.Sanitize(id)}'"));
+            string query = $@"
+SELECT dt.document_id, COUNT(*) AS unique_term_count, COALESCE(SUM(dt.term_frequency), 0) AS total_term_occurrences
+FROM {prefix}_document_terms dt INDEXED BY idx_{prefix}_docterms_doc
+WHERE dt.document_id IN ({inClause})
+GROUP BY dt.document_id;";
+
+            DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
+            Dictionary<string, DocumentTermStats> stats = new Dictionary<string, DocumentTermStats>();
+            foreach (DataRow row in dt.Rows)
+            {
+                string documentId = row["document_id"]?.ToString() ?? string.Empty;
+                if (string.IsNullOrEmpty(documentId)) continue;
+
+                stats[documentId] = new DocumentTermStats
+                {
+                    DocumentId = documentId,
+                    UniqueTermCount = Convert.ToInt64(row["unique_term_count"]),
+                    TotalTermOccurrences = Convert.ToInt64(row["total_term_occurrences"])
+                };
+            }
+
+            return stats;
+        }
+
         public async Task<long> DeleteByDocumentsAsync(string tablePrefix, IEnumerable<string> documentIds, CancellationToken token = default)
         {
             string prefix = TablePrefixValidator.Validate(tablePrefix);

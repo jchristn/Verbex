@@ -5,6 +5,7 @@ namespace Verbex.Mcp
     using System.Text.Json;
     using System.Threading;
     using System.Threading.Tasks;
+    using Verbex.Models;
     using Voltaic;
 
     /// <summary>
@@ -166,7 +167,10 @@ namespace Verbex.Mcp
                         maxResults = new { type = "integer", description = "Maximum results to return (default: 10)" },
                         useAndLogic = new { type = "boolean", description = "Use AND logic instead of OR (default: false)" },
                         labels = new { type = "array", items = new { type = "string" }, description = "Filter by labels (AND logic)" },
-                        tags = new { type = "object", additionalProperties = new { type = "string" }, description = "Filter by tags (AND logic)" }
+                        tags = new { type = "object", additionalProperties = new { type = "string" }, description = "Filter by tags (AND logic)" },
+                        includeMatchedTerms = new { type = "boolean", description = "Include matched query terms for each result (default: false)" },
+                        includeTermDetails = new { type = "boolean", description = "Include per-term score and frequency details for each result (default: false)" },
+                        includeDocumentTermStats = new { type = "boolean", description = "Include whole-document term statistics for each result using one grouped query (default: false)" }
                     },
                     required = new[] { "query" }
                 },
@@ -363,26 +367,70 @@ namespace Verbex.Mcp
             bool useAndLogic = GetBool(args, "useAndLogic", false);
             List<string>? labels = GetStringList(args, "labels");
             Dictionary<string, string>? tags = GetStringDict(args, "tags");
+            bool includeMatchedTerms = GetBool(args, "includeMatchedTerms", false);
+            bool includeTermDetails = GetBool(args, "includeTermDetails", false);
+            bool includeDocumentTermStats = GetBool(args, "includeDocumentTermStats", false);
 
             if (string.IsNullOrWhiteSpace(query))
                 return ToJson(new { error = "Query is required" });
 
             InvertedIndex index = GetOrCreateIndexAsync(indexName).GetAwaiter().GetResult();
             SearchResults results = index.SearchAsync(query, maxResults, useAndLogic, labels, tags).GetAwaiter().GetResult();
+            Dictionary<string, DocumentTermStats> statsByDocumentId = includeDocumentTermStats
+                ? index.GetDocumentTermStatsAsync(results.Results.Select(r => r.DocumentId)).GetAwaiter().GetResult()
+                : new Dictionary<string, DocumentTermStats>();
+
+            List<Dictionary<string, object?>> resultItems = results.Results.Select(r =>
+            {
+                Dictionary<string, object?> item = new Dictionary<string, object?>
+                {
+                    ["documentId"] = r.DocumentId,
+                    ["documentName"] = r.Document?.DocumentPath,
+                    ["score"] = r.Score,
+                    ["matchedTermCount"] = r.MatchedTermCount,
+                    ["totalTermMatches"] = r.TotalTermMatches,
+                    ["termScores"] = r.TermScores
+                };
+
+                if (includeMatchedTerms || includeTermDetails)
+                {
+                    item["matchedTerms"] = r.TermScores.Keys
+                        .OrderBy(term => term, StringComparer.Ordinal)
+                        .ToList();
+                }
+
+                if (includeTermDetails)
+                {
+                    item["termDetails"] = r.TermScores
+                        .Select(kvp => new
+                        {
+                            term = kvp.Key,
+                            score = kvp.Value,
+                            frequency = r.TermFrequencies.TryGetValue(kvp.Key, out int frequency) ? frequency : 0
+                        })
+                        .OrderByDescending(detail => detail.score)
+                        .ThenBy(detail => detail.term, StringComparer.Ordinal)
+                        .ToList();
+                }
+
+                if (includeDocumentTermStats
+                    && statsByDocumentId.TryGetValue(r.DocumentId, out DocumentTermStats? stats))
+                {
+                    item["documentTermStats"] = new
+                    {
+                        uniqueTermCount = stats.UniqueTermCount,
+                        totalTermOccurrences = stats.TotalTermOccurrences
+                    };
+                }
+
+                return item;
+            }).ToList();
 
             return ToJson(new
             {
                 totalCount = results.TotalCount,
                 searchTimeMs = results.SearchTime.TotalMilliseconds,
-                results = results.Results.Select(r => new
-                {
-                    documentId = r.DocumentId,
-                    documentName = r.Document?.DocumentPath,
-                    score = r.Score,
-                    matchedTermCount = r.MatchedTermCount,
-                    totalTermMatches = r.TotalTermMatches,
-                    termScores = r.TermScores
-                }).ToList()
+                results = resultItems
             });
         }
 

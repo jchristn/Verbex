@@ -499,7 +499,7 @@ class ApiClient {
   }
 
   // Search endpoints
-  async search(indexId, query, maxResults = 100, labels = null, tags = null, useAndLogic = false) {
+  async search(indexId, query, maxResults = 100, labels = null, tags = null, useAndLogic = false, enrichment = {}) {
     const body = {
       Query: query,
       MaxResults: maxResults,
@@ -510,6 +510,15 @@ class ApiClient {
     }
     if (tags && Object.keys(tags).length > 0) {
       body.Tags = tags;
+    }
+    if (enrichment.includeMatchedTerms) {
+      body.IncludeMatchedTerms = true;
+    }
+    if (enrichment.includeTermDetails) {
+      body.IncludeTermDetails = true;
+    }
+    if (enrichment.includeDocumentTermStats) {
+      body.IncludeDocumentTermStats = true;
     }
     return this.post(`/v1.0/indices/${encodeURIComponent(indexId)}/search`, body);
   }
