@@ -432,8 +432,18 @@ DROP TABLE IF EXISTS {prefix}_documents CASCADE;
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_labels_doc_label ON {prefix}_labels(document_id, label)",
 
                 // Tag indexes
+                $@"DELETE FROM {prefix}_tags older
+USING {prefix}_tags newer
+WHERE older.document_id IS NOT NULL
+  AND older.document_id = newer.document_id
+  AND older.key = newer.key
+  AND (
+      older.last_update_utc < newer.last_update_utc
+      OR (older.last_update_utc = newer.last_update_utc AND older.id < newer.id)
+  )",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_doc ON {prefix}_tags(document_id)",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_key ON {prefix}_tags(key)",
+                $"CREATE UNIQUE INDEX IF NOT EXISTS ux_{prefix}_tags_doc_key ON {prefix}_tags(document_id, key)",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_doc_key ON {prefix}_tags(document_id, key)",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_key_value ON {prefix}_tags(key, value)",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_key_value_doc ON {prefix}_tags(key, value, document_id)"

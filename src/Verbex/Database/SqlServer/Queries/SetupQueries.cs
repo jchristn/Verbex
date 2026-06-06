@@ -627,8 +627,19 @@ BEGIN
 
     ALTER TABLE {prefix}_tags ALTER COLUMN value NVARCHAR(1024) NULL;
 END",
+                $@"DELETE older
+FROM {prefix}_tags older
+INNER JOIN {prefix}_tags newer
+    ON older.document_id = newer.document_id
+   AND older.[key] = newer.[key]
+   AND (
+       older.last_update_utc < newer.last_update_utc
+       OR (older.last_update_utc = newer.last_update_utc AND older.id < newer.id)
+   )
+WHERE older.document_id IS NOT NULL",
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_doc') CREATE INDEX idx_{prefix}_tags_doc ON {prefix}_tags(document_id)",
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_key') CREATE INDEX idx_{prefix}_tags_key ON {prefix}_tags([key])",
+                $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'ux_{prefix}_tags_doc_key') CREATE UNIQUE INDEX ux_{prefix}_tags_doc_key ON {prefix}_tags(document_id, [key]) WHERE document_id IS NOT NULL",
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_doc_key') CREATE INDEX idx_{prefix}_tags_doc_key ON {prefix}_tags(document_id, [key])",
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_key_value') CREATE INDEX idx_{prefix}_tags_key_value ON {prefix}_tags([key], value)",
                 $"IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_{prefix}_tags_key_value_doc') CREATE INDEX idx_{prefix}_tags_key_value_doc ON {prefix}_tags([key], value, document_id)"

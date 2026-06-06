@@ -453,8 +453,18 @@ SET FOREIGN_KEY_CHECKS = 1;
                 $"CREATE INDEX idx_{prefix}_labels_doc_label ON {prefix}_labels(document_id, label)",
 
                 // Tag indexes
+                $@"DELETE older FROM {prefix}_tags older
+INNER JOIN {prefix}_tags newer
+    ON older.document_id = newer.document_id
+   AND older.`key` = newer.`key`
+   AND (
+       older.last_update_utc < newer.last_update_utc
+       OR (older.last_update_utc = newer.last_update_utc AND older.id < newer.id)
+   )
+WHERE older.document_id IS NOT NULL",
                 $"CREATE INDEX idx_{prefix}_tags_doc ON {prefix}_tags(document_id)",
                 $"CREATE INDEX idx_{prefix}_tags_key ON {prefix}_tags(`key`)",
+                $"CREATE UNIQUE INDEX ux_{prefix}_tags_doc_key ON {prefix}_tags(document_id, `key`)",
                 $"CREATE INDEX idx_{prefix}_tags_doc_key ON {prefix}_tags(document_id, `key`)",
                 $"CREATE INDEX idx_{prefix}_tags_key_value ON {prefix}_tags(`key`, value(255))",
                 $"CREATE INDEX idx_{prefix}_tags_key_value_doc ON {prefix}_tags(`key`, value(255), document_id)"

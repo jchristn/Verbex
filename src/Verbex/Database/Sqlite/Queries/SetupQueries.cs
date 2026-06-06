@@ -609,8 +609,21 @@ DROP TABLE IF EXISTS {prefix}_documents;
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_labels_label_doc_nocase ON {prefix}_labels(label COLLATE NOCASE, document_id)",
 
                 // Tag indexes
+                $@"DELETE FROM {prefix}_tags
+WHERE document_id IS NOT NULL
+  AND EXISTS (
+      SELECT 1
+      FROM {prefix}_tags newer
+      WHERE newer.document_id = {prefix}_tags.document_id
+        AND newer.key = {prefix}_tags.key
+        AND (
+            newer.last_update_utc > {prefix}_tags.last_update_utc
+            OR (newer.last_update_utc = {prefix}_tags.last_update_utc AND newer.id > {prefix}_tags.id)
+        )
+  )",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_doc ON {prefix}_tags(document_id)",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_key ON {prefix}_tags(key)",
+                $"CREATE UNIQUE INDEX IF NOT EXISTS ux_{prefix}_tags_doc_key ON {prefix}_tags(document_id, key)",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_doc_key ON {prefix}_tags(document_id, key)",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_key_value ON {prefix}_tags(key, value)",
                 $"CREATE INDEX IF NOT EXISTS idx_{prefix}_tags_key_value_doc ON {prefix}_tags(key, value, document_id)"

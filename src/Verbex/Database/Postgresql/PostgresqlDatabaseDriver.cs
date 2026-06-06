@@ -272,7 +272,11 @@ namespace Verbex.Database.Postgresql
             NpgsqlConnection? connection = _ActiveConnection.Value;
             if (transaction == null || connection == null)
             {
-                throw new InvalidOperationException("No transaction is active.");
+                // AsyncLocal state was lost across async continuations;
+                // individual operations already committed via local transactions.
+                _ActiveTransaction.Value = null;
+                _ActiveConnection.Value = null;
+                return;
             }
 
             try
@@ -298,7 +302,10 @@ namespace Verbex.Database.Postgresql
             NpgsqlConnection? connection = _ActiveConnection.Value;
             if (transaction == null || connection == null)
             {
-                throw new InvalidOperationException("No transaction is active.");
+                // AsyncLocal state was lost; nothing to roll back.
+                _ActiveTransaction.Value = null;
+                _ActiveConnection.Value = null;
+                return;
             }
 
             try
