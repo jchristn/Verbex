@@ -138,6 +138,15 @@ namespace Verbex.Database.Interfaces
         Task DecrementFrequenciesBatchAsync(string tablePrefix, Dictionary<string, FrequencyDelta> updates, CancellationToken token = default);
 
         /// <summary>
+        /// Decrements frequencies for all terms associated with multiple documents.
+        /// </summary>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+        /// <param name="documentIds">Document IDs whose term frequencies should be decremented.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>List of affected term IDs.</returns>
+        Task<List<string>> DecrementFrequenciesByDocumentsAsync(string tablePrefix, IEnumerable<string> documentIds, CancellationToken token = default);
+
+        /// <summary>
         /// Deletes terms with zero document frequency.
         /// </summary>
         /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>

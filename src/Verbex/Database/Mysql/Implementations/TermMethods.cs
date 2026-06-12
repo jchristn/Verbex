@@ -227,6 +227,49 @@ WHERE id IN ({inClause});";
             await IncrementFrequenciesBatchAsync(tablePrefix, negatedUpdates, token).ConfigureAwait(false);
         }
 
+        public async Task<List<string>> DecrementFrequenciesByDocumentsAsync(string tablePrefix, IEnumerable<string> documentIds, CancellationToken token = default)
+        {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            List<string> ids = documentIds?.Distinct().Where(id => !string.IsNullOrWhiteSpace(id)).ToList() ?? new List<string>();
+            if (ids.Count == 0) return new List<string>();
+
+            DateTime now = DateTime.UtcNow;
+            string inClause = string.Join(",", ids.ConvertAll(id => $"'{Sanitizer.Sanitize(id)}'"));
+
+            string affectedQuery = $@"SELECT term_id
+FROM {prefix}_document_terms
+WHERE document_id IN ({inClause})
+GROUP BY term_id;";
+            DataTable affectedResult = await _Driver.ExecuteQueryAsync(affectedQuery, false, token).ConfigureAwait(false);
+
+            List<string> affectedTermIds = new List<string>();
+            foreach (DataRow row in affectedResult.Rows)
+            {
+                string termId = row["term_id"]?.ToString() ?? string.Empty;
+                if (!string.IsNullOrEmpty(termId))
+                {
+                    affectedTermIds.Add(termId);
+                }
+            }
+
+            if (affectedTermIds.Count == 0) return affectedTermIds;
+
+            string updateQuery = $@"UPDATE {prefix}_terms AS terms
+JOIN (
+    SELECT term_id,
+           COUNT(*) AS document_frequency_delta,
+           COALESCE(SUM(term_frequency), 0) AS total_frequency_delta
+    FROM {prefix}_document_terms
+    WHERE document_id IN ({inClause})
+    GROUP BY term_id
+) AS deltas ON terms.id = deltas.term_id
+SET terms.document_frequency = GREATEST(terms.document_frequency - deltas.document_frequency_delta, 0),
+    terms.total_frequency = GREATEST(terms.total_frequency - deltas.total_frequency_delta, 0),
+    terms.last_update_utc = '{Sanitizer.FormatDateTime(now)}';";
+            await _Driver.ExecuteQueryAsync(updateQuery, true, token).ConfigureAwait(false);
+            return affectedTermIds;
+        }
+
         public async Task<List<string>> DeleteOrphanedAsync(string tablePrefix, CancellationToken token = default)
         {
             string prefix = TablePrefixValidator.Validate(tablePrefix);

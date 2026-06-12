@@ -793,19 +793,15 @@ namespace Verbex
             await _WriteLock.WaitAsync(token).ConfigureAwait(false);
             try
             {
-                Dictionary<string, FrequencyDelta> decrements =
-                    await _Driver.DocumentTerms.GetFrequencyDeltasByDocumentsAsync(_TablePrefix, requestedIds, token).ConfigureAwait(false);
                 List<string> deletedIds = new List<string>();
                 List<string> deletedTermTexts = new List<string>();
+                List<string> affectedTermIds = new List<string>();
 
                 // Wrap all deletion operations in a transaction for atomicity
                 await _Driver.ExecuteInTransactionAsync(async transactionToken =>
                 {
-                    // Step 1: Batch decrement term frequencies using aggregated document-term stats.
-                    if (decrements.Count > 0)
-                    {
-                        await _Driver.Terms.DecrementFrequenciesBatchAsync(_TablePrefix, decrements, transactionToken).ConfigureAwait(false);
-                    }
+                    // Step 1: Decrement term frequencies using a set-based update before deleting mappings.
+                    affectedTermIds = await _Driver.Terms.DecrementFrequenciesByDocumentsAsync(_TablePrefix, requestedIds, transactionToken).ConfigureAwait(false);
 
                     // Step 2: Delete all document-terms in one statement
                     await _Driver.DocumentTerms.DeleteByDocumentsAsync(_TablePrefix, requestedIds, transactionToken).ConfigureAwait(false);
@@ -828,7 +824,6 @@ namespace Verbex
                 // Invalidate caches after successful commit
                 if (deletedIds.Count > 0)
                 {
-                    List<string> affectedTermIds = decrements.Keys.ToList();
                     _CacheInvalidator?.OnDocumentsRemoved(deletedIds, affectedTermIds);
                 }
 
