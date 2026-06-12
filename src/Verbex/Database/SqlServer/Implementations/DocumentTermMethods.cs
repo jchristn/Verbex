@@ -9,6 +9,7 @@ namespace Verbex.Database.SqlServer.Implementations
     using System.Threading;
     using System.Threading.Tasks;
     using Verbex.Database.Interfaces;
+    using Verbex.DTO;
     using Verbex.Models;
 
     using Sanitizer = Verbex.Database.SqlServer.Sanitizer;
@@ -281,6 +282,37 @@ WHERE dt.document_id IN ({inClause});";
             List<DocumentTermRecord> list = new List<DocumentTermRecord>();
             foreach (DataRow row in dt.Rows) list.Add(MapRowToDocumentTerm(row));
             return list;
+        }
+
+        public async Task<Dictionary<string, FrequencyDelta>> GetFrequencyDeltasByDocumentsAsync(string tablePrefix, IEnumerable<string> documentIds, CancellationToken token = default)
+        {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            List<string> docIdList = documentIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            if (docIdList.Count == 0) return new Dictionary<string, FrequencyDelta>();
+
+            string inClause = string.Join(",", docIdList.Select(id => $"N'{Sanitizer.Sanitize(id)}'"));
+            string query = $@"
+SELECT term_id, COUNT(*) AS document_frequency_delta, COALESCE(SUM(term_frequency), 0) AS total_frequency_delta
+FROM {prefix}_document_terms WITH (INDEX(idx_{prefix}_docterms_doc))
+WHERE document_id IN ({inClause})
+GROUP BY term_id;";
+
+            DataTable dt = await _Driver.ExecuteQueryAsync(query, false, token).ConfigureAwait(false);
+            Dictionary<string, FrequencyDelta> deltas = new Dictionary<string, FrequencyDelta>();
+            foreach (DataRow row in dt.Rows)
+            {
+                string termId = row["term_id"]?.ToString() ?? string.Empty;
+                if (String.IsNullOrEmpty(termId)) continue;
+
+                deltas[termId] = new FrequencyDelta(
+                    Convert.ToInt32(row["document_frequency_delta"]),
+                    Convert.ToInt32(row["total_frequency_delta"]));
+            }
+
+            return deltas;
         }
 
         public async Task<Dictionary<string, DocumentTermStats>> GetStatsByDocumentsAsync(string tablePrefix, IEnumerable<string> documentIds, CancellationToken token = default)

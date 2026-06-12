@@ -26,6 +26,7 @@ namespace Test
             await runner.RunTestAsync("Batch Delete With Duplicates Test", TestBatchDeleteWithDuplicatesAsync).ConfigureAwait(false);
             await runner.RunTestAsync("Batch Delete Verifies Removal Test", TestBatchDeleteVerifiesRemovalAsync).ConfigureAwait(false);
             await runner.RunTestAsync("Batch Delete Cascades Metadata Test", TestBatchDeleteCascadesMetadataAsync).ConfigureAwait(false);
+            await runner.RunTestAsync("Batch Delete Large Term Set Test", TestBatchDeleteLargeTermSetAsync).ConfigureAwait(false);
         }
 
         private static async Task TestBatchDeleteAllFoundAsync()
@@ -192,6 +193,28 @@ namespace Test
             Dictionary<string, string> remainingTags = await index.GetTagsAsync(docId3).ConfigureAwait(false);
             TestAssert.AreEqual(1, remainingTags.Count, "Batch delete should not remove tags for remaining documents");
             TestAssert.AreEqual("keep-value", remainingTags["keep-key"]);
+        }
+
+        private static async Task TestBatchDeleteLargeTermSetAsync()
+        {
+            await using InvertedIndex index = await TestContext.CreateTestIndexAsync().ConfigureAwait(false);
+
+            List<string> idsToDelete = new List<string>();
+            for (int docIndex = 0; docIndex < 30; docIndex++)
+            {
+                string content = String.Join(" ", Enumerable.Range(0, 150).Select(termIndex => $"term_{docIndex}_{termIndex} shared_{termIndex}"));
+                string docId = await index.AddDocumentAsync($"large-{docIndex}.txt", content).ConfigureAwait(false);
+                idsToDelete.Add(docId);
+            }
+
+            string keepId = await index.AddDocumentAsync("keep.txt", "this document remains searchable").ConfigureAwait(false);
+
+            BatchDeleteResponse result = await index.RemoveDocumentsBatchAsync(idsToDelete).ConfigureAwait(false);
+
+            TestAssert.AreEqual(idsToDelete.Count, result.DeletedCount);
+            TestAssert.AreEqual(0, result.NotFoundCount);
+            TestAssert.AreEqual(1, await index.GetDocumentCountAsync().ConfigureAwait(false));
+            TestAssert.IsTrue(await index.DocumentExistsAsync(keepId).ConfigureAwait(false));
         }
     }
 }

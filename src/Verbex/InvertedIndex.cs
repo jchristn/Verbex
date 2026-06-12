@@ -793,56 +793,42 @@ namespace Verbex
             await _WriteLock.WaitAsync(token).ConfigureAwait(false);
             try
             {
-                // Step 1: Get all document-terms for all requested documents in a single query
-                List<DocumentTermRecord> allDocTerms = await _Driver.DocumentTerms.GetByDocumentsAsync(_TablePrefix, requestedIds, token).ConfigureAwait(false);
+                Dictionary<string, FrequencyDelta> decrements =
+                    await _Driver.DocumentTerms.GetFrequencyDeltasByDocumentsAsync(_TablePrefix, requestedIds, token).ConfigureAwait(false);
                 List<string> deletedIds = new List<string>();
                 List<string> deletedTermTexts = new List<string>();
 
                 // Wrap all deletion operations in a transaction for atomicity
                 await _Driver.ExecuteInTransactionAsync(async transactionToken =>
                 {
-                    // Step 2: Aggregate term frequency decrements across all documents
-                    if (allDocTerms.Count > 0)
+                    // Step 1: Batch decrement term frequencies using aggregated document-term stats.
+                    if (decrements.Count > 0)
                     {
-                        Dictionary<string, FrequencyDelta> decrements = new Dictionary<string, FrequencyDelta>();
-                        foreach (DocumentTermRecord docTerm in allDocTerms)
-                        {
-                            if (decrements.TryGetValue(docTerm.TermId, out FrequencyDelta? existing))
-                            {
-                                decrements[docTerm.TermId] = new FrequencyDelta(existing.DocFreqDelta + 1, existing.TotalFreqDelta + docTerm.TermFrequency);
-                            }
-                            else
-                            {
-                                decrements[docTerm.TermId] = new FrequencyDelta(1, docTerm.TermFrequency);
-                            }
-                        }
-
-                        // Step 3: Single batch decrement for all term frequencies
                         await _Driver.Terms.DecrementFrequenciesBatchAsync(_TablePrefix, decrements, transactionToken).ConfigureAwait(false);
                     }
 
-                    // Step 4: Delete all document-terms in one statement
+                    // Step 2: Delete all document-terms in one statement
                     await _Driver.DocumentTerms.DeleteByDocumentsAsync(_TablePrefix, requestedIds, transactionToken).ConfigureAwait(false);
 
-                    // Step 5: Delete subordinate label/tag records
+                    // Step 3: Delete subordinate label/tag records
                     await _Driver.Labels.RemoveAllByDocumentsAsync(_TablePrefix, requestedIds, transactionToken).ConfigureAwait(false);
                     await _Driver.Tags.RemoveAllByDocumentsAsync(_TablePrefix, requestedIds, transactionToken).ConfigureAwait(false);
 
-                    // Step 6: Delete all documents in one statement and get back which ones existed
+                    // Step 4: Delete all documents in one statement and get back which ones existed
                     deletedIds = await _Driver.Documents.DeleteBatchAsync(_TablePrefix, requestedIds, transactionToken).ConfigureAwait(false);
 
-                    // Step 7: Run orphan cleanup once at the end and get deleted term texts for cache invalidation
+                    // Step 5: Run orphan cleanup once at the end and get deleted term texts for cache invalidation
                     deletedTermTexts = await _Driver.Terms.DeleteOrphanedAsync(_TablePrefix, transactionToken).ConfigureAwait(false);
                 }, token).ConfigureAwait(false);
 
-                // Step 8: Calculate not-found IDs
+                // Step 6: Calculate not-found IDs
                 HashSet<string> deletedSet = new HashSet<string>(deletedIds);
                 List<string> notFoundIds = requestedIds.Where(id => !deletedSet.Contains(id)).ToList();
 
                 // Invalidate caches after successful commit
                 if (deletedIds.Count > 0)
                 {
-                    List<string> affectedTermIds = allDocTerms.Select(dt => dt.TermId).Distinct().ToList();
+                    List<string> affectedTermIds = decrements.Keys.ToList();
                     _CacheInvalidator?.OnDocumentsRemoved(deletedIds, affectedTermIds);
                 }
 

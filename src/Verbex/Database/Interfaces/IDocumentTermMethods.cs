@@ -3,6 +3,7 @@ namespace Verbex.Database.Interfaces
     using System.Collections.Generic;
     using System.Threading;
     using System.Threading.Tasks;
+    using Verbex.DTO;
     using Verbex.Models;
 
     /// <summary>
@@ -124,6 +125,18 @@ namespace Verbex.Database.Interfaces
         /// <param name="token">Cancellation token.</param>
         /// <returns>List of document-term records for all specified documents.</returns>
         Task<List<DocumentTermRecord>> GetByDocumentsAsync(string tablePrefix, IEnumerable<string> documentIds, CancellationToken token = default);
+
+        /// <summary>
+        /// Gets aggregate frequency deltas for terms in multiple documents without loading term positions.
+        /// </summary>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+        /// <param name="documentIds">Document IDs.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Dictionary mapping term IDs to aggregate frequency deltas.</returns>
+        Task<Dictionary<string, FrequencyDelta>> GetFrequencyDeltasByDocumentsAsync(
+            string tablePrefix,
+            IEnumerable<string> documentIds,
+            CancellationToken token = default);
 
         /// <summary>
         /// Gets aggregate term statistics for multiple documents.
