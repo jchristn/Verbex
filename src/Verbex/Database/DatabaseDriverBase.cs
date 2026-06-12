@@ -271,6 +271,80 @@ namespace Verbex.Database
         public abstract bool IsTransactionActive { get; }
 
         /// <summary>
+        /// Executes an operation inside a database transaction.
+        /// </summary>
+        /// <param name="operation">Operation to execute.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        /// <remarks>
+        /// Prefer this scoped API over manual BeginTransactionAsync/CommitTransactionAsync usage.
+        /// Implementations that store transaction state in async context can keep that state
+        /// visible for the entire operation and guarantee cleanup in one place.
+        /// </remarks>
+        public virtual async Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken token = default)
+        {
+            if (operation == null)
+            {
+                throw new ArgumentNullException(nameof(operation));
+            }
+
+            await ExecuteInTransactionAsync<object?>(async operationToken =>
+            {
+                await operation(operationToken).ConfigureAwait(false);
+                return null;
+            }, token).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Executes an operation inside a database transaction and returns a result.
+        /// </summary>
+        /// <typeparam name="T">Result type.</typeparam>
+        /// <param name="operation">Operation to execute.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Operation result.</returns>
+        /// <remarks>
+        /// Prefer this scoped API over manual BeginTransactionAsync/CommitTransactionAsync usage.
+        /// Implementations that store transaction state in async context can keep that state
+        /// visible for the entire operation and guarantee cleanup in one place.
+        /// </remarks>
+        public virtual async Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken token = default)
+        {
+            if (operation == null)
+            {
+                throw new ArgumentNullException(nameof(operation));
+            }
+
+            if (IsTransactionActive)
+            {
+                return await operation(token).ConfigureAwait(false);
+            }
+
+            await BeginTransactionAsync(token).ConfigureAwait(false);
+            try
+            {
+                T result = await operation(token).ConfigureAwait(false);
+                await CommitTransactionAsync(token).ConfigureAwait(false);
+                return result;
+            }
+            catch
+            {
+                if (IsTransactionActive)
+                {
+                    try
+                    {
+                        await RollbackTransactionAsync(CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        // Preserve the original operation failure.
+                    }
+                }
+
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Throws an exception if the driver has been disposed.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Thrown when the driver has been disposed.</exception>

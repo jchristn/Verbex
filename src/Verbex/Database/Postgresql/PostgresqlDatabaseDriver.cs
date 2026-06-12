@@ -22,15 +22,21 @@ namespace Verbex.Database.Postgresql
         private const int UnlimitedCommandTimeout = 0;
         private readonly SemaphoreSlim _Semaphore = new SemaphoreSlim(1, 1);
         private NpgsqlDataSource? _DataSource;
-        private readonly AsyncLocal<NpgsqlConnection?> _ActiveConnection = new AsyncLocal<NpgsqlConnection?>();
-        private readonly AsyncLocal<NpgsqlTransaction?> _ActiveTransaction = new AsyncLocal<NpgsqlTransaction?>();
+        private readonly AsyncLocal<ActiveTransactionContext?> _ActiveTransactionContext = new AsyncLocal<ActiveTransactionContext?>();
         private bool _IsOpen = false;
+
+        private sealed class ActiveTransactionContext
+        {
+            public NpgsqlConnection? Connection { get; set; }
+
+            public NpgsqlTransaction? Transaction { get; set; }
+        }
 
         /// <inheritdoc />
         public override bool IsOpen => _IsOpen;
 
         /// <inheritdoc />
-        public override bool IsTransactionActive => _ActiveTransaction.Value != null;
+        public override bool IsTransactionActive => _ActiveTransactionContext.Value?.Transaction != null;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PostgresqlDatabaseDriver"/> class.
@@ -135,8 +141,8 @@ namespace Verbex.Database.Postgresql
             }
 
             DataTable result = new DataTable();
-            NpgsqlConnection? activeConnection = _ActiveConnection.Value;
-            NpgsqlTransaction? activeTransaction = _ActiveTransaction.Value;
+            NpgsqlConnection? activeConnection = _ActiveTransactionContext.Value?.Connection;
+            NpgsqlTransaction? activeTransaction = _ActiveTransactionContext.Value?.Transaction;
             bool useActiveTransaction = activeTransaction != null && activeConnection != null;
             NpgsqlConnection? connection = activeConnection;
             NpgsqlTransaction? localTransaction = null;
@@ -214,17 +220,19 @@ namespace Verbex.Database.Postgresql
             await _Semaphore.WaitAsync(token).ConfigureAwait(false);
             try
             {
-                if (_ActiveTransaction.Value != null)
+                ActiveTransactionContext? activeContext = _ActiveTransactionContext.Value;
+                if (activeContext?.Transaction != null)
                 {
-                    await _ActiveTransaction.Value.DisposeAsync().ConfigureAwait(false);
-                    _ActiveTransaction.Value = null;
+                    await activeContext.Transaction.DisposeAsync().ConfigureAwait(false);
+                    activeContext.Transaction = null;
                 }
 
-                if (_ActiveConnection.Value != null)
+                if (activeContext?.Connection != null)
                 {
-                    await _ActiveConnection.Value.DisposeAsync().ConfigureAwait(false);
-                    _ActiveConnection.Value = null;
+                    await activeContext.Connection.DisposeAsync().ConfigureAwait(false);
+                    activeContext.Connection = null;
                 }
+                _ActiveTransactionContext.Value = null;
 
                 await _DataSource.DisposeAsync().ConfigureAwait(false);
                 _DataSource = null;
@@ -242,22 +250,35 @@ namespace Verbex.Database.Postgresql
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            if (_ActiveTransaction.Value != null)
+            if (_ActiveTransactionContext.Value?.Transaction != null)
             {
                 throw new InvalidOperationException("A transaction is already active.");
             }
 
-            NpgsqlConnection connection = await _DataSource!.OpenConnectionAsync(token).ConfigureAwait(false);
+            ActiveTransactionContext context = new ActiveTransactionContext();
+            _ActiveTransactionContext.Value = context;
+            NpgsqlConnection? connection = null;
 
             try
             {
+                connection = await _DataSource!.OpenConnectionAsync(token).ConfigureAwait(false);
                 NpgsqlTransaction transaction = await connection.BeginTransactionAsync(token).ConfigureAwait(false);
-                _ActiveConnection.Value = connection;
-                _ActiveTransaction.Value = transaction;
+                context.Connection = connection;
+                context.Transaction = transaction;
             }
             catch
             {
-                await connection.DisposeAsync().ConfigureAwait(false);
+                _ActiveTransactionContext.Value = null;
+                if (context.Transaction != null)
+                {
+                    await context.Transaction.DisposeAsync().ConfigureAwait(false);
+                    context.Transaction = null;
+                }
+
+                if (connection != null)
+                {
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                }
                 throw;
             }
         }
@@ -268,14 +289,12 @@ namespace Verbex.Database.Postgresql
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            NpgsqlTransaction? transaction = _ActiveTransaction.Value;
-            NpgsqlConnection? connection = _ActiveConnection.Value;
+            ActiveTransactionContext? context = _ActiveTransactionContext.Value;
+            NpgsqlTransaction? transaction = context?.Transaction;
+            NpgsqlConnection? connection = context?.Connection;
             if (transaction == null || connection == null)
             {
-                // AsyncLocal state was lost across async continuations;
-                // individual operations already committed via local transactions.
-                _ActiveTransaction.Value = null;
-                _ActiveConnection.Value = null;
+                _ActiveTransactionContext.Value = null;
                 return;
             }
 
@@ -285,10 +304,14 @@ namespace Verbex.Database.Postgresql
             }
             finally
             {
+                if (context != null)
+                {
+                    context.Transaction = null;
+                    context.Connection = null;
+                }
+                _ActiveTransactionContext.Value = null;
                 await transaction.DisposeAsync().ConfigureAwait(false);
                 await connection.DisposeAsync().ConfigureAwait(false);
-                _ActiveTransaction.Value = null;
-                _ActiveConnection.Value = null;
             }
         }
 
@@ -298,13 +321,12 @@ namespace Verbex.Database.Postgresql
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            NpgsqlTransaction? transaction = _ActiveTransaction.Value;
-            NpgsqlConnection? connection = _ActiveConnection.Value;
+            ActiveTransactionContext? context = _ActiveTransactionContext.Value;
+            NpgsqlTransaction? transaction = context?.Transaction;
+            NpgsqlConnection? connection = context?.Connection;
             if (transaction == null || connection == null)
             {
-                // AsyncLocal state was lost; nothing to roll back.
-                _ActiveTransaction.Value = null;
-                _ActiveConnection.Value = null;
+                _ActiveTransactionContext.Value = null;
                 return;
             }
 
@@ -314,10 +336,86 @@ namespace Verbex.Database.Postgresql
             }
             finally
             {
+                if (context != null)
+                {
+                    context.Transaction = null;
+                    context.Connection = null;
+                }
+                _ActiveTransactionContext.Value = null;
                 await transaction.DisposeAsync().ConfigureAwait(false);
                 await connection.DisposeAsync().ConfigureAwait(false);
-                _ActiveTransaction.Value = null;
-                _ActiveConnection.Value = null;
+            }
+        }
+
+        /// <inheritdoc />
+        public override async Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotOpen();
+
+            if (operation == null)
+            {
+                throw new ArgumentNullException(nameof(operation));
+            }
+
+            ActiveTransactionContext? activeContext = _ActiveTransactionContext.Value;
+            if (activeContext?.Transaction != null && activeContext.Connection != null)
+            {
+                return await operation(token).ConfigureAwait(false);
+            }
+
+            if (activeContext != null)
+            {
+                throw new InvalidOperationException("Inconsistent transaction state.");
+            }
+
+            ActiveTransactionContext context = new ActiveTransactionContext();
+            _ActiveTransactionContext.Value = context;
+            NpgsqlConnection? connection = null;
+            NpgsqlTransaction? transaction = null;
+
+            try
+            {
+                connection = await _DataSource!.OpenConnectionAsync(token).ConfigureAwait(false);
+                transaction = await connection.BeginTransactionAsync(token).ConfigureAwait(false);
+                context.Connection = connection;
+                context.Transaction = transaction;
+
+                T result = await operation(token).ConfigureAwait(false);
+                await transaction.CommitAsync(token).ConfigureAwait(false);
+                return result;
+            }
+            catch
+            {
+                if (transaction != null)
+                {
+                    try
+                    {
+                        await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        // Preserve the original operation failure.
+                    }
+                }
+
+                throw;
+            }
+            finally
+            {
+                context.Transaction = null;
+                context.Connection = null;
+                _ActiveTransactionContext.Value = null;
+
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync().ConfigureAwait(false);
+                }
+
+                if (connection != null)
+                {
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                }
             }
         }
 
@@ -497,8 +595,8 @@ namespace Verbex.Database.Postgresql
         {
             DataTable result = new DataTable();
 
-            NpgsqlConnection? activeConnection = _ActiveConnection.Value;
-            NpgsqlTransaction? activeTransaction = _ActiveTransaction.Value;
+            NpgsqlConnection? activeConnection = _ActiveTransactionContext.Value?.Connection;
+            NpgsqlTransaction? activeTransaction = _ActiveTransactionContext.Value?.Transaction;
             bool useActiveTransaction = activeTransaction != null && activeConnection != null;
 
             if (useActiveTransaction)
@@ -557,8 +655,8 @@ namespace Verbex.Database.Postgresql
         /// </summary>
         private async Task ExecuteNonQueryAsync(string query, bool isTransaction, int commandTimeout, CancellationToken token)
         {
-            NpgsqlConnection? activeConnection = _ActiveConnection.Value;
-            NpgsqlTransaction? activeTransaction = _ActiveTransaction.Value;
+            NpgsqlConnection? activeConnection = _ActiveTransactionContext.Value?.Connection;
+            NpgsqlTransaction? activeTransaction = _ActiveTransactionContext.Value?.Transaction;
             bool useActiveTransaction = activeTransaction != null && activeConnection != null;
 
             if (useActiveTransaction)

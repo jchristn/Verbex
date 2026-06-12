@@ -57,6 +57,11 @@ namespace Test
 
                 // Cross-tenant isolation tests
                 await runner.RunTestAsync("Tenant Isolation Test", TestTenantIsolationAsync).ConfigureAwait(false);
+                // This regression targets async-flow server drivers; SQLite uses a thread-affine write lock.
+                if (TestContext.DatabaseSettings?.Type != DatabaseTypeEnum.Sqlite)
+                {
+                    await runner.RunTestAsync("Scoped Transaction Rollback Test", TestScopedTransactionRollbackAsync).ConfigureAwait(false);
+                }
             }
             finally
             {
@@ -426,6 +431,33 @@ namespace Test
 
             TestAssert.AreEqual(1, usersA.Count());
             TestAssert.AreEqual(1, usersB.Count());
+        }
+
+        private static async Task TestScopedTransactionRollbackAsync()
+        {
+            using DatabaseDriverBase driver = await CreateTestDriverAsync().ConfigureAwait(false);
+
+            string tenantName = $"Rollback Tenant {Guid.NewGuid():N}";
+            string? tenantId = null;
+
+            await TestAssert.ThrowsAsync<InvalidOperationException>(
+                async () => await driver.ExecuteInTransactionAsync(async token =>
+                {
+                    TenantMetadata tenant = new TenantMetadata(tenantName);
+                    await driver.Tenants.CreateAsync(tenant, token).ConfigureAwait(false);
+                    tenantId = tenant.Identifier;
+
+                    await Task.Yield();
+                    throw new InvalidOperationException("force rollback");
+                }).ConfigureAwait(false),
+                "Scoped transaction should surface the original failure").ConfigureAwait(false);
+
+            TestAssert.IsNotNull(tenantId, "Tenant should have been assigned an identifier inside the transaction");
+            TenantMetadata? byId = await driver.Tenants.ReadByIdentifierAsync(tenantId!).ConfigureAwait(false);
+            TenantMetadata? byName = await driver.Tenants.ReadByNameAsync(tenantName).ConfigureAwait(false);
+
+            TestAssert.IsNull(byId, "Scoped transaction should roll back tenant creation by id");
+            TestAssert.IsNull(byName, "Scoped transaction should roll back tenant creation by name");
         }
     }
 }

@@ -22,15 +22,21 @@ namespace Verbex.Database.SqlServer
         private const int UnlimitedCommandTimeout = 0;
         private readonly SemaphoreSlim _Semaphore = new SemaphoreSlim(1, 1);
         private string? _ConnectionString;
-        private readonly AsyncLocal<SqlConnection?> _ActiveConnection = new AsyncLocal<SqlConnection?>();
-        private readonly AsyncLocal<SqlTransaction?> _ActiveTransaction = new AsyncLocal<SqlTransaction?>();
+        private readonly AsyncLocal<ActiveTransactionContext?> _ActiveTransactionContext = new AsyncLocal<ActiveTransactionContext?>();
         private bool _IsOpen = false;
+
+        private sealed class ActiveTransactionContext
+        {
+            public SqlConnection? Connection { get; set; }
+
+            public SqlTransaction? Transaction { get; set; }
+        }
 
         /// <inheritdoc />
         public override bool IsOpen => _IsOpen;
 
         /// <inheritdoc />
-        public override bool IsTransactionActive => _ActiveTransaction.Value != null;
+        public override bool IsTransactionActive => _ActiveTransactionContext.Value?.Transaction != null;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SqlServerDatabaseDriver"/> class.
@@ -133,8 +139,8 @@ namespace Verbex.Database.SqlServer
             }
 
             DataTable result = new DataTable();
-            SqlConnection? activeConnection = _ActiveConnection.Value;
-            SqlTransaction? activeTransaction = _ActiveTransaction.Value;
+            SqlConnection? activeConnection = _ActiveTransactionContext.Value?.Connection;
+            SqlTransaction? activeTransaction = _ActiveTransactionContext.Value?.Transaction;
             bool useActiveTransaction = activeTransaction != null && activeConnection != null;
             SqlConnection? connection = activeConnection;
             SqlTransaction? localTransaction = null;
@@ -208,17 +214,19 @@ namespace Verbex.Database.SqlServer
             await _Semaphore.WaitAsync(token).ConfigureAwait(false);
             try
             {
-                if (_ActiveTransaction.Value != null)
+                ActiveTransactionContext? activeContext = _ActiveTransactionContext.Value;
+                if (activeContext?.Transaction != null)
                 {
-                    await _ActiveTransaction.Value.DisposeAsync().ConfigureAwait(false);
-                    _ActiveTransaction.Value = null;
+                    await activeContext.Transaction.DisposeAsync().ConfigureAwait(false);
+                    activeContext.Transaction = null;
                 }
 
-                if (_ActiveConnection.Value != null)
+                if (activeContext?.Connection != null)
                 {
-                    await _ActiveConnection.Value.DisposeAsync().ConfigureAwait(false);
-                    _ActiveConnection.Value = null;
+                    await activeContext.Connection.DisposeAsync().ConfigureAwait(false);
+                    activeContext.Connection = null;
                 }
+                _ActiveTransactionContext.Value = null;
 
                 _IsOpen = false;
                 _ConnectionString = null;
@@ -235,23 +243,36 @@ namespace Verbex.Database.SqlServer
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            if (_ActiveTransaction.Value != null)
+            if (_ActiveTransactionContext.Value?.Transaction != null)
             {
                 throw new InvalidOperationException("A transaction is already active.");
             }
 
-            SqlConnection connection = new SqlConnection(_ConnectionString);
-            await connection.OpenAsync(token).ConfigureAwait(false);
+            ActiveTransactionContext context = new ActiveTransactionContext();
+            _ActiveTransactionContext.Value = context;
+            SqlConnection? connection = null;
 
             try
             {
+                connection = new SqlConnection(_ConnectionString);
+                await connection.OpenAsync(token).ConfigureAwait(false);
                 SqlTransaction transaction = connection.BeginTransaction();
-                _ActiveConnection.Value = connection;
-                _ActiveTransaction.Value = transaction;
+                context.Connection = connection;
+                context.Transaction = transaction;
             }
             catch
             {
-                await connection.DisposeAsync().ConfigureAwait(false);
+                _ActiveTransactionContext.Value = null;
+                if (context.Transaction != null)
+                {
+                    await context.Transaction.DisposeAsync().ConfigureAwait(false);
+                    context.Transaction = null;
+                }
+
+                if (connection != null)
+                {
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                }
                 throw;
             }
         }
@@ -262,14 +283,12 @@ namespace Verbex.Database.SqlServer
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            SqlTransaction? transaction = _ActiveTransaction.Value;
-            SqlConnection? connection = _ActiveConnection.Value;
+            ActiveTransactionContext? context = _ActiveTransactionContext.Value;
+            SqlTransaction? transaction = context?.Transaction;
+            SqlConnection? connection = context?.Connection;
             if (transaction == null || connection == null)
             {
-                // AsyncLocal state was lost across async continuations;
-                // individual operations already committed via local transactions.
-                _ActiveTransaction.Value = null;
-                _ActiveConnection.Value = null;
+                _ActiveTransactionContext.Value = null;
                 return;
             }
 
@@ -279,10 +298,14 @@ namespace Verbex.Database.SqlServer
             }
             finally
             {
+                if (context != null)
+                {
+                    context.Transaction = null;
+                    context.Connection = null;
+                }
+                _ActiveTransactionContext.Value = null;
                 await transaction.DisposeAsync().ConfigureAwait(false);
                 await connection.DisposeAsync().ConfigureAwait(false);
-                _ActiveTransaction.Value = null;
-                _ActiveConnection.Value = null;
             }
         }
 
@@ -292,13 +315,12 @@ namespace Verbex.Database.SqlServer
             ThrowIfDisposed();
             ThrowIfNotOpen();
 
-            SqlTransaction? transaction = _ActiveTransaction.Value;
-            SqlConnection? connection = _ActiveConnection.Value;
+            ActiveTransactionContext? context = _ActiveTransactionContext.Value;
+            SqlTransaction? transaction = context?.Transaction;
+            SqlConnection? connection = context?.Connection;
             if (transaction == null || connection == null)
             {
-                // AsyncLocal state was lost; nothing to roll back.
-                _ActiveTransaction.Value = null;
-                _ActiveConnection.Value = null;
+                _ActiveTransactionContext.Value = null;
                 return;
             }
 
@@ -308,10 +330,87 @@ namespace Verbex.Database.SqlServer
             }
             finally
             {
+                if (context != null)
+                {
+                    context.Transaction = null;
+                    context.Connection = null;
+                }
+                _ActiveTransactionContext.Value = null;
                 await transaction.DisposeAsync().ConfigureAwait(false);
                 await connection.DisposeAsync().ConfigureAwait(false);
-                _ActiveTransaction.Value = null;
-                _ActiveConnection.Value = null;
+            }
+        }
+
+        /// <inheritdoc />
+        public override async Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken token = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfNotOpen();
+
+            if (operation == null)
+            {
+                throw new ArgumentNullException(nameof(operation));
+            }
+
+            ActiveTransactionContext? activeContext = _ActiveTransactionContext.Value;
+            if (activeContext?.Transaction != null && activeContext.Connection != null)
+            {
+                return await operation(token).ConfigureAwait(false);
+            }
+
+            if (activeContext != null)
+            {
+                throw new InvalidOperationException("Inconsistent transaction state.");
+            }
+
+            ActiveTransactionContext context = new ActiveTransactionContext();
+            _ActiveTransactionContext.Value = context;
+            SqlConnection? connection = null;
+            SqlTransaction? transaction = null;
+
+            try
+            {
+                connection = new SqlConnection(_ConnectionString);
+                await connection.OpenAsync(token).ConfigureAwait(false);
+                transaction = connection.BeginTransaction();
+                context.Connection = connection;
+                context.Transaction = transaction;
+
+                T result = await operation(token).ConfigureAwait(false);
+                await transaction.CommitAsync(token).ConfigureAwait(false);
+                return result;
+            }
+            catch
+            {
+                if (transaction != null)
+                {
+                    try
+                    {
+                        await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        // Preserve the original operation failure.
+                    }
+                }
+
+                throw;
+            }
+            finally
+            {
+                context.Transaction = null;
+                context.Connection = null;
+                _ActiveTransactionContext.Value = null;
+
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync().ConfigureAwait(false);
+                }
+
+                if (connection != null)
+                {
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                }
             }
         }
 
@@ -493,8 +592,8 @@ namespace Verbex.Database.SqlServer
         {
             DataTable result = new DataTable();
 
-            SqlConnection? activeConnection = _ActiveConnection.Value;
-            SqlTransaction? activeTransaction = _ActiveTransaction.Value;
+            SqlConnection? activeConnection = _ActiveTransactionContext.Value?.Connection;
+            SqlTransaction? activeTransaction = _ActiveTransactionContext.Value?.Transaction;
             bool useActiveTransaction = activeTransaction != null && activeConnection != null;
 
             if (useActiveTransaction)
@@ -554,8 +653,8 @@ namespace Verbex.Database.SqlServer
         /// </summary>
         private async Task ExecuteNonQueryAsync(string query, bool isTransaction, int commandTimeout, CancellationToken token)
         {
-            SqlConnection? activeConnection = _ActiveConnection.Value;
-            SqlTransaction? activeTransaction = _ActiveTransaction.Value;
+            SqlConnection? activeConnection = _ActiveTransactionContext.Value?.Connection;
+            SqlTransaction? activeTransaction = _ActiveTransactionContext.Value?.Transaction;
             bool useActiveTransaction = activeTransaction != null && activeConnection != null;
 
             if (useActiveTransaction)

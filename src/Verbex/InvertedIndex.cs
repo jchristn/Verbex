@@ -329,32 +329,23 @@ namespace Verbex
             {
                 string documentId = IdGenerator.GenerateDocumentId();
                 string contentSha256 = ComputeContentHash(content);
+                IndexContentResult? indexResult = null;
 
-                await _Driver.BeginTransactionAsync(token).ConfigureAwait(false);
-                try
+                addResult = await _Driver.ExecuteInTransactionAsync(async transactionToken =>
                 {
-                    await _Driver.Documents.AddAsync(_TablePrefix, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
+                    await _Driver.Documents.AddAsync(_TablePrefix, documentId, documentName, contentSha256, content.Length, null, null, transactionToken).ConfigureAwait(false);
 
-                    IndexContentResult result = await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
+                    indexResult = await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, transactionToken).ConfigureAwait(false);
 
-                    await _Driver.CommitTransactionAsync(token).ConfigureAwait(false);
+                    indexResult.Metrics.Steps.LockWaitMs = lockWaitMs;
+                    return new AddDocumentResult(documentId, indexResult.Metrics);
+                }, token).ConfigureAwait(false);
 
-                    result.Metrics.Steps.LockWaitMs = lockWaitMs;
+                // Invalidate cache (using terms already computed during indexing)
+                _CacheInvalidator?.OnDocumentAdded(documentId, indexResult!.AffectedTerms);
 
-                    // Invalidate cache (using terms already computed during indexing)
-                    _CacheInvalidator?.OnDocumentAdded(documentId, result.AffectedTerms);
-
-                    // Check if flush is needed (increment counter inside lock, flush outside)
-                    shouldFlush = ShouldAutoFlush();
-
-                    addResult = new AddDocumentResult(documentId, result.Metrics);
-                }
-                catch
-                {
-                    if (_Driver.IsTransactionActive)
-                        await _Driver.RollbackTransactionAsync(token).ConfigureAwait(false);
-                    throw;
-                }
+                // Check if flush is needed (increment counter inside lock, flush outside)
+                shouldFlush = ShouldAutoFlush();
             }
             finally
             {
@@ -420,32 +411,23 @@ namespace Verbex
             try
             {
                 string contentSha256 = ComputeContentHash(content);
+                IndexContentResult? indexResult = null;
 
-                await _Driver.BeginTransactionAsync(token).ConfigureAwait(false);
-                try
+                addResult = await _Driver.ExecuteInTransactionAsync(async transactionToken =>
                 {
-                    await _Driver.Documents.AddAsync(_TablePrefix, documentId, documentName, contentSha256, content.Length, null, null, token).ConfigureAwait(false);
+                    await _Driver.Documents.AddAsync(_TablePrefix, documentId, documentName, contentSha256, content.Length, null, null, transactionToken).ConfigureAwait(false);
 
-                    IndexContentResult result = await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, token).ConfigureAwait(false);
+                    indexResult = await IndexDocumentContentAsync(documentId, documentName, content, stopwatch, transactionToken).ConfigureAwait(false);
 
-                    await _Driver.CommitTransactionAsync(token).ConfigureAwait(false);
+                    indexResult.Metrics.Steps.LockWaitMs = lockWaitMs;
+                    return new AddDocumentResult(documentId, indexResult.Metrics);
+                }, token).ConfigureAwait(false);
 
-                    result.Metrics.Steps.LockWaitMs = lockWaitMs;
+                // Invalidate cache (using terms already computed during indexing)
+                _CacheInvalidator?.OnDocumentAdded(documentId, indexResult!.AffectedTerms);
 
-                    // Invalidate cache (using terms already computed during indexing)
-                    _CacheInvalidator?.OnDocumentAdded(documentId, result.AffectedTerms);
-
-                    // Check if flush is needed (increment counter inside lock, flush outside)
-                    shouldFlush = ShouldAutoFlush();
-
-                    addResult = new AddDocumentResult(documentId, result.Metrics);
-                }
-                catch
-                {
-                    if (_Driver.IsTransactionActive)
-                        await _Driver.RollbackTransactionAsync(token).ConfigureAwait(false);
-                    throw;
-                }
+                // Check if flush is needed (increment counter inside lock, flush outside)
+                shouldFlush = ShouldAutoFlush();
             }
             finally
             {
@@ -739,10 +721,11 @@ namespace Verbex
             try
             {
                 List<DocumentTermRecord> docTerms = await _Driver.DocumentTerms.GetByDocumentAsync(_TablePrefix, documentId, token).ConfigureAwait(false);
+                bool deleted = false;
+                List<string> deletedTermTexts = new List<string>();
 
                 // Wrap all deletion operations in a transaction for atomicity
-                await _Driver.BeginTransactionAsync(token).ConfigureAwait(false);
-                try
+                await _Driver.ExecuteInTransactionAsync(async transactionToken =>
                 {
                     // Batch decrement term frequencies (single UPDATE instead of N)
                     if (docTerms.Count > 0)
@@ -753,39 +736,31 @@ namespace Verbex
                         {
                             decrements[docTerm.TermId] = new FrequencyDelta(1, docTerm.TermFrequency);
                         }
-                        await _Driver.Terms.DecrementFrequenciesBatchAsync(_TablePrefix, decrements, token).ConfigureAwait(false);
+                        await _Driver.Terms.DecrementFrequenciesBatchAsync(_TablePrefix, decrements, transactionToken).ConfigureAwait(false);
                     }
 
-                    await _Driver.DocumentTerms.DeleteByDocumentAsync(_TablePrefix, documentId, token).ConfigureAwait(false);
+                    await _Driver.DocumentTerms.DeleteByDocumentAsync(_TablePrefix, documentId, transactionToken).ConfigureAwait(false);
 
-                    bool deleted = await _Driver.Documents.DeleteAsync(_TablePrefix, documentId, token).ConfigureAwait(false);
+                    deleted = await _Driver.Documents.DeleteAsync(_TablePrefix, documentId, transactionToken).ConfigureAwait(false);
 
                     // Delete orphaned terms and get the list of deleted term texts for cache invalidation
-                    List<string> deletedTermTexts = await _Driver.Terms.DeleteOrphanedAsync(_TablePrefix, token).ConfigureAwait(false);
+                    deletedTermTexts = await _Driver.Terms.DeleteOrphanedAsync(_TablePrefix, transactionToken).ConfigureAwait(false);
+                }, token).ConfigureAwait(false);
 
-                    await _Driver.CommitTransactionAsync(token).ConfigureAwait(false);
-
-                    // Invalidate caches after successful commit
-                    if (deleted)
-                    {
-                        List<string> affectedTermIds = docTerms.Select(dt => dt.TermId).ToList();
-                        _CacheInvalidator?.OnDocumentRemoved(documentId, affectedTermIds);
-                    }
-
-                    // Invalidate TermIdCache for deleted orphan terms
-                    if (deletedTermTexts.Count > 0)
-                    {
-                        _TermIdCache?.RemoveRange(deletedTermTexts);
-                    }
-
-                    return deleted;
-                }
-                catch
+                // Invalidate caches after successful commit
+                if (deleted)
                 {
-                    if (_Driver.IsTransactionActive)
-                        await _Driver.RollbackTransactionAsync(token).ConfigureAwait(false);
-                    throw;
+                    List<string> affectedTermIds = docTerms.Select(dt => dt.TermId).ToList();
+                    _CacheInvalidator?.OnDocumentRemoved(documentId, affectedTermIds);
                 }
+
+                // Invalidate TermIdCache for deleted orphan terms
+                if (deletedTermTexts.Count > 0)
+                {
+                    _TermIdCache?.RemoveRange(deletedTermTexts);
+                }
+
+                return deleted;
             }
             finally
             {
@@ -818,10 +793,11 @@ namespace Verbex
             {
                 // Step 1: Get all document-terms for all requested documents in a single query
                 List<DocumentTermRecord> allDocTerms = await _Driver.DocumentTerms.GetByDocumentsAsync(_TablePrefix, requestedIds, token).ConfigureAwait(false);
+                List<string> deletedIds = new List<string>();
+                List<string> deletedTermTexts = new List<string>();
 
                 // Wrap all deletion operations in a transaction for atomicity
-                await _Driver.BeginTransactionAsync(token).ConfigureAwait(false);
-                try
+                await _Driver.ExecuteInTransactionAsync(async transactionToken =>
                 {
                     // Step 2: Aggregate term frequency decrements across all documents
                     if (allDocTerms.Count > 0)
@@ -840,52 +816,44 @@ namespace Verbex
                         }
 
                         // Step 3: Single batch decrement for all term frequencies
-                        await _Driver.Terms.DecrementFrequenciesBatchAsync(_TablePrefix, decrements, token).ConfigureAwait(false);
+                        await _Driver.Terms.DecrementFrequenciesBatchAsync(_TablePrefix, decrements, transactionToken).ConfigureAwait(false);
                     }
 
                     // Step 4: Delete all document-terms in one statement
-                    await _Driver.DocumentTerms.DeleteByDocumentsAsync(_TablePrefix, requestedIds, token).ConfigureAwait(false);
+                    await _Driver.DocumentTerms.DeleteByDocumentsAsync(_TablePrefix, requestedIds, transactionToken).ConfigureAwait(false);
 
                     // Step 5: Delete all documents in one statement and get back which ones existed
-                    List<string> deletedIds = await _Driver.Documents.DeleteBatchAsync(_TablePrefix, requestedIds, token).ConfigureAwait(false);
+                    deletedIds = await _Driver.Documents.DeleteBatchAsync(_TablePrefix, requestedIds, transactionToken).ConfigureAwait(false);
 
                     // Step 6: Run orphan cleanup once at the end and get deleted term texts for cache invalidation
-                    List<string> deletedTermTexts = await _Driver.Terms.DeleteOrphanedAsync(_TablePrefix, token).ConfigureAwait(false);
+                    deletedTermTexts = await _Driver.Terms.DeleteOrphanedAsync(_TablePrefix, transactionToken).ConfigureAwait(false);
+                }, token).ConfigureAwait(false);
 
-                    await _Driver.CommitTransactionAsync(token).ConfigureAwait(false);
+                // Step 7: Calculate not-found IDs
+                HashSet<string> deletedSet = new HashSet<string>(deletedIds);
+                List<string> notFoundIds = requestedIds.Where(id => !deletedSet.Contains(id)).ToList();
 
-                    // Step 7: Calculate not-found IDs
-                    HashSet<string> deletedSet = new HashSet<string>(deletedIds);
-                    List<string> notFoundIds = requestedIds.Where(id => !deletedSet.Contains(id)).ToList();
-
-                    // Invalidate caches after successful commit
-                    if (deletedIds.Count > 0)
-                    {
-                        List<string> affectedTermIds = allDocTerms.Select(dt => dt.TermId).Distinct().ToList();
-                        _CacheInvalidator?.OnDocumentsRemoved(deletedIds, affectedTermIds);
-                    }
-
-                    // Invalidate TermIdCache for deleted orphan terms
-                    if (deletedTermTexts.Count > 0)
-                    {
-                        _TermIdCache?.RemoveRange(deletedTermTexts);
-                    }
-
-                    return new BatchDeleteResponse
-                    {
-                        Deleted = deletedIds,
-                        NotFound = notFoundIds,
-                        DeletedCount = deletedIds.Count,
-                        NotFoundCount = notFoundIds.Count,
-                        RequestedCount = requestedIds.Count
-                    };
-                }
-                catch
+                // Invalidate caches after successful commit
+                if (deletedIds.Count > 0)
                 {
-                    if (_Driver.IsTransactionActive)
-                        await _Driver.RollbackTransactionAsync(token).ConfigureAwait(false);
-                    throw;
+                    List<string> affectedTermIds = allDocTerms.Select(dt => dt.TermId).Distinct().ToList();
+                    _CacheInvalidator?.OnDocumentsRemoved(deletedIds, affectedTermIds);
                 }
+
+                // Invalidate TermIdCache for deleted orphan terms
+                if (deletedTermTexts.Count > 0)
+                {
+                    _TermIdCache?.RemoveRange(deletedTermTexts);
+                }
+
+                return new BatchDeleteResponse
+                {
+                    Deleted = deletedIds,
+                    NotFound = notFoundIds,
+                    DeletedCount = deletedIds.Count,
+                    NotFoundCount = notFoundIds.Count,
+                    RequestedCount = requestedIds.Count
+                };
             }
             finally
             {
@@ -2065,150 +2033,133 @@ namespace Verbex
             int distinctTermCount = termPositions.Count;
             metrics.Counts.UniqueTerms = distinctTermCount;
 
-            // Use existing transaction if one is active (caller manages it), otherwise create our own
-            bool ownTransaction = !_Driver.IsTransactionActive;
-            if (ownTransaction)
+            if (!_Driver.IsTransactionActive)
             {
-                await _Driver.BeginTransactionAsync(token).ConfigureAwait(false);
-            }
-            try
-            {
-                // Step 3: Batch add/get all terms (with cache optimization)
-                stepStopwatch.Restart();
-                List<string> termList = new List<string>(termPositions.Keys);
-                Dictionary<string, string> termIds = new Dictionary<string, string>();
-                List<string> uncachedTerms;
-                int cacheHits = 0;
-                int cacheMisses = 0;
-
-                // Check cache first if available
-                if (_TermIdCache != null && _TermIdCache.IsLoaded)
-                {
-                    (Dictionary<string, string> cachedTermIds, List<string> notCached) = _TermIdCache.TryGetIds(termList);
-                    foreach (KeyValuePair<string, string> kvp in cachedTermIds)
-                    {
-                        termIds[kvp.Key] = kvp.Value;
-                    }
-                    uncachedTerms = notCached;
-                    cacheHits = cachedTermIds.Count;
-                    cacheMisses = notCached.Count;
-                }
-                else
-                {
-                    uncachedTerms = termList;
-                    cacheMisses = termList.Count;
-                }
-
-                // Query database only for uncached terms
-                int newTermsCount = 0;
-                if (uncachedTerms.Count > 0)
-                {
-                    Dictionary<string, string> termIdsToGenerate = new Dictionary<string, string>();
-                    foreach (string term in uncachedTerms)
-                    {
-                        termIdsToGenerate[IdGenerator.GenerateTermId()] = term;
-                    }
-                    Dictionary<string, string> dbTermIds = await _Driver.Terms.AddOrGetBatchAsync(_TablePrefix, termIdsToGenerate, token).ConfigureAwait(false);
-
-                    // Calculate new terms added (terms where we generated the ID that got used)
-                    foreach (KeyValuePair<string, string> kvp in termIdsToGenerate)
-                    {
-                        string generatedId = kvp.Key;
-                        string term = kvp.Value;
-                        if (dbTermIds.TryGetValue(term, out string? actualId) && actualId == generatedId)
-                        {
-                            newTermsCount++;
-                        }
-                    }
-
-                    // Write-through: update cache with results from DB
-                    _TermIdCache?.SetRange(dbTermIds);
-
-                    // Merge DB results into termIds
-                    foreach (KeyValuePair<string, string> kvp in dbTermIds)
-                    {
-                        termIds[kvp.Key] = kvp.Value;
-                    }
-                }
-                stepStopwatch.Stop();
-                metrics.Steps.TermLookupMs = stepStopwatch.Elapsed.TotalMilliseconds;
-                metrics.Counts.NewTerms = newTermsCount;
-                metrics.Counts.TermCacheHits = cacheHits;
-                metrics.Counts.TermCacheMisses = cacheMisses;
-
-                // Step 4: Prepare document-term mappings for batch insert
-                List<DocumentTermRecord> docTermRecords = new List<DocumentTermRecord>();
-                Dictionary<string, FrequencyDelta> frequencyUpdates =
-                    new Dictionary<string, FrequencyDelta>();
-
-                foreach (KeyValuePair<string, TermPositionData> kvp in termPositions)
-                {
-                    string term = kvp.Key;
-                    List<int> characterPositions = kvp.Value.CharacterPositions;
-                    List<int> termPositionsList = kvp.Value.TermPositions;
-                    int termFrequency = characterPositions.Count;
-
-                    if (termIds.TryGetValue(term, out string? termId))
-                    {
-                        docTermRecords.Add(new DocumentTermRecord
-                        {
-                            Id = IdGenerator.GenerateDocumentTermId(),
-                            DocumentId = documentId,
-                            TermId = termId,
-                            TermFrequency = termFrequency,
-                            CharacterPositions = characterPositions,
-                            TermPositions = termPositionsList
-                        });
-                        frequencyUpdates[termId] = new FrequencyDelta(1, termFrequency);
-                    }
-                }
-
-                // Step 5: Batch insert document-term mappings (single INSERT)
-                stepStopwatch.Restart();
-                await _Driver.DocumentTerms.AddBatchAsync(_TablePrefix, docTermRecords, token).ConfigureAwait(false);
-                stepStopwatch.Stop();
-                metrics.Steps.DocumentTermInsertMs = stepStopwatch.Elapsed.TotalMilliseconds;
-
-                // Step 6: Batch update term frequencies (single UPDATE)
-                stepStopwatch.Restart();
-                await _Driver.Terms.IncrementFrequenciesBatchAsync(_TablePrefix, frequencyUpdates, token).ConfigureAwait(false);
-                stepStopwatch.Stop();
-                metrics.Steps.FrequencyUpdateMs = stepStopwatch.Elapsed.TotalMilliseconds;
-
-                // Step 7: Update document metadata
-                stepStopwatch.Restart();
-                totalStopwatch.Stop();
-                await _Driver.Documents.UpdateAsync(
-                    _TablePrefix,
-                    documentId,
-                    documentPath,
-                    ComputeContentHash(content),
-                    content.Length,
-                    distinctTermCount,
-                    null,
-                    (decimal)totalStopwatch.Elapsed.TotalMilliseconds,
+                return await _Driver.ExecuteInTransactionAsync(
+                    async transactionToken => await IndexDocumentContentAsync(documentId, documentPath, content, totalStopwatch, transactionToken).ConfigureAwait(false),
                     token).ConfigureAwait(false);
-                stepStopwatch.Stop();
-                metrics.Steps.DocumentUpdateMs = stepStopwatch.Elapsed.TotalMilliseconds;
+            }
 
-                // Step 8: Commit transaction (only if we own it)
-                if (ownTransaction)
+            // Step 3: Batch add/get all terms (with cache optimization)
+            stepStopwatch.Restart();
+            List<string> termList = new List<string>(termPositions.Keys);
+            Dictionary<string, string> termIds = new Dictionary<string, string>();
+            List<string> uncachedTerms;
+            int cacheHits = 0;
+            int cacheMisses = 0;
+
+            // Check cache first if available
+            if (_TermIdCache != null && _TermIdCache.IsLoaded)
+            {
+                (Dictionary<string, string> cachedTermIds, List<string> notCached) = _TermIdCache.TryGetIds(termList);
+                foreach (KeyValuePair<string, string> kvp in cachedTermIds)
                 {
-                    stepStopwatch.Restart();
-                    await _Driver.CommitTransactionAsync(token).ConfigureAwait(false);
-                    stepStopwatch.Stop();
-                    metrics.Steps.TransactionCommitMs = stepStopwatch.Elapsed.TotalMilliseconds;
+                    termIds[kvp.Key] = kvp.Value;
+                }
+                uncachedTerms = notCached;
+                cacheHits = cachedTermIds.Count;
+                cacheMisses = notCached.Count;
+            }
+            else
+            {
+                uncachedTerms = termList;
+                cacheMisses = termList.Count;
+            }
+
+            // Query database only for uncached terms
+            int newTermsCount = 0;
+            if (uncachedTerms.Count > 0)
+            {
+                Dictionary<string, string> termIdsToGenerate = new Dictionary<string, string>();
+                foreach (string term in uncachedTerms)
+                {
+                    termIdsToGenerate[IdGenerator.GenerateTermId()] = term;
+                }
+                Dictionary<string, string> dbTermIds = await _Driver.Terms.AddOrGetBatchAsync(_TablePrefix, termIdsToGenerate, token).ConfigureAwait(false);
+
+                // Calculate new terms added (terms where we generated the ID that got used)
+                foreach (KeyValuePair<string, string> kvp in termIdsToGenerate)
+                {
+                    string generatedId = kvp.Key;
+                    string term = kvp.Value;
+                    if (dbTermIds.TryGetValue(term, out string? actualId) && actualId == generatedId)
+                    {
+                        newTermsCount++;
+                    }
                 }
 
-                metrics.TotalMs = totalStopwatch.Elapsed.TotalMilliseconds;
-                return new IndexContentResult(metrics, termList);
+                // Write-through: update cache with results from DB
+                _TermIdCache?.SetRange(dbTermIds);
+
+                // Merge DB results into termIds
+                foreach (KeyValuePair<string, string> kvp in dbTermIds)
+                {
+                    termIds[kvp.Key] = kvp.Value;
+                }
             }
-            catch
+            stepStopwatch.Stop();
+            metrics.Steps.TermLookupMs = stepStopwatch.Elapsed.TotalMilliseconds;
+            metrics.Counts.NewTerms = newTermsCount;
+            metrics.Counts.TermCacheHits = cacheHits;
+            metrics.Counts.TermCacheMisses = cacheMisses;
+
+            // Step 4: Prepare document-term mappings for batch insert
+            List<DocumentTermRecord> docTermRecords = new List<DocumentTermRecord>();
+            Dictionary<string, FrequencyDelta> frequencyUpdates =
+                new Dictionary<string, FrequencyDelta>();
+
+            foreach (KeyValuePair<string, TermPositionData> kvp in termPositions)
             {
-                if (ownTransaction && _Driver.IsTransactionActive)
-                    await _Driver.RollbackTransactionAsync(token).ConfigureAwait(false);
-                throw;
+                string term = kvp.Key;
+                List<int> characterPositions = kvp.Value.CharacterPositions;
+                List<int> termPositionsList = kvp.Value.TermPositions;
+                int termFrequency = characterPositions.Count;
+
+                if (termIds.TryGetValue(term, out string? termId))
+                {
+                    docTermRecords.Add(new DocumentTermRecord
+                    {
+                        Id = IdGenerator.GenerateDocumentTermId(),
+                        DocumentId = documentId,
+                        TermId = termId,
+                        TermFrequency = termFrequency,
+                        CharacterPositions = characterPositions,
+                        TermPositions = termPositionsList
+                    });
+                    frequencyUpdates[termId] = new FrequencyDelta(1, termFrequency);
+                }
             }
+
+            // Step 5: Batch insert document-term mappings (single INSERT)
+            stepStopwatch.Restart();
+            await _Driver.DocumentTerms.AddBatchAsync(_TablePrefix, docTermRecords, token).ConfigureAwait(false);
+            stepStopwatch.Stop();
+            metrics.Steps.DocumentTermInsertMs = stepStopwatch.Elapsed.TotalMilliseconds;
+
+            // Step 6: Batch update term frequencies (single UPDATE)
+            stepStopwatch.Restart();
+            await _Driver.Terms.IncrementFrequenciesBatchAsync(_TablePrefix, frequencyUpdates, token).ConfigureAwait(false);
+            stepStopwatch.Stop();
+            metrics.Steps.FrequencyUpdateMs = stepStopwatch.Elapsed.TotalMilliseconds;
+
+            // Step 7: Update document metadata
+            stepStopwatch.Restart();
+            totalStopwatch.Stop();
+            await _Driver.Documents.UpdateAsync(
+                _TablePrefix,
+                documentId,
+                documentPath,
+                ComputeContentHash(content),
+                content.Length,
+                distinctTermCount,
+                null,
+                (decimal)totalStopwatch.Elapsed.TotalMilliseconds,
+                token).ConfigureAwait(false);
+            stepStopwatch.Stop();
+            metrics.Steps.DocumentUpdateMs = stepStopwatch.Elapsed.TotalMilliseconds;
+
+            metrics.TotalMs = totalStopwatch.Elapsed.TotalMilliseconds;
+            return new IndexContentResult(metrics, termList);
         }
 
         private List<string> TokenizeAndProcess(string content)

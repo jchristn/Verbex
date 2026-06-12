@@ -548,6 +548,33 @@
             Gets whether a transaction is currently active.
             </summary>
         </member>
+        <member name="M:Verbex.Database.DatabaseDriverBase.ExecuteInTransactionAsync(System.Func{System.Threading.CancellationToken,System.Threading.Tasks.Task},System.Threading.CancellationToken)">
+            <summary>
+            Executes an operation inside a database transaction.
+            </summary>
+            <param name="operation">Operation to execute.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>A task representing the asynchronous operation.</returns>
+            <remarks>
+            Prefer this scoped API over manual BeginTransactionAsync/CommitTransactionAsync usage.
+            Implementations that store transaction state in async context can keep that state
+            visible for the entire operation and guarantee cleanup in one place.
+            </remarks>
+        </member>
+        <member name="M:Verbex.Database.DatabaseDriverBase.ExecuteInTransactionAsync``1(System.Func{System.Threading.CancellationToken,System.Threading.Tasks.Task{``0}},System.Threading.CancellationToken)">
+            <summary>
+            Executes an operation inside a database transaction and returns a result.
+            </summary>
+            <typeparam name="T">Result type.</typeparam>
+            <param name="operation">Operation to execute.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Operation result.</returns>
+            <remarks>
+            Prefer this scoped API over manual BeginTransactionAsync/CommitTransactionAsync usage.
+            Implementations that store transaction state in async context can keep that state
+            visible for the entire operation and guarantee cleanup in one place.
+            </remarks>
+        </member>
         <member name="M:Verbex.Database.DatabaseDriverBase.ThrowIfDisposed">
             <summary>
             Throws an exception if the driver has been disposed.
@@ -2765,6 +2792,9 @@
         <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.RollbackTransactionAsync(System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.ExecuteInTransactionAsync``1(System.Func{System.Threading.CancellationToken,System.Threading.Tasks.Task{``0}},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
         <member name="M:Verbex.Database.Mysql.MysqlDatabaseDriver.BuildConnectionString">
             <summary>
             Builds the MySQL connection string based on settings.
@@ -3311,6 +3341,9 @@
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.RollbackTransactionAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.ExecuteInTransactionAsync``1(System.Func{System.Threading.CancellationToken,System.Threading.Tasks.Task{``0}},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.Postgresql.PostgresqlDatabaseDriver.BuildConnectionString">
@@ -4629,6 +4662,9 @@
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.RollbackTransactionAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.ExecuteInTransactionAsync``1(System.Func{System.Threading.CancellationToken,System.Threading.Tasks.Task{``0}},System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="M:Verbex.Database.SqlServer.SqlServerDatabaseDriver.BuildConnectionString">
