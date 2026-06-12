@@ -88,6 +88,7 @@ All SDKs cover the complete Verbex REST API:
 - `GET /v1.0/indices/{id}/documents` - List documents
 - `POST /v1.0/indices/{id}/documents` - Add a document
 - `GET /v1.0/indices/{id}/documents/{docId}` - Get document
+- `POST /v1.0/indices/{id}/documents/delete` - Batch delete documents
 - `DELETE /v1.0/indices/{id}/documents/{docId}` - Delete document
 
 ### Search

@@ -29,6 +29,12 @@
 			"value": "verbexadmin",
 			"type": "string",
 			"description": "Admin bearer token for authentication"
+		},
+		{
+			"key": "request_history_id",
+			"value": "req_example",
+			"type": "string",
+			"description": "Request history entry ID for request history item, detail, and delete requests"
 		}
 	],
 	"item": [
@@ -986,6 +992,203 @@
 							]
 						},
 						"description": "Search for documents filtered by both labels and tags. Documents must match the search query AND have all specified labels AND have all specified tags."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Request History",
+			"description": "Request history inspection and cleanup endpoints",
+			"item": [
+				{
+					"name": "List Request History",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/requesthistory?method=POST&route=/v1.0/indices",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"requesthistory"
+							],
+							"query": [
+								{
+									"key": "method",
+									"value": "POST"
+								},
+								{
+									"key": "route",
+									"value": "/v1.0/indices"
+								}
+							]
+						},
+						"description": "List request history entries visible to the authenticated principal. Supports filters such as method, route, tenantId, userId, credentialId, indexId, sourceIp, principal, statusCode, fromUtc, and toUtc."
+					},
+					"response": []
+				},
+				{
+					"name": "Request History Summary",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/requesthistory/summary?bucketMinutes=60",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"requesthistory",
+								"summary"
+							],
+							"query": [
+								{
+									"key": "bucketMinutes",
+									"value": "60"
+								}
+							]
+						},
+						"description": "Get aggregated request history buckets for charting and dashboard summaries."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Request History (Bulk)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"method\": \"POST\",\n  \"route\": \"/v1.0/indices\",\n  \"tenantId\": \"default\",\n  \"statusCode\": \"200\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/requesthistory/delete",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"requesthistory",
+								"delete"
+							]
+						},
+						"description": "Delete all request history entries matching the supplied filters. Omit individual request body fields to leave those filters unset. An empty JSON object deletes all entries visible to the authenticated principal."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Request History Entry",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/requesthistory/{{request_history_id}}",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"requesthistory",
+								"{{request_history_id}}"
+							]
+						},
+						"description": "Get a single request history entry by ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Request History Detail",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/requesthistory/{{request_history_id}}/detail",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"requesthistory",
+								"{{request_history_id}}",
+								"detail"
+							]
+						},
+						"description": "Get stored request and response detail for a request history entry."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Request History Entry",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/requesthistory/{{request_history_id}}",
+							"protocol": "{{protocol}}",
+							"host": [
+								"{{hostname}}"
+							],
+							"port": "{{port}}",
+							"path": [
+								"v1.0",
+								"requesthistory",
+								"{{request_history_id}}"
+							]
+						},
+						"description": "Delete a single request history entry by ID."
 					},
 					"response": []
 				}

@@ -681,7 +681,7 @@ class ApiClient {
   }
 
   async bulkDeleteRequestHistory(params = {}, options = {}) {
-    return this.delete(`/v1.0/requesthistory/bulk${buildQueryString(params)}`, options);
+    return this.post('/v1.0/requesthistory/delete', params, options);
   }
 }
 

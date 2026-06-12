@@ -94,6 +94,7 @@ node test-harness.js http://localhost:8080 verbexadmin
 - `getDocument(indexId, documentId)` - Returns `DocumentInfo`
 - `getDocumentsBatch(indexId, documentIds)` - Returns `BatchDocumentsResult`
 - `documentExists(indexId, documentId)` - Returns `boolean`
+- `deleteDocumentsBatch(indexId, documentIds)` - Returns `BatchDeleteResult`
 - `deleteDocument(indexId, documentId)` - Returns `void`
 - `updateDocumentLabels(indexId, documentId, labels)` - Returns `void`
 - `updateDocumentTags(indexId, documentId, tags)` - Returns `void`
@@ -134,6 +135,7 @@ node test-harness.js http://localhost:8080 verbexadmin
 - `SearchTermDetail` - Optional per-term score/frequency detail
 - `SearchDocumentTermStats` - Optional whole-document term counts
 - `BatchDocumentsResult` - Batch document retrieval result (documents, notFound, count, requestedCount)
+- `BatchDeleteResult` - Batch document deletion result (deleted, notFound, deletedCount, notFoundCount, requestedCount)
 - `TenantInfo` - Tenant information
 - `UserInfo` - User information
 - `CredentialInfo` - Credential/API key information

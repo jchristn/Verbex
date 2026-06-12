@@ -810,11 +810,16 @@ namespace Verbex.Server.API.REST
                 ExceptionRoute);
 
             _Webserver.Routes.PostAuthentication.Static.Add(
-                HttpMethod.DELETE, "/v1.0/requesthistory/bulk", DeleteRequestHistoryBulkRoute,
+                HttpMethod.POST, "/v1.0/requesthistory/delete", DeleteRequestHistoryBulkRoute,
                 metadata => metadata
                     .WithTag("Request History")
                     .WithDescription("Delete all request history entries matching the supplied filters.")
+                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
+                        CreateRequestHistoryBulkDeleteRequestSchema(),
+                        "Request history filters. Omit filters to delete all entries visible to the authenticated principal.",
+                        required: true))
                     .WithResponse(200, OpenApiResponseMetadata.Json("Bulk delete result", CreateRequestHistoryBulkDeleteSchema()))
+                    .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
                     .WithResponse(401, OpenApiResponseMetadata.Unauthorized()),
                 ExceptionRoute);
 
@@ -4040,22 +4045,21 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 401, "Authentication required");
                 }
 
-                Dictionary<string, string> queryParameters = GetQueryParameters(ctx);
-                RequestHistoryQuery query = RequestHistoryQuery.Parse(
-                    null,
-                    null,
-                    queryParameters.GetValueOrDefault("method"),
-                    queryParameters.GetValueOrDefault("route"),
-                    queryParameters.GetValueOrDefault("tenantId"),
-                    queryParameters.GetValueOrDefault("userId"),
-                    queryParameters.GetValueOrDefault("credentialId"),
-                    queryParameters.GetValueOrDefault("indexId"),
-                    queryParameters.GetValueOrDefault("sourceIp"),
-                    queryParameters.GetValueOrDefault("principal"),
-                    queryParameters.GetValueOrDefault("statusCode"),
-                    queryParameters.GetValueOrDefault("fromUtc"),
-                    queryParameters.GetValueOrDefault("toUtc"),
-                    queryParameters.GetValueOrDefault("bucketMinutes"));
+                string body = await GetRequestBody(ctx).ConfigureAwait(false);
+                if (String.IsNullOrWhiteSpace(body))
+                {
+                    return new ResponseContext(false, 400, "Request body is required");
+                }
+
+                RequestHistoryQuery query;
+                try
+                {
+                    query = ParseRequestHistoryBulkDeleteRequest(body);
+                }
+                catch (JsonException)
+                {
+                    return new ResponseContext(false, 400, "Invalid JSON in request body");
+                }
 
                 ApplyRequestHistoryScope(auth, query);
                 RequestHistoryBulkDeleteResult deleteResult = await _RequestHistory.BulkDeleteAsync(query).ConfigureAwait(false);
@@ -4961,6 +4965,54 @@ namespace Verbex.Server.API.REST
                 || String.Equals(auth.CredentialId, entry.CredentialId, StringComparison.OrdinalIgnoreCase);
         }
 
+        private static RequestHistoryQuery ParseRequestHistoryBulkDeleteRequest(string body)
+        {
+            using JsonDocument document = JsonDocument.Parse(body);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                throw new JsonException("Request body must be a JSON object");
+            }
+
+            JsonElement root = document.RootElement;
+
+            return RequestHistoryQuery.Parse(
+                null,
+                null,
+                GetJsonString(root, "method", "httpMethod"),
+                GetJsonString(root, "route"),
+                GetJsonString(root, "tenantId"),
+                GetJsonString(root, "userId"),
+                GetJsonString(root, "credentialId"),
+                GetJsonString(root, "indexId"),
+                GetJsonString(root, "sourceIp"),
+                GetJsonString(root, "principal"),
+                GetJsonString(root, "statusCode"),
+                GetJsonString(root, "fromUtc"),
+                GetJsonString(root, "toUtc"),
+                GetJsonString(root, "bucketMinutes"));
+        }
+
+        private static string? GetJsonString(JsonElement root, params string[] names)
+        {
+            foreach (JsonProperty property in root.EnumerateObject())
+            {
+                if (!names.Any(name => String.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+
+                return property.Value.ValueKind switch
+                {
+                    JsonValueKind.String => property.Value.GetString(),
+                    JsonValueKind.Number => property.Value.GetRawText(),
+                    JsonValueKind.True => "true",
+                    JsonValueKind.False => "false",
+                    _ => null
+                };
+            }
+
+            return null;
+        }
 
         /// <summary>
         /// Get authentication token from request.
@@ -5989,6 +6041,28 @@ namespace Verbex.Server.API.REST
                 }
             };
             return response;
+        }
+
+        private OpenApiSchemaMetadata CreateRequestHistoryBulkDeleteRequestSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["method"] = OpenApiSchemaMetadata.String(),
+                    ["route"] = OpenApiSchemaMetadata.String(),
+                    ["tenantId"] = OpenApiSchemaMetadata.String(),
+                    ["userId"] = OpenApiSchemaMetadata.String(),
+                    ["credentialId"] = OpenApiSchemaMetadata.String(),
+                    ["indexId"] = OpenApiSchemaMetadata.String(),
+                    ["sourceIp"] = OpenApiSchemaMetadata.String(),
+                    ["principal"] = OpenApiSchemaMetadata.String(),
+                    ["statusCode"] = OpenApiSchemaMetadata.String(),
+                    ["fromUtc"] = OpenApiSchemaMetadata.String("date-time"),
+                    ["toUtc"] = OpenApiSchemaMetadata.String("date-time")
+                }
+            };
         }
 
         #endregion

@@ -116,10 +116,19 @@ The dashboard communicates with the following Verbex Server endpoints:
 - `GET /v1.0/indices/{id}/documents` - List documents
 - `GET /v1.0/indices/{id}/documents/{docId}` - Get document
 - `POST /v1.0/indices/{id}/documents` - Add document
+- `POST /v1.0/indices/{id}/documents/delete` - Batch delete documents
 - `DELETE /v1.0/indices/{id}/documents/{docId}` - Delete document
 
 ### Search
 - `POST /v1.0/indices/{id}/search` - Search documents
+
+### Request History
+- `GET /v1.0/requesthistory` - List request history
+- `GET /v1.0/requesthistory/summary` - Summarize request history
+- `POST /v1.0/requesthistory/delete` - Bulk delete request history by filters
+- `GET /v1.0/requesthistory/{id}` - Get request history entry
+- `GET /v1.0/requesthistory/{id}/detail` - Get request/response detail
+- `DELETE /v1.0/requesthistory/{id}` - Delete request history entry
 
 ## License
 

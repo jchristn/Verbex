@@ -94,6 +94,7 @@ python test_harness.py http://localhost:8080 verbexadmin
 - `get_document(index_id, document_id)` - Returns `DocumentInfo`
 - `get_documents_batch(index_id, document_ids)` - Returns `BatchDocumentsResult`
 - `document_exists(index_id, document_id)` - Returns `bool`
+- `delete_documents_batch(index_id, document_ids)` - Returns `BatchDeleteResult`
 - `delete_document(index_id, document_id)` - Returns `None`
 - `update_document_labels(index_id, document_id, labels)` - Returns `None`
 - `update_document_tags(index_id, document_id, tags)` - Returns `None`
@@ -134,6 +135,7 @@ python test_harness.py http://localhost:8080 verbexadmin
 - `SearchTermDetail` - Optional per-term score/frequency detail
 - `SearchDocumentTermStats` - Optional whole-document term counts
 - `BatchDocumentsResult` - Batch document retrieval result (documents, not_found, count, requested_count)
+- `BatchDeleteResult` - Batch document deletion result (deleted, not_found, deleted_count, not_found_count, requested_count)
 - `TenantInfo` - Tenant information
 - `UserInfo` - User information
 - `CredentialInfo` - Credential/API key information

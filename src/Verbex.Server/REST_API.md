@@ -703,6 +703,78 @@ curl -X POST http://localhost:8080/v1.0/indices/test/search \
 
 ---
 
+## Request History Endpoints
+
+### GET /v1.0/requesthistory
+
+List request history entries visible to the authenticated principal.
+
+```bash
+curl -X GET "http://localhost:8080/v1.0/requesthistory?method=POST&route=/v1.0/indices" \
+  -H "Authorization: Bearer verbexadmin"
+```
+
+### GET /v1.0/requesthistory/summary
+
+Return request history summary buckets for charting.
+
+```bash
+curl -X GET "http://localhost:8080/v1.0/requesthistory/summary?fromUtc=2026-06-01T00:00:00Z&toUtc=2026-06-12T00:00:00Z&bucketMinutes=60" \
+  -H "Authorization: Bearer verbexadmin"
+```
+
+### POST /v1.0/requesthistory/delete
+
+Delete all request history entries matching the supplied filters. Omit individual filter properties to leave them unset. An empty JSON object deletes every request history entry visible to the authenticated principal.
+
+```bash
+curl -X POST "http://localhost:8080/v1.0/requesthistory/delete" \
+  -H "Authorization: Bearer verbexadmin" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "method": "POST",
+    "route": "/v1.0/indices",
+    "tenantId": "default",
+    "userId": "usr_example",
+    "credentialId": "cred_example",
+    "indexId": "default",
+    "sourceIp": "127.0.0.1",
+    "principal": "admin",
+    "statusCode": "200",
+    "fromUtc": "2026-06-01T00:00:00Z",
+    "toUtc": "2026-06-12T00:00:00Z"
+  }'
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "timestampUtc": "2026-06-12T00:00:00.000Z",
+  "statusCode": 200,
+  "errorMessage": null,
+  "data": {
+    "deletedCount": 2,
+    "deletedIds": ["req_one", "req_two"]
+  },
+  "processingTimeMs": 8.5
+}
+```
+
+### GET /v1.0/requesthistory/{id}
+
+Get a single request history entry by ID.
+
+### GET /v1.0/requesthistory/{id}/detail
+
+Get stored request and response detail for a request history entry.
+
+### DELETE /v1.0/requesthistory/{id}
+
+Delete a single request history entry by ID.
+
+---
+
 ## Backup and Restore Endpoints
 
 These endpoints allow you to create backups of indices and restore them later.

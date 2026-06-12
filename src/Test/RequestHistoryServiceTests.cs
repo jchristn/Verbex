@@ -34,6 +34,8 @@ namespace Test
                 await runner.RunTestAsync("Request History Last Day Summary Test", TestLastDaySummaryAsync).ConfigureAwait(false);
                 await runner.RunTestAsync("Request History Last Week Summary Test", TestLastWeekSummaryAsync).ConfigureAwait(false);
                 await runner.RunTestAsync("Request History Last Month Summary Test", TestLastMonthSummaryAsync).ConfigureAwait(false);
+                await runner.RunTestAsync("Request History Bulk Delete Route Contract Test", TestBulkDeleteRouteContractAsync).ConfigureAwait(false);
+                await runner.RunTestAsync("Request History Bulk Delete Asset Contract Test", TestBulkDeleteAssetContractAsync).ConfigureAwait(false);
             }
             finally
             {
@@ -71,6 +73,90 @@ namespace Test
                 fromUtc: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc),
                 bucketMinutes: 720,
                 expectedBucketCount: 60).ConfigureAwait(false);
+        }
+
+        private static Task TestBulkDeleteRouteContractAsync()
+        {
+            string root = GetRepositoryRoot();
+            string source = File.ReadAllText(Path.Combine(root, "src", "Verbex.Server", "API", "REST", "RestServiceHandler.cs"));
+            string deletedBulkRoute = "/v1.0/requesthistory" + "/bulk";
+
+            TestAssert.IsTrue(
+                source.Contains("HttpMethod.POST, \"/v1.0/requesthistory/delete\"", StringComparison.Ordinal),
+                "request history bulk delete route should use POST /v1.0/requesthistory/delete");
+            TestAssert.IsFalse(
+                source.Contains($"HttpMethod.DELETE, \"{deletedBulkRoute}\"", StringComparison.Ordinal),
+                "request history bulk delete route should not expose the previous DELETE bulk shape");
+            TestAssert.IsTrue(
+                source.Contains("ParseRequestHistoryBulkDeleteRequest(body)", StringComparison.Ordinal),
+                "request history bulk delete should parse filters from request body");
+            TestAssert.IsTrue(
+                source.Contains("CreateRequestHistoryBulkDeleteRequestSchema()", StringComparison.Ordinal),
+                "request history bulk delete should expose an OpenAPI request schema");
+
+            return Task.CompletedTask;
+        }
+
+        private static Task TestBulkDeleteAssetContractAsync()
+        {
+            string root = GetRepositoryRoot();
+            string dashboardApiPath = Path.Combine(root, "dashboard", "src", "utils", "api.js");
+            string restApiPath = Path.Combine(root, "REST_API.md");
+            string serverRestApiPath = Path.Combine(root, "src", "Verbex.Server", "REST_API.md");
+            string postmanPath = Path.Combine(root, "Verbex.postman_collection.json");
+            string dashboardApi = File.ReadAllText(dashboardApiPath);
+            string restApi = File.ReadAllText(restApiPath);
+            string serverRestApi = File.ReadAllText(serverRestApiPath);
+            string postman = File.ReadAllText(postmanPath);
+            string deletedBulkRoute = "/v1.0/requesthistory" + "/bulk";
+
+            foreach (string assetPath in new[]
+            {
+                dashboardApiPath,
+                restApiPath,
+                serverRestApiPath,
+                postmanPath,
+                Path.Combine(root, "dashboard", "README.md"),
+                Path.Combine(root, "sdk", "README.md"),
+                Path.Combine(root, "sdk", "csharp", "README.md"),
+                Path.Combine(root, "sdk", "js", "README.md"),
+                Path.Combine(root, "sdk", "python", "README.md")
+            })
+            {
+                string asset = File.ReadAllText(assetPath);
+                TestAssert.IsFalse(
+                    asset.Contains(deletedBulkRoute, StringComparison.Ordinal),
+                    $"{assetPath} should not reference the old request history bulk delete route");
+            }
+
+            foreach (string assetPath in Directory.EnumerateFiles(Path.Combine(root, "dashboard", "dist"), "*.*", SearchOption.AllDirectories))
+            {
+                string extension = Path.GetExtension(assetPath);
+                if (extension != ".html" && extension != ".js" && extension != ".css")
+                {
+                    continue;
+                }
+
+                string asset = File.ReadAllText(assetPath);
+                TestAssert.IsFalse(
+                    asset.Contains(deletedBulkRoute, StringComparison.Ordinal),
+                    $"{assetPath} should not reference the old request history bulk delete route");
+            }
+
+            TestAssert.IsTrue(
+                dashboardApi.Contains("this.post('/v1.0/requesthistory/delete'", StringComparison.Ordinal),
+                "dashboard should call request history bulk delete with POST body");
+            TestAssert.IsTrue(
+                restApi.Contains("POST `/v1.0/requesthistory/delete`", StringComparison.Ordinal),
+                "REST_API.md should document POST request history bulk delete");
+            TestAssert.IsTrue(
+                serverRestApi.Contains("### POST /v1.0/requesthistory/delete", StringComparison.Ordinal),
+                "server REST_API.md should document POST request history bulk delete");
+            TestAssert.IsTrue(
+                postman.Contains("\"raw\": \"{{protocol}}://{{hostname}}:{{port}}/v1.0/requesthistory/delete\"", StringComparison.Ordinal),
+                "Postman should include POST request history bulk delete");
+
+            return Task.CompletedTask;
         }
 
         private static async Task AssertSummaryWindowAsync(DateTime fromUtc, int bucketMinutes, int expectedBucketCount)
@@ -177,6 +263,23 @@ namespace Test
             }
 
             return settings;
+        }
+
+        private static string GetRepositoryRoot()
+        {
+            DirectoryInfo? current = new DirectoryInfo(AppContext.BaseDirectory);
+            while (current != null)
+            {
+                if (File.Exists(Path.Combine(current.FullName, "REST_API.md")) &&
+                    Directory.Exists(Path.Combine(current.FullName, "src", "Verbex.Server")))
+                {
+                    return current.FullName;
+                }
+
+                current = current.Parent;
+            }
+
+            throw new DirectoryNotFoundException("Unable to locate repository root.");
         }
 
         private static void CleanupTestDatabase()

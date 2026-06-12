@@ -17,6 +17,7 @@ This document describes the REST API endpoints available in the Verbex inverted 
 - [Admin - Tenant APIs](#admin---tenant-apis)
 - [Admin - User APIs](#admin---user-apis)
 - [Admin - Credential APIs](#admin---credential-apis)
+- [Request History APIs](#request-history-apis)
 - [Backup & Restore APIs](#backup--restore-apis)
 - [Error Handling](#error-handling)
 
@@ -270,7 +271,7 @@ All API responses are wrapped in a standard format:
 | Index | PUT | `/v1.0/indices/{id}/tags` | Update index tags | Yes |
 | Index | PUT | `/v1.0/indices/{id}/customMetadata` | Update index custom metadata | Yes |
 | Document | GET | `/v1.0/indices/{id}/documents` | List documents (max 1000) or batch retrieve by IDs | Yes |
-| Document | DELETE | `/v1.0/indices/{id}/documents` | Batch delete documents by IDs | Yes |
+| Document | POST | `/v1.0/indices/{id}/documents/delete` | Batch delete documents by IDs | Yes |
 | Document | POST | `/v1.0/indices/{id}/documents` | Add document | Yes |
 | Document | GET | `/v1.0/indices/{id}/documents/{docId}` | Get document with metadata | Yes |
 | Document | HEAD | `/v1.0/indices/{id}/documents/{docId}` | Check if document exists | Yes |
@@ -300,6 +301,12 @@ All API responses are wrapped in a standard format:
 | Credential | DELETE | `/v1.0/tenants/{id}/credentials/{credId}` | Delete credential | Yes (Admin) |
 | Credential | PUT | `/v1.0/tenants/{id}/credentials/{credId}/labels` | Update credential labels | Yes (Admin) |
 | Credential | PUT | `/v1.0/tenants/{id}/credentials/{credId}/tags` | Update credential tags | Yes (Admin) |
+| Request History | GET | `/v1.0/requesthistory` | List request history entries | Yes |
+| Request History | GET | `/v1.0/requesthistory/summary` | Summarize request history | Yes |
+| Request History | POST | `/v1.0/requesthistory/delete` | Bulk delete request history entries by filters | Yes |
+| Request History | GET | `/v1.0/requesthistory/{id}` | Get request history entry | Yes |
+| Request History | GET | `/v1.0/requesthistory/{id}/detail` | Get request/response detail | Yes |
+| Request History | DELETE | `/v1.0/requesthistory/{id}` | Delete request history entry | Yes |
 | Backup | POST | `/v1.0/indices/{id}/backup` | Create index backup | Yes |
 | Restore | POST | `/v1.0/indices/restore` | Restore backup to new index | Yes |
 | Restore | POST | `/v1.0/indices/{id}/restore` | Restore backup to existing index | Yes |
@@ -1576,6 +1583,93 @@ Authorization: Bearer <token>
   "Tags": {"environment": "production", "service": "backend"}
 }
 ```
+
+## Request History APIs
+
+Request history endpoints inspect and manage captured API traffic. Non-global administrators are automatically scoped to their tenant, and non-admin users are further scoped to their own user or credential.
+
+### GET `/v1.0/requesthistory`
+**Description:** List request history entries visible to the authenticated principal.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Query Parameters:**
+- `page` (integer): Page number.
+- `pageSize` (integer): Page size.
+- `method` (string): HTTP method filter.
+- `route` (string): Route substring filter.
+- `tenantId` (string): Tenant filter, global admin only.
+- `userId` (string): User filter, admin only.
+- `credentialId` (string): Credential filter.
+- `indexId` (string): Index filter.
+- `sourceIp` (string): Source IP substring filter.
+- `principal` (string): Principal display substring filter.
+- `statusCode` (integer): Status code filter.
+- `fromUtc` (datetime): Inclusive start time.
+- `toUtc` (datetime): Inclusive end time.
+
+### GET `/v1.0/requesthistory/summary`
+**Description:** Return request history summary buckets for charting.
+
+Uses the same filters as `GET /v1.0/requesthistory`, plus:
+- `bucketMinutes` (integer): Bucket width in minutes.
+
+### POST `/v1.0/requesthistory/delete`
+**Description:** Bulk delete request history entries matching the supplied filters.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "method": "POST",
+  "route": "/v1.0/indices",
+  "tenantId": "default",
+  "userId": "usr_example",
+  "credentialId": "cred_example",
+  "indexId": "default",
+  "sourceIp": "127.0.0.1",
+  "principal": "admin",
+  "statusCode": "200",
+  "fromUtc": "2026-06-01T00:00:00Z",
+  "toUtc": "2026-06-12T00:00:00Z"
+}
+```
+
+Omit individual fields to leave those filters unset. An empty JSON object deletes all request history entries visible to the authenticated principal.
+
+**Response:**
+```json
+{
+  "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Success": true,
+  "TimestampUtc": "2026-06-12T00:00:00Z",
+  "StatusCode": 200,
+  "ErrorMessage": null,
+  "Data": {
+    "DeletedCount": 2,
+    "DeletedIds": ["req_one", "req_two"]
+  },
+  "Headers": {},
+  "ProcessingTimeMs": 8.5
+}
+```
+
+### GET `/v1.0/requesthistory/{id}`
+**Description:** Get a single request history entry by ID.
+
+### GET `/v1.0/requesthistory/{id}/detail`
+**Description:** Get stored request and response detail for a request history entry.
+
+### DELETE `/v1.0/requesthistory/{id}`
+**Description:** Delete a single request history entry by ID.
 
 ## Backup & Restore APIs
 
