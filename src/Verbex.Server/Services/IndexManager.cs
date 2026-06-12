@@ -239,6 +239,18 @@ namespace Verbex.Server.Services
                     await Task.Delay(50, token).ConfigureAwait(false);
                 }
 
+                string tablePrefix = TablePrefixValidator.FromIndexId(indexId);
+                try
+                {
+                    await _Database.DropIndexTablesAsync(tablePrefix, token).ConfigureAwait(false);
+                    _Logging?.Debug(_Header + "dropped database tables for index '" + indexId + "'");
+                }
+                catch (Exception ex)
+                {
+                    _Logging?.Error(_Header + "failed to drop database tables for index '" + indexId + "': " + ex.Message);
+                    return false;
+                }
+
                 // Delete on-disk storage directory if applicable
                 if (isOnDisk)
                 {

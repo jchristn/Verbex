@@ -2,11 +2,14 @@ namespace Test
 {
     using System;
     using System.Collections.Generic;
+    using System.Data;
     using System.IO;
     using System.Linq;
     using System.Threading.Tasks;
+    using Verbex;
     using Verbex.Database;
     using Verbex.Models;
+    using Verbex.Server.Services;
 
     /// <summary>
     /// Tests for multi-tenancy database operations.
@@ -57,6 +60,7 @@ namespace Test
 
                 // Cross-tenant isolation tests
                 await runner.RunTestAsync("Tenant Isolation Test", TestTenantIsolationAsync).ConfigureAwait(false);
+                await runner.RunTestAsync("Index Manager Delete Drops Tables Test", TestIndexManagerDeleteDropsTablesAsync).ConfigureAwait(false);
                 // This regression targets async-flow server drivers; SQLite uses a thread-affine write lock.
                 if (TestContext.DatabaseSettings?.Type != DatabaseTypeEnum.Sqlite)
                 {
@@ -458,6 +462,116 @@ namespace Test
 
             TestAssert.IsNull(byId, "Scoped transaction should roll back tenant creation by id");
             TestAssert.IsNull(byName, "Scoped transaction should roll back tenant creation by name");
+        }
+
+        private static async Task TestIndexManagerDeleteDropsTablesAsync()
+        {
+            using DatabaseDriverBase driver = await CreateTestDriverAsync().ConfigureAwait(false);
+            IndexManager manager = new IndexManager(driver);
+
+            string suffix = Guid.NewGuid().ToString("N");
+            string indexId = $"idx_mgr_del_{suffix}";
+            string tablePrefix = TablePrefixValidator.FromIndexId(indexId);
+            TenantMetadata tenant = new TenantMetadata($"Index Manager Delete Tenant {suffix}");
+
+            try
+            {
+                await driver.Tenants.CreateAsync(tenant).ConfigureAwait(false);
+
+                IndexMetadata metadata = new IndexMetadata(
+                    tenant.Identifier,
+                    $"Index Manager Delete {suffix}",
+                    "Temporary index for delete table cleanup regression")
+                {
+                    Identifier = indexId,
+                    InMemory = false
+                };
+
+                await manager.CreateIndexAsync(metadata).ConfigureAwait(false);
+                long tableCountAfterCreate = await CountIndexTablesAsync(driver, tablePrefix).ConfigureAwait(false);
+                TestAssert.AreEqual(5L, tableCountAfterCreate, "Index creation should create all prefixed tables");
+
+                InvertedIndex? index = manager.GetIndex(indexId);
+                TestAssert.IsNotNull(index, "Index manager should return the created runtime index");
+
+                string documentId = $"doc_{suffix}";
+                await index!.AddDocumentAsync(documentId, documentId, "index manager delete validation document").ConfigureAwait(false);
+                await index.AddLabelsBatchAsync(documentId, new List<string> { "delete-validation" }).ConfigureAwait(false);
+                await index.AddTagsBatchAsync(documentId, new Dictionary<string, string> { ["mode"] = "delete-validation" }).ConfigureAwait(false);
+
+                bool deleted = await manager.DeleteIndexAsync(tenant.Identifier, indexId).ConfigureAwait(false);
+                TestAssert.IsTrue(deleted, "Index delete should succeed");
+
+                IndexMetadata? deletedMetadata = await driver.Indexes.ReadByIdentifierAsync(tenant.Identifier, indexId).ConfigureAwait(false);
+                TestAssert.IsNull(deletedMetadata, "Index metadata should be deleted");
+
+                long tableCountAfterDelete = await CountIndexTablesAsync(driver, tablePrefix).ConfigureAwait(false);
+                TestAssert.AreEqual(0L, tableCountAfterDelete, "Index delete should drop all prefixed tables");
+            }
+            finally
+            {
+                await manager.DisposeAllAsync().ConfigureAwait(false);
+
+                try
+                {
+                    await driver.Indexes.DeleteByIdentifierAsync(tenant.Identifier, indexId).ConfigureAwait(false);
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    await driver.DropIndexTablesAsync(tablePrefix).ConfigureAwait(false);
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    await driver.Tenants.DeleteByIdentifierAsync(tenant.Identifier).ConfigureAwait(false);
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        private static async Task<long> CountIndexTablesAsync(DatabaseDriverBase driver, string tablePrefix)
+        {
+            string postgresqlSchema = string.IsNullOrWhiteSpace(driver.Settings.Schema) ? "public" : driver.Settings.Schema;
+            string sqlServerSchema = string.IsNullOrWhiteSpace(driver.Settings.Schema) ? "dbo" : driver.Settings.Schema;
+            string tableNames = string.Join(",",
+                new[]
+                {
+                    $"{tablePrefix}_documents",
+                    $"{tablePrefix}_terms",
+                    $"{tablePrefix}_document_terms",
+                    $"{tablePrefix}_labels",
+                    $"{tablePrefix}_tags"
+                }.Select(name => $"'{EscapeSql(name)}'"));
+
+            string query = driver.Settings.Type switch
+            {
+                DatabaseTypeEnum.Sqlite =>
+                    $"SELECT COUNT(*) AS table_count FROM sqlite_master WHERE type = 'table' AND name IN ({tableNames});",
+                DatabaseTypeEnum.Postgresql =>
+                    $"SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema = '{EscapeSql(postgresqlSchema)}' AND table_name IN ({tableNames});",
+                DatabaseTypeEnum.Mysql =>
+                    $"SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema = '{EscapeSql(driver.Settings.DatabaseName)}' AND table_name IN ({tableNames});",
+                DatabaseTypeEnum.SqlServer =>
+                    $"SELECT COUNT(*) AS table_count FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '{EscapeSql(sqlServerSchema)}' AND TABLE_NAME IN ({tableNames});",
+                _ => throw new NotSupportedException($"Unsupported database type {driver.Settings.Type}")
+            };
+
+            DataTable table = await driver.ExecuteQueryAsync(query).ConfigureAwait(false);
+            return Convert.ToInt64(table.Rows[0][0]);
+        }
+
+        private static string EscapeSql(string value)
+        {
+            return (value ?? string.Empty).Replace("'", "''");
         }
     }
 }
