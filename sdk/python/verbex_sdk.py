@@ -1209,10 +1209,11 @@ class VerbexClient:
         if not document_ids:
             return BatchDeleteResult()
 
-        # Join IDs with commas - encode individual IDs but not the commas
-        from urllib.parse import quote
-        ids_param = ','.join(quote(doc_id, safe='') for doc_id in document_ids)
-        data = self._make_request('DELETE', f'/v1.0/indices/{index_id}/documents?ids={ids_param}')
+        data = self._make_request(
+            'POST',
+            f'/v1.0/indices/{index_id}/documents/delete',
+            data={'DocumentIds': document_ids}
+        )
 
         return BatchDeleteResult(
             deleted=data.get('deleted', []) if data else [],

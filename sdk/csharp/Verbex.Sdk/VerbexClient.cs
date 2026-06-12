@@ -755,12 +755,10 @@ namespace Verbex.Sdk
                 return new BatchDeleteResponse();
             }
 
-            // Join IDs with commas - escape individual IDs that might contain special characters
-            string idsParam = string.Join(",", idList.Select(id => Uri.EscapeDataString(id)));
             return await MakeRequestAsync<BatchDeleteResponse>(
-                HttpMethod.Delete,
-                $"/v1.0/indices/{indexId}/documents?ids={idsParam}",
-                null,
+                HttpMethod.Post,
+                $"/v1.0/indices/{indexId}/documents/delete",
+                new { DocumentIds = idList },
                 true,
                 cancellationToken).ConfigureAwait(false);
         }

@@ -871,7 +871,7 @@ The response format is the same as the default document list response.
 
 #### Batch Document Deletion
 
-**Request:** `DELETE /v1.0/indices/{id}/documents?ids=doc1,doc2,doc3`
+**Request:** `POST /v1.0/indices/{id}/documents/delete`
 
 Delete multiple documents by ID in a single request. This is more efficient than making multiple individual delete requests.
 
@@ -883,10 +883,12 @@ Authorization: Bearer <token>
 **Path Parameters:**
 - `id` (string): Index identifier
 
-**Query Parameters:**
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| ids | string | Yes | Comma-separated list of document IDs to delete |
+**Request Body:**
+```json
+{
+  "DocumentIds": ["doc1", "doc2", "doc3"]
+}
+```
 
 **Response:**
 ```json
@@ -921,7 +923,7 @@ Authorization: Bearer <token>
 **Notes:**
 - The operation is partially successful if some documents exist and some don't
 - Successfully deleted documents are listed in `Deleted`, missing ones in `NotFound`
-- Returns 400 Bad Request if the `ids` parameter is missing or empty
+- Returns 400 Bad Request if the request body is missing or contains no document IDs
 
 ### POST `/v1.0/indices/{id}/documents`
 **Description:** Add a new document to an index

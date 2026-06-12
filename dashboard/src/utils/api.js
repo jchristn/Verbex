@@ -482,8 +482,7 @@ class ApiClient {
     if (!documentIds || documentIds.length === 0) {
       return { data: { deleted: [], notFound: [], deletedCount: 0, notFoundCount: 0, requestedCount: 0 } };
     }
-    const idsParam = documentIds.map(id => encodeURIComponent(id)).join(',');
-    return this.delete(`/v1.0/indices/${encodeURIComponent(indexId)}/documents?ids=${idsParam}`);
+    return this.post(`/v1.0/indices/${encodeURIComponent(indexId)}/documents/delete`, { DocumentIds: documentIds });
   }
 
   async updateDocumentLabels(indexId, docId, labels) {

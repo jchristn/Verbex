@@ -582,15 +582,28 @@
 				{
 					"name": "Delete Documents (Batch)",
 					"request": {
-						"method": "DELETE",
+						"method": "POST",
 						"header": [
 							{
 								"key": "Authorization",
 								"value": "Bearer {{access_key}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
 							}
 						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"DocumentIds\": [\"doc1\", \"doc2\", \"doc3\"]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
 						"url": {
-							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/documents?ids=doc1,doc2,doc3",
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/indices/test-index/documents/delete",
 							"protocol": "{{protocol}}",
 							"host": [
 								"{{hostname}}"
@@ -600,17 +613,11 @@
 								"v1.0",
 								"indices",
 								"test-index",
-								"documents"
-							],
-							"query": [
-								{
-									"key": "ids",
-									"value": "doc1,doc2,doc3",
-									"description": "Comma-separated list of document IDs to delete"
-								}
+								"documents",
+								"delete"
 							]
 						},
-						"description": "Delete multiple documents from an index by their IDs. This is more efficient than making multiple individual delete requests.\n\nQuery parameters:\n- ids: Comma-separated list of document IDs to delete\n\nResponse includes:\n- Deleted: Array of document IDs that were deleted\n- NotFound: Array of document IDs that were not found\n- DeletedCount: Number of documents deleted\n- NotFoundCount: Number of documents not found\n- RequestedCount: Total number of IDs requested"
+						"description": "Delete multiple documents from an index by their IDs. This is more efficient than making multiple individual delete requests.\n\nRequest body:\n- DocumentIds: Array of document IDs to delete\n\nResponse includes:\n- Deleted: Array of document IDs that were deleted\n- NotFound: Array of document IDs that were not found\n- DeletedCount: Number of documents deleted\n- NotFoundCount: Number of documents not found\n- RequestedCount: Total number of IDs requested"
 					},
 					"response": []
 				},

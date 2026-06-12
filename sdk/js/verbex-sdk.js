@@ -1197,9 +1197,7 @@ class VerbexClient {
         if (!documentIds || documentIds.length === 0) {
             return new BatchDeleteResult({});
         }
-        // Join IDs with commas - encode individual IDs but not the commas
-        const idsParam = documentIds.map(id => encodeURIComponent(id)).join(',');
-        const data = await this._makeRequest('DELETE', `/v1.0/indices/${indexId}/documents?ids=${idsParam}`);
+        const data = await this._makeRequest('POST', `/v1.0/indices/${indexId}/documents/delete`, { DocumentIds: documentIds });
         return new BatchDeleteResult(data || {});
     }
 

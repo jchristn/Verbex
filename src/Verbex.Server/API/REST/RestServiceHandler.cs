@@ -530,12 +530,15 @@ namespace Verbex.Server.API.REST
                 ExceptionRoute);
 
             _Webserver.Routes.PostAuthentication.Parameter.Add(
-                HttpMethod.DELETE, "/v1.0/indices/{id}/documents", BatchDeleteIndexDocumentsRoute,
+                HttpMethod.POST, "/v1.0/indices/{id}/documents/delete", BatchDeleteIndexDocumentsRoute,
                 metadata => metadata
                     .WithTag("Documents")
                     .WithDescription("Delete multiple documents from an index by IDs. Returns which documents were deleted and which were not found.")
                     .WithParameter(OpenApiParameterMetadata.Path("id", "The unique identifier of the index"))
-                    .WithParameter(OpenApiParameterMetadata.Query("ids", "Comma-separated list of document IDs to delete", required: true))
+                    .WithRequestBody(OpenApiRequestBodyMetadata.Json(
+                        CreateBatchDeleteDocumentsRequestSchema(),
+                        "Document IDs to delete",
+                        required: true))
                     .WithResponse(200, OpenApiResponseMetadata.Json("Batch delete result", CreateBatchDeleteResultSchema()))
                     .WithResponse(400, OpenApiResponseMetadata.BadRequest(CreateErrorSchema()))
                     .WithResponse(401, OpenApiResponseMetadata.Unauthorized())
@@ -2293,7 +2296,7 @@ namespace Verbex.Server.API.REST
 
         /// <summary>
         /// Batch delete documents from index route.
-        /// Deletes multiple documents specified via the ids query parameter.
+        /// Deletes multiple documents specified in the request body.
         /// </summary>
         /// <param name="ctx">HTTP context.</param>
         /// <returns>Task.</returns>
@@ -2313,27 +2316,27 @@ namespace Verbex.Server.API.REST
                     return new ResponseContext(false, 404, "Index not found");
                 }
 
-                string? idsParam = ctx.Request.Query?.Elements?["ids"];
-                if (String.IsNullOrEmpty(idsParam))
+                string body = await GetRequestBody(ctx);
+                if (String.IsNullOrEmpty(body))
                 {
-                    return new ResponseContext(false, 400, "The 'ids' query parameter is required");
+                    return new ResponseContext(false, 400, "Request body is required");
                 }
 
-                List<string> requestedIds = idsParam
-                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
-                    .Select(id => id.Trim())
-                    .Distinct()
-                    .ToList();
-
-                if (requestedIds.Count == 0)
+                DTO.Requests.BatchDeleteDocumentsRequest? request = JsonSerializer.Deserialize<DTO.Requests.BatchDeleteDocumentsRequest>(body, _JsonOptions);
+                if (request == null)
                 {
-                    return new ResponseContext(false, 400, "No valid document IDs provided");
+                    return new ResponseContext(false, 400, "Invalid JSON in request body");
+                }
+
+                if (!request.Validate(out string errorMessage))
+                {
+                    return new ResponseContext(false, 400, errorMessage);
                 }
 
                 try
                 {
                     // Use optimized batch deletion method
-                    BatchDeleteResponse deleteResult = await index.RemoveDocumentsBatchAsync(requestedIds).ConfigureAwait(false);
+                    BatchDeleteResponse deleteResult = await index.RemoveDocumentsBatchAsync(request.GetDocumentIds()).ConfigureAwait(false);
 
                     return new ResponseContext
                     {
@@ -5238,6 +5241,22 @@ namespace Verbex.Server.API.REST
                 }
             };
             return response;
+        }
+
+        /// <summary>
+        /// Create batch delete documents request schema.
+        /// </summary>
+        private OpenApiSchemaMetadata CreateBatchDeleteDocumentsRequestSchema()
+        {
+            return new OpenApiSchemaMetadata
+            {
+                Type = "object",
+                Properties = new Dictionary<string, OpenApiSchemaMetadata>
+                {
+                    ["DocumentIds"] = OpenApiSchemaMetadata.CreateArray(OpenApiSchemaMetadata.String())
+                },
+                Required = new List<string> { "DocumentIds" }
+            };
         }
 
         /// <summary>

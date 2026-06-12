@@ -455,13 +455,15 @@ curl -X DELETE http://localhost:8080/v1.0/indices/main/documents/doc-123 \
 }
 ```
 
-### DELETE /v1.0/indices/{indexId}/documents?ids=id1,id2,id3
+### POST /v1.0/indices/{indexId}/documents/delete
 
 Delete multiple documents by IDs from a specific index (batch delete).
 
 ```bash
-curl -X DELETE "http://localhost:8080/v1.0/indices/main/documents?ids=doc-1,doc-2,doc-3" \
-  -H "Authorization: Bearer verbexadmin"
+curl -X POST "http://localhost:8080/v1.0/indices/main/documents/delete" \
+  -H "Authorization: Bearer verbexadmin" \
+  -H "Content-Type: application/json" \
+  -d '{"DocumentIds":["doc-1","doc-2","doc-3"]}'
 ```
 
 **Expected Response:**
