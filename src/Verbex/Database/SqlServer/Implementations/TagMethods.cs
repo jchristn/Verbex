@@ -195,6 +195,22 @@ VALUES (N'{Sanitizer.Sanitize(id)}', {Sanitizer.FormatNullableString(documentId)
             return count;
         }
 
+        public async Task<long> RemoveAllByDocumentsAsync(string tablePrefix, IEnumerable<string> documentIds, CancellationToken token = default)
+        {
+            string prefix = TablePrefixValidator.Validate(tablePrefix);
+            List<string> idList = documentIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+            if (idList.Count == 0) return 0;
+
+            string inClause = string.Join(",", idList.Select(id => $"N'{Sanitizer.Sanitize(id)}'"));
+            string countQuery = $"SELECT COUNT(*) FROM {prefix}_tags WHERE document_id IN ({inClause});";
+            DataTable countResult = await _Driver.ExecuteQueryAsync(countQuery, false, token).ConfigureAwait(false);
+            long count = countResult.Rows.Count > 0 ? Convert.ToInt64(countResult.Rows[0][0]) : 0;
+
+            string query = $"DELETE FROM {prefix}_tags WHERE document_id IN ({inClause});";
+            await _Driver.ExecuteQueryAsync(query, true, token).ConfigureAwait(false);
+            return count;
+        }
+
         public async Task ReplaceAsync(string tablePrefix, string documentId, IDictionary<string, string> tags, CancellationToken token = default)
         {
             await RemoveAllAsync(tablePrefix, documentId, token).ConfigureAwait(false);

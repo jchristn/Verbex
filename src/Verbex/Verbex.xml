@@ -1664,6 +1664,15 @@
             <param name="token">Cancellation token.</param>
             <returns>Number of labels removed.</returns>
         </member>
+        <member name="M:Verbex.Database.Interfaces.ILabelMethods.RemoveAllByDocumentsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Removes all labels from multiple documents.
+            </summary>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+            <param name="documentIds">Document IDs.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of labels removed.</returns>
+        </member>
         <member name="M:Verbex.Database.Interfaces.ILabelMethods.ReplaceAsync(System.String,System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <summary>
             Replaces all labels on a document.
@@ -1952,6 +1961,15 @@
             </summary>
             <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
             <param name="documentId">Document ID.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Number of tags removed.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ITagMethods.RemoveAllByDocumentsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Removes all tags from multiple documents.
+            </summary>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+            <param name="documentIds">Document IDs.</param>
             <param name="token">Cancellation token.</param>
             <returns>Number of tags removed.</returns>
         </member>
@@ -5892,7 +5910,7 @@
         <member name="M:Verbex.InvertedIndex.ClearAsync(System.Threading.CancellationToken)">
             <summary>
             Removes all documents from the index.
-            Also clears all terms, labels, and tags via cascade delete.
+            Also clears all terms, labels, and tags.
             </summary>
             <param name="token">Cancellation token.</param>
             <returns>Number of documents removed.</returns>

@@ -740,6 +740,8 @@ namespace Verbex
                     }
 
                     await _Driver.DocumentTerms.DeleteByDocumentAsync(_TablePrefix, documentId, transactionToken).ConfigureAwait(false);
+                    await _Driver.Labels.RemoveAllAsync(_TablePrefix, documentId, transactionToken).ConfigureAwait(false);
+                    await _Driver.Tags.RemoveAllAsync(_TablePrefix, documentId, transactionToken).ConfigureAwait(false);
 
                     deleted = await _Driver.Documents.DeleteAsync(_TablePrefix, documentId, transactionToken).ConfigureAwait(false);
 
@@ -822,14 +824,18 @@ namespace Verbex
                     // Step 4: Delete all document-terms in one statement
                     await _Driver.DocumentTerms.DeleteByDocumentsAsync(_TablePrefix, requestedIds, transactionToken).ConfigureAwait(false);
 
-                    // Step 5: Delete all documents in one statement and get back which ones existed
+                    // Step 5: Delete subordinate label/tag records
+                    await _Driver.Labels.RemoveAllByDocumentsAsync(_TablePrefix, requestedIds, transactionToken).ConfigureAwait(false);
+                    await _Driver.Tags.RemoveAllByDocumentsAsync(_TablePrefix, requestedIds, transactionToken).ConfigureAwait(false);
+
+                    // Step 6: Delete all documents in one statement and get back which ones existed
                     deletedIds = await _Driver.Documents.DeleteBatchAsync(_TablePrefix, requestedIds, transactionToken).ConfigureAwait(false);
 
-                    // Step 6: Run orphan cleanup once at the end and get deleted term texts for cache invalidation
+                    // Step 7: Run orphan cleanup once at the end and get deleted term texts for cache invalidation
                     deletedTermTexts = await _Driver.Terms.DeleteOrphanedAsync(_TablePrefix, transactionToken).ConfigureAwait(false);
                 }, token).ConfigureAwait(false);
 
-                // Step 7: Calculate not-found IDs
+                // Step 8: Calculate not-found IDs
                 HashSet<string> deletedSet = new HashSet<string>(deletedIds);
                 List<string> notFoundIds = requestedIds.Where(id => !deletedSet.Contains(id)).ToList();
 
@@ -863,7 +869,7 @@ namespace Verbex
 
         /// <summary>
         /// Removes all documents from the index.
-        /// Also clears all terms, labels, and tags via cascade delete.
+        /// Also clears all terms, labels, and tags.
         /// </summary>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Number of documents removed.</returns>
@@ -875,9 +881,16 @@ namespace Verbex
             await _WriteLock.WaitAsync(token).ConfigureAwait(false);
             try
             {
-                long documentCount = await _Driver.Documents.DeleteAllAsync(_TablePrefix, token).ConfigureAwait(false);
-
-                await _Driver.Terms.DeleteAllAsync(_TablePrefix, token).ConfigureAwait(false);
+                long documentCount = await _Driver.ExecuteInTransactionAsync(async transactionToken =>
+                {
+                    long deletedDocuments = await _Driver.Documents.GetCountAsync(_TablePrefix, transactionToken).ConfigureAwait(false);
+                    await _Driver.DocumentTerms.DeleteAllAsync(_TablePrefix, transactionToken).ConfigureAwait(false);
+                    await _Driver.Labels.DeleteAllAsync(_TablePrefix, transactionToken).ConfigureAwait(false);
+                    await _Driver.Tags.DeleteAllAsync(_TablePrefix, transactionToken).ConfigureAwait(false);
+                    await _Driver.Documents.DeleteAllAsync(_TablePrefix, transactionToken).ConfigureAwait(false);
+                    await _Driver.Terms.DeleteAllAsync(_TablePrefix, transactionToken).ConfigureAwait(false);
+                    return deletedDocuments;
+                }, token).ConfigureAwait(false);
 
                 // Invalidate all caches
                 _CacheInvalidator?.OnIndexCleared();

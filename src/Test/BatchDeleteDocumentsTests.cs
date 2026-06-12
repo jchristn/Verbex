@@ -25,6 +25,7 @@ namespace Test
             await runner.RunTestAsync("Batch Delete Empty List Test", TestBatchDeleteEmptyListAsync).ConfigureAwait(false);
             await runner.RunTestAsync("Batch Delete With Duplicates Test", TestBatchDeleteWithDuplicatesAsync).ConfigureAwait(false);
             await runner.RunTestAsync("Batch Delete Verifies Removal Test", TestBatchDeleteVerifiesRemovalAsync).ConfigureAwait(false);
+            await runner.RunTestAsync("Batch Delete Cascades Metadata Test", TestBatchDeleteCascadesMetadataAsync).ConfigureAwait(false);
         }
 
         private static async Task TestBatchDeleteAllFoundAsync()
@@ -162,6 +163,35 @@ namespace Test
             // Verify only one document remains
             long docCount = await index.GetDocumentCountAsync().ConfigureAwait(false);
             TestAssert.AreEqual(1, docCount);
+        }
+
+        private static async Task TestBatchDeleteCascadesMetadataAsync()
+        {
+            await using InvertedIndex index = await TestContext.CreateTestIndexAsync().ConfigureAwait(false);
+
+            string docId1 = await index.AddDocumentAsync("doc1.txt", "Document one with metadata").ConfigureAwait(false);
+            string docId2 = await index.AddDocumentAsync("doc2.txt", "Document two with metadata").ConfigureAwait(false);
+            string docId3 = await index.AddDocumentAsync("doc3.txt", "Document three stays").ConfigureAwait(false);
+
+            await index.AddLabelAsync(docId1, "delete-label").ConfigureAwait(false);
+            await index.SetTagAsync(docId1, "delete-key", "delete-value").ConfigureAwait(false);
+            await index.AddLabelAsync(docId2, "delete-label").ConfigureAwait(false);
+            await index.SetTagAsync(docId2, "delete-key", "delete-value").ConfigureAwait(false);
+            await index.AddLabelAsync(docId3, "keep-label").ConfigureAwait(false);
+            await index.SetTagAsync(docId3, "keep-key", "keep-value").ConfigureAwait(false);
+
+            BatchDeleteResponse result = await index.RemoveDocumentsBatchAsync(new List<string> { docId1, docId2 }).ConfigureAwait(false);
+
+            TestAssert.AreEqual(2, result.DeletedCount);
+            TestAssert.AreEqual(0, (await index.GetLabelsAsync(docId1).ConfigureAwait(false)).Count, "Batch delete should remove labels for first deleted document");
+            TestAssert.AreEqual(0, (await index.GetTagsAsync(docId1).ConfigureAwait(false)).Count, "Batch delete should remove tags for first deleted document");
+            TestAssert.AreEqual(0, (await index.GetLabelsAsync(docId2).ConfigureAwait(false)).Count, "Batch delete should remove labels for second deleted document");
+            TestAssert.AreEqual(0, (await index.GetTagsAsync(docId2).ConfigureAwait(false)).Count, "Batch delete should remove tags for second deleted document");
+
+            TestAssert.AreEqual(1, (await index.GetLabelsAsync(docId3).ConfigureAwait(false)).Count, "Batch delete should not remove labels for remaining documents");
+            Dictionary<string, string> remainingTags = await index.GetTagsAsync(docId3).ConfigureAwait(false);
+            TestAssert.AreEqual(1, remainingTags.Count, "Batch delete should not remove tags for remaining documents");
+            TestAssert.AreEqual("keep-value", remainingTags["keep-key"]);
         }
     }
 }

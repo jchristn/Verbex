@@ -110,6 +110,15 @@ namespace Verbex.Database.Interfaces
         Task<long> RemoveAllAsync(string tablePrefix, string documentId, CancellationToken token = default);
 
         /// <summary>
+        /// Removes all labels from multiple documents.
+        /// </summary>
+        /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+        /// <param name="documentIds">Document IDs.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Number of labels removed.</returns>
+        Task<long> RemoveAllByDocumentsAsync(string tablePrefix, IEnumerable<string> documentIds, CancellationToken token = default);
+
+        /// <summary>
         /// Replaces all labels on a document.
         /// </summary>
         /// <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>

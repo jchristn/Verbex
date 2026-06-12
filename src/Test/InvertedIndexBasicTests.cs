@@ -25,6 +25,7 @@ namespace Test
             await runner.RunTestAsync("Document Count Test", TestDocumentCountAsync).ConfigureAwait(false);
             await runner.RunTestAsync("Flush Operation Test", TestFlushOperationAsync).ConfigureAwait(false);
             await runner.RunTestAsync("Max Results Limit Test", TestMaxResultsLimitAsync).ConfigureAwait(false);
+            await runner.RunTestAsync("Clear Cascades Metadata Test", TestClearCascadesMetadataAsync).ConfigureAwait(false);
         }
 
         private static async Task TestDocumentAdditionAsync()
@@ -47,6 +48,8 @@ namespace Test
             await using InvertedIndex index = await TestContext.CreateTestIndexAsync().ConfigureAwait(false);
 
             string docId = await index.AddDocumentAsync("test.txt", "content to be removed").ConfigureAwait(false);
+            await index.AddLabelAsync(docId, "stale-label").ConfigureAwait(false);
+            await index.SetTagAsync(docId, "stale-key", "stale-value").ConfigureAwait(false);
             long count = await index.GetDocumentCountAsync().ConfigureAwait(false);
             TestAssert.AreEqual(1L, count);
 
@@ -59,6 +62,11 @@ namespace Test
 
             SearchResults results = await index.SearchAsync("content").ConfigureAwait(false);
             TestAssert.AreEqual(0, results.TotalCount);
+
+            List<string> labels = await index.GetLabelsAsync(docId).ConfigureAwait(false);
+            Dictionary<string, string> tags = await index.GetTagsAsync(docId).ConfigureAwait(false);
+            TestAssert.AreEqual(0, labels.Count, "Deleting a document should remove document labels");
+            TestAssert.AreEqual(0, tags.Count, "Deleting a document should remove document tags");
         }
 
         private static async Task TestBasicSearchAsync()
@@ -159,6 +167,26 @@ namespace Test
             TestAssert.AreEqual(5, results.Results.Count);
 
             TestHelpers.DisplaySearchResults(results, "test", "Max Results Limit Test");
+        }
+
+        private static async Task TestClearCascadesMetadataAsync()
+        {
+            await using InvertedIndex index = await TestContext.CreateTestIndexAsync().ConfigureAwait(false);
+
+            string docId = await index.AddDocumentAsync("clear.txt", "document with metadata").ConfigureAwait(false);
+            await index.AddLabelAsync(docId, "clear-label").ConfigureAwait(false);
+            await index.SetTagAsync(docId, "clear-key", "clear-value").ConfigureAwait(false);
+            await index.AddIndexLabelAsync("index-clear-label").ConfigureAwait(false);
+            await index.SetIndexTagAsync("index-clear-key", "index-clear-value").ConfigureAwait(false);
+
+            long removed = await index.ClearAsync().ConfigureAwait(false);
+            TestAssert.AreEqual(1L, removed);
+
+            TestAssert.AreEqual(0L, await index.GetDocumentCountAsync().ConfigureAwait(false));
+            TestAssert.AreEqual(0, (await index.GetLabelsAsync(docId).ConfigureAwait(false)).Count, "Clear should remove document labels");
+            TestAssert.AreEqual(0, (await index.GetTagsAsync(docId).ConfigureAwait(false)).Count, "Clear should remove document tags");
+            TestAssert.AreEqual(0, (await index.GetIndexLabelsAsync().ConfigureAwait(false)).Count, "Clear should remove index labels");
+            TestAssert.AreEqual(0, (await index.GetIndexTagsAsync().ConfigureAwait(false)).Count, "Clear should remove index tags");
         }
     }
 }
