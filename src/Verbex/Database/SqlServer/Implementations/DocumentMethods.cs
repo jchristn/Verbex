@@ -444,12 +444,12 @@ OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY;";
             if (hasTagFilter)
             {
                 KeyValuePair<string, string> firstTag = tags!.First();
-                baseFilter = $"SELECT document_id FROM {prefix}_tags WHERE [key] = '{Sanitizer.Sanitize(firstTag.Key)}' AND [value] = '{Sanitizer.Sanitize(firstTag.Value)}'";
+                baseFilter = $"SELECT document_id FROM {prefix}_tags WHERE [key] = N'{Sanitizer.Sanitize(firstTag.Key)}' AND [value] = N'{Sanitizer.Sanitize(firstTag.Value)}'";
                 filterIndex = 1;
             }
             else
             {
-                baseFilter = $"SELECT document_id FROM {prefix}_labels WHERE label = '{Sanitizer.Sanitize(labelList![0])}'";
+                baseFilter = $"SELECT document_id FROM {prefix}_labels WHERE label = N'{Sanitizer.Sanitize(labelList![0])}' COLLATE Latin1_General_CI_AS";
                 filterIndex = 1;
             }
 
@@ -461,7 +461,7 @@ OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY;";
                 {
                     string currentQuery = filteredDocsQuery.ToString();
                     filteredDocsQuery.Clear();
-                    filteredDocsQuery.Append($"SELECT document_id FROM ({currentQuery}) AS tf{filterIndex} WHERE document_id IN (SELECT document_id FROM {prefix}_tags WHERE [key] = '{Sanitizer.Sanitize(tag.Key)}' AND [value] = '{Sanitizer.Sanitize(tag.Value)}')");
+                    filteredDocsQuery.Append($"SELECT document_id FROM ({currentQuery}) AS tf{filterIndex} WHERE document_id IN (SELECT document_id FROM {prefix}_tags WHERE [key] = N'{Sanitizer.Sanitize(tag.Key)}' AND [value] = N'{Sanitizer.Sanitize(tag.Value)}')");
                     filterIndex++;
                 }
             }
@@ -473,7 +473,7 @@ OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY;";
                 {
                     string currentQuery = filteredDocsQuery.ToString();
                     filteredDocsQuery.Clear();
-                    filteredDocsQuery.Append($"SELECT document_id FROM ({currentQuery}) AS lf{filterIndex} WHERE document_id IN (SELECT document_id FROM {prefix}_labels WHERE label = '{Sanitizer.Sanitize(label)}')");
+                    filteredDocsQuery.Append($"SELECT document_id FROM ({currentQuery}) AS lf{filterIndex} WHERE document_id IN (SELECT document_id FROM {prefix}_labels WHERE label = N'{Sanitizer.Sanitize(label)}' COLLATE Latin1_General_CI_AS)");
                     filterIndex++;
                 }
             }

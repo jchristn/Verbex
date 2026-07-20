@@ -21,6 +21,9 @@ namespace Test
             await runner.RunTestAsync("WildcardSearch_ReturnsAllDocuments", TestWildcardSearchReturnsAllDocumentsAsync).ConfigureAwait(false);
             await runner.RunTestAsync("WildcardSearch_WithLabelFilter", TestWildcardSearchWithLabelFilterAsync).ConfigureAwait(false);
             await runner.RunTestAsync("WildcardSearch_WithTagFilter", TestWildcardSearchWithTagFilterAsync).ConfigureAwait(false);
+            await runner.RunTestAsync("WildcardSearch_WithReportedUserMasterGuidTagFilter", TestWildcardSearchWithReportedUserMasterGuidTagFilterAsync).ConfigureAwait(false);
+            await runner.RunTestAsync("WildcardSearch_WithMultipleTagFilters", TestWildcardSearchWithMultipleTagFiltersAsync).ConfigureAwait(false);
+            await runner.RunTestAsync("WildcardSearch_WithMixedCaseLabelFilter", TestWildcardSearchWithMixedCaseLabelFilterAsync).ConfigureAwait(false);
             await runner.RunTestAsync("WildcardSearch_WithLabelAndTagFilter", TestWildcardSearchWithLabelAndTagFilterAsync).ConfigureAwait(false);
             await runner.RunTestAsync("WildcardSearch_MaxResults", TestWildcardSearchMaxResultsAsync).ConfigureAwait(false);
             await runner.RunTestAsync("WildcardSearch_ReturnsZeroScores", TestWildcardSearchReturnsZeroScoresAsync).ConfigureAwait(false);
@@ -73,6 +76,66 @@ namespace Test
             SearchResults results = await index.SearchAsync("*", null, false, null, tags).ConfigureAwait(false);
 
             TestAssert.AreEqual(2, results.TotalCount, "Wildcard with tag filter should return 2 documents");
+        }
+
+        private static async Task TestWildcardSearchWithReportedUserMasterGuidTagFilterAsync()
+        {
+            await using InvertedIndex index = await TestContext.CreateTestIndexAsync().ConfigureAwait(false);
+
+            string matchingUserMasterGuid = "292799b6-6a32-4098-b472-972ab4cc0897";
+            string doc1 = await index.AddDocumentAsync("doc1.txt", "first document").ConfigureAwait(false);
+            string doc2 = await index.AddDocumentAsync("doc2.txt", "second document").ConfigureAwait(false);
+
+            await index.SetTagAsync(doc1, "UserMasterGUID", matchingUserMasterGuid).ConfigureAwait(false);
+            await index.SetTagAsync(doc2, "UserMasterGUID", "a1ccfe04-23f1-4cfb-a019-2ec6ab641c37").ConfigureAwait(false);
+
+            Dictionary<string, string> tags = new Dictionary<string, string>
+            {
+                { "UserMasterGUID", matchingUserMasterGuid }
+            };
+            SearchResults results = await index.SearchAsync("*", 25, false, null, tags).ConfigureAwait(false);
+
+            TestAssert.AreEqual(1, results.TotalCount, "Wildcard with UserMasterGUID tag filter should return 1 document");
+            TestAssert.AreEqual(doc1, results.Results[0].DocumentId, "Wildcard tag filter should return the matching document");
+        }
+
+        private static async Task TestWildcardSearchWithMultipleTagFiltersAsync()
+        {
+            await using InvertedIndex index = await TestContext.CreateTestIndexAsync().ConfigureAwait(false);
+
+            string doc1 = await index.AddDocumentAsync("doc1.txt", "first document").ConfigureAwait(false);
+            string doc2 = await index.AddDocumentAsync("doc2.txt", "second document").ConfigureAwait(false);
+            string doc3 = await index.AddDocumentAsync("doc3.txt", "third document").ConfigureAwait(false);
+
+            await index.AddTagsBatchAsync(doc1, new Dictionary<string, string> { { "status", "published" }, { "owner", "alpha" } }).ConfigureAwait(false);
+            await index.AddTagsBatchAsync(doc2, new Dictionary<string, string> { { "status", "published" }, { "owner", "beta" } }).ConfigureAwait(false);
+            await index.AddTagsBatchAsync(doc3, new Dictionary<string, string> { { "status", "draft" }, { "owner", "alpha" } }).ConfigureAwait(false);
+
+            Dictionary<string, string> tags = new Dictionary<string, string>
+            {
+                { "status", "published" },
+                { "owner", "alpha" }
+            };
+            SearchResults results = await index.SearchAsync("*", null, false, null, tags).ConfigureAwait(false);
+
+            TestAssert.AreEqual(1, results.TotalCount, "Wildcard with multiple tag filters should use AND logic");
+            TestAssert.AreEqual(doc1, results.Results[0].DocumentId, "Wildcard multiple tag filters should return the matching document");
+        }
+
+        private static async Task TestWildcardSearchWithMixedCaseLabelFilterAsync()
+        {
+            await using InvertedIndex index = await TestContext.CreateTestIndexAsync().ConfigureAwait(false);
+
+            string doc1 = await index.AddDocumentAsync("doc1.txt", "first document").ConfigureAwait(false);
+            await index.AddDocumentAsync("doc2.txt", "second document").ConfigureAwait(false);
+
+            await index.AddLabelAsync(doc1, "Featured").ConfigureAwait(false);
+
+            List<string> labels = new List<string> { "FEATURED" };
+            SearchResults results = await index.SearchAsync("*", null, false, labels, null).ConfigureAwait(false);
+
+            TestAssert.AreEqual(1, results.TotalCount, "Wildcard label filters should be case-insensitive");
+            TestAssert.AreEqual(doc1, results.Results[0].DocumentId, "Wildcard mixed-case label filter should return the matching document");
         }
 
         private static async Task TestWildcardSearchWithLabelAndTagFilterAsync()

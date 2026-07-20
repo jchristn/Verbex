@@ -653,9 +653,25 @@ namespace Verbex
 
             List<BatchAddDocumentResult> addedDocs = new List<BatchAddDocumentResult>();
             List<BatchAddDocumentResult> failedDocs = new List<BatchAddDocumentResult>();
+            HashSet<string> requestedDocumentIds = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (BatchAddDocumentItem doc in docList)
             {
+                if (!string.IsNullOrEmpty(doc.Id))
+                {
+                    if (!requestedDocumentIds.Add(doc.Id))
+                    {
+                        failedDocs.Add(BatchAddDocumentResult.Failed(doc.Name, $"Duplicate document ID '{doc.Id}' in batch."));
+                        continue;
+                    }
+
+                    if (await DocumentExistsAsync(doc.Id, token).ConfigureAwait(false))
+                    {
+                        failedDocs.Add(BatchAddDocumentResult.Failed(doc.Name, $"Document with ID '{doc.Id}' already exists."));
+                        continue;
+                    }
+                }
+
                 try
                 {
                     string documentId;
@@ -689,7 +705,7 @@ namespace Verbex
 
                     addedDocs.Add(BatchAddDocumentResult.Successful(documentId, doc.Name));
                 }
-                catch (Exception ex)
+                catch (ArgumentException ex)
                 {
                     failedDocs.Add(BatchAddDocumentResult.Failed(doc.Name, ex.Message));
                 }

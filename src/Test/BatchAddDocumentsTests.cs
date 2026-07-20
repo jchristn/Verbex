@@ -22,6 +22,7 @@ namespace Test
         {
             await runner.RunTestAsync("Batch Add All Success Test", TestBatchAddAllSuccessAsync).ConfigureAwait(false);
             await runner.RunTestAsync("Batch Add With Custom IDs Test", TestBatchAddWithCustomIdsAsync).ConfigureAwait(false);
+            await runner.RunTestAsync("Batch Add With Duplicate Custom IDs Test", TestBatchAddWithDuplicateCustomIdsAsync).ConfigureAwait(false);
             await runner.RunTestAsync("Batch Add With Metadata Test", TestBatchAddWithMetadataAsync).ConfigureAwait(false);
             await runner.RunTestAsync("Batch Add Empty List Test", TestBatchAddEmptyListAsync).ConfigureAwait(false);
             await runner.RunTestAsync("Batch Add Single Document Test", TestBatchAddSingleDocumentAsync).ConfigureAwait(false);
@@ -89,6 +90,36 @@ namespace Test
             DocumentMetadata? doc1 = await index.GetDocumentAsync(customId1).ConfigureAwait(false);
             TestAssert.IsNotNull(doc1);
             TestAssert.AreEqual("doc1.txt", doc1!.DocumentPath);
+        }
+
+        private static async Task TestBatchAddWithDuplicateCustomIdsAsync()
+        {
+            await using InvertedIndex index = await TestContext.CreateTestIndexAsync().ConfigureAwait(false);
+
+            string existingId = "existing-id-001";
+            string duplicatedId = "duplicate-id-001";
+
+            await index.AddDocumentAsync(existingId, "existing-original.txt", "Existing document content").ConfigureAwait(false);
+
+            List<BatchAddDocumentItem> documents = new List<BatchAddDocumentItem>
+            {
+                new BatchAddDocumentItem("existing-duplicate.txt", "Should fail because the ID already exists") { Id = existingId },
+                new BatchAddDocumentItem("new-document.txt", "Should be added successfully") { Id = duplicatedId },
+                new BatchAddDocumentItem("request-duplicate.txt", "Should fail because the ID is repeated") { Id = duplicatedId }
+            };
+
+            BatchAddDocumentsResponse result = await index.AddDocumentsBatchAsync(documents).ConfigureAwait(false);
+
+            TestAssert.AreEqual(1, result.AddedCount);
+            TestAssert.AreEqual(2, result.FailedCount);
+
+            TestAssert.AreEqual(duplicatedId, result.Added[0].DocumentId);
+
+            BatchAddDocumentResult existingFailure = result.Failed.First(f => f.Name == "existing-duplicate.txt");
+            TestAssert.AreEqual($"Document with ID '{existingId}' already exists.", existingFailure.ErrorMessage);
+
+            BatchAddDocumentResult requestDuplicateFailure = result.Failed.First(f => f.Name == "request-duplicate.txt");
+            TestAssert.AreEqual($"Duplicate document ID '{duplicatedId}' in batch.", requestDuplicateFailure.ErrorMessage);
         }
 
         private static async Task TestBatchAddWithMetadataAsync()

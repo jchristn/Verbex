@@ -136,7 +136,7 @@ WHERE dt.term_id IN ({inClause});";
                 if (hasTagFilter)
                 {
                     KeyValuePair<string, string> firstTag = tags!.First();
-                    baseFilter = $"SELECT document_id FROM {prefix}_tags WHERE `key` = '{Sanitizer.Sanitize(firstTag.Key)}' AND value = '{Sanitizer.Sanitize(firstTag.Value)}'";
+                    baseFilter = $"SELECT document_id FROM {prefix}_tags WHERE `key` = '{Sanitizer.Sanitize(firstTag.Key)}' AND `value` = '{Sanitizer.Sanitize(firstTag.Value)}'";
                     filterIndex = 1;
                 }
                 else
@@ -155,7 +155,7 @@ WHERE dt.term_id IN ({inClause});";
                     {
                         string currentQuery = filteredDocsQuery.ToString();
                         filteredDocsQuery.Clear();
-                        filteredDocsQuery.Append($"SELECT document_id FROM ({currentQuery}) AS tf{filterIndex} WHERE document_id IN (SELECT document_id FROM {prefix}_tags WHERE `key` = '{Sanitizer.Sanitize(tag.Key)}' AND value = '{Sanitizer.Sanitize(tag.Value)}')");
+                        filteredDocsQuery.Append($"SELECT document_id FROM ({currentQuery}) AS tf{filterIndex} WHERE document_id IN (SELECT document_id FROM {prefix}_tags WHERE `key` = '{Sanitizer.Sanitize(tag.Key)}' AND `value` = '{Sanitizer.Sanitize(tag.Value)}')");
                         filterIndex++;
                     }
                 }
