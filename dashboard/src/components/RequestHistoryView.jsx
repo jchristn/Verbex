@@ -436,6 +436,10 @@ function RequestHistoryView() {
     setPage(1);
   };
 
+  const refreshHistory = () => {
+    setRefreshKey((current) => current + 1);
+  };
+
   const handleOpenDetails = async (entry) => {
     setSelectedEntry(entry);
     setSelectedDetail(null);
@@ -460,7 +464,7 @@ function RequestHistoryView() {
       setDeleteEntry(null);
       setSelectedEntry(null);
       setSelectedDetail(null);
-      setRefreshKey((current) => current + 1);
+      refreshHistory();
     } catch (err) {
       setAlertState({ isOpen: true, title: 'Request History', message: err.message, variant: 'error' });
     } finally {
@@ -474,7 +478,7 @@ function RequestHistoryView() {
       await apiClient.bulkDeleteRequestHistory(queryParams);
       setShowBulkDelete(false);
       setPage(1);
-      setRefreshKey((current) => current + 1);
+      refreshHistory();
     } catch (err) {
       setAlertState({ isOpen: true, title: 'Request History', message: err.message, variant: 'error' });
     } finally {
@@ -674,6 +678,7 @@ function RequestHistoryView() {
             setPageSize(nextPageSize);
             setPage(1);
           }}
+          onRefresh={refreshHistory}
         />
       </div>
 

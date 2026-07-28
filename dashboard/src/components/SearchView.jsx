@@ -5,6 +5,7 @@ import MetadataModal from './MetadataModal';
 import CopyableId from './CopyableId';
 import ActionMenu from './ActionMenu';
 import SortableHeader from './SortableHeader';
+import Pagination from './Pagination';
 import './SearchView.css';
 
 function SearchView({ selectedIndex, indices, onIndexSelect }) {
@@ -12,6 +13,8 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
   const [query, setQuery] = useState('');
   const [maxResults, setMaxResults] = useState(25);
   const [results, setResults] = useState(null);
+  const [resultPage, setResultPage] = useState(1);
+  const [resultPageSize, setResultPageSize] = useState(25);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState('');
   const [searchTime, setSearchTime] = useState(null);
@@ -45,6 +48,7 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
     onIndexSelect(newIndex || null);
     // Clear results and filters when index changes
     setResults(null);
+    setResultPage(1);
     setError('');
     setFilterLabels('');
     setFilterTags('');
@@ -109,9 +113,7 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
            JSON.stringify(pendingTags) !== JSON.stringify(appliedTags);
   }, [filterLabels, filterTags, appliedLabels, appliedTags]);
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-
+  const executeSearch = async ({ preserveResults = false } = {}) => {
     if (!selectedIndex) {
       setError('Please select an index from the dropdown');
       return;
@@ -124,7 +126,10 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
 
     setError('');
     setIsSearching(true);
-    setResults(null);
+    if (!preserveResults) {
+      setResults(null);
+      setResultPage(1);
+    }
 
     try {
       let searchQuery = query.trim();
@@ -162,9 +167,11 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
 
       setResults(filteredResults);
       setSearchTime(response.processingTimeMs);
-      // Reset sort to rank ascending when new results come in
-      setSortColumn('rank');
-      setSortDirection('asc');
+      if (!preserveResults) {
+        // Reset sort to rank ascending when new results come in
+        setSortColumn('rank');
+        setSortDirection('asc');
+      }
     } catch (err) {
       setError(err.message || 'Search failed');
     } finally {
@@ -172,9 +179,21 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
     }
   };
 
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    await executeSearch();
+  };
+
+  const refreshSearchResults = () => {
+    if (!isSearching) {
+      executeSearch({ preserveResults: true });
+    }
+  };
+
   const handleClear = () => {
     setQuery('');
     setResults(null);
+    setResultPage(1);
     setError('');
     setSearchTime(null);
   };
@@ -233,7 +252,19 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
     return sorted;
   }, [results, sortColumn, sortDirection]);
 
+  const resultTotalPages = Math.max(1, Math.ceil(sortedResults.length / resultPageSize));
+  const clampedResultPage = Math.min(resultPage, resultTotalPages);
+  const paginatedResults = useMemo(() => {
+    const startIndex = (clampedResultPage - 1) * resultPageSize;
+    return sortedResults.slice(startIndex, startIndex + resultPageSize);
+  }, [clampedResultPage, resultPageSize, sortedResults]);
+
+  useEffect(() => {
+    setResultPage((current) => Math.min(current, resultTotalPages));
+  }, [resultTotalPages]);
+
   const selectedIndexInfo = indices.find((i) => i.identifier === selectedIndex);
+  const canRefreshSearch = Boolean(selectedIndex && query.trim());
 
   const handleViewDetails = (result) => {
     setSelectedResult(result);
@@ -495,7 +526,7 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedResults.map((result) => (
+                  {paginatedResults.map((result) => (
                     <tr key={result.documentId || result.rank} className="clickable-row" onClick={() => handleViewDetails(result)}>
                       <td className="rank-column">{result.rank}</td>
                       <td className="score-column">
@@ -543,6 +574,21 @@ function SearchView({ selectedIndex, indices, onIndexSelect }) {
               </table>
             )}
           </div>
+          {sortedResults.length > 0 && (
+            <Pagination
+              currentPage={clampedResultPage}
+              totalPages={resultTotalPages}
+              pageSize={resultPageSize}
+              totalItems={sortedResults.length}
+              onPageChange={setResultPage}
+              onPageSizeChange={(size) => {
+                setResultPageSize(size);
+                setResultPage(1);
+              }}
+              onRefresh={canRefreshSearch ? refreshSearchResults : undefined}
+              pageSizeOptions={[10, 25, 50, 100, 250]}
+            />
+          )}
         </div>
       )}
 

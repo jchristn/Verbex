@@ -2,6 +2,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 8px 12px;
   border-top: 1px solid var(--border-color);
   background: var(--bg-primary);
@@ -15,19 +16,24 @@
 .pagination-controls {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 14px;
 }
 
+.pagination-auto-refresh,
 .pagination-size {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
+.pagination-auto-refresh label,
 .pagination-size label {
   color: var(--text-secondary);
 }
 
+.pagination-auto-refresh select,
 .pagination-size select {
   padding: 4px 28px 4px 8px;
   border: 1px solid var(--border-color);
@@ -114,4 +120,16 @@
 
 .pagination-jump input[type=number] {
   -moz-appearance: textfield;
+}
+
+@media (max-width: 860px) {
+  .pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pagination-controls {
+    justify-content: flex-start;
+    width: 100%;
+  }
 }

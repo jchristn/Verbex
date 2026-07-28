@@ -1,4 +1,14 @@
+import { useEffect, useId, useRef, useState } from 'react';
 import './Pagination.css';
+
+const AUTO_REFRESH_OPTIONS = [
+  { value: 0, label: 'None' },
+  { value: 15000, label: 'Every 15 seconds' },
+  { value: 30000, label: 'Every 30 seconds' },
+  { value: 60000, label: 'Every 60 seconds' },
+  { value: 180000, label: 'Every 180 seconds' },
+  { value: 300000, label: 'Every 300 seconds' }
+];
 
 function Pagination({
   currentPage,
@@ -8,8 +18,29 @@ function Pagination({
   onPageChange,
   onPageSizeChange,
   onRefresh,
+  autoRefreshDefaultMs = 30000,
+  autoRefreshOptions = AUTO_REFRESH_OPTIONS,
   pageSizeOptions = [10, 25, 50, 100, 250, 500, 1000]
 }) {
+  const [autoRefreshMs, setAutoRefreshMs] = useState(autoRefreshDefaultMs);
+  const autoRefreshId = useId();
+  const refreshRef = useRef(onRefresh);
+  const hasRefresh = Boolean(onRefresh);
+
+  useEffect(() => {
+    refreshRef.current = onRefresh;
+  }, [onRefresh]);
+
+  useEffect(() => {
+    if (!hasRefresh || autoRefreshMs <= 0) return undefined;
+
+    const intervalId = window.setInterval(() => {
+      refreshRef.current?.();
+    }, autoRefreshMs);
+
+    return () => window.clearInterval(intervalId);
+  }, [autoRefreshMs, hasRefresh]);
+
   const handlePageInput = (e) => {
     if (e.key === 'Enter') {
       const page = parseInt(e.target.value, 10);
@@ -30,6 +61,22 @@ function Pagination({
       </div>
 
       <div className="pagination-controls">
+        {onRefresh && (
+          <div className="pagination-auto-refresh">
+            <label htmlFor={autoRefreshId}>Auto-refresh:</label>
+            <select
+              id={autoRefreshId}
+              value={autoRefreshMs}
+              onChange={(e) => setAutoRefreshMs(parseInt(e.target.value, 10))}
+              title="Auto-refresh interval"
+            >
+              {autoRefreshOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="pagination-size">
           <label>Per page:</label>
           <select
