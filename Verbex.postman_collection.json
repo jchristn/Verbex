@@ -1012,7 +1012,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/requesthistory?method=POST&route=/v1.0/indices",
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/requesthistory?method=POST&route=/v1.0/indices&success=false",
 							"protocol": "{{protocol}}",
 							"host": [
 								"{{hostname}}"
@@ -1030,10 +1030,14 @@
 								{
 									"key": "route",
 									"value": "/v1.0/indices"
+								},
+								{
+									"key": "success",
+									"value": "false"
 								}
 							]
 						},
-						"description": "List request history entries visible to the authenticated principal. Supports filters such as method, route, tenantId, userId, credentialId, indexId, sourceIp, principal, statusCode, fromUtc, and toUtc."
+						"description": "List request history entries visible to the authenticated principal. Supports filters such as method, route, tenantId, userId, credentialId, indexId, sourceIp, principal, statusCode, success, fromUtc, and toUtc."
 					},
 					"response": []
 				},
@@ -1048,7 +1052,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/requesthistory/summary?bucketMinutes=60",
+							"raw": "{{protocol}}://{{hostname}}:{{port}}/v1.0/requesthistory/summary?bucketMinutes=60&success=false",
 							"protocol": "{{protocol}}",
 							"host": [
 								"{{hostname}}"
@@ -1063,6 +1067,10 @@
 								{
 									"key": "bucketMinutes",
 									"value": "60"
+								},
+								{
+									"key": "success",
+									"value": "false"
 								}
 							]
 						},
@@ -1086,7 +1094,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"method\": \"POST\",\n  \"route\": \"/v1.0/indices\",\n  \"tenantId\": \"default\",\n  \"statusCode\": \"200\"\n}",
+							"raw": "{\n  \"method\": \"POST\",\n  \"route\": \"/v1.0/indices\",\n  \"tenantId\": \"default\",\n  \"statusCode\": \"200\",\n  \"success\": false\n}",
 							"options": {
 								"raw": {
 									"language": "json"

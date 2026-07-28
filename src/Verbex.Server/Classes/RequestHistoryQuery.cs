@@ -64,6 +64,11 @@ namespace Verbex.Server.Classes
         public int? StatusCode { get; set; }
 
         /// <summary>
+        /// Optional success flag filter.
+        /// </summary>
+        public bool? Success { get; set; }
+
+        /// <summary>
         /// Optional range start.
         /// </summary>
         public DateTime? FromUtc { get; set; }
@@ -98,6 +103,7 @@ namespace Verbex.Server.Classes
             string? sourceIp,
             string? principal,
             string? statusCode,
+            string? success,
             string? fromUtc,
             string? toUtc,
             string? bucketMinutes)
@@ -127,6 +133,19 @@ namespace Verbex.Server.Classes
             if (Int32.TryParse(statusCode, out int parsedStatusCode))
             {
                 query.StatusCode = parsedStatusCode;
+            }
+
+            if (Boolean.TryParse(success, out bool parsedSuccess))
+            {
+                query.Success = parsedSuccess;
+            }
+            else if (String.Equals(success, "1", StringComparison.OrdinalIgnoreCase))
+            {
+                query.Success = true;
+            }
+            else if (String.Equals(success, "0", StringComparison.OrdinalIgnoreCase))
+            {
+                query.Success = false;
             }
 
             if (DateTime.TryParse(

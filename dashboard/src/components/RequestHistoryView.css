@@ -1,6 +1,6 @@
 .request-history-view {
   width: 100%;
-  --history-chart-track-height: 168px;
+  --history-chart-track-height: 252px;
   --history-chart-column-gap: 2px;
   --history-chart-bar-max-width: 8px;
 }
@@ -12,9 +12,20 @@
   margin-bottom: 16px;
 }
 
+.request-history-top-grid > .workspace-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 360px;
+}
+
+.request-history-top-grid > .workspace-card > .workspace-card-body {
+  flex: 1;
+}
+
 .request-history-stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -264,18 +275,39 @@
   gap: 12px;
 }
 
+.request-history-checkbox-field {
+  display: inline-flex;
+  align-items: center;
+  align-self: end;
+  gap: 8px;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.request-history-checkbox-field input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.request-history-checkbox-field span {
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
 .request-history-table-wrap {
   overflow-x: auto;
 }
 
 .request-history-table code {
   font-size: 0.78rem;
-}
-
-.history-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
 }
 
 .request-history-detail {
@@ -328,7 +360,7 @@
     grid-template-columns: 1fr;
   }
 
-  .history-actions {
-    flex-direction: column;
+  .request-history-top-grid > .workspace-card {
+    min-height: 320px;
   }
 }

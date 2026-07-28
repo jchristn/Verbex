@@ -710,7 +710,7 @@ curl -X POST http://localhost:8080/v1.0/indices/test/search \
 List request history entries visible to the authenticated principal.
 
 ```bash
-curl -X GET "http://localhost:8080/v1.0/requesthistory?method=POST&route=/v1.0/indices" \
+curl -X GET "http://localhost:8080/v1.0/requesthistory?method=POST&route=/v1.0/indices&success=false" \
   -H "Authorization: Bearer verbexadmin"
 ```
 
@@ -719,7 +719,7 @@ curl -X GET "http://localhost:8080/v1.0/requesthistory?method=POST&route=/v1.0/i
 Return request history summary buckets for charting.
 
 ```bash
-curl -X GET "http://localhost:8080/v1.0/requesthistory/summary?fromUtc=2026-06-01T00:00:00Z&toUtc=2026-06-12T00:00:00Z&bucketMinutes=60" \
+curl -X GET "http://localhost:8080/v1.0/requesthistory/summary?fromUtc=2026-06-01T00:00:00Z&toUtc=2026-06-12T00:00:00Z&bucketMinutes=60&success=false" \
   -H "Authorization: Bearer verbexadmin"
 ```
 
@@ -741,6 +741,7 @@ curl -X POST "http://localhost:8080/v1.0/requesthistory/delete" \
     "sourceIp": "127.0.0.1",
     "principal": "admin",
     "statusCode": "200",
+    "success": false,
     "fromUtc": "2026-06-01T00:00:00Z",
     "toUtc": "2026-06-12T00:00:00Z"
   }'

@@ -406,6 +406,7 @@ INSERT INTO request_history_detail (
             }
 
             if (query.StatusCode.HasValue) clauses.Add($"status_code = {query.StatusCode.Value}");
+            if (query.Success.HasValue) clauses.Add($"success = {BooleanSql(query.Success.Value)}");
             if (query.FromUtc.HasValue) clauses.Add($"created_utc >= '{EscapeSql(FormatDateTimeValue(query.FromUtc.Value))}'");
             if (query.ToUtc.HasValue) clauses.Add($"created_utc <= '{EscapeSql(FormatDateTimeValue(query.ToUtc.Value))}'");
 

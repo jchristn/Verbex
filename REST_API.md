@@ -1608,6 +1608,7 @@ Authorization: Bearer <token>
 - `sourceIp` (string): Source IP substring filter.
 - `principal` (string): Principal display substring filter.
 - `statusCode` (integer): Status code filter.
+- `success` (boolean): Success flag filter. Use `false` for failed requests only.
 - `fromUtc` (datetime): Inclusive start time.
 - `toUtc` (datetime): Inclusive end time.
 
@@ -1638,6 +1639,7 @@ Content-Type: application/json
   "sourceIp": "127.0.0.1",
   "principal": "admin",
   "statusCode": "200",
+  "success": false,
   "fromUtc": "2026-06-01T00:00:00Z",
   "toUtc": "2026-06-12T00:00:00Z"
 }

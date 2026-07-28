@@ -34,6 +34,7 @@ namespace Test
                 await runner.RunTestAsync("Request History Last Day Summary Test", TestLastDaySummaryAsync).ConfigureAwait(false);
                 await runner.RunTestAsync("Request History Last Week Summary Test", TestLastWeekSummaryAsync).ConfigureAwait(false);
                 await runner.RunTestAsync("Request History Last Month Summary Test", TestLastMonthSummaryAsync).ConfigureAwait(false);
+                await runner.RunTestAsync("Request History Success Filter Test", TestSuccessFilterAsync).ConfigureAwait(false);
                 await runner.RunTestAsync("Request History Bulk Delete Route Contract Test", TestBulkDeleteRouteContractAsync).ConfigureAwait(false);
                 await runner.RunTestAsync("Request History Bulk Delete Asset Contract Test", TestBulkDeleteAssetContractAsync).ConfigureAwait(false);
             }
@@ -73,6 +74,45 @@ namespace Test
                 fromUtc: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc),
                 bucketMinutes: 720,
                 expectedBucketCount: 60).ConfigureAwait(false);
+        }
+
+        private static async Task TestSuccessFilterAsync()
+        {
+            (DatabaseDriverBase driver, RequestHistoryService service) = await CreateTestServiceAsync().ConfigureAwait(false);
+            try
+            {
+                string tenantId = $"reqhist_{Guid.NewGuid():N}";
+                DateTime fromUtc = new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc);
+                DateTime toUtc = fromUtc.AddHours(1);
+
+                await RecordAsync(service, tenantId, fromUtc.AddMinutes(10), true, 20).ConfigureAwait(false);
+                await RecordAsync(service, tenantId, fromUtc.AddMinutes(20), false, 40).ConfigureAwait(false);
+
+                RequestHistoryQuery query = new RequestHistoryQuery
+                {
+                    TenantId = tenantId,
+                    Success = false,
+                    FromUtc = fromUtc,
+                    ToUtc = toUtc,
+                    BucketMinutes = 60
+                };
+
+                var (entries, totalCount) = await service.SearchAsync(query).ConfigureAwait(false);
+                RequestHistorySummary summary = await service.GetSummaryAsync(query).ConfigureAwait(false);
+
+                TestAssert.AreEqual(1L, totalCount);
+                TestAssert.CollectionCount(entries, 1);
+                TestAssert.AreEqual(false, entries[0].Success);
+                TestAssert.AreEqual(1, summary.TotalCount);
+                TestAssert.AreEqual(0, summary.SuccessCount);
+                TestAssert.AreEqual(1, summary.FailureCount);
+                TestAssert.AreEqual(40d, summary.AverageDurationMs);
+            }
+            finally
+            {
+                service.Dispose();
+                driver.Dispose();
+            }
         }
 
         private static Task TestBulkDeleteRouteContractAsync()

@@ -3,22 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import './MetadataModal.css';
 import './ApiExplorerView.css';
 
-const HISTORY_KEY = 'verbex_api_explorer_history';
 const RESPONSE_TABS = ['preview', 'body', 'headers', 'status', 'code'];
 const CODE_TABS = ['curl', 'fetch', 'csharp'];
-
-function loadExplorerHistory() {
-  try {
-    const saved = localStorage.getItem(HISTORY_KEY);
-    return saved ? JSON.parse(saved) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveExplorerHistory(history) {
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 12)));
-}
 
 function resolveSchema(schema, spec, seen = new Set()) {
   if (!schema) return null;
@@ -149,6 +135,11 @@ function getOperationSubtext(operation) {
   return '';
 }
 
+function formatOperationOption(operation) {
+  const subtext = getOperationSubtext(operation);
+  return `${operation.method.toUpperCase()} ${operation.path}${subtext ? ` - ${subtext}` : ''}`;
+}
+
 function getResponseText(response, responseTab, codeTab) {
   if (!response) return '';
 
@@ -226,9 +217,7 @@ function ApiExplorerView() {
   const [response, setResponse] = useState(null);
   const [responseTab, setResponseTab] = useState('preview');
   const [codeTab, setCodeTab] = useState('curl');
-  const [history, setHistory] = useState(() => loadExplorerHistory());
   const [abortController, setAbortController] = useState(null);
-  const [pendingReplay, setPendingReplay] = useState(null);
   const [responseCopied, setResponseCopied] = useState(false);
 
   const operations = useMemo(() => {
@@ -275,8 +264,8 @@ function ApiExplorerView() {
   }, [operations, operationFilter, selectedTag]);
 
   const selectedOperation = useMemo(
-    () => operations.find((operation) => operation.id === selectedOperationId) || filteredOperations[0] || null,
-    [operations, filteredOperations, selectedOperationId]
+    () => operations.find((operation) => operation.id === selectedOperationId) || null,
+    [operations, selectedOperationId]
   );
 
   useEffect(() => {
@@ -315,45 +304,42 @@ function ApiExplorerView() {
   }, [serverUrl, token]);
 
   useEffect(() => {
-    if (!selectedOperation && filteredOperations.length > 0) {
+    if (filteredOperations.length < 1) {
+      setSelectedOperationId('');
+      return;
+    }
+
+    if (!filteredOperations.some((operation) => operation.id === selectedOperationId)) {
       setSelectedOperationId(filteredOperations[0].id);
     }
-  }, [filteredOperations, selectedOperation]);
+  }, [filteredOperations, selectedOperationId]);
 
   useEffect(() => {
     if (!selectedOperation) return;
 
-    if (pendingReplay?.operationId === selectedOperation.id) {
-      setPathValues(pendingReplay.request.pathValues || {});
-      setQueryValues(pendingReplay.request.queryValues || {});
-      setHeaderValues(pendingReplay.request.headerValues || {});
-      setBodyValue(pendingReplay.request.bodyValue || '');
-      setPendingReplay(null);
-    } else {
-      const nextPath = {};
-      const nextQuery = {};
-      const nextHeaders = {};
+    const nextPath = {};
+    const nextQuery = {};
+    const nextHeaders = {};
 
-      selectedOperation.parameters.forEach((parameter) => {
-        if (parameter.in === 'path') nextPath[parameter.name] = parameterInitialValue(parameter, spec);
-        if (parameter.in === 'query') nextQuery[parameter.name] = parameterInitialValue(parameter, spec);
-        if (parameter.in === 'header' && !['authorization', 'content-type'].includes(parameter.name.toLowerCase())) {
-          nextHeaders[parameter.name] = parameterInitialValue(parameter, spec);
-        }
-      });
+    selectedOperation.parameters.forEach((parameter) => {
+      if (parameter.in === 'path') nextPath[parameter.name] = parameterInitialValue(parameter, spec);
+      if (parameter.in === 'query') nextQuery[parameter.name] = parameterInitialValue(parameter, spec);
+      if (parameter.in === 'header' && !['authorization', 'content-type'].includes(parameter.name.toLowerCase())) {
+        nextHeaders[parameter.name] = parameterInitialValue(parameter, spec);
+      }
+    });
 
-      setPathValues(nextPath);
-      setQueryValues(nextQuery);
-      setHeaderValues(nextHeaders);
-      setBodyValue(selectedOperation.requestBody
-        ? JSON.stringify(schemaExample(selectedOperation.requestBody.schema, spec), null, 2)
-        : '');
-    }
+    setPathValues(nextPath);
+    setQueryValues(nextQuery);
+    setHeaderValues(nextHeaders);
+    setBodyValue(selectedOperation.requestBody
+      ? JSON.stringify(schemaExample(selectedOperation.requestBody.schema, spec), null, 2)
+      : '');
 
     setResponse(null);
     setResponseTab('preview');
     setCodeTab('curl');
-  }, [selectedOperation, spec, pendingReplay]);
+  }, [selectedOperation, spec]);
 
   const requestPreview = useMemo(() => {
     if (!selectedOperation || !serverUrl) return null;
@@ -453,29 +439,6 @@ function ApiExplorerView() {
 
       setResponse(nextResponse);
       setResponseCopied(false);
-      setHistory((currentHistory) => {
-        const nextHistory = [
-          {
-            id: crypto.randomUUID(),
-            timestamp: new Date().toISOString(),
-            operationId: selectedOperation.id,
-            summary: selectedOperation.summary,
-            method: selectedOperation.method,
-            path: selectedOperation.path,
-            status: result.status,
-            request: {
-              pathValues,
-              queryValues,
-              headerValues,
-              bodyValue
-            }
-          },
-          ...currentHistory
-        ].slice(0, 12);
-
-        saveExplorerHistory(nextHistory);
-        return nextHistory;
-      });
     } catch (err) {
       if (err.name !== 'AbortError') {
         setError(err.message || 'Request failed');
@@ -483,16 +446,6 @@ function ApiExplorerView() {
     } finally {
       setAbortController(null);
     }
-  };
-
-  const handleReplay = (entry) => {
-    setPendingReplay(entry);
-    setSelectedOperationId(entry.operationId);
-  };
-
-  const clearHistory = () => {
-    setHistory([]);
-    saveExplorerHistory([]);
   };
 
   const handleCopyResponse = async () => {
@@ -510,7 +463,7 @@ function ApiExplorerView() {
       <div className="workspace-header">
         <div className="workspace-title">
           <h2>API Explorer</h2>
-          <p className="workspace-subtitle">Browse the live OpenAPI document, compose requests, and replay recent calls from the dashboard.</p>
+          <p className="workspace-subtitle">Browse the live OpenAPI document, compose requests, and inspect responses from the dashboard.</p>
         </div>
         <div className="workspace-actions">
           <button className="btn btn-secondary" onClick={() => window.open(`${serverUrl.replace(/\/$/, '')}/swagger`, '_blank', 'noopener,noreferrer')}>
@@ -530,67 +483,41 @@ function ApiExplorerView() {
       {error && <div className="api-explorer-error">{error}</div>}
 
       <div className="api-explorer-layout">
-        <div className="api-explorer-sidebar">
-          <div className="workspace-card">
-            <div className="workspace-card-header">
-              <h3>Operations</h3>
-            </div>
-            <div className="workspace-card-body api-explorer-card-body">
-              <div className="api-explorer-filters">
-                <input
-                  type="text"
-                  value={operationFilter}
-                  onChange={(event) => setOperationFilter(event.target.value)}
-                  placeholder="Filter operations"
-                />
-                <select value={selectedTag} onChange={(event) => setSelectedTag(event.target.value)}>
-                  {tags.map((tag) => (
-                    <option key={tag} value={tag}>{tag}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="api-explorer-operations">
-                {loading && <div className="loading-spinner">Loading OpenAPI document...</div>}
-                {!loading && filteredOperations.map((operation) => (
-                  <button
-                    key={operation.id}
-                    type="button"
-                    className={`api-operation-item ${selectedOperation?.id === operation.id ? 'active' : ''}`}
-                    onClick={() => setSelectedOperationId(operation.id)}
-                  >
-                    <span className={methodClass(operation.method)}>{operation.method.toUpperCase()}</span>
-                    <span className="api-operation-label">{operation.path}</span>
-                    {getOperationSubtext(operation) && (
-                      <span className="api-operation-subtext">{getOperationSubtext(operation)}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
+        <div className="workspace-card api-operations-card">
+          <div className="workspace-card-header">
+            <h3>Operations</h3>
+            <span className="workspace-subtitle">{filteredOperations.length} available</span>
           </div>
-
-          <div className="workspace-card">
-            <div className="workspace-card-header">
-              <h3>Recent Requests</h3>
-              <button className="btn btn-secondary btn-sm" onClick={clearHistory} disabled={history.length === 0}>Clear</button>
+          <div className="workspace-card-body api-explorer-card-body">
+            <div className="api-explorer-filters">
+              <input
+                type="text"
+                value={operationFilter}
+                onChange={(event) => setOperationFilter(event.target.value)}
+                placeholder="Filter operations"
+              />
+              <select value={selectedTag} onChange={(event) => setSelectedTag(event.target.value)}>
+                {tags.map((tag) => (
+                  <option key={tag} value={tag}>{tag}</option>
+                ))}
+              </select>
             </div>
-            <div className="workspace-card-body api-explorer-card-body">
-              {history.length === 0 ? (
-                <div className="empty-state compact-empty-state">
-                  <p className="empty-state-description">Local replay history is empty.</p>
-                </div>
-              ) : (
-                <div className="api-history-list">
-                  {history.map((entry) => (
-                    <button key={entry.id} type="button" className="api-history-item" onClick={() => handleReplay(entry)}>
-                      <span className={methodClass(entry.method)}>{entry.method.toUpperCase()}</span>
-                      <span className="api-history-summary">{entry.summary}</span>
-                      <span className="api-history-meta">{new Date(entry.timestamp).toLocaleString()} - {entry.status || 'pending'}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <label className="api-operation-select-field">
+              <span className="sr-only">Operation</span>
+              <select
+                value={selectedOperation?.id || ''}
+                onChange={(event) => setSelectedOperationId(event.target.value)}
+                disabled={loading || filteredOperations.length === 0}
+              >
+                {loading && <option value="">Loading OpenAPI document...</option>}
+                {!loading && filteredOperations.length === 0 && <option value="">No operations match the current filters</option>}
+                {!loading && filteredOperations.map((operation) => (
+                  <option key={operation.id} value={operation.id}>
+                    {formatOperationOption(operation)}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         </div>
 

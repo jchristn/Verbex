@@ -796,6 +796,7 @@ namespace Verbex.Server.API.REST
                 metadata => metadata
                     .WithTag("Request History")
                     .WithDescription("Search request history entries visible to the authenticated principal.")
+                    .WithParameter(OpenApiParameterMetadata.Query("success", "Filter by request success; use false for failed requests", required: false))
                     .WithResponse(200, OpenApiResponseMetadata.Json("Request history search results", CreateRequestHistoryListSchema()))
                     .WithResponse(401, OpenApiResponseMetadata.Unauthorized()),
                 ExceptionRoute);
@@ -805,6 +806,7 @@ namespace Verbex.Server.API.REST
                 metadata => metadata
                     .WithTag("Request History")
                     .WithDescription("Get aggregated request history buckets for charting and dashboard summaries.")
+                    .WithParameter(OpenApiParameterMetadata.Query("success", "Filter by request success; use false for failed requests", required: false))
                     .WithResponse(200, OpenApiResponseMetadata.Json("Request history summary", CreateRequestHistorySummarySchema()))
                     .WithResponse(401, OpenApiResponseMetadata.Unauthorized()),
                 ExceptionRoute);
@@ -3832,6 +3834,7 @@ namespace Verbex.Server.API.REST
                     queryParameters.GetValueOrDefault("sourceIp"),
                     queryParameters.GetValueOrDefault("principal"),
                     queryParameters.GetValueOrDefault("statusCode"),
+                    queryParameters.GetValueOrDefault("success"),
                     queryParameters.GetValueOrDefault("fromUtc"),
                     queryParameters.GetValueOrDefault("toUtc"),
                     queryParameters.GetValueOrDefault("bucketMinutes"));
@@ -3883,6 +3886,7 @@ namespace Verbex.Server.API.REST
                     queryParameters.GetValueOrDefault("sourceIp"),
                     queryParameters.GetValueOrDefault("principal"),
                     queryParameters.GetValueOrDefault("statusCode"),
+                    queryParameters.GetValueOrDefault("success"),
                     queryParameters.GetValueOrDefault("fromUtc"),
                     queryParameters.GetValueOrDefault("toUtc"),
                     queryParameters.GetValueOrDefault("bucketMinutes"));
@@ -4987,6 +4991,7 @@ namespace Verbex.Server.API.REST
                 GetJsonString(root, "sourceIp"),
                 GetJsonString(root, "principal"),
                 GetJsonString(root, "statusCode"),
+                GetJsonString(root, "success"),
                 GetJsonString(root, "fromUtc"),
                 GetJsonString(root, "toUtc"),
                 GetJsonString(root, "bucketMinutes"));
@@ -6059,6 +6064,7 @@ namespace Verbex.Server.API.REST
                     ["sourceIp"] = OpenApiSchemaMetadata.String(),
                     ["principal"] = OpenApiSchemaMetadata.String(),
                     ["statusCode"] = OpenApiSchemaMetadata.String(),
+                    ["success"] = OpenApiSchemaMetadata.Boolean(),
                     ["fromUtc"] = OpenApiSchemaMetadata.String("date-time"),
                     ["toUtc"] = OpenApiSchemaMetadata.String("date-time")
                 }

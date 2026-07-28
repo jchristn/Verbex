@@ -6,6 +6,7 @@ import ConfirmModal from './ConfirmModal';
 import AlertModal from './AlertModal';
 import Pagination from './Pagination';
 import CopyableId from './CopyableId';
+import ActionMenu from './ActionMenu';
 import './ApiExplorerView.css';
 import './RequestHistoryView.css';
 
@@ -324,6 +325,7 @@ function RequestHistoryView() {
     principal: '',
     tenantId: '',
     userId: '',
+    failedOnly: false,
     fromUtc: toLocalInputValue(new Date(Date.now() - 24 * 60 * 60 * 1000)),
     toUtc: toLocalInputValue(new Date())
   }));
@@ -335,8 +337,9 @@ function RequestHistoryView() {
     indexId: filters.indexId,
     principal: filters.principal,
     tenantId: userInfo?.isGlobalAdmin ? filters.tenantId : undefined,
-    userId: userInfo?.isAdmin || userInfo?.isGlobalAdmin ? filters.userId : undefined
-  }), [filters.indexId, filters.method, filters.principal, filters.route, filters.statusCode, filters.tenantId, filters.userId, userInfo]);
+    userId: userInfo?.isAdmin || userInfo?.isGlobalAdmin ? filters.userId : undefined,
+    success: filters.failedOnly ? false : undefined
+  }), [filters.failedOnly, filters.indexId, filters.method, filters.principal, filters.route, filters.statusCode, filters.tenantId, filters.userId, userInfo]);
 
   const queryParams = useMemo(() => ({
     page,
@@ -425,6 +428,7 @@ function RequestHistoryView() {
       principal: '',
       tenantId: '',
       userId: '',
+      failedOnly: false,
       fromUtc: toLocalInputValue(new Date(Date.now() - 24 * 60 * 60 * 1000)),
       toUtc: toLocalInputValue(new Date())
     });
@@ -561,6 +565,14 @@ function RequestHistoryView() {
               <span>Status Code</span>
               <input type="text" value={filters.statusCode} onChange={(event) => handleFilterChange('statusCode', event.target.value)} placeholder="200" />
             </label>
+            <label className="request-history-checkbox-field">
+              <input
+                type="checkbox"
+                checked={filters.failedOnly}
+                onChange={(event) => handleFilterChange('failedOnly', event.target.checked)}
+              />
+              <span>Failed only</span>
+            </label>
             <label className="api-input-field">
               <span>Route</span>
               <input type="text" value={filters.route} onChange={(event) => handleFilterChange('route', event.target.value)} placeholder="/v1.0/indices" />
@@ -631,11 +643,20 @@ function RequestHistoryView() {
                     <td><span className={`status-pill ${entry.success ? 'success' : 'error'}`}>{entry.statusCode}</span></td>
                     <td>{entry.durationMs?.toFixed(2)} ms</td>
                     <td>{formatBytes(entry.requestSizeBytes)} / {formatBytes(entry.responseSizeBytes)}</td>
-                    <td className="actions-column">
-                      <div className="history-actions">
-                        <button className="btn btn-secondary btn-sm" onClick={() => handleOpenDetails(entry)}>View</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteEntry(entry)}>Delete</button>
-                      </div>
+                    <td className="actions-column" onClick={(event) => event.stopPropagation()}>
+                      <ActionMenu
+                        actions={[
+                          {
+                            label: 'View',
+                            onClick: () => handleOpenDetails(entry)
+                          },
+                          {
+                            label: 'Delete',
+                            variant: 'danger',
+                            onClick: () => setDeleteEntry(entry)
+                          }
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}
