@@ -20,10 +20,10 @@ namespace VerbexCli.Commands
             Command maintCommand = new Command("maint", "Maintenance operations for indices");
 
             // Add subcommands
-            maintCommand.AddCommand(CreateFlushCommand());
-            maintCommand.AddCommand(CreateGarbageCollectCommand());
-            maintCommand.AddCommand(CreateBenchmarkCommand());
-            maintCommand.AddCommand(CreateStressCommand());
+            maintCommand.Subcommands.Add(CreateFlushCommand());
+            maintCommand.Subcommands.Add(CreateGarbageCollectCommand());
+            maintCommand.Subcommands.Add(CreateBenchmarkCommand());
+            maintCommand.Subcommands.Add(CreateStressCommand());
 
             return maintCommand;
         }
@@ -36,18 +36,17 @@ namespace VerbexCli.Commands
         {
             Command flushCommand = new Command("flush", "Force flush write buffer");
 
-            Option<string> indexOption = new Option<string>(
-                aliases: new[] { "--index", "-i" },
-                description: "Index name (uses active index if not specified)")
+            Option<string> indexOption = new Option<string>("--index", "-i")
             {
-                IsRequired = false
+                Description = "Index name (uses active index if not specified)"
             };
-            flushCommand.AddOption(indexOption);
+            flushCommand.Options.Add(indexOption);
 
-            flushCommand.SetHandler(async (string? index) =>
+            flushCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string? index = parseResult.GetValue(indexOption);
                 await HandleFlushAsync(index).ConfigureAwait(false);
-            }, indexOption);
+            });
 
             return flushCommand;
         }
@@ -60,18 +59,17 @@ namespace VerbexCli.Commands
         {
             Command gcCommand = new Command("gc", "Run garbage collection");
 
-            Option<string> indexOption = new Option<string>(
-                aliases: new[] { "--index", "-i" },
-                description: "Index name (uses active index if not specified)")
+            Option<string> indexOption = new Option<string>("--index", "-i")
             {
-                IsRequired = false
+                Description = "Index name (uses active index if not specified)"
             };
-            gcCommand.AddOption(indexOption);
+            gcCommand.Options.Add(indexOption);
 
-            gcCommand.SetHandler(async (string? index) =>
+            gcCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string? index = parseResult.GetValue(indexOption);
                 await HandleGarbageCollectAsync(index).ConfigureAwait(false);
-            }, indexOption);
+            });
 
             return gcCommand;
         }
@@ -84,28 +82,26 @@ namespace VerbexCli.Commands
         {
             Command benchmarkCommand = new Command("benchmark", "Run performance benchmark");
 
-            Option<string> indexOption = new Option<string>(
-                aliases: new[] { "--index", "-i" },
-                description: "Index name (uses active index if not specified)")
+            Option<string> indexOption = new Option<string>("--index", "-i")
             {
-                IsRequired = false
+                Description = "Index name (uses active index if not specified)"
             };
 
-            Option<int> documentsOption = new Option<int>(
-                aliases: new[] { "--documents", "-d" },
-                description: "Number of documents to benchmark with")
+            Option<int> documentsOption = new Option<int>("--documents", "-d")
             {
-                IsRequired = false
+                Description = "Number of documents to benchmark with"
             };
-            documentsOption.SetDefaultValue(100);
+            documentsOption.DefaultValueFactory = _ => 100;
 
-            benchmarkCommand.AddOption(indexOption);
-            benchmarkCommand.AddOption(documentsOption);
+            benchmarkCommand.Options.Add(indexOption);
+            benchmarkCommand.Options.Add(documentsOption);
 
-            benchmarkCommand.SetHandler(async (string? index, int documents) =>
+            benchmarkCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string? index = parseResult.GetValue(indexOption);
+                int documents = parseResult.GetValue(documentsOption);
                 await HandleBenchmarkAsync(index, documents).ConfigureAwait(false);
-            }, indexOption, documentsOption);
+            });
 
             return benchmarkCommand;
         }
@@ -118,28 +114,26 @@ namespace VerbexCli.Commands
         {
             Command stressCommand = new Command("stress", "Run stress test");
 
-            Option<string> indexOption = new Option<string>(
-                aliases: new[] { "--index", "-i" },
-                description: "Index name (uses active index if not specified)")
+            Option<string> indexOption = new Option<string>("--index", "-i")
             {
-                IsRequired = false
+                Description = "Index name (uses active index if not specified)"
             };
 
-            Option<int> documentsOption = new Option<int>(
-                aliases: new[] { "--documents", "-d" },
-                description: "Number of documents for stress test")
+            Option<int> documentsOption = new Option<int>("--documents", "-d")
             {
-                IsRequired = false
+                Description = "Number of documents for stress test"
             };
-            documentsOption.SetDefaultValue(1000);
+            documentsOption.DefaultValueFactory = _ => 1000;
 
-            stressCommand.AddOption(indexOption);
-            stressCommand.AddOption(documentsOption);
+            stressCommand.Options.Add(indexOption);
+            stressCommand.Options.Add(documentsOption);
 
-            stressCommand.SetHandler(async (string? index, int documents) =>
+            stressCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string? index = parseResult.GetValue(indexOption);
+                int documents = parseResult.GetValue(documentsOption);
                 await HandleStressAsync(index, documents).ConfigureAwait(false);
-            }, indexOption, documentsOption);
+            });
 
             return stressCommand;
         }

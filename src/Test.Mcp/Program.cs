@@ -5,7 +5,8 @@ namespace Test.Mcp
     using System.Text.Json;
     using System.Threading;
     using System.Threading.Tasks;
-    using Voltaic;
+    using Voltaic.Core;
+    using Voltaic.Mcp;
 
     /// <summary>
     /// Comprehensive test console for Verbex MCP Server.

@@ -20,9 +20,9 @@ namespace VerbexCli.Commands
             Command configCommand = new Command("config", "Manage CLI configuration");
 
             // Add subcommands
-            configCommand.AddCommand(CreateConfigShowCommand());
-            configCommand.AddCommand(CreateConfigSetCommand());
-            configCommand.AddCommand(CreateConfigUnsetCommand());
+            configCommand.Subcommands.Add(CreateConfigShowCommand());
+            configCommand.Subcommands.Add(CreateConfigSetCommand());
+            configCommand.Subcommands.Add(CreateConfigUnsetCommand());
 
             return configCommand;
         }
@@ -35,7 +35,7 @@ namespace VerbexCli.Commands
         {
             Command showCommand = new Command("show", "Show current configuration");
 
-            showCommand.SetHandler(async () =>
+            showCommand.SetAction(async (ParseResult parseResult) =>
             {
                 await HandleConfigShowAsync().ConfigureAwait(false);
             });
@@ -51,16 +51,18 @@ namespace VerbexCli.Commands
         {
             Command setCommand = new Command("set", "Set a configuration value");
 
-            Argument<string> keyArgument = new Argument<string>("key", "Configuration key");
-            Argument<string> valueArgument = new Argument<string>("value", "Configuration value");
+            Argument<string> keyArgument = new Argument<string>("key") { Description = "Configuration key" };
+            Argument<string> valueArgument = new Argument<string>("value") { Description = "Configuration value" };
 
-            setCommand.AddArgument(keyArgument);
-            setCommand.AddArgument(valueArgument);
+            setCommand.Arguments.Add(keyArgument);
+            setCommand.Arguments.Add(valueArgument);
 
-            setCommand.SetHandler(async (string key, string value) =>
+            setCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string key = parseResult.GetValue(keyArgument)!;
+                string value = parseResult.GetValue(valueArgument)!;
                 await HandleConfigSetAsync(key, value).ConfigureAwait(false);
-            }, keyArgument, valueArgument);
+            });
 
             return setCommand;
         }
@@ -73,14 +75,15 @@ namespace VerbexCli.Commands
         {
             Command unsetCommand = new Command("unset", "Unset a configuration value");
 
-            Argument<string> keyArgument = new Argument<string>("key", "Configuration key");
+            Argument<string> keyArgument = new Argument<string>("key") { Description = "Configuration key" };
 
-            unsetCommand.AddArgument(keyArgument);
+            unsetCommand.Arguments.Add(keyArgument);
 
-            unsetCommand.SetHandler(async (string key) =>
+            unsetCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string key = parseResult.GetValue(keyArgument)!;
                 await HandleConfigUnsetAsync(key).ConfigureAwait(false);
-            }, keyArgument);
+            });
 
             return unsetCommand;
         }

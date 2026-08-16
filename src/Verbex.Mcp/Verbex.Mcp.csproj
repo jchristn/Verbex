@@ -10,7 +10,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Voltaic" Version="0.1.5" />
+		<PackageReference Include="Voltaic" Version="0.6.0" />
 	</ItemGroup>
 
 	<ItemGroup>

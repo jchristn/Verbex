@@ -3,7 +3,6 @@ namespace VerbexCli.Commands
     using System;
     using System.Collections.Generic;
     using System.CommandLine;
-    using System.CommandLine.Invocation;
     using System.Linq;
     using System.Threading.Tasks;
     using VerbexCli.Infrastructure;
@@ -21,88 +20,72 @@ namespace VerbexCli.Commands
         {
             Command searchCommand = new Command("search", "Search documents in an index");
 
-            Argument<string> queryArgument = new Argument<string>("query", "Search query");
+            Argument<string> queryArgument = new Argument<string>("query") { Description = "Search query" };
 
-            Option<string> indexOption = new Option<string>(
-                aliases: new[] { "--index", "-i" },
-                description: "Index name (uses active index if not specified)")
+            Option<string> indexOption = new Option<string>("--index", "-i")
             {
-                IsRequired = false
+                Description = "Index name (uses active index if not specified)"
             };
 
-            Option<bool> andOption = new Option<bool>(
-                aliases: new[] { "--and" },
-                description: "Use AND logic (all terms must match)")
+            Option<bool> andOption = new Option<bool>("--and")
             {
-                IsRequired = false
+                Description = "Use AND logic (all terms must match)"
             };
 
-            Option<int> limitOption = new Option<int>(
-                aliases: new[] { "--limit", "-l" },
-                description: "Maximum number of results")
+            Option<int> limitOption = new Option<int>("--limit", "-l")
             {
-                IsRequired = false
+                Description = "Maximum number of results"
             };
-            limitOption.SetDefaultValue(10);
+            limitOption.DefaultValueFactory = _ => 10;
 
-            Option<string[]> filterOption = new Option<string[]>(
-                aliases: new[] { "--filter", "-f" },
-                description: "Tag filters in key=value format (can be specified multiple times)")
+            Option<string[]> filterOption = new Option<string[]>("--filter", "-f")
             {
-                IsRequired = false,
+                Description = "Tag filters in key=value format (can be specified multiple times)",
                 AllowMultipleArgumentsPerToken = true
             };
 
-            Option<string[]> labelOption = new Option<string[]>(
-                aliases: new[] { "--label", "-L" },
-                description: "Label filters (can be specified multiple times)")
+            Option<string[]> labelOption = new Option<string[]>("--label", "-L")
             {
-                IsRequired = false,
+                Description = "Label filters (can be specified multiple times)",
                 AllowMultipleArgumentsPerToken = true
             };
 
-            Option<bool> matchedTermsOption = new Option<bool>(
-                aliases: new[] { "--matched-terms" },
-                description: "Include matched query term values in the output")
+            Option<bool> matchedTermsOption = new Option<bool>("--matched-terms")
             {
-                IsRequired = false
+                Description = "Include matched query term values in the output"
             };
 
-            Option<bool> termDetailsOption = new Option<bool>(
-                aliases: new[] { "--term-details" },
-                description: "Include per-term score and frequency details in the output")
+            Option<bool> termDetailsOption = new Option<bool>("--term-details")
             {
-                IsRequired = false
+                Description = "Include per-term score and frequency details in the output"
             };
 
-            Option<bool> termStatsOption = new Option<bool>(
-                aliases: new[] { "--term-stats" },
-                description: "Include whole-document unique term and total occurrence statistics")
+            Option<bool> termStatsOption = new Option<bool>("--term-stats")
             {
-                IsRequired = false
+                Description = "Include whole-document unique term and total occurrence statistics"
             };
 
-            searchCommand.AddArgument(queryArgument);
-            searchCommand.AddOption(indexOption);
-            searchCommand.AddOption(andOption);
-            searchCommand.AddOption(limitOption);
-            searchCommand.AddOption(filterOption);
-            searchCommand.AddOption(labelOption);
-            searchCommand.AddOption(matchedTermsOption);
-            searchCommand.AddOption(termDetailsOption);
-            searchCommand.AddOption(termStatsOption);
+            searchCommand.Arguments.Add(queryArgument);
+            searchCommand.Options.Add(indexOption);
+            searchCommand.Options.Add(andOption);
+            searchCommand.Options.Add(limitOption);
+            searchCommand.Options.Add(filterOption);
+            searchCommand.Options.Add(labelOption);
+            searchCommand.Options.Add(matchedTermsOption);
+            searchCommand.Options.Add(termDetailsOption);
+            searchCommand.Options.Add(termStatsOption);
 
-            searchCommand.SetHandler(async (InvocationContext context) =>
+            searchCommand.SetAction(async (ParseResult parseResult) =>
             {
-                string query = context.ParseResult.GetValueForArgument(queryArgument);
-                string? index = context.ParseResult.GetValueForOption(indexOption);
-                bool useAnd = context.ParseResult.GetValueForOption(andOption);
-                int limit = context.ParseResult.GetValueForOption(limitOption);
-                string[]? filters = context.ParseResult.GetValueForOption(filterOption);
-                string[]? labels = context.ParseResult.GetValueForOption(labelOption);
-                bool matchedTerms = context.ParseResult.GetValueForOption(matchedTermsOption);
-                bool termDetails = context.ParseResult.GetValueForOption(termDetailsOption);
-                bool termStats = context.ParseResult.GetValueForOption(termStatsOption);
+                string query = parseResult.GetValue(queryArgument)!;
+                string? index = parseResult.GetValue(indexOption);
+                bool useAnd = parseResult.GetValue(andOption);
+                int limit = parseResult.GetValue(limitOption);
+                string[]? filters = parseResult.GetValue(filterOption);
+                string[]? labels = parseResult.GetValue(labelOption);
+                bool matchedTerms = parseResult.GetValue(matchedTermsOption);
+                bool termDetails = parseResult.GetValue(termDetailsOption);
+                bool termStats = parseResult.GetValue(termStatsOption);
 
                 await HandleSearchAsync(index, query, useAnd, limit, filters, labels, matchedTerms, termDetails, termStats).ConfigureAwait(false);
             });

@@ -2,11 +2,7 @@ namespace VerbexCli
 {
     using System;
     using System.CommandLine;
-    using System.CommandLine.Builder;
-    using System.CommandLine.Invocation;
-    using System.CommandLine.Parsing;
     using System.IO;
-    using System.Linq;
     using System.Threading.Tasks;
     using VerbexCli.Commands;
     using VerbexCli.Infrastructure;
@@ -16,6 +12,13 @@ namespace VerbexCli
     /// </summary>
     public static class Program
     {
+        private static Option<OutputFormat> _OutputOption = null!;
+        private static Option<bool> _NoColorOption = null!;
+        private static Option<bool> _VerboseOption = null!;
+        private static Option<bool> _QuietOption = null!;
+        private static Option<bool> _DebugOption = null!;
+        private static Option<string?> _ConfigDirOption = null!;
+
         /// <summary>
         /// Main entry point for the application
         /// </summary>
@@ -28,19 +31,12 @@ namespace VerbexCli
                 // Create the root command
                 RootCommand rootCommand = CreateRootCommand();
 
-                // Build the command line parser with enhanced features
-                CommandLineBuilder builder = new CommandLineBuilder(rootCommand)
-                    .UseDefaults()
-                    .UseExceptionHandler(HandleException)
-                    .UseHelp()
-                    .EnablePosixBundling()
-                    .EnableDirectives()
-                    .AddMiddleware(ProcessGlobalOptions);
-
-                Parser parser = builder.Build();
+                // Parse and process global options before invoking the matched command
+                ParseResult parseResult = rootCommand.Parse(args);
+                ProcessGlobalOptions(parseResult);
 
                 // Execute the command
-                return await parser.InvokeAsync(args).ConfigureAwait(false);
+                return await parseResult.InvokeAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -59,24 +55,21 @@ namespace VerbexCli
         /// <returns>Configured root command</returns>
         private static RootCommand CreateRootCommand()
         {
-            RootCommand rootCommand = new RootCommand("Verbex CLI - Professional command-line interface for the Verbex inverted index library")
-            {
-                Name = "vbx"
-            };
+            RootCommand rootCommand = new RootCommand("Verbex CLI - Professional command-line interface for the Verbex inverted index library");
 
             // Add global options
             AddGlobalOptions(rootCommand);
 
             // Add main command groups
-            rootCommand.AddCommand(IndexCommands.CreateIndexCommand());
-            rootCommand.AddCommand(DocumentCommands.CreateDocumentCommand());
-            rootCommand.AddCommand(SearchCommands.CreateSearchCommand());
-            rootCommand.AddCommand(StatsCommands.CreateStatsCommand());
-            rootCommand.AddCommand(MaintenanceCommands.CreateMaintenanceCommand());
-            rootCommand.AddCommand(ConfigCommands.CreateConfigCommand());
-            rootCommand.AddCommand(AdminCommands.CreateAdminCommand());
-            rootCommand.AddCommand(BackupCommands.CreateBackupCommand());
-            rootCommand.AddCommand(BackupCommands.CreateRestoreCommand());
+            rootCommand.Subcommands.Add(IndexCommands.CreateIndexCommand());
+            rootCommand.Subcommands.Add(DocumentCommands.CreateDocumentCommand());
+            rootCommand.Subcommands.Add(SearchCommands.CreateSearchCommand());
+            rootCommand.Subcommands.Add(StatsCommands.CreateStatsCommand());
+            rootCommand.Subcommands.Add(MaintenanceCommands.CreateMaintenanceCommand());
+            rootCommand.Subcommands.Add(ConfigCommands.CreateConfigCommand());
+            rootCommand.Subcommands.Add(AdminCommands.CreateAdminCommand());
+            rootCommand.Subcommands.Add(BackupCommands.CreateBackupCommand());
+            rootCommand.Subcommands.Add(BackupCommands.CreateRestoreCommand());
 
             return rootCommand;
         }
@@ -88,184 +81,104 @@ namespace VerbexCli
         private static void AddGlobalOptions(RootCommand rootCommand)
         {
             // Output format option
-            Option<OutputFormat> outputOption = new Option<OutputFormat>(
-                aliases: new[] { "--output", "-o" },
-                description: "Output format")
+            _OutputOption = new Option<OutputFormat>("--output", "-o")
             {
-                IsRequired = false
+                Description = "Output format",
+                DefaultValueFactory = _ => OutputFormat.Table,
+                Recursive = true
             };
-            outputOption.SetDefaultValue(OutputFormat.Table);
 
             // No color option
-            Option<bool> noColorOption = new Option<bool>(
-                aliases: new[] { "--no-color" },
-                description: "Disable colored output")
+            _NoColorOption = new Option<bool>("--no-color")
             {
-                IsRequired = false
+                Description = "Disable colored output",
+                Recursive = true
             };
 
             // Verbose option
-            Option<bool> verboseOption = new Option<bool>(
-                aliases: new[] { "--verbose", "-v" },
-                description: "Enable verbose output")
+            _VerboseOption = new Option<bool>("--verbose", "-v")
             {
-                IsRequired = false
+                Description = "Enable verbose output",
+                Recursive = true
             };
 
             // Quiet option
-            Option<bool> quietOption = new Option<bool>(
-                aliases: new[] { "--quiet", "-q" },
-                description: "Enable quiet output (minimal output)")
+            _QuietOption = new Option<bool>("--quiet", "-q")
             {
-                IsRequired = false
+                Description = "Enable quiet output (minimal output)",
+                Recursive = true
             };
 
             // Debug option
-            Option<bool> debugOption = new Option<bool>(
-                aliases: new[] { "--debug" },
-                description: "Enable debug output")
+            _DebugOption = new Option<bool>("--debug")
             {
-                IsRequired = false
+                Description = "Enable debug output",
+                Recursive = true
             };
 
             // Config directory option
-            Option<string?> configDirOption = new Option<string?>(
-                aliases: new[] { "--config-dir" },
-                description: "Specify custom directory for configuration and index data (default: ~/.vbx). Use 'default' to reset to default directory.")
+            _ConfigDirOption = new Option<string?>("--config-dir")
             {
-                IsRequired = false
+                Description = "Specify custom directory for configuration and index data (default: ~/.vbx). Use 'default' to reset to default directory.",
+                Recursive = true
             };
 
-            rootCommand.AddGlobalOption(outputOption);
-            rootCommand.AddGlobalOption(noColorOption);
-            rootCommand.AddGlobalOption(verboseOption);
-            rootCommand.AddGlobalOption(quietOption);
-            rootCommand.AddGlobalOption(debugOption);
-            rootCommand.AddGlobalOption(configDirOption);
+            rootCommand.Options.Add(_OutputOption);
+            rootCommand.Options.Add(_NoColorOption);
+            rootCommand.Options.Add(_VerboseOption);
+            rootCommand.Options.Add(_QuietOption);
+            rootCommand.Options.Add(_DebugOption);
+            rootCommand.Options.Add(_ConfigDirOption);
         }
 
         /// <summary>
         /// Processes global options and sets them in the OutputManager
         /// </summary>
-        /// <param name="context">Invocation context</param>
-        /// <param name="next">Next middleware delegate</param>
-        /// <returns>Task representing the async operation</returns>
-        private static async Task ProcessGlobalOptions(InvocationContext context, Func<InvocationContext, Task> next)
+        /// <param name="parseResult">Parsed command line result</param>
+        private static void ProcessGlobalOptions(ParseResult parseResult)
         {
-            ParseResult parseResult = context.ParseResult;
-
-            // Store references to the global options for easier access
-            Option<OutputFormat>? outputOption = null;
-            Option<bool>? noColorOption = null;
-            Option<bool>? verboseOption = null;
-            Option<bool>? quietOption = null;
-            Option<bool>? debugOption = null;
-            Option<string?>? configDirOption = null;
-
-            foreach (Option option in parseResult.RootCommandResult.Command.Options)
-            {
-                if (option is Option<OutputFormat> outOpt && outOpt.HasAlias("--output"))
-                    outputOption = outOpt;
-                else if (option is Option<bool> boolOpt)
-                {
-                    if (boolOpt.HasAlias("--no-color"))
-                        noColorOption = boolOpt;
-                    else if (boolOpt.HasAlias("--verbose"))
-                        verboseOption = boolOpt;
-                    else if (boolOpt.HasAlias("--quiet"))
-                        quietOption = boolOpt;
-                    else if (boolOpt.HasAlias("--debug"))
-                        debugOption = boolOpt;
-                }
-                else if (option is Option<string?> strOpt && strOpt.HasAlias("--config-dir"))
-                    configDirOption = strOpt;
-            }
-
             // Process output format option
-            if (outputOption != null)
-            {
-                OutputFormat format = parseResult.GetValueForOption(outputOption);
-                OutputManager.DefaultFormat = format;
-            }
+            OutputFormat format = parseResult.GetValue(_OutputOption);
+            OutputManager.DefaultFormat = format;
 
             // Process no-color option
-            if (noColorOption != null)
-            {
-                bool noColor = parseResult.GetValueForOption(noColorOption);
-                if (noColor)
-                    OutputManager.ColorEnabled = false;
-            }
+            if (parseResult.GetValue(_NoColorOption))
+                OutputManager.ColorEnabled = false;
 
             // Process verbose option
-            if (verboseOption != null)
-            {
-                bool verbose = parseResult.GetValueForOption(verboseOption);
-                OutputManager.VerboseEnabled = verbose;
-            }
+            OutputManager.VerboseEnabled = parseResult.GetValue(_VerboseOption);
 
             // Process quiet option
-            if (quietOption != null)
-            {
-                bool quiet = parseResult.GetValueForOption(quietOption);
-                OutputManager.QuietEnabled = quiet;
-            }
+            OutputManager.QuietEnabled = parseResult.GetValue(_QuietOption);
 
             // Process debug option
-            if (debugOption != null)
-            {
-                bool debug = parseResult.GetValueForOption(debugOption);
-                if (debug)
-                    Environment.SetEnvironmentVariable("VBX_DEBUG", "1");
-            }
+            if (parseResult.GetValue(_DebugOption))
+                Environment.SetEnvironmentVariable("VBX_DEBUG", "1");
 
             // Process config directory option
-            if (configDirOption != null)
+            string? configDir = parseResult.GetValue(_ConfigDirOption);
+            if (!string.IsNullOrEmpty(configDir))
             {
-                string? configDir = parseResult.GetValueForOption(configDirOption);
-                if (!string.IsNullOrEmpty(configDir))
+                if (configDir.Equals("default", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (configDir.Equals("default", StringComparison.OrdinalIgnoreCase))
+                    // Clear the custom config directory setting
+                    GlobalConfig.SetConfigDirectory(null);
+                    // Don't need to initialize IndexManager - it will use default
+                }
+                else
+                {
+                    if (!Path.IsPathRooted(configDir))
                     {
-                        // Clear the custom config directory setting
-                        GlobalConfig.SetConfigDirectory(null);
-                        // Don't need to initialize IndexManager - it will use default
+                        configDir = Path.GetFullPath(configDir);
                     }
-                    else
-                    {
-                        if (!Path.IsPathRooted(configDir))
-                        {
-                            configDir = Path.GetFullPath(configDir);
-                        }
 
-                        // Save the config directory preference for future commands
-                        GlobalConfig.SetConfigDirectory(configDir);
+                    // Save the config directory preference for future commands
+                    GlobalConfig.SetConfigDirectory(configDir);
 
-                        // Initialize with the custom directory for this command
-                        IndexManager.Initialize(configDir);
-                    }
+                    // Initialize with the custom directory for this command
+                    IndexManager.Initialize(configDir);
                 }
             }
-
-            await next(context).ConfigureAwait(false);
-        }
-
-        /// <summary>
-        /// Handles unhandled exceptions
-        /// </summary>
-        /// <param name="exception">Exception that occurred</param>
-        /// <param name="context">Parser context</param>
-        private static void HandleException(Exception exception, InvocationContext context)
-        {
-            OutputManager.WriteError($"Error: {exception.Message}");
-
-            // Check for debug flag in arguments or environment
-            if (context.ParseResult.Tokens.Any(t => t.Value == "--debug") ||
-                Environment.GetEnvironmentVariable("VBX_DEBUG") == "1")
-            {
-                OutputManager.WriteError($"Stack trace: {exception.StackTrace}");
-            }
-
-            context.ExitCode = 1;
         }
     }
 }

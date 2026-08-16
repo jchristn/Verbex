@@ -1432,6 +1432,15 @@
             <param name="token">Cancellation token.</param>
             <returns>List of document-term records for all specified documents.</returns>
         </member>
+        <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.GetFrequencyDeltasByDocumentsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Gets aggregate frequency deltas for terms in multiple documents without loading term positions.
+            </summary>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+            <param name="documentIds">Document IDs.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Dictionary mapping term IDs to aggregate frequency deltas.</returns>
+        </member>
         <member name="M:Verbex.Database.Interfaces.IDocumentTermMethods.GetStatsByDocumentsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
             <summary>
             Gets aggregate term statistics for multiple documents.
@@ -2301,6 +2310,15 @@
             <param name="updates">Dictionary mapping term ID to frequency deltas.</param>
             <param name="token">Cancellation token.</param>
             <returns>Task.</returns>
+        </member>
+        <member name="M:Verbex.Database.Interfaces.ITermMethods.DecrementFrequenciesByDocumentsAsync(System.String,System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Decrements frequencies for all terms associated with multiple documents.
+            </summary>
+            <param name="tablePrefix">Table prefix (index identifier) for the prefixed tables.</param>
+            <param name="documentIds">Document IDs whose term frequencies should be decremented.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>List of affected term IDs.</returns>
         </member>
         <member name="M:Verbex.Database.Interfaces.ITermMethods.DeleteOrphanedAsync(System.String,System.Threading.CancellationToken)">
             <summary>
@@ -5129,6 +5147,45 @@
             <param name="ids">Document IDs to check.</param>
         </member>
         <member name="M:Verbex.DTO.Requests.BatchCheckExistenceRequest.Validate(System.String@)">
+            <summary>
+            Validate the request.
+            </summary>
+            <param name="errorMessage">Error message if validation fails.</param>
+            <returns>True if valid, false otherwise.</returns>
+        </member>
+        <member name="T:Verbex.DTO.Requests.BatchDeleteDocumentsRequest">
+            <summary>
+            Request to delete multiple documents in a batch operation.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Requests.BatchDeleteDocumentsRequest.DocumentIds">
+            <summary>
+            Document identifiers to delete.
+            </summary>
+        </member>
+        <member name="P:Verbex.DTO.Requests.BatchDeleteDocumentsRequest.Ids">
+            <summary>
+            Alternate identifier list property accepted for compatibility with generic bulk-delete clients.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.Requests.BatchDeleteDocumentsRequest.#ctor">
+            <summary>
+            Instantiate.
+            </summary>
+        </member>
+        <member name="M:Verbex.DTO.Requests.BatchDeleteDocumentsRequest.#ctor(System.Collections.Generic.List{System.String})">
+            <summary>
+            Instantiate with document identifiers.
+            </summary>
+            <param name="documentIds">Document identifiers to delete.</param>
+        </member>
+        <member name="M:Verbex.DTO.Requests.BatchDeleteDocumentsRequest.GetDocumentIds">
+            <summary>
+            Gets the normalized distinct document IDs from the request.
+            </summary>
+            <returns>Distinct non-empty document IDs.</returns>
+        </member>
+        <member name="M:Verbex.DTO.Requests.BatchDeleteDocumentsRequest.Validate(System.String@)">
             <summary>
             Validate the request.
             </summary>

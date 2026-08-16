@@ -2,7 +2,6 @@ namespace VerbexCli.Commands
 {
     using System;
     using System.CommandLine;
-    using System.CommandLine.Invocation;
     using System.IO;
     using System.IO.Compression;
     using System.Security.Cryptography;
@@ -38,31 +37,27 @@ namespace VerbexCli.Commands
         {
             Command backupCommand = new Command("backup", "Create a backup of an index");
 
-            Argument<string> nameArgument = new Argument<string>("name", "Name of the index to backup");
+            Argument<string> nameArgument = new Argument<string>("name") { Description = "Name of the index to backup" };
 
-            Option<string?> outputOption = new Option<string?>(
-                aliases: new[] { "--output", "-o" },
-                description: "Output file path (default: <index-name>.vbx)")
+            Option<string?> outputOption = new Option<string?>("--output", "-o")
             {
-                IsRequired = false
+                Description = "Output file path (default: <index-name>.vbx)"
             };
 
-            Option<string?> outputDirOption = new Option<string?>(
-                aliases: new[] { "--output-dir", "-d" },
-                description: "Output directory (backup will be named <index-name>_<timestamp>.vbx)")
+            Option<string?> outputDirOption = new Option<string?>("--output-dir", "-d")
             {
-                IsRequired = false
+                Description = "Output directory (backup will be named <index-name>_<timestamp>.vbx)"
             };
 
-            backupCommand.AddArgument(nameArgument);
-            backupCommand.AddOption(outputOption);
-            backupCommand.AddOption(outputDirOption);
+            backupCommand.Arguments.Add(nameArgument);
+            backupCommand.Options.Add(outputOption);
+            backupCommand.Options.Add(outputDirOption);
 
-            backupCommand.SetHandler(async (InvocationContext context) =>
+            backupCommand.SetAction(async (ParseResult parseResult) =>
             {
-                string name = context.ParseResult.GetValueForArgument(nameArgument);
-                string? output = context.ParseResult.GetValueForOption(outputOption);
-                string? outputDir = context.ParseResult.GetValueForOption(outputDirOption);
+                string name = parseResult.GetValue(nameArgument)!;
+                string? output = parseResult.GetValue(outputOption);
+                string? outputDir = parseResult.GetValue(outputDirOption);
 
                 await HandleBackupAsync(name, output, outputDir).ConfigureAwait(false);
             });
@@ -78,40 +73,34 @@ namespace VerbexCli.Commands
         {
             Command restoreCommand = new Command("restore", "Restore an index from a backup file");
 
-            Argument<string> fileArgument = new Argument<string>("file", "Backup file path (.vbx)");
+            Argument<string> fileArgument = new Argument<string>("file") { Description = "Backup file path (.vbx)" };
 
-            Option<string?> nameOption = new Option<string?>(
-                aliases: new[] { "--name", "-n" },
-                description: "Name for the restored index (default: original name)")
+            Option<string?> nameOption = new Option<string?>("--name", "-n")
             {
-                IsRequired = false
+                Description = "Name for the restored index (default: original name)"
             };
 
-            Option<string?> replaceOption = new Option<string?>(
-                aliases: new[] { "--replace", "-r" },
-                description: "Replace an existing index with the backup contents")
+            Option<string?> replaceOption = new Option<string?>("--replace", "-r")
             {
-                IsRequired = false
+                Description = "Replace an existing index with the backup contents"
             };
 
-            Option<bool> forceOption = new Option<bool>(
-                aliases: new[] { "--force", "-f" },
-                description: "Force restore without confirmation (for replace)")
+            Option<bool> forceOption = new Option<bool>("--force", "-f")
             {
-                IsRequired = false
+                Description = "Force restore without confirmation (for replace)"
             };
 
-            restoreCommand.AddArgument(fileArgument);
-            restoreCommand.AddOption(nameOption);
-            restoreCommand.AddOption(replaceOption);
-            restoreCommand.AddOption(forceOption);
+            restoreCommand.Arguments.Add(fileArgument);
+            restoreCommand.Options.Add(nameOption);
+            restoreCommand.Options.Add(replaceOption);
+            restoreCommand.Options.Add(forceOption);
 
-            restoreCommand.SetHandler(async (InvocationContext context) =>
+            restoreCommand.SetAction(async (ParseResult parseResult) =>
             {
-                string file = context.ParseResult.GetValueForArgument(fileArgument);
-                string? name = context.ParseResult.GetValueForOption(nameOption);
-                string? replace = context.ParseResult.GetValueForOption(replaceOption);
-                bool force = context.ParseResult.GetValueForOption(forceOption);
+                string file = parseResult.GetValue(fileArgument)!;
+                string? name = parseResult.GetValue(nameOption);
+                string? replace = parseResult.GetValue(replaceOption);
+                bool force = parseResult.GetValue(forceOption);
 
                 await HandleRestoreAsync(file, name, replace, force).ConfigureAwait(false);
             });

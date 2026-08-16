@@ -28,9 +28,9 @@ namespace VerbexCli.Commands
             Command adminCommand = new Command("admin", "Multi-tenant administration commands");
 
             // Add subcommand groups
-            adminCommand.AddCommand(CreateTenantCommand());
-            adminCommand.AddCommand(CreateUserCommand());
-            adminCommand.AddCommand(CreateCredentialCommand());
+            adminCommand.Subcommands.Add(CreateTenantCommand());
+            adminCommand.Subcommands.Add(CreateUserCommand());
+            adminCommand.Subcommands.Add(CreateCredentialCommand());
 
             return adminCommand;
         }
@@ -64,10 +64,10 @@ namespace VerbexCli.Commands
         {
             Command tenantCommand = new Command("tenant", "Manage tenants");
 
-            tenantCommand.AddCommand(CreateTenantListCommand());
-            tenantCommand.AddCommand(CreateTenantCreateCommand());
-            tenantCommand.AddCommand(CreateTenantInfoCommand());
-            tenantCommand.AddCommand(CreateTenantDeleteCommand());
+            tenantCommand.Subcommands.Add(CreateTenantListCommand());
+            tenantCommand.Subcommands.Add(CreateTenantCreateCommand());
+            tenantCommand.Subcommands.Add(CreateTenantInfoCommand());
+            tenantCommand.Subcommands.Add(CreateTenantDeleteCommand());
 
             return tenantCommand;
         }
@@ -76,7 +76,7 @@ namespace VerbexCli.Commands
         {
             Command listCommand = new Command("ls", "List all tenants");
 
-            listCommand.SetHandler(async () =>
+            listCommand.SetAction(async (ParseResult parseResult) =>
             {
                 await HandleTenantListAsync().ConfigureAwait(false);
             });
@@ -88,22 +88,22 @@ namespace VerbexCli.Commands
         {
             Command createCommand = new Command("create", "Create a new tenant");
 
-            Argument<string> nameArgument = new Argument<string>("name", "Name of the tenant");
+            Argument<string> nameArgument = new Argument<string>("name") { Description = "Name of the tenant" };
 
-            Option<string> descriptionOption = new Option<string>(
-                aliases: new[] { "--description", "-d" },
-                description: "Tenant description")
+            Option<string> descriptionOption = new Option<string>("--description", "-d")
             {
-                IsRequired = false
+                Description = "Tenant description"
             };
 
-            createCommand.AddArgument(nameArgument);
-            createCommand.AddOption(descriptionOption);
+            createCommand.Arguments.Add(nameArgument);
+            createCommand.Options.Add(descriptionOption);
 
-            createCommand.SetHandler(async (string name, string? description) =>
+            createCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string name = parseResult.GetValue(nameArgument)!;
+                string? description = parseResult.GetValue(descriptionOption);
                 await HandleTenantCreateAsync(name, description).ConfigureAwait(false);
-            }, nameArgument, descriptionOption);
+            });
 
             return createCommand;
         }
@@ -112,13 +112,14 @@ namespace VerbexCli.Commands
         {
             Command infoCommand = new Command("info", "Show tenant details");
 
-            Argument<string> idArgument = new Argument<string>("id", "Tenant identifier");
-            infoCommand.AddArgument(idArgument);
+            Argument<string> idArgument = new Argument<string>("id") { Description = "Tenant identifier" };
+            infoCommand.Arguments.Add(idArgument);
 
-            infoCommand.SetHandler(async (string id) =>
+            infoCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string id = parseResult.GetValue(idArgument)!;
                 await HandleTenantInfoAsync(id).ConfigureAwait(false);
-            }, idArgument);
+            });
 
             return infoCommand;
         }
@@ -127,22 +128,22 @@ namespace VerbexCli.Commands
         {
             Command deleteCommand = new Command("delete", "Delete a tenant");
 
-            Argument<string> idArgument = new Argument<string>("id", "Tenant identifier");
+            Argument<string> idArgument = new Argument<string>("id") { Description = "Tenant identifier" };
 
-            Option<bool> forceOption = new Option<bool>(
-                aliases: new[] { "--force", "-f" },
-                description: "Force deletion without confirmation")
+            Option<bool> forceOption = new Option<bool>("--force", "-f")
             {
-                IsRequired = false
+                Description = "Force deletion without confirmation"
             };
 
-            deleteCommand.AddArgument(idArgument);
-            deleteCommand.AddOption(forceOption);
+            deleteCommand.Arguments.Add(idArgument);
+            deleteCommand.Options.Add(forceOption);
 
-            deleteCommand.SetHandler(async (string id, bool force) =>
+            deleteCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string id = parseResult.GetValue(idArgument)!;
+                bool force = parseResult.GetValue(forceOption);
                 await HandleTenantDeleteAsync(id, force).ConfigureAwait(false);
-            }, idArgument, forceOption);
+            });
 
             return deleteCommand;
         }
@@ -153,10 +154,10 @@ namespace VerbexCli.Commands
         {
             Command userCommand = new Command("user", "Manage users");
 
-            userCommand.AddCommand(CreateUserListCommand());
-            userCommand.AddCommand(CreateUserCreateCommand());
-            userCommand.AddCommand(CreateUserInfoCommand());
-            userCommand.AddCommand(CreateUserDeleteCommand());
+            userCommand.Subcommands.Add(CreateUserListCommand());
+            userCommand.Subcommands.Add(CreateUserCreateCommand());
+            userCommand.Subcommands.Add(CreateUserInfoCommand());
+            userCommand.Subcommands.Add(CreateUserDeleteCommand());
 
             return userCommand;
         }
@@ -165,13 +166,14 @@ namespace VerbexCli.Commands
         {
             Command listCommand = new Command("ls", "List users in a tenant");
 
-            Argument<string> tenantArgument = new Argument<string>("tenant", "Tenant identifier");
-            listCommand.AddArgument(tenantArgument);
+            Argument<string> tenantArgument = new Argument<string>("tenant") { Description = "Tenant identifier" };
+            listCommand.Arguments.Add(tenantArgument);
 
-            listCommand.SetHandler(async (string tenantId) =>
+            listCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string tenantId = parseResult.GetValue(tenantArgument)!;
                 await HandleUserListAsync(tenantId).ConfigureAwait(false);
-            }, tenantArgument);
+            });
 
             return listCommand;
         }
@@ -180,42 +182,42 @@ namespace VerbexCli.Commands
         {
             Command createCommand = new Command("create", "Create a new user");
 
-            Argument<string> tenantArgument = new Argument<string>("tenant", "Tenant identifier");
-            Argument<string> emailArgument = new Argument<string>("email", "User email");
-            Argument<string> passwordArgument = new Argument<string>("password", "User password");
+            Argument<string> tenantArgument = new Argument<string>("tenant") { Description = "Tenant identifier" };
+            Argument<string> emailArgument = new Argument<string>("email") { Description = "User email" };
+            Argument<string> passwordArgument = new Argument<string>("password") { Description = "User password" };
 
-            Option<string> firstNameOption = new Option<string>(
-                aliases: new[] { "--first-name", "-f" },
-                description: "First name")
+            Option<string> firstNameOption = new Option<string>("--first-name", "-f")
             {
-                IsRequired = false
+                Description = "First name"
             };
 
-            Option<string> lastNameOption = new Option<string>(
-                aliases: new[] { "--last-name", "-l" },
-                description: "Last name")
+            Option<string> lastNameOption = new Option<string>("--last-name", "-l")
             {
-                IsRequired = false
+                Description = "Last name"
             };
 
-            Option<bool> adminOption = new Option<bool>(
-                aliases: new[] { "--admin", "-a" },
-                description: "Make user a tenant admin")
+            Option<bool> adminOption = new Option<bool>("--admin", "-a")
             {
-                IsRequired = false
+                Description = "Make user a tenant admin"
             };
 
-            createCommand.AddArgument(tenantArgument);
-            createCommand.AddArgument(emailArgument);
-            createCommand.AddArgument(passwordArgument);
-            createCommand.AddOption(firstNameOption);
-            createCommand.AddOption(lastNameOption);
-            createCommand.AddOption(adminOption);
+            createCommand.Arguments.Add(tenantArgument);
+            createCommand.Arguments.Add(emailArgument);
+            createCommand.Arguments.Add(passwordArgument);
+            createCommand.Options.Add(firstNameOption);
+            createCommand.Options.Add(lastNameOption);
+            createCommand.Options.Add(adminOption);
 
-            createCommand.SetHandler(async (string tenantId, string email, string password, string? firstName, string? lastName, bool isAdmin) =>
+            createCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string tenantId = parseResult.GetValue(tenantArgument)!;
+                string email = parseResult.GetValue(emailArgument)!;
+                string password = parseResult.GetValue(passwordArgument)!;
+                string? firstName = parseResult.GetValue(firstNameOption);
+                string? lastName = parseResult.GetValue(lastNameOption);
+                bool isAdmin = parseResult.GetValue(adminOption);
                 await HandleUserCreateAsync(tenantId, email, password, firstName, lastName, isAdmin).ConfigureAwait(false);
-            }, tenantArgument, emailArgument, passwordArgument, firstNameOption, lastNameOption, adminOption);
+            });
 
             return createCommand;
         }
@@ -224,15 +226,17 @@ namespace VerbexCli.Commands
         {
             Command infoCommand = new Command("info", "Show user details");
 
-            Argument<string> tenantArgument = new Argument<string>("tenant", "Tenant identifier");
-            Argument<string> idArgument = new Argument<string>("id", "User identifier");
-            infoCommand.AddArgument(tenantArgument);
-            infoCommand.AddArgument(idArgument);
+            Argument<string> tenantArgument = new Argument<string>("tenant") { Description = "Tenant identifier" };
+            Argument<string> idArgument = new Argument<string>("id") { Description = "User identifier" };
+            infoCommand.Arguments.Add(tenantArgument);
+            infoCommand.Arguments.Add(idArgument);
 
-            infoCommand.SetHandler(async (string tenantId, string id) =>
+            infoCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string tenantId = parseResult.GetValue(tenantArgument)!;
+                string id = parseResult.GetValue(idArgument)!;
                 await HandleUserInfoAsync(tenantId, id).ConfigureAwait(false);
-            }, tenantArgument, idArgument);
+            });
 
             return infoCommand;
         }
@@ -241,24 +245,25 @@ namespace VerbexCli.Commands
         {
             Command deleteCommand = new Command("delete", "Delete a user");
 
-            Argument<string> tenantArgument = new Argument<string>("tenant", "Tenant identifier");
-            Argument<string> idArgument = new Argument<string>("id", "User identifier");
+            Argument<string> tenantArgument = new Argument<string>("tenant") { Description = "Tenant identifier" };
+            Argument<string> idArgument = new Argument<string>("id") { Description = "User identifier" };
 
-            Option<bool> forceOption = new Option<bool>(
-                aliases: new[] { "--force", "-f" },
-                description: "Force deletion without confirmation")
+            Option<bool> forceOption = new Option<bool>("--force", "-f")
             {
-                IsRequired = false
+                Description = "Force deletion without confirmation"
             };
 
-            deleteCommand.AddArgument(tenantArgument);
-            deleteCommand.AddArgument(idArgument);
-            deleteCommand.AddOption(forceOption);
+            deleteCommand.Arguments.Add(tenantArgument);
+            deleteCommand.Arguments.Add(idArgument);
+            deleteCommand.Options.Add(forceOption);
 
-            deleteCommand.SetHandler(async (string tenantId, string id, bool force) =>
+            deleteCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string tenantId = parseResult.GetValue(tenantArgument)!;
+                string id = parseResult.GetValue(idArgument)!;
+                bool force = parseResult.GetValue(forceOption);
                 await HandleUserDeleteAsync(tenantId, id, force).ConfigureAwait(false);
-            }, tenantArgument, idArgument, forceOption);
+            });
 
             return deleteCommand;
         }
@@ -269,10 +274,10 @@ namespace VerbexCli.Commands
         {
             Command credentialCommand = new Command("credential", "Manage API credentials");
 
-            credentialCommand.AddCommand(CreateCredentialListCommand());
-            credentialCommand.AddCommand(CreateCredentialCreateCommand());
-            credentialCommand.AddCommand(CreateCredentialInfoCommand());
-            credentialCommand.AddCommand(CreateCredentialDeleteCommand());
+            credentialCommand.Subcommands.Add(CreateCredentialListCommand());
+            credentialCommand.Subcommands.Add(CreateCredentialCreateCommand());
+            credentialCommand.Subcommands.Add(CreateCredentialInfoCommand());
+            credentialCommand.Subcommands.Add(CreateCredentialDeleteCommand());
 
             return credentialCommand;
         }
@@ -281,13 +286,14 @@ namespace VerbexCli.Commands
         {
             Command listCommand = new Command("ls", "List credentials in a tenant");
 
-            Argument<string> tenantArgument = new Argument<string>("tenant", "Tenant identifier");
-            listCommand.AddArgument(tenantArgument);
+            Argument<string> tenantArgument = new Argument<string>("tenant") { Description = "Tenant identifier" };
+            listCommand.Arguments.Add(tenantArgument);
 
-            listCommand.SetHandler(async (string tenantId) =>
+            listCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string tenantId = parseResult.GetValue(tenantArgument)!;
                 await HandleCredentialListAsync(tenantId).ConfigureAwait(false);
-            }, tenantArgument);
+            });
 
             return listCommand;
         }
@@ -296,24 +302,25 @@ namespace VerbexCli.Commands
         {
             Command createCommand = new Command("create", "Create a new API credential");
 
-            Argument<string> tenantArgument = new Argument<string>("tenant", "Tenant identifier");
-            Argument<string> userArgument = new Argument<string>("user", "User identifier");
+            Argument<string> tenantArgument = new Argument<string>("tenant") { Description = "Tenant identifier" };
+            Argument<string> userArgument = new Argument<string>("user") { Description = "User identifier" };
 
-            Option<string> descriptionOption = new Option<string>(
-                aliases: new[] { "--description", "-d" },
-                description: "Credential description")
+            Option<string> descriptionOption = new Option<string>("--description", "-d")
             {
-                IsRequired = false
+                Description = "Credential description"
             };
 
-            createCommand.AddArgument(tenantArgument);
-            createCommand.AddArgument(userArgument);
-            createCommand.AddOption(descriptionOption);
+            createCommand.Arguments.Add(tenantArgument);
+            createCommand.Arguments.Add(userArgument);
+            createCommand.Options.Add(descriptionOption);
 
-            createCommand.SetHandler(async (string tenantId, string userId, string? description) =>
+            createCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string tenantId = parseResult.GetValue(tenantArgument)!;
+                string userId = parseResult.GetValue(userArgument)!;
+                string? description = parseResult.GetValue(descriptionOption);
                 await HandleCredentialCreateAsync(tenantId, userId, description).ConfigureAwait(false);
-            }, tenantArgument, userArgument, descriptionOption);
+            });
 
             return createCommand;
         }
@@ -322,15 +329,17 @@ namespace VerbexCli.Commands
         {
             Command infoCommand = new Command("info", "Show credential details");
 
-            Argument<string> tenantArgument = new Argument<string>("tenant", "Tenant identifier");
-            Argument<string> idArgument = new Argument<string>("id", "Credential identifier");
-            infoCommand.AddArgument(tenantArgument);
-            infoCommand.AddArgument(idArgument);
+            Argument<string> tenantArgument = new Argument<string>("tenant") { Description = "Tenant identifier" };
+            Argument<string> idArgument = new Argument<string>("id") { Description = "Credential identifier" };
+            infoCommand.Arguments.Add(tenantArgument);
+            infoCommand.Arguments.Add(idArgument);
 
-            infoCommand.SetHandler(async (string tenantId, string id) =>
+            infoCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string tenantId = parseResult.GetValue(tenantArgument)!;
+                string id = parseResult.GetValue(idArgument)!;
                 await HandleCredentialInfoAsync(tenantId, id).ConfigureAwait(false);
-            }, tenantArgument, idArgument);
+            });
 
             return infoCommand;
         }
@@ -339,24 +348,25 @@ namespace VerbexCli.Commands
         {
             Command deleteCommand = new Command("delete", "Delete a credential");
 
-            Argument<string> tenantArgument = new Argument<string>("tenant", "Tenant identifier");
-            Argument<string> idArgument = new Argument<string>("id", "Credential identifier");
+            Argument<string> tenantArgument = new Argument<string>("tenant") { Description = "Tenant identifier" };
+            Argument<string> idArgument = new Argument<string>("id") { Description = "Credential identifier" };
 
-            Option<bool> forceOption = new Option<bool>(
-                aliases: new[] { "--force", "-f" },
-                description: "Force deletion without confirmation")
+            Option<bool> forceOption = new Option<bool>("--force", "-f")
             {
-                IsRequired = false
+                Description = "Force deletion without confirmation"
             };
 
-            deleteCommand.AddArgument(tenantArgument);
-            deleteCommand.AddArgument(idArgument);
-            deleteCommand.AddOption(forceOption);
+            deleteCommand.Arguments.Add(tenantArgument);
+            deleteCommand.Arguments.Add(idArgument);
+            deleteCommand.Options.Add(forceOption);
 
-            deleteCommand.SetHandler(async (string tenantId, string id, bool force) =>
+            deleteCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string tenantId = parseResult.GetValue(tenantArgument)!;
+                string id = parseResult.GetValue(idArgument)!;
+                bool force = parseResult.GetValue(forceOption);
                 await HandleCredentialDeleteAsync(tenantId, id, force).ConfigureAwait(false);
-            }, tenantArgument, idArgument, forceOption);
+            });
 
             return deleteCommand;
         }

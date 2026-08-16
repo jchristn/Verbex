@@ -22,10 +22,10 @@ namespace VerbexCli.Commands
         {
             Command docCommand = new Command("doc", "Manage documents in indices");
 
-            docCommand.AddCommand(CreateDocumentAddCommand());
-            docCommand.AddCommand(CreateDocumentRemoveCommand());
-            docCommand.AddCommand(CreateDocumentListCommand());
-            docCommand.AddCommand(CreateDocumentClearCommand());
+            docCommand.Subcommands.Add(CreateDocumentAddCommand());
+            docCommand.Subcommands.Add(CreateDocumentRemoveCommand());
+            docCommand.Subcommands.Add(CreateDocumentListCommand());
+            docCommand.Subcommands.Add(CreateDocumentClearCommand());
 
             return docCommand;
         }
@@ -38,64 +38,59 @@ namespace VerbexCli.Commands
         {
             Command addCommand = new Command("add", "Add a document (use --content or --file)");
 
-            Argument<string> nameArgument = new Argument<string>("name", "Document name");
+            Argument<string> nameArgument = new Argument<string>("name") { Description = "Document name" };
 
-            Option<string> indexOption = new Option<string>(
-                aliases: new[] { "--index", "-i" },
-                description: "Index name (uses active index if not specified)")
+            Option<string> indexOption = new Option<string>("--index", "-i")
             {
-                IsRequired = false
+                Description = "Index name (uses active index if not specified)"
             };
 
-            Option<string> contentOption = new Option<string>(
-                aliases: new[] { "--content", "-c" },
-                description: "Document content (mutually exclusive with --file)")
+            Option<string> contentOption = new Option<string>("--content", "-c")
             {
-                IsRequired = false
+                Description = "Document content (mutually exclusive with --file)"
             };
 
-            Option<string> fileOption = new Option<string>(
-                aliases: new[] { "--file", "-f" },
-                description: "Load content from file (mutually exclusive with --content)")
+            Option<string> fileOption = new Option<string>("--file", "-f")
             {
-                IsRequired = false
+                Description = "Load content from file (mutually exclusive with --content)"
             };
 
-            Option<string[]> metadataOption = new Option<string[]>(
-                aliases: new[] { "--meta", "-m", "--tag", "-t" },
-                description: "Tags in key=value format (repeatable)")
+            Option<string[]> metadataOption = new Option<string[]>("--meta", "-m", "--tag", "-t")
             {
-                IsRequired = false,
+                Description = "Tags in key=value format (repeatable)",
                 AllowMultipleArgumentsPerToken = true
             };
 
-            Option<string[]> labelOption = new Option<string[]>(
-                aliases: new[] { "--label", "-L" },
-                description: "Labels to associate with the document (repeatable)")
+            Option<string[]> labelOption = new Option<string[]>("--label", "-L")
             {
-                IsRequired = false,
+                Description = "Labels to associate with the document (repeatable)",
                 AllowMultipleArgumentsPerToken = true
             };
 
-            Option<string> customMetadataOption = new Option<string>(
-                aliases: new[] { "--custom-metadata", "-M" },
-                description: "Custom metadata as a JSON string (e.g., '{\"key\": \"value\"}')")
+            Option<string> customMetadataOption = new Option<string>("--custom-metadata", "-M")
             {
-                IsRequired = false
+                Description = "Custom metadata as a JSON string (e.g., '{\"key\": \"value\"}')"
             };
 
-            addCommand.AddArgument(nameArgument);
-            addCommand.AddOption(indexOption);
-            addCommand.AddOption(contentOption);
-            addCommand.AddOption(fileOption);
-            addCommand.AddOption(metadataOption);
-            addCommand.AddOption(labelOption);
-            addCommand.AddOption(customMetadataOption);
+            addCommand.Arguments.Add(nameArgument);
+            addCommand.Options.Add(indexOption);
+            addCommand.Options.Add(contentOption);
+            addCommand.Options.Add(fileOption);
+            addCommand.Options.Add(metadataOption);
+            addCommand.Options.Add(labelOption);
+            addCommand.Options.Add(customMetadataOption);
 
-            addCommand.SetHandler(async (string name, string? index, string? content, string? file, string[]? metadata, string[]? labels, string? customMetadata) =>
+            addCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string name = parseResult.GetValue(nameArgument)!;
+                string? index = parseResult.GetValue(indexOption);
+                string? content = parseResult.GetValue(contentOption);
+                string? file = parseResult.GetValue(fileOption);
+                string[]? metadata = parseResult.GetValue(metadataOption);
+                string[]? labels = parseResult.GetValue(labelOption);
+                string? customMetadata = parseResult.GetValue(customMetadataOption);
                 await HandleDocumentAddAsync(index, name, content, file, metadata, labels, customMetadata).ConfigureAwait(false);
-            }, nameArgument, indexOption, contentOption, fileOption, metadataOption, labelOption, customMetadataOption);
+            });
 
             return addCommand;
         }
@@ -108,22 +103,22 @@ namespace VerbexCli.Commands
         {
             Command removeCommand = new Command("remove", "Remove a document");
 
-            Argument<string> nameArgument = new Argument<string>("name", "Document name");
+            Argument<string> nameArgument = new Argument<string>("name") { Description = "Document name" };
 
-            Option<string> indexOption = new Option<string>(
-                aliases: new[] { "--index", "-i" },
-                description: "Index name (uses active index if not specified)")
+            Option<string> indexOption = new Option<string>("--index", "-i")
             {
-                IsRequired = false
+                Description = "Index name (uses active index if not specified)"
             };
 
-            removeCommand.AddArgument(nameArgument);
-            removeCommand.AddOption(indexOption);
+            removeCommand.Arguments.Add(nameArgument);
+            removeCommand.Options.Add(indexOption);
 
-            removeCommand.SetHandler(async (string name, string? index) =>
+            removeCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string name = parseResult.GetValue(nameArgument)!;
+                string? index = parseResult.GetValue(indexOption);
                 await HandleDocumentRemoveAsync(index, name).ConfigureAwait(false);
-            }, nameArgument, indexOption);
+            });
 
             return removeCommand;
         }
@@ -136,37 +131,34 @@ namespace VerbexCli.Commands
         {
             Command listCommand = new Command("ls", "List documents in an index");
 
-            Option<string> indexOption = new Option<string>(
-                aliases: new[] { "--index", "-i" },
-                description: "Index name (uses active index if not specified)")
+            Option<string> indexOption = new Option<string>("--index", "-i")
             {
-                IsRequired = false
+                Description = "Index name (uses active index if not specified)"
             };
 
-            Option<string[]> labelOption = new Option<string[]>(
-                aliases: new[] { "--label", "-L" },
-                description: "Filter by label (can be specified multiple times)")
+            Option<string[]> labelOption = new Option<string[]>("--label", "-L")
             {
-                IsRequired = false,
+                Description = "Filter by label (can be specified multiple times)",
                 AllowMultipleArgumentsPerToken = true
             };
 
-            Option<string[]> tagOption = new Option<string[]>(
-                aliases: new[] { "--tag", "-t" },
-                description: "Filter by tag in key=value format (can be specified multiple times)")
+            Option<string[]> tagOption = new Option<string[]>("--tag", "-t")
             {
-                IsRequired = false,
+                Description = "Filter by tag in key=value format (can be specified multiple times)",
                 AllowMultipleArgumentsPerToken = true
             };
 
-            listCommand.AddOption(indexOption);
-            listCommand.AddOption(labelOption);
-            listCommand.AddOption(tagOption);
+            listCommand.Options.Add(indexOption);
+            listCommand.Options.Add(labelOption);
+            listCommand.Options.Add(tagOption);
 
-            listCommand.SetHandler(async (string? index, string[]? labels, string[]? tags) =>
+            listCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string? index = parseResult.GetValue(indexOption);
+                string[]? labels = parseResult.GetValue(labelOption);
+                string[]? tags = parseResult.GetValue(tagOption);
                 await HandleDocumentListAsync(index, labels, tags).ConfigureAwait(false);
-            }, indexOption, labelOption, tagOption);
+            });
 
             return listCommand;
         }
@@ -179,27 +171,25 @@ namespace VerbexCli.Commands
         {
             Command clearCommand = new Command("clear", "Clear all documents from an index");
 
-            Option<string> indexOption = new Option<string>(
-                aliases: new[] { "--index", "-i" },
-                description: "Index name (uses active index if not specified)")
+            Option<string> indexOption = new Option<string>("--index", "-i")
             {
-                IsRequired = false
+                Description = "Index name (uses active index if not specified)"
             };
 
-            Option<bool> forceOption = new Option<bool>(
-                aliases: new[] { "--force" },
-                description: "Force clearing without confirmation")
+            Option<bool> forceOption = new Option<bool>("--force")
             {
-                IsRequired = false
+                Description = "Force clearing without confirmation"
             };
 
-            clearCommand.AddOption(indexOption);
-            clearCommand.AddOption(forceOption);
+            clearCommand.Options.Add(indexOption);
+            clearCommand.Options.Add(forceOption);
 
-            clearCommand.SetHandler(async (string? index, bool force) =>
+            clearCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string? index = parseResult.GetValue(indexOption);
+                bool force = parseResult.GetValue(forceOption);
                 await HandleDocumentClearAsync(index, force).ConfigureAwait(false);
-            }, indexOption, forceOption);
+            });
 
             return clearCommand;
         }

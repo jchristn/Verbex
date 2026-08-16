@@ -79,6 +79,7 @@ namespace Test.Shared
                 AddCoreSuite(suites, "Search Enrichment", suffix, mode, SearchEnrichmentTests.RunAllAsync);
             }
 
+            AddSuite(suites, "Argument Validation", StorageMode.InMemory, NegativeValidationTests.RunAllAsync);
             AddSuite(suites, "Storage Mode", null, StorageModeTests.RunAllAsync);
             AddSuite(suites, "Database Driver", null, DatabaseDriverTests.RunAllAsync);
             AddSuite(suites, "Request History Service", null, RequestHistoryServiceTests.RunAllAsync);

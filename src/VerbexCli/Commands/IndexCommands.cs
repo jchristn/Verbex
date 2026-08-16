@@ -3,7 +3,6 @@ namespace VerbexCli.Commands
     using System;
     using System.Collections.Generic;
     using System.CommandLine;
-    using System.CommandLine.Invocation;
     using System.IO;
     using System.Linq;
     using System.Text.Json;
@@ -24,12 +23,12 @@ namespace VerbexCli.Commands
             Command indexCommand = new Command("index", "Manage Verbex indices");
 
             // Add subcommands
-            indexCommand.AddCommand(CreateIndexCreateCommand());
-            indexCommand.AddCommand(CreateIndexListCommand());
-            indexCommand.AddCommand(CreateIndexUseCommand());
-            indexCommand.AddCommand(CreateIndexDeleteCommand());
-            indexCommand.AddCommand(CreateIndexInfoCommand());
-            indexCommand.AddCommand(CreateIndexExportCommand());
+            indexCommand.Subcommands.Add(CreateIndexCreateCommand());
+            indexCommand.Subcommands.Add(CreateIndexListCommand());
+            indexCommand.Subcommands.Add(CreateIndexUseCommand());
+            indexCommand.Subcommands.Add(CreateIndexDeleteCommand());
+            indexCommand.Subcommands.Add(CreateIndexInfoCommand());
+            indexCommand.Subcommands.Add(CreateIndexExportCommand());
 
             return indexCommand;
         }
@@ -42,88 +41,72 @@ namespace VerbexCli.Commands
         {
             Command createCommand = new Command("create", "Create a new index");
 
-            Argument<string> nameArgument = new Argument<string>("name", "Name of the index to create");
+            Argument<string> nameArgument = new Argument<string>("name") { Description = "Name of the index to create" };
 
-            Option<string> storageOption = new Option<string>(
-                aliases: new[] { "--storage", "-s" },
-                description: "Storage mode (memory, disk, hybrid)")
+            Option<string> storageOption = new Option<string>("--storage", "-s")
             {
-                IsRequired = false
+                Description = "Storage mode (memory, disk, hybrid)"
             };
-            storageOption.SetDefaultValue("memory");
+            storageOption.DefaultValueFactory = _ => "memory";
 
-            Option<bool> lemmatizerOption = new Option<bool>(
-                aliases: new[] { "--lemmatizer", "-l" },
-                description: "Enable lemmatization")
+            Option<bool> lemmatizerOption = new Option<bool>("--lemmatizer", "-l")
             {
-                IsRequired = false
+                Description = "Enable lemmatization"
             };
 
-            Option<bool> stopWordsOption = new Option<bool>(
-                aliases: new[] { "--stopwords", "-w" },
-                description: "Enable stop word removal")
+            Option<bool> stopWordsOption = new Option<bool>("--stopwords", "-w")
             {
-                IsRequired = false
+                Description = "Enable stop word removal"
             };
 
-            Option<int> minLengthOption = new Option<int>(
-                aliases: new[] { "--min-length" },
-                description: "Minimum token length")
+            Option<int> minLengthOption = new Option<int>("--min-length")
             {
-                IsRequired = false
+                Description = "Minimum token length"
             };
 
-            Option<int> maxLengthOption = new Option<int>(
-                aliases: new[] { "--max-length" },
-                description: "Maximum token length")
+            Option<int> maxLengthOption = new Option<int>("--max-length")
             {
-                IsRequired = false
+                Description = "Maximum token length"
             };
 
-            Option<string[]> tagOption = new Option<string[]>(
-                aliases: new[] { "--tag", "-t" },
-                description: "Tags in key=value format (repeatable)")
+            Option<string[]> tagOption = new Option<string[]>("--tag", "-t")
             {
-                IsRequired = false,
+                Description = "Tags in key=value format (repeatable)",
                 AllowMultipleArgumentsPerToken = true
             };
 
-            Option<string[]> labelOption = new Option<string[]>(
-                aliases: new[] { "--label", "-L" },
-                description: "Labels to associate with the index (repeatable)")
+            Option<string[]> labelOption = new Option<string[]>("--label", "-L")
             {
-                IsRequired = false,
+                Description = "Labels to associate with the index (repeatable)",
                 AllowMultipleArgumentsPerToken = true
             };
 
-            Option<string> customMetadataOption = new Option<string>(
-                aliases: new[] { "--custom-metadata", "-M" },
-                description: "Custom metadata as a JSON string (e.g., '{\"environment\": \"production\"}')")
+            Option<string> customMetadataOption = new Option<string>("--custom-metadata", "-M")
             {
-                IsRequired = false
+                Description = "Custom metadata as a JSON string (e.g., '{\"environment\": \"production\"}')"
             };
 
-            createCommand.AddArgument(nameArgument);
-            createCommand.AddOption(storageOption);
-            createCommand.AddOption(lemmatizerOption);
-            createCommand.AddOption(stopWordsOption);
-            createCommand.AddOption(minLengthOption);
-            createCommand.AddOption(maxLengthOption);
-            createCommand.AddOption(tagOption);
-            createCommand.AddOption(labelOption);
-            createCommand.AddOption(customMetadataOption);
+            createCommand.Arguments.Add(nameArgument);
+            createCommand.Options.Add(storageOption);
+            createCommand.Options.Add(lemmatizerOption);
+            createCommand.Options.Add(stopWordsOption);
+            createCommand.Options.Add(minLengthOption);
+            createCommand.Options.Add(maxLengthOption);
+            createCommand.Options.Add(tagOption);
+            createCommand.Options.Add(labelOption);
+            createCommand.Options.Add(customMetadataOption);
 
-            createCommand.SetHandler(async (InvocationContext context) =>
+            createCommand.SetAction(async (ParseResult parseResult) =>
             {
-                string name = context.ParseResult.GetValueForArgument(nameArgument);
-                string storage = context.ParseResult.GetValueForOption(storageOption) ?? "memory";
-                bool lemmatizer = context.ParseResult.GetValueForOption(lemmatizerOption);
-                bool stopWords = context.ParseResult.GetValueForOption(stopWordsOption);
-                int minLength = context.ParseResult.GetValueForOption(minLengthOption);
-                int maxLength = context.ParseResult.GetValueForOption(maxLengthOption);
-                string[]? tags = context.ParseResult.GetValueForOption(tagOption);
-                string[]? labels = context.ParseResult.GetValueForOption(labelOption);
-                string? customMetadata = context.ParseResult.GetValueForOption(customMetadataOption);
+                string name = parseResult.GetValue(nameArgument)!;
+                string storage = parseResult.GetValue(storageOption) ?? "memory";
+                bool lemmatizer = parseResult.GetValue(lemmatizerOption);
+                bool stopWords = parseResult.GetValue(stopWordsOption);
+                int minLength = parseResult.GetValue(minLengthOption);
+                int maxLength = parseResult.GetValue(maxLengthOption);
+                string[]? tags = parseResult.GetValue(tagOption);
+                string[]? labels = parseResult.GetValue(labelOption);
+                string? customMetadata = parseResult.GetValue(customMetadataOption);
 
                 await HandleIndexCreateAsync(name, storage, lemmatizer, stopWords, minLength, maxLength, tags, labels, customMetadata).ConfigureAwait(false);
             });
@@ -139,7 +122,7 @@ namespace VerbexCli.Commands
         {
             Command listCommand = new Command("ls", "List all available indices");
 
-            listCommand.SetHandler(async () =>
+            listCommand.SetAction(async (ParseResult parseResult) =>
             {
                 await HandleIndexListAsync().ConfigureAwait(false);
             });
@@ -155,13 +138,14 @@ namespace VerbexCli.Commands
         {
             Command useCommand = new Command("use", "Switch to a different index");
 
-            Argument<string> nameArgument = new Argument<string>("name", "Name of the index to use");
-            useCommand.AddArgument(nameArgument);
+            Argument<string> nameArgument = new Argument<string>("name") { Description = "Name of the index to use" };
+            useCommand.Arguments.Add(nameArgument);
 
-            useCommand.SetHandler(async (string name) =>
+            useCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string name = parseResult.GetValue(nameArgument)!;
                 await HandleIndexUseAsync(name).ConfigureAwait(false);
-            }, nameArgument);
+            });
 
             return useCommand;
         }
@@ -174,22 +158,22 @@ namespace VerbexCli.Commands
         {
             Command deleteCommand = new Command("delete", "Delete an index");
 
-            Argument<string> nameArgument = new Argument<string>("name", "Name of the index to delete");
+            Argument<string> nameArgument = new Argument<string>("name") { Description = "Name of the index to delete" };
 
-            Option<bool> forceOption = new Option<bool>(
-                aliases: new[] { "--force", "-f" },
-                description: "Force deletion without confirmation")
+            Option<bool> forceOption = new Option<bool>("--force", "-f")
             {
-                IsRequired = false
+                Description = "Force deletion without confirmation"
             };
 
-            deleteCommand.AddArgument(nameArgument);
-            deleteCommand.AddOption(forceOption);
+            deleteCommand.Arguments.Add(nameArgument);
+            deleteCommand.Options.Add(forceOption);
 
-            deleteCommand.SetHandler(async (string name, bool force) =>
+            deleteCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string name = parseResult.GetValue(nameArgument)!;
+                bool force = parseResult.GetValue(forceOption);
                 await HandleIndexDeleteAsync(name, force).ConfigureAwait(false);
-            }, nameArgument, forceOption);
+            });
 
             return deleteCommand;
         }
@@ -202,17 +186,19 @@ namespace VerbexCli.Commands
         {
             Command infoCommand = new Command("info", "Show information about an index");
 
-            Argument<string> nameArgument = new Argument<string>("name", "Name of the index (optional - shows current if not specified)")
+            Argument<string> nameArgument = new Argument<string>("name")
             {
+                Description = "Name of the index (optional - shows current if not specified)",
                 Arity = ArgumentArity.ZeroOrOne
             };
 
-            infoCommand.AddArgument(nameArgument);
+            infoCommand.Arguments.Add(nameArgument);
 
-            infoCommand.SetHandler(async (string? name) =>
+            infoCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string? name = parseResult.GetValue(nameArgument);
                 await HandleIndexInfoAsync(name).ConfigureAwait(false);
-            }, nameArgument);
+            });
 
             return infoCommand;
         }
@@ -225,16 +211,18 @@ namespace VerbexCli.Commands
         {
             Command exportCommand = new Command("export", "Export index data to a file");
 
-            Argument<string> nameArgument = new Argument<string>("name", "Name of the index to export");
-            Argument<string> fileArgument = new Argument<string>("file", "Output file path");
+            Argument<string> nameArgument = new Argument<string>("name") { Description = "Name of the index to export" };
+            Argument<string> fileArgument = new Argument<string>("file") { Description = "Output file path" };
 
-            exportCommand.AddArgument(nameArgument);
-            exportCommand.AddArgument(fileArgument);
+            exportCommand.Arguments.Add(nameArgument);
+            exportCommand.Arguments.Add(fileArgument);
 
-            exportCommand.SetHandler(async (string name, string file) =>
+            exportCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string name = parseResult.GetValue(nameArgument)!;
+                string file = parseResult.GetValue(fileArgument)!;
                 await HandleIndexExportAsync(name, file).ConfigureAwait(false);
-            }, nameArgument, fileArgument);
+            });
 
             return exportCommand;
         }

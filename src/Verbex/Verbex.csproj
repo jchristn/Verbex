@@ -4,7 +4,7 @@
 		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<Version>0.1.10</Version>
+		<Version>0.2.0</Version>
 		<ApplicationIcon>logo.ico</ApplicationIcon>
 		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 		<DocumentationFile>$(OutputPath)Verbex.xml</DocumentationFile>
@@ -45,12 +45,12 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Caching" Version="5.0.0" />
-		<PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.1" />
-		<PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.1" />
-		<PackageReference Include="MySqlConnector" Version="2.4.0" />
-		<PackageReference Include="Npgsql" Version="9.0.3" />
-		<PackageReference Include="PrettyId" Version="2.0.0" />
+		<PackageReference Include="Caching" Version="5.0.1" />
+		<PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.11" />
+		<PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+		<PackageReference Include="MySqlConnector" Version="2.6.2" />
+		<PackageReference Include="Npgsql" Version="10.0.3" />
+		<PackageReference Include="PrettyId" Version="2.0.1" />
 	</ItemGroup>
 
 </Project>

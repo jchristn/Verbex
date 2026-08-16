@@ -18,35 +18,32 @@ namespace VerbexCli.Commands
         {
             Command statsCommand = new Command("stats", "Show statistics for an index");
 
-            Option<string> indexOption = new Option<string>(
-                aliases: new[] { "--index", "-i" },
-                description: "Index name (uses active index if not specified)")
+            Option<string> indexOption = new Option<string>("--index", "-i")
             {
-                IsRequired = false
+                Description = "Index name (uses active index if not specified)"
             };
 
-            Option<string> termOption = new Option<string>(
-                aliases: new[] { "--term", "-t" },
-                description: "Show statistics for a specific term")
+            Option<string> termOption = new Option<string>("--term", "-t")
             {
-                IsRequired = false
+                Description = "Show statistics for a specific term"
             };
 
-            Option<bool> cacheOption = new Option<bool>(
-                aliases: new[] { "--cache", "-c" },
-                description: "Show cache statistics")
+            Option<bool> cacheOption = new Option<bool>("--cache", "-c")
             {
-                IsRequired = false
+                Description = "Show cache statistics"
             };
 
-            statsCommand.AddOption(indexOption);
-            statsCommand.AddOption(termOption);
-            statsCommand.AddOption(cacheOption);
+            statsCommand.Options.Add(indexOption);
+            statsCommand.Options.Add(termOption);
+            statsCommand.Options.Add(cacheOption);
 
-            statsCommand.SetHandler(async (string? index, string? term, bool cache) =>
+            statsCommand.SetAction(async (ParseResult parseResult) =>
             {
+                string? index = parseResult.GetValue(indexOption);
+                string? term = parseResult.GetValue(termOption);
+                bool cache = parseResult.GetValue(cacheOption);
                 await HandleStatsAsync(index, term, cache).ConfigureAwait(false);
-            }, indexOption, termOption, cacheOption);
+            });
 
             return statsCommand;
         }

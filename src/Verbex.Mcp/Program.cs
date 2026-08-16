@@ -6,7 +6,8 @@ namespace Verbex.Mcp
     using System.Threading;
     using System.Threading.Tasks;
     using Verbex.Models;
-    using Voltaic;
+    using Voltaic.Core;
+    using Voltaic.Mcp;
 
     /// <summary>
     /// Verbex MCP Server - Exposes InvertedIndex as MCP tools for RAG applications.
@@ -359,7 +360,7 @@ namespace Verbex.Mcp
 
         #region Tool Handlers
 
-        private static object SearchHandler(JsonElement? args)
+        private static object SearchHandler(RpcParameters args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
             string query = GetString(args, "query", "");
@@ -434,7 +435,7 @@ namespace Verbex.Mcp
             });
         }
 
-        private static object AddDocumentHandler(JsonElement? args)
+        private static object AddDocumentHandler(RpcParameters args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
             string name = GetString(args, "name", "");
@@ -464,7 +465,7 @@ namespace Verbex.Mcp
             });
         }
 
-        private static object GetDocumentHandler(JsonElement? args)
+        private static object GetDocumentHandler(RpcParameters args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
             string documentId = GetString(args, "documentId", "");
@@ -491,7 +492,7 @@ namespace Verbex.Mcp
             });
         }
 
-        private static object ListDocumentsHandler(JsonElement? args)
+        private static object ListDocumentsHandler(RpcParameters args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
             int limit = GetInt(args, "limit", 100);
@@ -513,7 +514,7 @@ namespace Verbex.Mcp
             });
         }
 
-        private static object DeleteDocumentHandler(JsonElement? args)
+        private static object DeleteDocumentHandler(RpcParameters args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
             string documentId = GetString(args, "documentId", "");
@@ -527,7 +528,7 @@ namespace Verbex.Mcp
             return ToJson(new { success = removed });
         }
 
-        private static object StatisticsHandler(JsonElement? args)
+        private static object StatisticsHandler(RpcParameters args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
 
@@ -547,7 +548,7 @@ namespace Verbex.Mcp
             });
         }
 
-        private static object ListIndicesHandler(JsonElement? args)
+        private static object ListIndicesHandler(RpcParameters args)
         {
             List<string> indices = _Indices.Keys.ToList();
 
@@ -564,7 +565,7 @@ namespace Verbex.Mcp
             return ToJson(new { indices = indices });
         }
 
-        private static object CreateIndexHandler(JsonElement? args)
+        private static object CreateIndexHandler(RpcParameters args)
         {
             string name = GetString(args, "name", "");
             bool inMemory = GetBool(args, "inMemory", false);
@@ -611,7 +612,7 @@ namespace Verbex.Mcp
             });
         }
 
-        private static object DeleteIndexHandler(JsonElement? args)
+        private static object DeleteIndexHandler(RpcParameters args)
         {
             string name = GetString(args, "name", "");
 
@@ -652,7 +653,7 @@ namespace Verbex.Mcp
             return ToJson(new { success = true });
         }
 
-        private static object AddLabelsHandler(JsonElement? args)
+        private static object AddLabelsHandler(RpcParameters args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
             string documentId = GetString(args, "documentId", "");
@@ -669,7 +670,7 @@ namespace Verbex.Mcp
             return ToJson(new { success = true });
         }
 
-        private static object AddTagsHandler(JsonElement? args)
+        private static object AddTagsHandler(RpcParameters args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
             string documentId = GetString(args, "documentId", "");
@@ -686,7 +687,7 @@ namespace Verbex.Mcp
             return ToJson(new { success = true });
         }
 
-        private static object IndexExistsHandler(JsonElement? args)
+        private static object IndexExistsHandler(RpcParameters args)
         {
             string name = GetString(args, "name", "");
 
@@ -705,7 +706,7 @@ namespace Verbex.Mcp
             return ToJson(new { exists = exists, indexName = name });
         }
 
-        private static object DocumentExistsHandler(JsonElement? args)
+        private static object DocumentExistsHandler(RpcParameters args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
             string documentId = GetString(args, "documentId", "");
@@ -765,23 +766,42 @@ namespace Verbex.Mcp
             _Indices.Clear();
         }
 
-        private static string GetString(JsonElement? args, string property, string defaultValue)
+        private static JsonElement? ToElement(RpcParameters args)
         {
-            if (args.HasValue && args.Value.TryGetProperty(property, out JsonElement prop) && prop.ValueKind == JsonValueKind.String)
+            if (args != null && args.HasValue && !string.IsNullOrEmpty(args.RawJson))
+            {
+                try
+                {
+                    return JsonSerializer.Deserialize<JsonElement>(args.RawJson);
+                }
+                catch (JsonException)
+                {
+                    return null;
+                }
+            }
+            return null;
+        }
+
+        private static string GetString(RpcParameters args, string property, string defaultValue)
+        {
+            JsonElement? root = ToElement(args);
+            if (root.HasValue && root.Value.TryGetProperty(property, out JsonElement prop) && prop.ValueKind == JsonValueKind.String)
                 return prop.GetString() ?? defaultValue;
             return defaultValue;
         }
 
-        private static int GetInt(JsonElement? args, string property, int defaultValue)
+        private static int GetInt(RpcParameters args, string property, int defaultValue)
         {
-            if (args.HasValue && args.Value.TryGetProperty(property, out JsonElement prop) && prop.ValueKind == JsonValueKind.Number)
+            JsonElement? root = ToElement(args);
+            if (root.HasValue && root.Value.TryGetProperty(property, out JsonElement prop) && prop.ValueKind == JsonValueKind.Number)
                 return prop.GetInt32();
             return defaultValue;
         }
 
-        private static bool GetBool(JsonElement? args, string property, bool defaultValue)
+        private static bool GetBool(RpcParameters args, string property, bool defaultValue)
         {
-            if (args.HasValue && args.Value.TryGetProperty(property, out JsonElement prop))
+            JsonElement? root = ToElement(args);
+            if (root.HasValue && root.Value.TryGetProperty(property, out JsonElement prop))
             {
                 if (prop.ValueKind == JsonValueKind.True) return true;
                 if (prop.ValueKind == JsonValueKind.False) return false;
@@ -789,9 +809,10 @@ namespace Verbex.Mcp
             return defaultValue;
         }
 
-        private static List<string>? GetStringList(JsonElement? args, string property)
+        private static List<string>? GetStringList(RpcParameters args, string property)
         {
-            if (args.HasValue && args.Value.TryGetProperty(property, out JsonElement prop) && prop.ValueKind == JsonValueKind.Array)
+            JsonElement? root = ToElement(args);
+            if (root.HasValue && root.Value.TryGetProperty(property, out JsonElement prop) && prop.ValueKind == JsonValueKind.Array)
             {
                 List<string> result = new List<string>();
                 foreach (JsonElement item in prop.EnumerateArray())
@@ -804,9 +825,10 @@ namespace Verbex.Mcp
             return null;
         }
 
-        private static Dictionary<string, string>? GetStringDict(JsonElement? args, string property)
+        private static Dictionary<string, string>? GetStringDict(RpcParameters args, string property)
         {
-            if (args.HasValue && args.Value.TryGetProperty(property, out JsonElement prop) && prop.ValueKind == JsonValueKind.Object)
+            JsonElement? root = ToElement(args);
+            if (root.HasValue && root.Value.TryGetProperty(property, out JsonElement prop) && prop.ValueKind == JsonValueKind.Object)
             {
                 Dictionary<string, string> result = new Dictionary<string, string>();
                 foreach (JsonProperty item in prop.EnumerateObject())
