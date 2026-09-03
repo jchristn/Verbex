@@ -9,7 +9,8 @@ function Sidebar({ activeView, onViewChange, indices, isAdmin }) {
     { id: 'documents', label: 'Documents', icon: '\uD83D\uDCC4', tourId: 'nav-documents' },
     { id: 'search', label: 'Search', icon: '\uD83D\uDD0D', tourId: 'nav-search' },
     { id: 'apiExplorer', label: 'API Explorer', icon: '\uD83E\uDDEA', tourId: 'nav-api-explorer' },
-    { id: 'requestHistory', label: 'Request History', icon: '\uD83D\uDD52', tourId: 'nav-request-history' }
+    { id: 'requestHistory', label: 'Request History', icon: '\uD83D\uDD52', tourId: 'nav-request-history' },
+    { id: 'observability', label: 'Observability', icon: '\uD83D\uDCC8', tourId: 'nav-observability' }
   ];
 
   const adminItems = [

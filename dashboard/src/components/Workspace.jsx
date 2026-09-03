@@ -6,6 +6,7 @@ import UsersView from './UsersView';
 import CredentialsView from './CredentialsView';
 import ApiExplorerView from './ApiExplorerView';
 import RequestHistoryView from './RequestHistoryView';
+import ObservabilityView from './ObservabilityView';
 import './Workspace.css';
 
 function Workspace({
@@ -54,6 +55,8 @@ function Workspace({
         return <ApiExplorerView />;
       case 'requestHistory':
         return <RequestHistoryView />;
+      case 'observability':
+        return <ObservabilityView />;
       case 'tenants':
         return (
           <TenantsView

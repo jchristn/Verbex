@@ -54,6 +54,17 @@ namespace Verbex.Mcp
 
             Directory.CreateDirectory(_StorageDirectory);
 
+            // Initialize telemetry (metrics, traces, logs) pushed over OTLP. Controlled by environment:
+            //   VERBEX_TELEMETRY_ENABLE (default true), VERBEX_OTLP_ENDPOINT (default http://localhost:4317),
+            //   VERBEX_OTLP_PROTOCOL (grpc|httpprotobuf, default grpc).
+            string? telemetryEnv = Environment.GetEnvironmentVariable("VERBEX_TELEMETRY_ENABLE");
+            bool telemetryEnable = true;
+            if (!string.IsNullOrEmpty(telemetryEnv) && bool.TryParse(telemetryEnv, out bool telemetryParsed))
+                telemetryEnable = telemetryParsed;
+            string otlpEndpoint = Environment.GetEnvironmentVariable("VERBEX_OTLP_ENDPOINT") ?? "http://localhost:4317";
+            string otlpProtocol = Environment.GetEnvironmentVariable("VERBEX_OTLP_PROTOCOL") ?? "grpc";
+            McpTelemetry.Start(telemetryEnable, otlpEndpoint, otlpProtocol);
+
             CancellationTokenSource cts = new CancellationTokenSource();
             Console.CancelKeyPress += (s, e) =>
             {
@@ -80,6 +91,9 @@ namespace Verbex.Mcp
             }
 
             await CleanupIndicesAsync().ConfigureAwait(false);
+
+            McpTelemetry.Flush();
+            McpTelemetry.Shutdown();
         }
 
         private static async Task RunStdioServerAsync(CancellationToken token)
@@ -121,36 +135,36 @@ namespace Verbex.Mcp
 
         private static void RegisterAllTools(McpServer server)
         {
-            server.RegisterMethod("verbex_search", SearchHandler);
-            server.RegisterMethod("verbex_add_document", AddDocumentHandler);
-            server.RegisterMethod("verbex_get_document", GetDocumentHandler);
-            server.RegisterMethod("verbex_list_documents", ListDocumentsHandler);
-            server.RegisterMethod("verbex_delete_document", DeleteDocumentHandler);
-            server.RegisterMethod("verbex_statistics", StatisticsHandler);
-            server.RegisterMethod("verbex_list_indices", ListIndicesHandler);
-            server.RegisterMethod("verbex_create_index", CreateIndexHandler);
-            server.RegisterMethod("verbex_delete_index", DeleteIndexHandler);
-            server.RegisterMethod("verbex_add_labels", AddLabelsHandler);
-            server.RegisterMethod("verbex_add_tags", AddTagsHandler);
-            server.RegisterMethod("verbex_index_exists", IndexExistsHandler);
-            server.RegisterMethod("verbex_document_exists", DocumentExistsHandler);
+            server.RegisterMethod("verbex_search", (a) => McpTelemetry.Invoke("verbex_search", a, SearchHandler));
+            server.RegisterMethod("verbex_add_document", (a) => McpTelemetry.Invoke("verbex_add_document", a, AddDocumentHandler));
+            server.RegisterMethod("verbex_get_document", (a) => McpTelemetry.Invoke("verbex_get_document", a, GetDocumentHandler));
+            server.RegisterMethod("verbex_list_documents", (a) => McpTelemetry.Invoke("verbex_list_documents", a, ListDocumentsHandler));
+            server.RegisterMethod("verbex_delete_document", (a) => McpTelemetry.Invoke("verbex_delete_document", a, DeleteDocumentHandler));
+            server.RegisterMethod("verbex_statistics", (a) => McpTelemetry.Invoke("verbex_statistics", a, StatisticsHandler));
+            server.RegisterMethod("verbex_list_indices", (a) => McpTelemetry.Invoke("verbex_list_indices", a, ListIndicesHandler));
+            server.RegisterMethod("verbex_create_index", (a) => McpTelemetry.Invoke("verbex_create_index", a, CreateIndexHandler));
+            server.RegisterMethod("verbex_delete_index", (a) => McpTelemetry.Invoke("verbex_delete_index", a, DeleteIndexHandler));
+            server.RegisterMethod("verbex_add_labels", (a) => McpTelemetry.Invoke("verbex_add_labels", a, AddLabelsHandler));
+            server.RegisterMethod("verbex_add_tags", (a) => McpTelemetry.Invoke("verbex_add_tags", a, AddTagsHandler));
+            server.RegisterMethod("verbex_index_exists", (a) => McpTelemetry.Invoke("verbex_index_exists", a, IndexExistsHandler));
+            server.RegisterMethod("verbex_document_exists", (a) => McpTelemetry.Invoke("verbex_document_exists", a, DocumentExistsHandler));
         }
 
         private static void RegisterAllTools(McpWebsocketsServer server)
         {
-            server.RegisterMethod("verbex_search", SearchHandler);
-            server.RegisterMethod("verbex_add_document", AddDocumentHandler);
-            server.RegisterMethod("verbex_get_document", GetDocumentHandler);
-            server.RegisterMethod("verbex_list_documents", ListDocumentsHandler);
-            server.RegisterMethod("verbex_delete_document", DeleteDocumentHandler);
-            server.RegisterMethod("verbex_statistics", StatisticsHandler);
-            server.RegisterMethod("verbex_list_indices", ListIndicesHandler);
-            server.RegisterMethod("verbex_create_index", CreateIndexHandler);
-            server.RegisterMethod("verbex_delete_index", DeleteIndexHandler);
-            server.RegisterMethod("verbex_add_labels", AddLabelsHandler);
-            server.RegisterMethod("verbex_add_tags", AddTagsHandler);
-            server.RegisterMethod("verbex_index_exists", IndexExistsHandler);
-            server.RegisterMethod("verbex_document_exists", DocumentExistsHandler);
+            server.RegisterMethod("verbex_search", (a) => McpTelemetry.Invoke("verbex_search", a, SearchHandler));
+            server.RegisterMethod("verbex_add_document", (a) => McpTelemetry.Invoke("verbex_add_document", a, AddDocumentHandler));
+            server.RegisterMethod("verbex_get_document", (a) => McpTelemetry.Invoke("verbex_get_document", a, GetDocumentHandler));
+            server.RegisterMethod("verbex_list_documents", (a) => McpTelemetry.Invoke("verbex_list_documents", a, ListDocumentsHandler));
+            server.RegisterMethod("verbex_delete_document", (a) => McpTelemetry.Invoke("verbex_delete_document", a, DeleteDocumentHandler));
+            server.RegisterMethod("verbex_statistics", (a) => McpTelemetry.Invoke("verbex_statistics", a, StatisticsHandler));
+            server.RegisterMethod("verbex_list_indices", (a) => McpTelemetry.Invoke("verbex_list_indices", a, ListIndicesHandler));
+            server.RegisterMethod("verbex_create_index", (a) => McpTelemetry.Invoke("verbex_create_index", a, CreateIndexHandler));
+            server.RegisterMethod("verbex_delete_index", (a) => McpTelemetry.Invoke("verbex_delete_index", a, DeleteIndexHandler));
+            server.RegisterMethod("verbex_add_labels", (a) => McpTelemetry.Invoke("verbex_add_labels", a, AddLabelsHandler));
+            server.RegisterMethod("verbex_add_tags", (a) => McpTelemetry.Invoke("verbex_add_tags", a, AddTagsHandler));
+            server.RegisterMethod("verbex_index_exists", (a) => McpTelemetry.Invoke("verbex_index_exists", a, IndexExistsHandler));
+            server.RegisterMethod("verbex_document_exists", (a) => McpTelemetry.Invoke("verbex_document_exists", a, DocumentExistsHandler));
         }
 
         private static void RegisterAllToolsHttp(McpHttpServer server)
@@ -175,7 +189,7 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "query" }
                 },
-                SearchHandler);
+                (a) => McpTelemetry.Invoke("verbex_search", a, SearchHandler));
 
             server.RegisterTool(
                 "verbex_add_document",
@@ -193,7 +207,7 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "name", "content" }
                 },
-                AddDocumentHandler);
+                (a) => McpTelemetry.Invoke("verbex_add_document", a, AddDocumentHandler));
 
             server.RegisterTool(
                 "verbex_get_document",
@@ -208,7 +222,7 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "documentId" }
                 },
-                GetDocumentHandler);
+                (a) => McpTelemetry.Invoke("verbex_get_document", a, GetDocumentHandler));
 
             server.RegisterTool(
                 "verbex_list_documents",
@@ -223,7 +237,7 @@ namespace Verbex.Mcp
                         offset = new { type = "integer", description = "Offset for pagination (default: 0)" }
                     }
                 },
-                ListDocumentsHandler);
+                (a) => McpTelemetry.Invoke("verbex_list_documents", a, ListDocumentsHandler));
 
             server.RegisterTool(
                 "verbex_delete_document",
@@ -238,7 +252,7 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "documentId" }
                 },
-                DeleteDocumentHandler);
+                (a) => McpTelemetry.Invoke("verbex_delete_document", a, DeleteDocumentHandler));
 
             server.RegisterTool(
                 "verbex_statistics",
@@ -251,7 +265,7 @@ namespace Verbex.Mcp
                         index = new { type = "string", description = "Index name (default: 'default')" }
                     }
                 },
-                StatisticsHandler);
+                (a) => McpTelemetry.Invoke("verbex_statistics", a, StatisticsHandler));
 
             server.RegisterTool(
                 "verbex_list_indices",
@@ -261,7 +275,7 @@ namespace Verbex.Mcp
                     type = "object",
                     properties = new { }
                 },
-                ListIndicesHandler);
+                (a) => McpTelemetry.Invoke("verbex_list_indices", a, ListIndicesHandler));
 
             server.RegisterTool(
                 "verbex_create_index",
@@ -280,7 +294,7 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "name" }
                 },
-                CreateIndexHandler);
+                (a) => McpTelemetry.Invoke("verbex_create_index", a, CreateIndexHandler));
 
             server.RegisterTool(
                 "verbex_delete_index",
@@ -294,7 +308,7 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "name" }
                 },
-                DeleteIndexHandler);
+                (a) => McpTelemetry.Invoke("verbex_delete_index", a, DeleteIndexHandler));
 
             server.RegisterTool(
                 "verbex_add_labels",
@@ -310,7 +324,7 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "documentId", "labels" }
                 },
-                AddLabelsHandler);
+                (a) => McpTelemetry.Invoke("verbex_add_labels", a, AddLabelsHandler));
 
             server.RegisterTool(
                 "verbex_add_tags",
@@ -326,7 +340,7 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "documentId", "tags" }
                 },
-                AddTagsHandler);
+                (a) => McpTelemetry.Invoke("verbex_add_tags", a, AddTagsHandler));
 
             server.RegisterTool(
                 "verbex_index_exists",
@@ -340,7 +354,7 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "name" }
                 },
-                IndexExistsHandler);
+                (a) => McpTelemetry.Invoke("verbex_index_exists", a, IndexExistsHandler));
 
             server.RegisterTool(
                 "verbex_document_exists",
@@ -355,7 +369,7 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "documentId" }
                 },
-                DocumentExistsHandler);
+                (a) => McpTelemetry.Invoke("verbex_document_exists", a, DocumentExistsHandler));
         }
 
         #region Tool Handlers

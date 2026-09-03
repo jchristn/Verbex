@@ -4,7 +4,7 @@
 		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<Version>0.2.0</Version>
+		<Version>0.2.1</Version>
 		<ApplicationIcon>logo.ico</ApplicationIcon>
 		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 		<DocumentationFile>$(OutputPath)Verbex.xml</DocumentationFile>
@@ -17,7 +17,7 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<RepositoryUrl>https://github.com/jchristn/verbex</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
-		<PackageReleaseNotes>Verbex is in ALPHA.</PackageReleaseNotes>
+		<PackageReleaseNotes>Verbex is in ALPHA. 0.2.1 adds built-in OpenTelemetry-based metrics and tracing (System.Diagnostics.Metrics Meter and ActivitySource named "Verbex.Core") covering indexing, search, and batch operations.</PackageReleaseNotes>
 		<PackageLicenseFile>LICENSE.md</PackageLicenseFile>
 		<PackageTags>search;fulltext;full-text-search;text-search;inverted-index;index;indexing;tf-idf;lucene;elasticsearch;solr;sqlite;tokenization;lemmatization;document-search;search-engine;information-retrieval;stopwords</PackageTags>
 		<IncludeSymbols>True</IncludeSymbols>

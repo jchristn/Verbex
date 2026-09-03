@@ -131,6 +131,22 @@ namespace Verbex.Server.Classes
             }
         }
 
+        /// <summary>
+        /// Telemetry (metrics, traces, logs) settings.
+        /// </summary>
+        public TelemetrySettings Telemetry
+        {
+            get
+            {
+                return _Telemetry;
+            }
+            set
+            {
+                if (value == null) _Telemetry = new TelemetrySettings();
+                else _Telemetry = value;
+            }
+        }
+
         #endregion
 
         #region Private-Members
@@ -142,6 +158,7 @@ namespace Verbex.Server.Classes
         private string _AdminBearerToken = "verbexadmin";
         private RequestHistorySettings _RequestHistory = new RequestHistorySettings();
         private DebugSettings _Debug = new DebugSettings();
+        private TelemetrySettings _Telemetry = new TelemetrySettings();
 
         #endregion
 

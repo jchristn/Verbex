@@ -29,6 +29,7 @@ namespace Verbex.Server
         private static IndexManager? _IndexManager = null;
         private static RestServiceHandler? _RestService = null;
         private static LoggingModule? _Logging = null;
+        private static ServerTelemetry? _Telemetry = null;
 
         #endregion
 
@@ -78,6 +79,13 @@ namespace Verbex.Server
                 if (_IndexManager != null)
                 {
                     await _IndexManager.DisposeAllAsync().ConfigureAwait(false);
+                }
+
+                if (_Telemetry != null)
+                {
+                    _Logging?.Info(_Header + "flushing telemetry...");
+                    _Telemetry.Flush();
+                    _Telemetry.Dispose();
                 }
 
                 _Logging?.Info(_Header + "stopped at " + DateTime.UtcNow);
@@ -145,6 +153,40 @@ namespace Verbex.Server
             {
                 _Settings.Rest.Port = portInt;
             }
+
+            // Telemetry environment overrides (useful in containers)
+            string? telemetryEnable = Environment.GetEnvironmentVariable("VERBEX_TELEMETRY_ENABLE");
+            if (!String.IsNullOrEmpty(telemetryEnable) && Boolean.TryParse(telemetryEnable, out bool telemetryEnableBool))
+            {
+                _Settings.Telemetry.Enable = telemetryEnableBool;
+            }
+
+            string? otlpEndpoint = Environment.GetEnvironmentVariable("VERBEX_OTLP_ENDPOINT");
+            if (!String.IsNullOrEmpty(otlpEndpoint)) _Settings.Telemetry.Otlp.Endpoint = otlpEndpoint;
+
+            string? otlpProtocol = Environment.GetEnvironmentVariable("VERBEX_OTLP_PROTOCOL");
+            if (!String.IsNullOrEmpty(otlpProtocol)) _Settings.Telemetry.Otlp.Protocol = otlpProtocol;
+
+            string? otlpEnable = Environment.GetEnvironmentVariable("VERBEX_OTLP_ENABLE");
+            if (!String.IsNullOrEmpty(otlpEnable) && Boolean.TryParse(otlpEnable, out bool otlpEnableBool))
+            {
+                _Settings.Telemetry.Otlp.Enable = otlpEnableBool;
+            }
+
+            string? promEnable = Environment.GetEnvironmentVariable("VERBEX_PROMETHEUS_ENABLE");
+            if (!String.IsNullOrEmpty(promEnable) && Boolean.TryParse(promEnable, out bool promEnableBool))
+            {
+                _Settings.Telemetry.Prometheus.Enable = promEnableBool;
+            }
+
+            string? promHostname = Environment.GetEnvironmentVariable("VERBEX_PROMETHEUS_HOSTNAME");
+            if (!String.IsNullOrEmpty(promHostname)) _Settings.Telemetry.Prometheus.Hostname = promHostname;
+
+            string? promPort = Environment.GetEnvironmentVariable("VERBEX_PROMETHEUS_PORT");
+            if (!String.IsNullOrEmpty(promPort) && Int32.TryParse(promPort, out int promPortInt))
+            {
+                _Settings.Telemetry.Prometheus.Port = promPortInt;
+            }
         }
 
         /// <summary>
@@ -200,13 +242,27 @@ namespace Verbex.Server
         {
             if (_Settings == null) throw new InvalidOperationException("Settings must be initialized before globals");
 
+            // Initialize telemetry pipeline (metrics, traces, logs) before other subsystems so their
+            // instrumentation is collected from the first request.
+            _Telemetry = ServerTelemetry.Start(_Settings.Telemetry);
+            if (_Telemetry.Enabled)
+            {
+                _Logging?.Info(_Header + "telemetry enabled (OTLP="
+                    + _Settings.Telemetry.Otlp.Enable + " endpoint=" + _Settings.Telemetry.Otlp.Endpoint
+                    + ", Prometheus=" + (_Telemetry.PrometheusScrapeUrl ?? "disabled") + ")");
+            }
+            else
+            {
+                _Logging?.Info(_Header + "telemetry disabled");
+            }
+
             // Initialize database driver
             _Database = await DatabaseDriverFactory.CreateAndInitializeAsync(_Settings.Database).ConfigureAwait(false);
             _Logging?.Info(_Header + "database driver initialized (" + _Settings.Database.Type + ")");
 
             _Authentication = new AuthenticationService(_Settings.AdminBearerToken, _Database);
             _IndexManager = new IndexManager(_Database, _Logging);
-            _RestService = new RestServiceHandler(_Settings, _Authentication, _IndexManager, _Database, _Logging!);
+            _RestService = new RestServiceHandler(_Settings, _Authentication, _IndexManager, _Database, _Logging!, _Telemetry);
         }
 
         /// <summary>

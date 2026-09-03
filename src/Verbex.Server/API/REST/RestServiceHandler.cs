@@ -1,5 +1,6 @@
 namespace Verbex.Server.API.REST
 {
+    using Radiant;
     using SyslogLogging;
     using System;
     using System.Collections.Concurrent;
@@ -56,6 +57,7 @@ namespace Verbex.Server.API.REST
         private Webserver? _Webserver = null;
         private BackupService? _BackupService = null;
         private RequestHistoryService? _RequestHistory = null;
+        private ServerTelemetry? _Telemetry = null;
         private readonly ConditionalWeakTable<HttpContextBase, RequestHistoryCaptureContext> _RequestHistoryContexts = new ConditionalWeakTable<HttpContextBase, RequestHistoryCaptureContext>();
         private readonly ConcurrentDictionary<string, RequestTimingContext> _RequestTimingContexts = new ConcurrentDictionary<string, RequestTimingContext>();
         private readonly string _Header = "[RestServiceHandler] ";
@@ -72,14 +74,16 @@ namespace Verbex.Server.API.REST
         /// <param name="indexManager">Index manager.</param>
         /// <param name="database">Database driver for multi-tenant operations.</param>
         /// <param name="logging">Logging module.</param>
+        /// <param name="telemetry">Server telemetry pipeline used to record HTTP metrics and spans.</param>
         /// <exception cref="ArgumentNullException">Thrown when required parameter is null.</exception>
-        public RestServiceHandler(Settings settings, AuthenticationService auth, IndexManager indexManager, DatabaseDriverBase database, LoggingModule logging)
+        public RestServiceHandler(Settings settings, AuthenticationService auth, IndexManager indexManager, DatabaseDriverBase database, LoggingModule logging, ServerTelemetry telemetry)
         {
             _Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _Auth = auth ?? throw new ArgumentNullException(nameof(auth));
             _IndexManager = indexManager ?? throw new ArgumentNullException(nameof(indexManager));
             _Database = database ?? throw new ArgumentNullException(nameof(database));
             _Logging = logging ?? throw new ArgumentNullException(nameof(logging));
+            _Telemetry = telemetry ?? throw new ArgumentNullException(nameof(telemetry));
 
             // Initialize backup service
             _BackupService = new BackupService(indexManager, settings.DataDirectory, logging);
@@ -925,6 +929,10 @@ namespace Verbex.Server.API.REST
 
             try
             {
+                // Record HTTP telemetry for every routed request (including HEAD and 404s) so
+                // coverage is complete regardless of whether request history is persisted.
+                RecordHttpMetrics(ctx, durationMs);
+
                 _Logging.Debug(
                     _Header
                     + ctx.Request.Method + " " + ctx.Request.Url.RawWithQuery + " "
@@ -943,6 +951,37 @@ namespace Verbex.Server.API.REST
             finally
             {
                 RemoveRequestTiming(ctx);
+            }
+        }
+
+        /// <summary>
+        /// Record HTTP server metrics (duration, count, request/response body sizes) for a completed
+        /// request. Never throws; telemetry failures are logged at debug level and swallowed.
+        /// </summary>
+        /// <param name="ctx">HTTP context.</param>
+        /// <param name="durationMs">Request duration in milliseconds.</param>
+        private void RecordHttpMetrics(HttpContextBase ctx, double durationMs)
+        {
+            if (_Telemetry == null) return;
+
+            try
+            {
+                string method = ctx.Request.Method.ToString();
+                string route = NormalizeRouteTemplate(ctx);
+                int statusCode = ctx.Response.StatusCode;
+                RequestHistoryCaptureContext capture = GetOrCreateRequestHistoryCapture(ctx);
+
+                _Telemetry.RecordHttpRequest(
+                    method,
+                    statusCode,
+                    route,
+                    durationMs / 1000.0,
+                    capture.RequestSizeBytes,
+                    capture.ResponseSizeBytes);
+            }
+            catch (Exception e)
+            {
+                _Logging?.Debug(_Header + "telemetry record error: " + e.Message);
             }
         }
 
@@ -4889,6 +4928,18 @@ namespace Verbex.Server.API.REST
             RequestContext requestContext = BuildRequestContext(ctx, requestType);
             ResponseContext responseContext;
 
+            string httpMethod = ctx.Request.Method.ToString();
+            string httpRoute = NormalizeRouteTemplate(ctx);
+
+            // Server span wraps the whole handler in the request's own async flow, so Verbex core
+            // library spans (indexing, search) nest correctly beneath it.
+            using RadiantSpan span = _Telemetry!.StartServerSpan(httpMethod + " " + httpRoute);
+            span.SetTag(SemConv.Http.AttributeMethod, httpMethod);
+            span.SetTag(SemConv.Http.AttributeRoute, httpRoute);
+            span.SetTag(SemConv.Attributes.Protocol, "http");
+
+            _Telemetry.AdjustActiveRequests(httpMethod, 1.0);
+
             try
             {
                 responseContext = await handler(requestContext);
@@ -4897,9 +4948,19 @@ namespace Verbex.Server.API.REST
             {
                 _Logging?.Error(_Header + "exception:" + Environment.NewLine + e.ToString());
                 responseContext = new ResponseContext(false, 500, "Internal server error");
+                span.RecordException(e);
+            }
+            finally
+            {
+                _Telemetry.AdjustActiveRequests(httpMethod, -1.0);
             }
 
             responseContext.ProcessingTimeMs = DateTime.UtcNow.Subtract(startTime).TotalMilliseconds;
+
+            span.SetTag(SemConv.Http.AttributeStatusCode, responseContext.StatusCode);
+            if (responseContext.Success) span.SetOk();
+            else span.SetError("status " + responseContext.StatusCode);
+
             await SendResponse(ctx, responseContext);
         }
 

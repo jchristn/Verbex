@@ -1,3 +1,20 @@
+# Verbex full stack with integrated observability (metrics, traces, logs).
+#
+# Application:
+#   verbex-server     REST API                         http://localhost:8080  (Swagger: /swagger)
+#   verbex-dashboard  Web dashboard                    http://localhost:8200
+#
+# Observability (see the dashboard's "Observability" view for links + credentials):
+#   grafana           Dashboards / Explore             http://localhost:3000  (admin / admin)
+#   prometheus        Metrics (PromQL)                 http://localhost:9090
+#   tempo             Traces backend (via Grafana)     http://localhost:3200
+#   loki              Logs backend (via Grafana)       http://localhost:3100
+#   otel-collector    OTLP intake (gRPC 4317/HTTP 4318), Prometheus exposition 8889
+#
+# The server and MCP push OTLP to the collector; Prometheus scrapes the collector;
+# Grafana reads Prometheus/Tempo/Loki. Grafana dashboards are provisioned into a
+# top-level "Verbex" folder, organized by domain.
+
 services:
   verbex-server:
     image: jchristn77/verbex-server:v0.1.0
@@ -12,6 +29,12 @@ services:
     restart: unless-stopped
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
+      - VERBEX_TELEMETRY_ENABLE=true
+      - VERBEX_OTLP_ENDPOINT=http://otel-collector:4317
+      - VERBEX_OTLP_PROTOCOL=grpc
+      - VERBEX_PROMETHEUS_ENABLE=false
+    depends_on:
+      - otel-collector
 
   verbex-dashboard:
     image: jchristn77/verbex-dashboard:v0.1.0
@@ -22,4 +45,88 @@ services:
       - ./dashboard/logs:/app/logs
     environment:
       - VERBEX_SERVER_URL=http://verbex-server:8080
+      # Links surfaced in the dashboard "Observability" view (opened in the user's browser).
+      - VERBEX_GRAFANA_URL=http://localhost:3000
+      - VERBEX_PROMETHEUS_URL=http://localhost:9090
+      - VERBEX_TEMPO_URL=http://localhost:3200
+      - VERBEX_LOKI_URL=http://localhost:3100
+      - VERBEX_METRICS_URL=http://localhost:9464/metrics
     restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.109.0
+    container_name: verbex-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8889:8889"   # Prometheus exposition (scraped by Prometheus)
+    restart: unless-stopped
+    depends_on:
+      - tempo
+      - loki
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: verbex-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yaml"
+      - "--enable-feature=exemplar-storage"
+    volumes:
+      - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yaml
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    depends_on:
+      - otel-collector
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    container_name: verbex-tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo.yaml
+      - tempo-data:/var/tempo
+    ports:
+      - "3200:3200"   # Tempo query API
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.2.1
+    container_name: verbex-loki
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - ./observability/loki-config.yaml:/etc/loki/local-config.yaml
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: verbex-grafana
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_USERS_DEFAULT_THEME=dark
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+
+volumes:
+  prometheus-data:
+  tempo-data:
+  loki-data:
+  grafana-data:

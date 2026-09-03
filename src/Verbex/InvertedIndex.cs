@@ -16,6 +16,7 @@ namespace Verbex
     using Verbex.DTO.Requests;
     using Verbex.DTO.Responses;
     using Verbex.Models;
+    using Verbex.Telemetry;
     using Verbex.Utilities;
 
     /// <summary>
@@ -317,6 +318,9 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(documentName);
             ArgumentNullException.ThrowIfNull(content);
 
+            using Activity? activity = VerbexTelemetry.StartActivity("verbex.add_document", ActivityKind.Internal);
+            activity?.SetTag(VerbexTelemetry.TagIndex, _IndexName);
+
             Stopwatch stopwatch = Stopwatch.StartNew();
 
             await _WriteLock.WaitAsync(token).ConfigureAwait(false);
@@ -324,6 +328,7 @@ namespace Verbex
 
             AddDocumentResult addResult;
             bool shouldFlush = false;
+            long termOccurrences = 0;
 
             try
             {
@@ -341,11 +346,19 @@ namespace Verbex
                     return new AddDocumentResult(documentId, indexResult.Metrics);
                 }, token).ConfigureAwait(false);
 
+                termOccurrences = indexResult?.AffectedTerms?.Count ?? 0;
+
                 // Invalidate cache (using terms already computed during indexing)
                 _CacheInvalidator?.OnDocumentAdded(documentId, indexResult!.AffectedTerms);
 
                 // Check if flush is needed (increment counter inside lock, flush outside)
                 shouldFlush = ShouldAutoFlush();
+            }
+            catch (Exception ex)
+            {
+                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                VerbexTelemetry.RecordDocumentIndexed(_IndexName, stopwatch.Elapsed.TotalSeconds, 0, false);
+                throw;
             }
             finally
             {
@@ -358,6 +371,8 @@ namespace Verbex
                 await PerformAutoFlushAsync(token).ConfigureAwait(false);
             }
 
+            VerbexTelemetry.RecordDocumentIndexed(_IndexName, stopwatch.Elapsed.TotalSeconds, termOccurrences, true);
+            activity?.SetStatus(ActivityStatusCode.Ok);
             return addResult;
         }
 
@@ -400,6 +415,9 @@ namespace Verbex
             ArgumentNullException.ThrowIfNull(documentName);
             ArgumentNullException.ThrowIfNull(content);
 
+            using Activity? activity = VerbexTelemetry.StartActivity("verbex.add_document", ActivityKind.Internal);
+            activity?.SetTag(VerbexTelemetry.TagIndex, _IndexName);
+
             Stopwatch stopwatch = Stopwatch.StartNew();
 
             await _WriteLock.WaitAsync(token).ConfigureAwait(false);
@@ -407,6 +425,7 @@ namespace Verbex
 
             AddDocumentResult addResult;
             bool shouldFlush = false;
+            long termOccurrences = 0;
 
             try
             {
@@ -423,11 +442,19 @@ namespace Verbex
                     return new AddDocumentResult(documentId, indexResult.Metrics);
                 }, token).ConfigureAwait(false);
 
+                termOccurrences = indexResult?.AffectedTerms?.Count ?? 0;
+
                 // Invalidate cache (using terms already computed during indexing)
                 _CacheInvalidator?.OnDocumentAdded(documentId, indexResult!.AffectedTerms);
 
                 // Check if flush is needed (increment counter inside lock, flush outside)
                 shouldFlush = ShouldAutoFlush();
+            }
+            catch (Exception ex)
+            {
+                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                VerbexTelemetry.RecordDocumentIndexed(_IndexName, stopwatch.Elapsed.TotalSeconds, 0, false);
+                throw;
             }
             finally
             {
@@ -440,6 +467,8 @@ namespace Verbex
                 await PerformAutoFlushAsync(token).ConfigureAwait(false);
             }
 
+            VerbexTelemetry.RecordDocumentIndexed(_IndexName, stopwatch.Elapsed.TotalSeconds, termOccurrences, true);
+            activity?.SetStatus(ActivityStatusCode.Ok);
             return addResult;
         }
 
@@ -645,9 +674,14 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documents);
 
+            using Activity? activity = VerbexTelemetry.StartActivity("verbex.batch_add", ActivityKind.Internal);
+            activity?.SetTag(VerbexTelemetry.TagIndex, _IndexName);
+            Stopwatch batchStopwatch = Stopwatch.StartNew();
+
             List<BatchAddDocumentItem> docList = documents.ToList();
             if (docList.Count == 0)
             {
+                VerbexTelemetry.RecordBatch(_IndexName, "add", batchStopwatch.Elapsed.TotalSeconds, true);
                 return new BatchAddDocumentsResponse();
             }
 
@@ -711,6 +745,10 @@ namespace Verbex
                 }
             }
 
+            VerbexTelemetry.RecordBatch(_IndexName, "add", batchStopwatch.Elapsed.TotalSeconds, failedDocs.Count == 0);
+            activity?.SetTag("verbex.batch.added", addedDocs.Count);
+            activity?.SetTag("verbex.batch.failed", failedDocs.Count);
+            activity?.SetStatus(failedDocs.Count == 0 ? ActivityStatusCode.Ok : ActivityStatusCode.Error);
             return new BatchAddDocumentsResponse
             {
                 Added = addedDocs,
@@ -732,6 +770,9 @@ namespace Verbex
             ThrowIfDisposed();
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentId);
+
+            using Activity? activity = VerbexTelemetry.StartActivity("verbex.remove_document", ActivityKind.Internal);
+            activity?.SetTag(VerbexTelemetry.TagIndex, _IndexName);
 
             await _WriteLock.WaitAsync(token).ConfigureAwait(false);
             try
@@ -778,7 +819,14 @@ namespace Verbex
                     _TermIdCache?.RemoveRange(deletedTermTexts);
                 }
 
+                VerbexTelemetry.RecordDocumentRemoved(_IndexName, deleted);
+                activity?.SetStatus(ActivityStatusCode.Ok);
                 return deleted;
+            }
+            catch (Exception ex)
+            {
+                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                throw;
             }
             finally
             {
@@ -800,9 +848,14 @@ namespace Verbex
             ThrowIfNotOpen();
             ArgumentNullException.ThrowIfNull(documentIds);
 
+            using Activity? activity = VerbexTelemetry.StartActivity("verbex.batch_remove", ActivityKind.Internal);
+            activity?.SetTag(VerbexTelemetry.TagIndex, _IndexName);
+            Stopwatch batchStopwatch = Stopwatch.StartNew();
+
             List<string> requestedIds = documentIds.Distinct().Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
             if (requestedIds.Count == 0)
             {
+                VerbexTelemetry.RecordBatch(_IndexName, "remove", batchStopwatch.Elapsed.TotalSeconds, true);
                 return new BatchDeleteResponse();
             }
 
@@ -849,6 +902,8 @@ namespace Verbex
                     _TermIdCache?.RemoveRange(deletedTermTexts);
                 }
 
+                VerbexTelemetry.RecordBatch(_IndexName, "remove", batchStopwatch.Elapsed.TotalSeconds, true);
+                activity?.SetStatus(ActivityStatusCode.Ok);
                 return new BatchDeleteResponse
                 {
                     Deleted = deletedIds,
@@ -857,6 +912,12 @@ namespace Verbex
                     NotFoundCount = notFoundIds.Count,
                     RequestedCount = requestedIds.Count
                 };
+            }
+            catch (Exception ex)
+            {
+                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                VerbexTelemetry.RecordBatch(_IndexName, "remove", batchStopwatch.Elapsed.TotalSeconds, false);
+                throw;
             }
             finally
             {
@@ -930,6 +991,34 @@ namespace Verbex
         /// <param name="token">Cancellation token.</param>
         /// <returns>Search results.</returns>
         public async Task<SearchResults> SearchAsync(string query, int? maxResults, bool useAndLogic, List<string>? labels, Dictionary<string, string>? tags, CancellationToken token = default)
+        {
+            string mode = !String.IsNullOrWhiteSpace(query) && query.Trim() == "*"
+                ? "wildcard"
+                : (useAndLogic ? "and" : "or");
+
+            using Activity? activity = VerbexTelemetry.StartActivity("verbex.search", ActivityKind.Internal);
+            activity?.SetTag(VerbexTelemetry.TagIndex, _IndexName);
+            activity?.SetTag(VerbexTelemetry.TagMode, mode);
+
+            Stopwatch searchStopwatch = Stopwatch.StartNew();
+
+            try
+            {
+                SearchResults results = await ExecuteSearchAsync(query, maxResults, useAndLogic, labels, tags, token).ConfigureAwait(false);
+                VerbexTelemetry.RecordSearch(_IndexName, mode, searchStopwatch.Elapsed.TotalSeconds, results.TotalCount, true);
+                activity?.SetTag("verbex.search.result_count", results.TotalCount);
+                activity?.SetStatus(ActivityStatusCode.Ok);
+                return results;
+            }
+            catch (Exception ex)
+            {
+                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                VerbexTelemetry.RecordSearch(_IndexName, mode, searchStopwatch.Elapsed.TotalSeconds, 0, false);
+                throw;
+            }
+        }
+
+        private async Task<SearchResults> ExecuteSearchAsync(string query, int? maxResults, bool useAndLogic, List<string>? labels, Dictionary<string, string>? tags, CancellationToken token = default)
         {
             ThrowIfDisposed();
             ThrowIfNotOpen();

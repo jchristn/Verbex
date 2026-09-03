@@ -32,5 +32,21 @@
     "Exceptions": true,
     "Requests": false,
     "DatabaseQueries": false
+  },
+  "Telemetry": {
+    "Enable": true,
+    "ServiceName": "verbex-server",
+    "ServiceInstanceId": null,
+    "Otlp": {
+      "Enable": true,
+      "Endpoint": "http://localhost:4317",
+      "Protocol": "grpc"
+    },
+    "Prometheus": {
+      "Enable": true,
+      "Hostname": "localhost",
+      "Port": 9464,
+      "Path": "/metrics"
+    }
   }
 }
