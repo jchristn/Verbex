@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/jchristn/verbex/main/assets/logo.png" alt="Verbex Logo" width="128" height="128">
+  <img src="https://raw.githubusercontent.com/jchristn/verbex/main/assets/logo.png" alt="Verbex Logo" width="320">
 
   # Verbex
 
