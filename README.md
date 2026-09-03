@@ -238,6 +238,7 @@ curl -X POST http://localhost:8080/v1.0/indices/restore \
 
 - **[DOCKER.md](DOCKER.md)** - Docker deployment guide
 - **[REST_API.md](REST_API.md)** - REST API reference (includes backup & restore)
+- **[MCP_API.md](MCP_API.md)** - MCP server tools, transports, and AI client installation
 - **[VBX_CLI.md](VBX_CLI.md)** - CLI documentation
 - **[STORAGE.md](STORAGE.md)** - Storage architecture
 - **[SCORING.md](SCORING.md)** - Scoring algorithm details

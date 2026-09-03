@@ -41,6 +41,8 @@ namespace Verbex.Mcp
             string transport = "stdio";
             string host = "127.0.0.1";
             int port = 8200;
+            bool install = false;
+            bool uninstall = false;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -50,6 +52,23 @@ namespace Verbex.Mcp
                     host = args[++i];
                 else if (args[i] == "--port" && i + 1 < args.Length)
                     port = int.Parse(args[++i]);
+                else if (args[i] == "--install")
+                    install = true;
+                else if (args[i] == "--uninstall")
+                    uninstall = true;
+            }
+
+            // Register or remove the Verbex MCP server in supported AI client configs, then exit.
+            // These commands do not start the server; they only edit client configuration files.
+            if (install)
+            {
+                McpInstaller.Install(host, port);
+                return;
+            }
+            if (uninstall)
+            {
+                McpInstaller.Uninstall();
+                return;
             }
 
             Directory.CreateDirectory(_StorageDirectory);

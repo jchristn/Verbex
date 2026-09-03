@@ -32,9 +32,24 @@ dotnet run --project src/Verbex.Mcp -- --transport http --host 127.0.0.1 --port 
 dotnet run --project src/Verbex.Mcp -- --transport websocket --host 127.0.0.1 --port 8200
 ```
 
-## Claude Code Integration
+## Installing into AI Clients
 
-Add to your `~/.claude/claude_desktop_config.json`:
+Register (or remove) Verbex in the config files of Claude Code, Cursor, Codex, the Gemini CLI, and Mux with
+the built-in command. Both operations target the HTTP endpoint, so start the server with
+`--transport http` first, and preserve every other configured MCP server.
+
+```bash
+verbex-mcp --install                                # add 'verbex' to every detected client config
+verbex-mcp --install --host 127.0.0.1 --port 8200   # advertise a specific host/port
+verbex-mcp --uninstall                              # remove 'verbex' from every client config
+```
+
+Equivalent per-agent, per-OS scripts live in [`../../scripts/`](../../scripts/README.md). Full details,
+including the endpoint each client uses, are in [`../../MCP_API.md`](../../MCP_API.md).
+
+## Claude Code Integration (stdio)
+
+To have Claude Code launch the server over stdio instead, add it directly:
 
 ```json
 {
@@ -185,6 +200,27 @@ Add tags to a document.
   "tags": {"status": "approved", "priority": "high"}
 }
 ```
+
+### verbex_index_exists
+Check whether an index exists (in memory or on disk).
+
+```json
+{
+  "name": "my-index"
+}
+```
+
+### verbex_document_exists
+Check whether a document exists in an index.
+
+```json
+{
+  "index": "default",
+  "documentId": "doc_abc123"
+}
+```
+
+See [`../../MCP_API.md`](../../MCP_API.md) for the full input/output schema of every tool.
 
 ## Storage
 
