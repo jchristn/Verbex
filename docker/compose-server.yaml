@@ -12,3 +12,9 @@ services:
     restart: unless-stopped
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/v1.0/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 2
+      start_period: 30s

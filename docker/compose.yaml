@@ -34,7 +34,14 @@ services:
       - VERBEX_OTLP_PROTOCOL=grpc
       - VERBEX_PROMETHEUS_ENABLE=false
     depends_on:
-      - otel-collector
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/v1.0/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 2
+      start_period: 30s
 
   verbex-dashboard:
     image: jchristn77/verbex-dashboard:v0.2.1
@@ -52,6 +59,15 @@ services:
       - VERBEX_LOKI_URL=http://localhost:3100
       - VERBEX_METRICS_URL=http://localhost:9464/metrics
     restart: unless-stopped
+    depends_on:
+      verbex-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8200/"]
+      interval: 5s
+      timeout: 3s
+      retries: 2
+      start_period: 15s
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.109.0
@@ -65,8 +81,10 @@ services:
       - "8889:8889"   # Prometheus exposition (scraped by Prometheus)
     restart: unless-stopped
     depends_on:
-      - tempo
-      - loki
+      tempo:
+        condition: service_started
+      loki:
+        condition: service_started
 
   prometheus:
     image: prom/prometheus:v2.55.1
@@ -81,7 +99,8 @@ services:
       - "9090:9090"
     restart: unless-stopped
     depends_on:
-      - otel-collector
+      otel-collector:
+        condition: service_started
 
   tempo:
     image: grafana/tempo:2.6.1
@@ -121,9 +140,12 @@ services:
       - GF_USERS_DEFAULT_THEME=dark
     restart: unless-stopped
     depends_on:
-      - prometheus
-      - tempo
-      - loki
+      prometheus:
+        condition: service_started
+      tempo:
+        condition: service_started
+      loki:
+        condition: service_started
 
 volumes:
   prometheus-data:
