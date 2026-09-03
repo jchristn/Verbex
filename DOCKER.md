@@ -9,9 +9,17 @@ cd docker
 docker compose up -d
 ```
 
-This starts:
-- **Verbex Server** at http://localhost:8080
+This starts the application **and** a full observability stack:
+- **Verbex Server** at http://localhost:8080 (Swagger at `/swagger`)
 - **Dashboard** at http://localhost:8200
+- **Grafana** at http://localhost:3000 (`admin` / `admin`)
+- **Prometheus** at http://localhost:9090
+- **Tempo** (traces, via Grafana) at http://localhost:3200
+- **Loki** (logs, via Grafana) at http://localhost:3100
+- **OpenTelemetry Collector** (OTLP gRPC 4317 / HTTP 4318, Prometheus exposition 8889)
+
+See [TELEMETRY.md](TELEMETRY.md) for the full telemetry reference. The dashboard's
+**Observability** view links out to each service with its URL and default credentials.
 
 ## Compose Files
 
@@ -59,6 +67,11 @@ The server is configured via `docker/server/verbex.json`:
 
 **Important**: Change `AdminBearerToken` for production deployments.
 
+The config also contains a `Telemetry` block controlling metrics/traces export (OTLP to the
+collector and, optionally, an in-process Prometheus endpoint). In the bundled stack it points at
+`http://otel-collector:4317`. See [TELEMETRY.md](TELEMETRY.md) for all options and environment
+overrides (`VERBEX_OTLP_ENDPOINT`, `VERBEX_TELEMETRY_ENABLE`, etc.).
+
 ### Volumes
 
 The compose files mount these directories:
@@ -76,6 +89,11 @@ The compose files mount these directories:
 |---------|------|
 | Server | 8080 |
 | Dashboard | 8200 |
+| Grafana | 3000 |
+| Prometheus | 9090 |
+| Tempo | 3200 |
+| Loki | 3100 |
+| OTLP collector (gRPC / HTTP / Prometheus) | 4317 / 4318 / 8889 |
 
 To change ports, edit the compose file:
 
@@ -84,20 +102,39 @@ ports:
   - "9000:8080"  # Host:Container
 ```
 
+## Observability
+
+`compose.yaml` runs a complete observability stack alongside the application. The server and MCP
+server push OpenTelemetry data to the collector; Prometheus scrapes the collector; Grafana reads
+Prometheus (metrics), Tempo (traces), and Loki (logs).
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| Grafana | http://localhost:3000 | `admin` / `admin` |
+| Prometheus | http://localhost:9090 | none |
+| Tempo (via Grafana) | http://localhost:3200 | none |
+| Loki (via Grafana) | http://localhost:3100 | none |
+
+Grafana dashboards are provisioned into a top-level **Verbex** folder, organized by domain:
+**Verbex - HTTP**, **Verbex - Application**, **Verbex - MCP**, and **Verbex - Runtime**.
+Datasources are wired for metric↔trace↔log correlation. Configuration lives under
+`docker/observability/` (collector, Prometheus, Tempo, Loki) and `docker/grafana/` (provisioning +
+dashboards). Full details are in [TELEMETRY.md](TELEMETRY.md).
+
 ## Building Images
 
 ### Build Server Image
 
 ```bash
 cd src
-docker build -t jchristn77/verbex-server:v0.1.0 -f Verbex.Server/Dockerfile .
+docker build -t jchristn77/verbex-server:v0.2.1 -f Verbex.Server/Dockerfile .
 ```
 
 ### Build Dashboard Image
 
 ```bash
 cd dashboard
-docker build -t jchristn77/verbex-dashboard:v0.1.0 .
+docker build -t jchristn77/verbex-dashboard:v0.2.1 .
 ```
 
 ## Production Considerations

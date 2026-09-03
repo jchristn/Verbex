@@ -46,5 +46,21 @@
     "Exceptions": true,
     "Requests": false,
     "DatabaseQueries": false
+  },
+  "Telemetry": {
+    "Enable": true,
+    "ServiceName": "verbex-server",
+    "ServiceInstanceId": null,
+    "Otlp": {
+      "Enable": true,
+      "Endpoint": "http://otel-collector:4317",
+      "Protocol": "grpc"
+    },
+    "Prometheus": {
+      "Enable": false,
+      "Hostname": "*",
+      "Port": 9464,
+      "Path": "/metrics"
+    }
   }
 }

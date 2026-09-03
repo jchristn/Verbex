@@ -241,6 +241,7 @@ curl -X POST http://localhost:8080/v1.0/indices/restore \
 - **[VBX_CLI.md](VBX_CLI.md)** - CLI documentation
 - **[STORAGE.md](STORAGE.md)** - Storage architecture
 - **[SCORING.md](SCORING.md)** - Scoring algorithm details
+- **[TELEMETRY.md](TELEMETRY.md)** - Metrics, tracing, and observability integration
 
 ## Configuration
 

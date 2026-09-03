@@ -17,7 +17,7 @@
 
 services:
   verbex-server:
-    image: jchristn77/verbex-server:v0.1.0
+    image: jchristn77/verbex-server:v0.2.1
     container_name: verbex-server
     ports:
       - "8080:8080"
@@ -37,7 +37,7 @@ services:
       - otel-collector
 
   verbex-dashboard:
-    image: jchristn77/verbex-dashboard:v0.1.0
+    image: jchristn77/verbex-dashboard:v0.2.1
     container_name: verbex-dashboard
     ports:
       - "8200:8200"
