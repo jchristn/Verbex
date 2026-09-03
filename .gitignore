@@ -342,3 +342,5 @@ paket-files/
 __pycache__/
 *.pyc
  
+# Dated log files (e.g., verbex.log.20260903)
+*.log.*
