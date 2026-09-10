@@ -77,6 +77,19 @@
   color: var(--text-primary);
 }
 
+.discord-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  text-decoration: none;
+  color: var(--text-secondary);
+}
+
+.discord-btn:hover {
+  color: var(--text-primary);
+}
+
 .github-btn {
   display: flex;
   align-items: center;
