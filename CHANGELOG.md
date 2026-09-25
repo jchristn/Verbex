@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Upgraded Voltaic to 2.0.0. The MCP server now publishes only the 13 Verbex tools: Voltaic's demo tools (`ping`, `echo`, `getTime`, `getSessions`, `getClients`) are gone from `tools/list` and `tools/call`. The protocol `ping` returns `{}` instead of `"pong"`, tools are callable only through `tools/call` (a bare tool-name call returns `-32601`), and tool argument schemas are enforced more strictly: a non-string `tags` value is now rejected with `-32602` instead of being silently dropped.
+- `Test.Mcp` now asserts that `tools/list` contains exactly the Verbex tools on every transport, that `ping` returns an empty result on every transport, that demo tools and bare tool-name calls are rejected, and that non-string tag values are rejected on `verbex_add_document`, `verbex_add_tags`, and `verbex_search`.
 - Upgraded Voltaic to 1.1.0. MCP clients on the stateless `2026-07-28` revision, such as Claude Code 2.1.x, now see the Verbex tools over Streamable HTTP. Also updated Microsoft.Data.Sqlite 10.0.12, Microsoft.Data.SqlClient 7.1.0, Watson 7.2.0, SyslogLogging 2.2.2, System.CommandLine 2.0.12, Microsoft.NET.Test.Sdk 18.10.1, and NUnit3TestAdapter 6.3.0.
 - Fixed the MCP server's stdio and WebSocket transports exposing no Verbex tools. Tools were registered as raw methods, so `tools/list` omitted them and `tools/call` returned "Tool not found". All transports now register one shared tool set.
 - Fixed a path traversal in the MCP server: index names flowed straight into filesystem paths, so `verbex_delete_index` with a name like `../..` could recursively delete directories outside the storage root. Index names are now validated on every tool.

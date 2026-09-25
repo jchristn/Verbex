@@ -35,6 +35,9 @@ namespace Test.Mcp
             "verbex_document_exists"
         };
 
+        // Published by Voltaic 1.x on every server; Voltaic 2.x publishes none of them unless opted in.
+        private static readonly string[] _VoltaicDemoTools = new[] { "ping", "echo", "getTime", "getSessions", "getClients" };
+
         private static readonly List<Process> _ServerProcesses = new List<Process>();
         private static McpHttpClient? _Client;
         private static int _TestsPassed = 0;
@@ -266,7 +269,10 @@ namespace Test.Mcp
             await TestInvalidIndexNamesAsync().ConfigureAwait(false);
             await TestConcurrentAddsAsync().ConfigureAwait(false);
             await TestUnknownToolAsync().ConfigureAwait(false);
-            await TestBuiltInToolsAsync().ConfigureAwait(false);
+            await TestProtocolPingAsync().ConfigureAwait(false);
+            await TestNoDiagnosticToolsAsync().ConfigureAwait(false);
+            await TestBareToolMethodRejectedAsync().ConfigureAwait(false);
+            await TestTagSchemaValidationAsync().ConfigureAwait(false);
         }
 
         private static async Task TestInitializeAsync()
@@ -954,19 +960,115 @@ namespace Test.Mcp
             }).ConfigureAwait(false);
         }
 
-        private static async Task TestBuiltInToolsAsync()
+        private static async Task TestProtocolPingAsync()
         {
-            await RunTestAsync("Built-in MCP Tools", async () =>
+            await RunTestAsync("Protocol ping returns an empty result", async () =>
             {
-                await CallToolAsync("ping", new { }).ConfigureAwait(false);
-                Console.WriteLine("    ping: OK");
+                // Voltaic 2.x answers ping per the MCP spec with {} rather than the v1.x "pong" string.
+                await _Client!.PingAsync().ConfigureAwait(false);
 
-                JsonElement echoResult = await CallToolAsync("echo", new { message = "Hello MCP!" }).ConfigureAwait(false);
-                Assert(echoResult.GetRawText().Contains("Hello MCP!"), "echo should return the message");
-                Console.WriteLine("    echo: OK");
+                JsonElement result = await _Client!.CallAsync<JsonElement>("ping", null).ConfigureAwait(false);
+                AssertEquals(JsonValueKind.Object, result.ValueKind, "ping result kind");
+                AssertEquals(0, result.EnumerateObject().Count(), "ping result should be an empty object: " + result.GetRawText());
+            }).ConfigureAwait(false);
+        }
 
-                await CallToolAsync("getTime", new { }).ConfigureAwait(false);
-                Console.WriteLine("    getTime: OK");
+        private static async Task TestNoDiagnosticToolsAsync()
+        {
+            await RunTestAsync("Voltaic demo tools are not published or callable", async () =>
+            {
+                JsonElement list = await _Client!.CallAsync<JsonElement>("tools/list", null).ConfigureAwait(false);
+                List<string> names = list.GetProperty("tools").EnumerateArray().Select(t => t.GetProperty("name").GetString() ?? "").ToList();
+                foreach (string demo in _VoltaicDemoTools)
+                    Assert(!names.Contains(demo), $"tools/list should not include Voltaic demo tool '{demo}'");
+
+                foreach (string demo in _VoltaicDemoTools)
+                {
+                    bool threw = false;
+                    try
+                    {
+                        await CallToolAsync(demo, new { }).ConfigureAwait(false);
+                    }
+                    catch (Exception e) when (e is not TestAssertException)
+                    {
+                        threw = true;
+                        Assert(e.Message.Contains("not found", StringComparison.OrdinalIgnoreCase), $"tools/call {demo} should report not found: " + e.Message);
+                    }
+
+                    Assert(threw, $"tools/call {demo} should fail");
+                }
+
+                Console.WriteLine($"    {_VoltaicDemoTools.Length} demo tools absent from tools/list and rejected by tools/call");
+            }).ConfigureAwait(false);
+        }
+
+        private static async Task TestBareToolMethodRejectedAsync()
+        {
+            await RunTestAsync("Tools are not callable as bare JSON-RPC methods (-32601)", async () =>
+            {
+                bool threw = false;
+                try
+                {
+                    await _Client!.CallAsync<JsonElement>("verbex_list_indices", new { }).ConfigureAwait(false);
+                }
+                catch (Exception e) when (e is not TestAssertException)
+                {
+                    threw = true;
+                    Assert(e.Message.Contains("-32601"), "Bare tool call should fail with -32601: " + e.Message);
+                }
+
+                Assert(threw, "Calling a tool by its bare name should fail");
+
+                JsonElement viaToolsCall = await CallToolDataAsync("verbex_list_indices", new { }).ConfigureAwait(false);
+                Assert(viaToolsCall.TryGetProperty("indices", out _), "The same tool should succeed through tools/call");
+            }).ConfigureAwait(false);
+        }
+
+        private static async Task TestTagSchemaValidationAsync()
+        {
+            await RunTestAsync("Tag values must be strings (additionalProperties schema is enforced)", async () =>
+            {
+                // Positive: string tag values pass validation and are stored.
+                JsonElement ok = await CallToolDataAsync("verbex_add_document", new
+                {
+                    index = _TestIndexName,
+                    name = "schema-string-tags",
+                    content = "Schema validation positive case.",
+                    tags = new { stage = "validated" }
+                }).ConfigureAwait(false);
+                Assert(ok.GetProperty("success").GetBoolean(), "String tag values should be accepted");
+
+                // Negative: non-string tag values are rejected with -32602 before the handler runs, for each tool
+                // whose schema declares tags as additionalProperties { type: string }.
+                object[] badCalls = new object[]
+                {
+                    ToolCall("verbex_add_document", new { index = _TestIndexName, name = "schema-bad-tags", content = "Should not be indexed.", tags = new { priority = 5 } }),
+                    ToolCall("verbex_add_tags", new { index = _TestIndexName, documentId = ok.GetProperty("documentId").GetString(), tags = new { reviewed = true } }),
+                    ToolCall("verbex_search", new { index = _TestIndexName, query = "schema", tags = new { nested = new { a = "b" } } })
+                };
+
+                foreach (object call in badCalls)
+                {
+                    bool threw = false;
+                    try
+                    {
+                        await _Client!.CallAsync<JsonElement>("tools/call", call).ConfigureAwait(false);
+                    }
+                    catch (Exception e) when (e is not TestAssertException)
+                    {
+                        threw = true;
+                        Assert(e.Message.Contains("-32602"), "Invalid tag value should fail with -32602: " + e.Message);
+                    }
+
+                    Assert(threw, "Non-string tag value should be rejected: " + JsonSerializer.Serialize(call));
+                }
+
+                JsonElement list = await CallToolDataAsync("verbex_list_documents", new { index = _TestIndexName, limit = 1000 }).ConfigureAwait(false);
+                bool indexed = list.GetProperty("documents").EnumerateArray().Any(d => d.GetProperty("documentPath").GetString() == "schema-bad-tags");
+                Assert(!indexed, "A rejected call must not index the document");
+
+                JsonElement removed = await CallToolDataAsync("verbex_delete_document", new { index = _TestIndexName, documentId = ok.GetProperty("documentId").GetString() }).ConfigureAwait(false);
+                Assert(removed.GetProperty("success").GetBoolean(), "Cleanup delete should succeed");
             }).ConfigureAwait(false);
         }
 
@@ -1093,6 +1195,15 @@ namespace Test.Mcp
                 AssertVerbexTools(list);
             }).ConfigureAwait(false);
 
+            await RunTestAsync($"{label}: ping returns an empty result", async () =>
+            {
+                // {} under handshake revisions; only resultType under the stateless 2026-07-28 revision.
+                JsonElement pong = await rpc("ping", null).ConfigureAwait(false);
+                AssertEquals(JsonValueKind.Object, pong.ValueKind, "ping result kind");
+                List<string> props = pong.EnumerateObject().Select(p => p.Name).Where(n => n != "resultType").ToList();
+                Assert(!props.Any(), "ping result should carry no payload: " + pong.GetRawText());
+            }).ConfigureAwait(false);
+
             await RunTestAsync($"{label}: create, add, search, get, delete", async () =>
             {
                 JsonElement created = ParseToolResult(await rpc("tools/call", ToolCall("verbex_create_index", new { name = index })).ConfigureAwait(false));
@@ -1193,7 +1304,10 @@ namespace Test.Mcp
                 AssertEquals("object", tool.GetProperty("inputSchema").GetProperty("type").GetString(), $"{expected} inputSchema type");
             }
 
-            Console.WriteLine($"    tools/list: {tools.Count} tools ({_ExpectedTools.Length} Verbex tools verified)");
+            List<string> unexpected = tools.Keys.Where(k => !_ExpectedTools.Contains(k)).ToList();
+            Assert(!unexpected.Any(), $"tools/list should contain only Verbex tools (unexpected: {string.Join(", ", unexpected)})");
+
+            Console.WriteLine($"    tools/list: exactly the {_ExpectedTools.Length} Verbex tools");
         }
 
         private static async Task RunTestAsync(string testName, Func<Task> test)
