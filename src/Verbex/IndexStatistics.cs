@@ -88,7 +88,8 @@ namespace Verbex
         }
 
         /// <summary>
-        /// Gets or sets the average terms per document.
+        /// Gets or sets the average number of unique terms per document (<see cref="PostingCount"/> divided by
+        /// <see cref="DocumentCount"/>); 0 when the index is empty.
         /// Value is rounded to 4 decimal places.
         /// </summary>
         public double AverageTermsPerDocument

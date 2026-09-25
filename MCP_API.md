@@ -12,7 +12,7 @@ the Verbex inverted index as MCP tools. It gives an LLM full-text search and doc
 | --- | --- | --- | --- |
 | stdio (default) | `verbex-mcp` or `verbex-mcp --transport stdio` | stdin/stdout | Clients that launch the server process |
 | HTTP | `verbex-mcp --transport http --host 127.0.0.1 --port 8200` | `http://<host>:<port>/mcp` (Streamable HTTP) | Claude Code, Cursor, Codex, Gemini, Mux, web apps |
-| WebSocket | `verbex-mcp --transport websocket --host 127.0.0.1 --port 8200` | `ws://<host>:<port>` | Real-time apps |
+| WebSocket | `verbex-mcp --transport websocket --host 127.0.0.1 --port 8200` | `ws://<host>:<port>/mcp` | Real-time apps |
 
 The HTTP transport also exposes a legacy JSON-RPC endpoint at `/rpc` and an SSE endpoint at `/events`; the
 recommended endpoint for modern MCP clients is the Streamable HTTP endpoint at `/mcp`.
@@ -63,9 +63,13 @@ Indices are persisted under:
 - Windows: `%USERPROFILE%\.verbex-mcp\indices\`
 - Linux/macOS: `~/.verbex-mcp/indices/`
 
+Set `VERBEX_MCP_STORAGE_DIR` to use a different directory (for example, to isolate a test run).
+
 Each index gets its own directory with an SQLite database (`index.db`). Indices referenced by a tool are
 opened on demand, creating an on-disk index if one does not already exist. The default index name is
-`default`.
+`default`. Because the name becomes a directory name, index names must be 1-128 characters from
+`A-Z`, `a-z`, `0-9`, `-`, `_`, and `.`, and may not be `.` or `..`; any other name is rejected with an
+`Invalid index name` error.
 
 ## Telemetry
 
@@ -81,7 +85,10 @@ Each tool invocation is instrumented and pushed over OTLP (metrics, traces, logs
 ## Response Conventions
 
 - Every tool returns a single JSON object serialized with camelCase property names.
-- Validation and not-found failures are returned as `{ "error": "<message>" }` rather than throwing.
+- Validation, not-found, and other tool failures are returned as a tool result with `isError: true` whose
+  text is `{ "error": "<message>" }`, rather than as a JSON-RPC protocol error, so the calling model can see
+  the reason. Calling an unknown tool name is a JSON-RPC error.
+- Every transport (stdio, HTTP, WebSocket) advertises the same tools through `tools/list`.
 - The `index` parameter defaults to `default` on every tool that accepts it.
 
 ## Tool Inventory
@@ -347,11 +354,15 @@ Get statistics about an index including document count, term count, and storage 
   "termCount": 5400,
   "postingCount": 38210,
   "totalDocumentSize": 1048576,
-  "averageDocumentLength": 8738.1,
+  "averageDocumentLength": 758.3333,
   "totalTermOccurrences": 91000,
-  "averageTermsPerDocument": 758.3
+  "averageTermsPerDocument": 318.4167
 }
 ```
+
+`postingCount` is the number of term-document pairs. `averageDocumentLength` is term occurrences per
+document (`totalTermOccurrences / documentCount`), and `averageTermsPerDocument` is unique terms per
+document (`postingCount / documentCount`).
 
 ### `verbex_list_indices`
 

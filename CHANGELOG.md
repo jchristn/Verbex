@@ -1,5 +1,16 @@
 # Change Log
 
+## Unreleased
+
+- Upgraded Voltaic to 1.1.0. MCP clients on the stateless `2026-07-28` revision, such as Claude Code 2.1.x, now see the Verbex tools over Streamable HTTP. Also updated Microsoft.Data.Sqlite 10.0.12, Microsoft.Data.SqlClient 7.1.0, Watson 7.2.0, SyslogLogging 2.2.2, System.CommandLine 2.0.12, Microsoft.NET.Test.Sdk 18.10.1, and NUnit3TestAdapter 6.3.0.
+- Fixed the MCP server's stdio and WebSocket transports exposing no Verbex tools. Tools were registered as raw methods, so `tools/list` omitted them and `tools/call` returned "Tool not found". All transports now register one shared tool set.
+- Fixed a path traversal in the MCP server: index names flowed straight into filesystem paths, so `verbex_delete_index` with a name like `../..` could recursively delete directories outside the storage root. Index names are now validated on every tool.
+- MCP tool failures are now returned with `isError: true`, and unexpected exceptions become `isError` results instead of JSON-RPC errors.
+- Fixed a race where concurrent MCP calls for an index that was not yet open could open it twice.
+- Fixed `IndexStatistics.PostingCount` and `AverageTermsPerDocument` always being 0 on every database driver.
+- Added `VERBEX_MCP_STORAGE_DIR` to override the MCP index storage directory.
+- Rebuilt the `Test.Mcp` harness. It previously failed to start the server (no `--framework`) and ignored connection failures. It now covers all 13 tools, error results, path traversal, concurrency, and the stdio, WebSocket, handshake Streamable HTTP, and stateless Streamable HTTP transports.
+
 ## Current Version
 
 v0.2.1

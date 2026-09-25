@@ -228,7 +228,8 @@ Indices are stored by default in:
 - Windows: `%USERPROFILE%\.verbex-mcp\indices\`
 - Linux/macOS: `~/.verbex-mcp/indices/`
 
-Each index gets its own directory with an SQLite database.
+Set `VERBEX_MCP_STORAGE_DIR` to override the location. Each index gets its own directory with an SQLite
+database, so index names are limited to `A-Z`, `a-z`, `0-9`, `-`, `_`, and `.` (not `.` or `..`).
 
 ## Use Cases
 

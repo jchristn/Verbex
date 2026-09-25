@@ -16,11 +16,14 @@ namespace Verbex.Mcp
     public class Program
     {
         private static readonly ConcurrentDictionary<string, InvertedIndex> _Indices = new();
+        private static readonly SemaphoreSlim _IndicesLock = new SemaphoreSlim(1, 1);
         private static readonly string _DefaultIndexName = "default";
-        private static readonly string _StorageDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".verbex-mcp",
-            "indices");
+        private static readonly string _ServerName = "Verbex MCP Server";
+        private static readonly string _ServerVersion = "1.0.0";
+        private static readonly string _InvalidIndexNameMessage =
+            "Invalid index name: use 1-128 characters from A-Z, a-z, 0-9, '-', '_' or '.' (not '.' or '..')";
+        // Override with VERBEX_MCP_STORAGE_DIR (for example, to isolate test runs); default ~/.verbex-mcp/indices.
+        private static readonly string _StorageDirectory = ResolveStorageDirectory();
 
         private static readonly JsonSerializerOptions _JsonOptions = new JsonSerializerOptions
         {
@@ -34,6 +37,17 @@ namespace Verbex.Mcp
         private static string ToJson(object obj)
         {
             return JsonSerializer.Serialize(obj, _JsonOptions);
+        }
+
+        /// <summary>
+        /// Builds a tool error result: the same <c>{"error": ...}</c> JSON text as before, flagged with
+        /// <c>isError</c> so MCP clients can tell a failed call from a successful one.
+        /// </summary>
+        private static McpToolCallResult ToolError(string message)
+        {
+            McpToolCallResult result = McpToolCallResult.FromText(ToJson(new { error = message }));
+            result.IsError = true;
+            return result;
         }
 
         public static async Task Main(string[] args)
@@ -117,21 +131,28 @@ namespace Verbex.Mcp
 
         private static async Task RunStdioServerAsync(CancellationToken token)
         {
-            McpServer server = new McpServer();
-            RegisterAllTools(server);
+            // stdout carries the JSON-RPC stream in stdio mode; nothing else may write to it.
+            using McpServer server = new McpServer();
+            server.ServerName = _ServerName;
+            server.ServerVersion = _ServerVersion;
+
+            foreach (VerbexMcpTool tool in BuildTools())
+                server.RegisterTool(tool.Name, tool.Description, tool.InputSchema, WithTelemetry(tool));
+
             await server.RunAsync(token).ConfigureAwait(false);
         }
 
         private static async Task RunHttpServerAsync(string host, int port, CancellationToken token)
         {
-            McpHttpServer server = new McpHttpServer(host, port);
-            server.ServerName = "Verbex MCP Server";
-            server.ServerVersion = "1.0.0";
+            using McpHttpServer server = new McpHttpServer(host, port);
+            server.ServerName = _ServerName;
+            server.ServerVersion = _ServerVersion;
             server.Log += (sender, message) => Console.WriteLine($"[Verbex MCP] {message}");
             server.ClientConnected += (sender, client) => Console.WriteLine($"[Verbex MCP] Client connected: {client.SessionId}");
             server.ClientDisconnected += (sender, client) => Console.WriteLine($"[Verbex MCP] Client disconnected: {client.SessionId}");
 
-            RegisterAllToolsHttp(server);
+            foreach (VerbexMcpTool tool in BuildTools())
+                server.RegisterTool(tool.Name, tool.Description, tool.InputSchema, WithTelemetry(tool));
 
             Console.WriteLine($"[Verbex MCP] HTTP server starting on http://{host}:{port}");
             await server.StartAsync(token).ConfigureAwait(false);
@@ -139,56 +160,45 @@ namespace Verbex.Mcp
 
         private static async Task RunWebSocketServerAsync(string host, int port, CancellationToken token)
         {
-            McpWebsocketsServer server = new McpWebsocketsServer(host, port);
-            server.ServerName = "Verbex MCP Server";
-            server.ServerVersion = "1.0.0";
+            using McpWebsocketsServer server = new McpWebsocketsServer(host, port);
+            server.ServerName = _ServerName;
+            server.ServerVersion = _ServerVersion;
             server.Log += (sender, message) => Console.WriteLine($"[Verbex MCP] {message}");
             server.ClientConnected += (sender, client) => Console.WriteLine($"[Verbex MCP] Client connected: {client.SessionId}");
             server.ClientDisconnected += (sender, client) => Console.WriteLine($"[Verbex MCP] Client disconnected: {client.SessionId}");
 
-            RegisterAllTools(server);
+            foreach (VerbexMcpTool tool in BuildTools())
+                server.RegisterTool(tool.Name, tool.Description, tool.InputSchema, WithTelemetry(tool));
 
-            Console.WriteLine($"[Verbex MCP] WebSocket server starting on ws://{host}:{port}");
+            Console.WriteLine($"[Verbex MCP] WebSocket server starting on ws://{host}:{port}/mcp");
             await server.StartAsync(token).ConfigureAwait(false);
         }
 
-        private static void RegisterAllTools(McpServer server)
+        private static Func<RpcParameters?, object> WithTelemetry(VerbexMcpTool tool)
         {
-            server.RegisterMethod("verbex_search", (a) => McpTelemetry.Invoke("verbex_search", a, SearchHandler));
-            server.RegisterMethod("verbex_add_document", (a) => McpTelemetry.Invoke("verbex_add_document", a, AddDocumentHandler));
-            server.RegisterMethod("verbex_get_document", (a) => McpTelemetry.Invoke("verbex_get_document", a, GetDocumentHandler));
-            server.RegisterMethod("verbex_list_documents", (a) => McpTelemetry.Invoke("verbex_list_documents", a, ListDocumentsHandler));
-            server.RegisterMethod("verbex_delete_document", (a) => McpTelemetry.Invoke("verbex_delete_document", a, DeleteDocumentHandler));
-            server.RegisterMethod("verbex_statistics", (a) => McpTelemetry.Invoke("verbex_statistics", a, StatisticsHandler));
-            server.RegisterMethod("verbex_list_indices", (a) => McpTelemetry.Invoke("verbex_list_indices", a, ListIndicesHandler));
-            server.RegisterMethod("verbex_create_index", (a) => McpTelemetry.Invoke("verbex_create_index", a, CreateIndexHandler));
-            server.RegisterMethod("verbex_delete_index", (a) => McpTelemetry.Invoke("verbex_delete_index", a, DeleteIndexHandler));
-            server.RegisterMethod("verbex_add_labels", (a) => McpTelemetry.Invoke("verbex_add_labels", a, AddLabelsHandler));
-            server.RegisterMethod("verbex_add_tags", (a) => McpTelemetry.Invoke("verbex_add_tags", a, AddTagsHandler));
-            server.RegisterMethod("verbex_index_exists", (a) => McpTelemetry.Invoke("verbex_index_exists", a, IndexExistsHandler));
-            server.RegisterMethod("verbex_document_exists", (a) => McpTelemetry.Invoke("verbex_document_exists", a, DocumentExistsHandler));
+            // Failures inside a tool are reported as an isError tool result (per the MCP spec) rather than a
+            // JSON-RPC protocol error, so the calling model sees the reason and can correct its arguments.
+            return (a) =>
+            {
+                try
+                {
+                    return McpTelemetry.Invoke(tool.Name, a, tool.Handler);
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    return ToolError(e.Message);
+                }
+            };
         }
 
-        private static void RegisterAllTools(McpWebsocketsServer server)
+        /// <summary>
+        /// Builds the Verbex tool set shared by every transport.
+        /// </summary>
+        internal static List<VerbexMcpTool> BuildTools()
         {
-            server.RegisterMethod("verbex_search", (a) => McpTelemetry.Invoke("verbex_search", a, SearchHandler));
-            server.RegisterMethod("verbex_add_document", (a) => McpTelemetry.Invoke("verbex_add_document", a, AddDocumentHandler));
-            server.RegisterMethod("verbex_get_document", (a) => McpTelemetry.Invoke("verbex_get_document", a, GetDocumentHandler));
-            server.RegisterMethod("verbex_list_documents", (a) => McpTelemetry.Invoke("verbex_list_documents", a, ListDocumentsHandler));
-            server.RegisterMethod("verbex_delete_document", (a) => McpTelemetry.Invoke("verbex_delete_document", a, DeleteDocumentHandler));
-            server.RegisterMethod("verbex_statistics", (a) => McpTelemetry.Invoke("verbex_statistics", a, StatisticsHandler));
-            server.RegisterMethod("verbex_list_indices", (a) => McpTelemetry.Invoke("verbex_list_indices", a, ListIndicesHandler));
-            server.RegisterMethod("verbex_create_index", (a) => McpTelemetry.Invoke("verbex_create_index", a, CreateIndexHandler));
-            server.RegisterMethod("verbex_delete_index", (a) => McpTelemetry.Invoke("verbex_delete_index", a, DeleteIndexHandler));
-            server.RegisterMethod("verbex_add_labels", (a) => McpTelemetry.Invoke("verbex_add_labels", a, AddLabelsHandler));
-            server.RegisterMethod("verbex_add_tags", (a) => McpTelemetry.Invoke("verbex_add_tags", a, AddTagsHandler));
-            server.RegisterMethod("verbex_index_exists", (a) => McpTelemetry.Invoke("verbex_index_exists", a, IndexExistsHandler));
-            server.RegisterMethod("verbex_document_exists", (a) => McpTelemetry.Invoke("verbex_document_exists", a, DocumentExistsHandler));
-        }
+            List<VerbexMcpTool> tools = new List<VerbexMcpTool>();
 
-        private static void RegisterAllToolsHttp(McpHttpServer server)
-        {
-            server.RegisterTool(
+            tools.Add(new VerbexMcpTool(
                 "verbex_search",
                 "Search indexed documents using TF-IDF relevance scoring. Returns matching documents ranked by relevance. Use this for RAG retrieval.",
                 new
@@ -208,9 +218,9 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "query" }
                 },
-                (a) => McpTelemetry.Invoke("verbex_search", a, SearchHandler));
+                SearchHandler));
 
-            server.RegisterTool(
+            tools.Add(new VerbexMcpTool(
                 "verbex_add_document",
                 "Add a document to the search index with optional metadata. The document content will be tokenized and indexed for full-text search.",
                 new
@@ -226,9 +236,9 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "name", "content" }
                 },
-                (a) => McpTelemetry.Invoke("verbex_add_document", a, AddDocumentHandler));
+                AddDocumentHandler));
 
-            server.RegisterTool(
+            tools.Add(new VerbexMcpTool(
                 "verbex_get_document",
                 "Retrieve a specific document by ID with full content and metadata.",
                 new
@@ -241,9 +251,9 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "documentId" }
                 },
-                (a) => McpTelemetry.Invoke("verbex_get_document", a, GetDocumentHandler));
+                GetDocumentHandler));
 
-            server.RegisterTool(
+            tools.Add(new VerbexMcpTool(
                 "verbex_list_documents",
                 "List all documents in an index with pagination.",
                 new
@@ -256,9 +266,9 @@ namespace Verbex.Mcp
                         offset = new { type = "integer", description = "Offset for pagination (default: 0)" }
                     }
                 },
-                (a) => McpTelemetry.Invoke("verbex_list_documents", a, ListDocumentsHandler));
+                ListDocumentsHandler));
 
-            server.RegisterTool(
+            tools.Add(new VerbexMcpTool(
                 "verbex_delete_document",
                 "Remove a document from the index.",
                 new
@@ -271,9 +281,9 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "documentId" }
                 },
-                (a) => McpTelemetry.Invoke("verbex_delete_document", a, DeleteDocumentHandler));
+                DeleteDocumentHandler));
 
-            server.RegisterTool(
+            tools.Add(new VerbexMcpTool(
                 "verbex_statistics",
                 "Get statistics about an index including document count, term count, and storage details.",
                 new
@@ -284,9 +294,9 @@ namespace Verbex.Mcp
                         index = new { type = "string", description = "Index name (default: 'default')" }
                     }
                 },
-                (a) => McpTelemetry.Invoke("verbex_statistics", a, StatisticsHandler));
+                StatisticsHandler));
 
-            server.RegisterTool(
+            tools.Add(new VerbexMcpTool(
                 "verbex_list_indices",
                 "List all available indices.",
                 new
@@ -294,9 +304,9 @@ namespace Verbex.Mcp
                     type = "object",
                     properties = new { }
                 },
-                (a) => McpTelemetry.Invoke("verbex_list_indices", a, ListIndicesHandler));
+                ListIndicesHandler));
 
-            server.RegisterTool(
+            tools.Add(new VerbexMcpTool(
                 "verbex_create_index",
                 "Create a new search index with optional configuration.",
                 new
@@ -313,9 +323,9 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "name" }
                 },
-                (a) => McpTelemetry.Invoke("verbex_create_index", a, CreateIndexHandler));
+                CreateIndexHandler));
 
-            server.RegisterTool(
+            tools.Add(new VerbexMcpTool(
                 "verbex_delete_index",
                 "Delete an index and all its documents.",
                 new
@@ -327,9 +337,9 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "name" }
                 },
-                (a) => McpTelemetry.Invoke("verbex_delete_index", a, DeleteIndexHandler));
+                DeleteIndexHandler));
 
-            server.RegisterTool(
+            tools.Add(new VerbexMcpTool(
                 "verbex_add_labels",
                 "Add labels to a document for categorization.",
                 new
@@ -343,9 +353,9 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "documentId", "labels" }
                 },
-                (a) => McpTelemetry.Invoke("verbex_add_labels", a, AddLabelsHandler));
+                AddLabelsHandler));
 
-            server.RegisterTool(
+            tools.Add(new VerbexMcpTool(
                 "verbex_add_tags",
                 "Add key-value tags to a document for metadata.",
                 new
@@ -359,9 +369,9 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "documentId", "tags" }
                 },
-                (a) => McpTelemetry.Invoke("verbex_add_tags", a, AddTagsHandler));
+                AddTagsHandler));
 
-            server.RegisterTool(
+            tools.Add(new VerbexMcpTool(
                 "verbex_index_exists",
                 "Check if an index exists. Returns true if the index exists, false otherwise.",
                 new
@@ -373,9 +383,9 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "name" }
                 },
-                (a) => McpTelemetry.Invoke("verbex_index_exists", a, IndexExistsHandler));
+                IndexExistsHandler));
 
-            server.RegisterTool(
+            tools.Add(new VerbexMcpTool(
                 "verbex_document_exists",
                 "Check if a document exists in an index. Returns true if the document exists, false otherwise.",
                 new
@@ -388,12 +398,13 @@ namespace Verbex.Mcp
                     },
                     required = new[] { "documentId" }
                 },
-                (a) => McpTelemetry.Invoke("verbex_document_exists", a, DocumentExistsHandler));
+                DocumentExistsHandler));
+            return tools;
         }
 
         #region Tool Handlers
 
-        private static object SearchHandler(RpcParameters args)
+        private static object SearchHandler(RpcParameters? args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
             string query = GetString(args, "query", "");
@@ -406,7 +417,7 @@ namespace Verbex.Mcp
             bool includeDocumentTermStats = GetBool(args, "includeDocumentTermStats", false);
 
             if (string.IsNullOrWhiteSpace(query))
-                return ToJson(new { error = "Query is required" });
+                return ToolError("Query is required");
 
             InvertedIndex index = GetOrCreateIndexAsync(indexName).GetAwaiter().GetResult();
             SearchResults results = index.SearchAsync(query, maxResults, useAndLogic, labels, tags).GetAwaiter().GetResult();
@@ -468,7 +479,7 @@ namespace Verbex.Mcp
             });
         }
 
-        private static object AddDocumentHandler(RpcParameters args)
+        private static object AddDocumentHandler(RpcParameters? args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
             string name = GetString(args, "name", "");
@@ -477,9 +488,9 @@ namespace Verbex.Mcp
             Dictionary<string, string>? tags = GetStringDict(args, "tags");
 
             if (string.IsNullOrWhiteSpace(name))
-                return ToJson(new { error = "Document name is required" });
+                return ToolError("Document name is required");
             if (string.IsNullOrWhiteSpace(content))
-                return ToJson(new { error = "Document content is required" });
+                return ToolError("Document content is required");
 
             InvertedIndex index = GetOrCreateIndexAsync(indexName).GetAwaiter().GetResult();
             string documentId = index.AddDocumentAsync(name, content).GetAwaiter().GetResult();
@@ -498,19 +509,19 @@ namespace Verbex.Mcp
             });
         }
 
-        private static object GetDocumentHandler(RpcParameters args)
+        private static object GetDocumentHandler(RpcParameters? args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
             string documentId = GetString(args, "documentId", "");
 
             if (string.IsNullOrWhiteSpace(documentId))
-                return ToJson(new { error = "Document ID is required" });
+                return ToolError("Document ID is required");
 
             InvertedIndex index = GetOrCreateIndexAsync(indexName).GetAwaiter().GetResult();
             DocumentMetadata? doc = index.GetDocumentWithMetadataAsync(documentId).GetAwaiter().GetResult();
 
             if (doc == null)
-                return ToJson(new { error = "Document not found" });
+                return ToolError("Document not found");
 
             return ToJson(new
             {
@@ -525,7 +536,7 @@ namespace Verbex.Mcp
             });
         }
 
-        private static object ListDocumentsHandler(RpcParameters args)
+        private static object ListDocumentsHandler(RpcParameters? args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
             int limit = GetInt(args, "limit", 100);
@@ -547,13 +558,13 @@ namespace Verbex.Mcp
             });
         }
 
-        private static object DeleteDocumentHandler(RpcParameters args)
+        private static object DeleteDocumentHandler(RpcParameters? args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
             string documentId = GetString(args, "documentId", "");
 
             if (string.IsNullOrWhiteSpace(documentId))
-                return ToJson(new { error = "Document ID is required" });
+                return ToolError("Document ID is required");
 
             InvertedIndex index = GetOrCreateIndexAsync(indexName).GetAwaiter().GetResult();
             bool removed = index.RemoveDocumentAsync(documentId).GetAwaiter().GetResult();
@@ -561,7 +572,7 @@ namespace Verbex.Mcp
             return ToJson(new { success = removed });
         }
 
-        private static object StatisticsHandler(RpcParameters args)
+        private static object StatisticsHandler(RpcParameters? args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
 
@@ -581,7 +592,7 @@ namespace Verbex.Mcp
             });
         }
 
-        private static object ListIndicesHandler(RpcParameters args)
+        private static object ListIndicesHandler(RpcParameters? args)
         {
             List<string> indices = _Indices.Keys.ToList();
 
@@ -598,7 +609,7 @@ namespace Verbex.Mcp
             return ToJson(new { indices = indices });
         }
 
-        private static object CreateIndexHandler(RpcParameters args)
+        private static object CreateIndexHandler(RpcParameters? args)
         {
             string name = GetString(args, "name", "");
             bool inMemory = GetBool(args, "inMemory", false);
@@ -608,34 +619,44 @@ namespace Verbex.Mcp
             int maxTokenLength = GetInt(args, "maxTokenLength", 0);
 
             if (string.IsNullOrWhiteSpace(name))
-                return ToJson(new { error = "Index name is required" });
+                return ToolError("Index name is required");
+            if (!IsValidIndexName(name))
+                return ToolError(_InvalidIndexNameMessage);
 
-            if (_Indices.ContainsKey(name))
-                return ToJson(new { error = "Index already exists" });
-
-            VerbexConfiguration config;
-            if (inMemory)
+            _IndicesLock.Wait();
+            try
             {
-                config = VerbexConfiguration.CreateInMemory();
+                if (_Indices.ContainsKey(name))
+                    return ToolError("Index already exists");
+
+                VerbexConfiguration config;
+                if (inMemory)
+                {
+                    config = VerbexConfiguration.CreateInMemory();
+                }
+                else
+                {
+                    string indexDir = Path.Combine(_StorageDirectory, name);
+                    config = VerbexConfiguration.CreateOnDisk(indexDir, "index.db");
+                }
+
+                if (enableLemmatizer)
+                    config.Lemmatizer = new BasicLemmatizer();
+                if (enableStopWords)
+                    config.StopWordRemover = new BasicStopWordRemover();
+                if (minTokenLength > 0)
+                    config.MinTokenLength = minTokenLength;
+                if (maxTokenLength > 0)
+                    config.MaxTokenLength = maxTokenLength;
+
+                InvertedIndex index = new InvertedIndex(name, config);
+                index.OpenAsync().GetAwaiter().GetResult();
+                _Indices[name] = index;
             }
-            else
+            finally
             {
-                string indexDir = Path.Combine(_StorageDirectory, name);
-                config = VerbexConfiguration.CreateOnDisk(indexDir, "index.db");
+                _IndicesLock.Release();
             }
-
-            if (enableLemmatizer)
-                config.Lemmatizer = new BasicLemmatizer();
-            if (enableStopWords)
-                config.StopWordRemover = new BasicStopWordRemover();
-            if (minTokenLength > 0)
-                config.MinTokenLength = minTokenLength;
-            if (maxTokenLength > 0)
-                config.MaxTokenLength = maxTokenLength;
-
-            InvertedIndex index = new InvertedIndex(name, config);
-            index.OpenAsync().GetAwaiter().GetResult();
-            _Indices[name] = index;
 
             return ToJson(new
             {
@@ -645,57 +666,67 @@ namespace Verbex.Mcp
             });
         }
 
-        private static object DeleteIndexHandler(RpcParameters args)
+        private static object DeleteIndexHandler(RpcParameters? args)
         {
             string name = GetString(args, "name", "");
 
             if (string.IsNullOrWhiteSpace(name))
-                return ToJson(new { error = "Index name is required" });
+                return ToolError("Index name is required");
+            if (!IsValidIndexName(name))
+                return ToolError(_InvalidIndexNameMessage);
 
-            if (_Indices.TryRemove(name, out InvertedIndex? index))
+            _IndicesLock.Wait();
+            try
             {
-                try
+                if (_Indices.TryRemove(name, out InvertedIndex? index))
                 {
-                    index.CloseAsync().GetAwaiter().GetResult();
+                    try
+                    {
+                        index.CloseAsync().GetAwaiter().GetResult();
+                    }
+                    catch
+                    {
+                        // Ignore close errors
+                    }
+                    index.Dispose();
                 }
-                catch
+
+                // Give the system time to release file handles
+                Thread.Sleep(100);
+
+                string indexDir = Path.Combine(_StorageDirectory, name);
+                if (Directory.Exists(indexDir))
                 {
-                    // Ignore close errors
+                    try
+                    {
+                        Directory.Delete(indexDir, true);
+                    }
+                    catch (IOException)
+                    {
+                        // Retry after a short delay
+                        Thread.Sleep(500);
+                        Directory.Delete(indexDir, true);
+                    }
                 }
-                index.Dispose();
             }
-
-            // Give the system time to release file handles
-            Thread.Sleep(100);
-
-            string indexDir = Path.Combine(_StorageDirectory, name);
-            if (Directory.Exists(indexDir))
+            finally
             {
-                try
-                {
-                    Directory.Delete(indexDir, true);
-                }
-                catch (IOException)
-                {
-                    // Retry after a short delay
-                    Thread.Sleep(500);
-                    Directory.Delete(indexDir, true);
-                }
+                _IndicesLock.Release();
             }
 
             return ToJson(new { success = true });
         }
 
-        private static object AddLabelsHandler(RpcParameters args)
+        private static object AddLabelsHandler(RpcParameters? args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
             string documentId = GetString(args, "documentId", "");
             List<string>? labels = GetStringList(args, "labels");
 
             if (string.IsNullOrWhiteSpace(documentId))
-                return ToJson(new { error = "Document ID is required" });
+                return ToolError("Document ID is required");
             if (labels == null || labels.Count == 0)
-                return ToJson(new { error = "Labels are required" });
+                return ToolError("Labels are required");
 
             InvertedIndex index = GetOrCreateIndexAsync(indexName).GetAwaiter().GetResult();
             index.AddLabelsBatchAsync(documentId, labels).GetAwaiter().GetResult();
@@ -703,16 +734,16 @@ namespace Verbex.Mcp
             return ToJson(new { success = true });
         }
 
-        private static object AddTagsHandler(RpcParameters args)
+        private static object AddTagsHandler(RpcParameters? args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
             string documentId = GetString(args, "documentId", "");
             Dictionary<string, string>? tags = GetStringDict(args, "tags");
 
             if (string.IsNullOrWhiteSpace(documentId))
-                return ToJson(new { error = "Document ID is required" });
+                return ToolError("Document ID is required");
             if (tags == null || tags.Count == 0)
-                return ToJson(new { error = "Tags are required" });
+                return ToolError("Tags are required");
 
             InvertedIndex index = GetOrCreateIndexAsync(indexName).GetAwaiter().GetResult();
             index.AddTagsBatchAsync(documentId, tags).GetAwaiter().GetResult();
@@ -720,12 +751,15 @@ namespace Verbex.Mcp
             return ToJson(new { success = true });
         }
 
-        private static object IndexExistsHandler(RpcParameters args)
+        private static object IndexExistsHandler(RpcParameters? args)
         {
             string name = GetString(args, "name", "");
 
             if (string.IsNullOrWhiteSpace(name))
-                return ToJson(new { error = "Index name is required" });
+                return ToolError("Index name is required");
+
+            if (!IsValidIndexName(name))
+                return ToolError(_InvalidIndexNameMessage);
 
             bool exists = _Indices.ContainsKey(name);
 
@@ -739,13 +773,13 @@ namespace Verbex.Mcp
             return ToJson(new { exists = exists, indexName = name });
         }
 
-        private static object DocumentExistsHandler(RpcParameters args)
+        private static object DocumentExistsHandler(RpcParameters? args)
         {
             string indexName = GetString(args, "index", _DefaultIndexName);
             string documentId = GetString(args, "documentId", "");
 
             if (string.IsNullOrWhiteSpace(documentId))
-                return ToJson(new { error = "Document ID is required" });
+                return ToolError("Document ID is required");
 
             InvertedIndex index = GetOrCreateIndexAsync(indexName).GetAwaiter().GetResult();
             bool exists = index.DocumentExistsAsync(documentId).GetAwaiter().GetResult();
@@ -762,24 +796,58 @@ namespace Verbex.Mcp
             if (_Indices.TryGetValue(indexName, out InvertedIndex? existing))
                 return existing;
 
-            string indexDir = Path.Combine(_StorageDirectory, indexName);
-            VerbexConfiguration config;
+            if (!IsValidIndexName(indexName))
+                throw new ArgumentException(_InvalidIndexNameMessage, nameof(indexName));
 
-            if (Directory.Exists(indexDir) && File.Exists(Path.Combine(indexDir, "index.db")))
+            // Serialize open/create so concurrent calls for the same index never open two handles on one database.
+            await _IndicesLock.WaitAsync().ConfigureAwait(false);
+            try
             {
-                config = VerbexConfiguration.CreateOnDisk(indexDir, "index.db");
-            }
-            else
-            {
+                if (_Indices.TryGetValue(indexName, out existing))
+                    return existing;
+
+                string indexDir = Path.Combine(_StorageDirectory, indexName);
                 Directory.CreateDirectory(indexDir);
-                config = VerbexConfiguration.CreateOnDisk(indexDir, "index.db");
+                VerbexConfiguration config = VerbexConfiguration.CreateOnDisk(indexDir, "index.db");
+
+                InvertedIndex index = new InvertedIndex(indexName, config);
+                await index.OpenAsync().ConfigureAwait(false);
+
+                _Indices[indexName] = index;
+                return index;
             }
+            finally
+            {
+                _IndicesLock.Release();
+            }
+        }
 
-            InvertedIndex index = new InvertedIndex(indexName, config);
-            await index.OpenAsync().ConfigureAwait(false);
+        private static string ResolveStorageDirectory()
+        {
+            string? overrideDir = Environment.GetEnvironmentVariable("VERBEX_MCP_STORAGE_DIR");
+            if (!string.IsNullOrWhiteSpace(overrideDir))
+                return Path.GetFullPath(overrideDir);
 
-            _Indices[indexName] = index;
-            return index;
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".verbex-mcp",
+                "indices");
+        }
+
+        /// <summary>
+        /// Index names become directory names under the storage root, so they are restricted to a safe
+        /// character set; this blocks path traversal such as <c>../..</c> reaching <c>Directory.Delete</c>.
+        /// </summary>
+        internal static bool IsValidIndexName(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name) || name.Length > 128) return false;
+            if (name == "." || name == "..") return false;
+            foreach (char c in name)
+            {
+                if (!(char.IsAsciiLetterOrDigit(c) || c == '-' || c == '_' || c == '.'))
+                    return false;
+            }
+            return true;
         }
 
         private static async Task CleanupIndicesAsync()
@@ -799,7 +867,7 @@ namespace Verbex.Mcp
             _Indices.Clear();
         }
 
-        private static JsonElement? ToElement(RpcParameters args)
+        private static JsonElement? ToElement(RpcParameters? args)
         {
             if (args != null && args.HasValue && !string.IsNullOrEmpty(args.RawJson))
             {
@@ -815,7 +883,7 @@ namespace Verbex.Mcp
             return null;
         }
 
-        private static string GetString(RpcParameters args, string property, string defaultValue)
+        private static string GetString(RpcParameters? args, string property, string defaultValue)
         {
             JsonElement? root = ToElement(args);
             if (root.HasValue && root.Value.TryGetProperty(property, out JsonElement prop) && prop.ValueKind == JsonValueKind.String)
@@ -823,15 +891,19 @@ namespace Verbex.Mcp
             return defaultValue;
         }
 
-        private static int GetInt(RpcParameters args, string property, int defaultValue)
+        private static int GetInt(RpcParameters? args, string property, int defaultValue)
         {
             JsonElement? root = ToElement(args);
             if (root.HasValue && root.Value.TryGetProperty(property, out JsonElement prop) && prop.ValueKind == JsonValueKind.Number)
-                return prop.GetInt32();
+            {
+                if (prop.TryGetInt32(out int value)) return value;
+                if (prop.TryGetDouble(out double d) && !double.IsNaN(d))
+                    return (int)Math.Clamp(Math.Truncate(d), int.MinValue, int.MaxValue);
+            }
             return defaultValue;
         }
 
-        private static bool GetBool(RpcParameters args, string property, bool defaultValue)
+        private static bool GetBool(RpcParameters? args, string property, bool defaultValue)
         {
             JsonElement? root = ToElement(args);
             if (root.HasValue && root.Value.TryGetProperty(property, out JsonElement prop))
@@ -842,7 +914,7 @@ namespace Verbex.Mcp
             return defaultValue;
         }
 
-        private static List<string>? GetStringList(RpcParameters args, string property)
+        private static List<string>? GetStringList(RpcParameters? args, string property)
         {
             JsonElement? root = ToElement(args);
             if (root.HasValue && root.Value.TryGetProperty(property, out JsonElement prop) && prop.ValueKind == JsonValueKind.Array)
@@ -858,7 +930,7 @@ namespace Verbex.Mcp
             return null;
         }
 
-        private static Dictionary<string, string>? GetStringDict(RpcParameters args, string property)
+        private static Dictionary<string, string>? GetStringDict(RpcParameters? args, string property)
         {
             JsonElement? root = ToElement(args);
             if (root.HasValue && root.Value.TryGetProperty(property, out JsonElement prop) && prop.ValueKind == JsonValueKind.Object)

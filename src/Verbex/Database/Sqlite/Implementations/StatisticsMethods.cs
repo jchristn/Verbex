@@ -39,9 +39,14 @@ namespace Verbex.Database.Sqlite.Implementations
             DataTable totalResult = await _Driver.ExecuteQueryAsync(totalTermsQuery, false, token).ConfigureAwait(false);
             stats.TotalTermOccurrences = totalResult.Rows.Count > 0 ? Convert.ToInt64(totalResult.Rows[0][0]) : 0;
 
+            string postingCountQuery = $"SELECT COUNT(*) FROM {prefix}_document_terms;";
+            DataTable postingResult = await _Driver.ExecuteQueryAsync(postingCountQuery, false, token).ConfigureAwait(false);
+            stats.PostingCount = postingResult.Rows.Count > 0 ? Convert.ToInt64(postingResult.Rows[0][0]) : 0;
+
             if (stats.DocumentCount > 0)
             {
                 stats.AverageDocumentLength = (double)stats.TotalTermOccurrences / stats.DocumentCount;
+                stats.AverageTermsPerDocument = (double)stats.PostingCount / stats.DocumentCount;
             }
 
             string docLengthQuery = $"SELECT COALESCE(SUM(document_length), 0) FROM {prefix}_documents;";
