@@ -90,11 +90,15 @@ Each tool invocation is instrumented and pushed over OTLP (metrics, traces, logs
   the reason. Calling an unknown tool name is a JSON-RPC error.
 - Every transport (stdio, HTTP, WebSocket) advertises the same tools through `tools/list`, and only the Verbex
   tools below. Tools are invoked only through `tools/call`; calling a tool name as a bare JSON-RPC method
-  returns `-32601`. The protocol `ping` method returns an empty result (`{}`).
-
-- Arguments are validated against each tool's input schema before the tool runs. A schema violation is a
-  JSON-RPC `-32602` error, not an `isError` result. In particular, `tags` values must be JSON strings:
-  `{ "priority": "5" }` is accepted, `{ "priority": 5 }` is rejected.
+  returns `-32601`. On the handshake revisions (stdio, WebSocket, and handshake Streamable HTTP), the protocol
+  `ping` method returns an empty result (`{}`). The stateless `2026-07-28` revision has no `ping`, so it returns
+  `-32601` there.
+- Clients must send `initialize` exactly once per session; a second `initialize` is rejected with `-32600`.
+  Voltaic 2.1+ clients perform the handshake automatically when they connect.
+- Arguments are validated against each tool's input schema before the tool runs; the tool never runs on
+  invalid arguments. A schema violation is a tool result with `isError: true` whose text names the problem,
+  as the MCP 2025-11-25 specification requires, not a JSON-RPC `-32602` error. In particular, `tags` values
+  must be JSON strings: `{ "priority": "5" }` is accepted, `{ "priority": 5 }` is rejected.
 - The `index` parameter defaults to `default` on every tool that accepts it.
 
 ## Tool Inventory

@@ -243,6 +243,11 @@ curl -X POST http://localhost:8080/v1.0/indices/restore \
 - **[STORAGE.md](STORAGE.md)** - Storage architecture
 - **[SCORING.md](SCORING.md)** - Scoring algorithm details
 - **[TELEMETRY.md](TELEMETRY.md)** - Metrics, tracing, and observability integration
+- **[CHANGELOG.md](CHANGELOG.md)** - Release history
+
+## Version History
+
+The current version is **v0.2.2**, a dependency update (Voltaic 2.2.1, Watson 7.2.2, Caching 5.1.2, Microsoft.Data.SqlClient 7.1.1, and others). With Voltaic 2.2.1, MCP tool calls with invalid arguments return an `isError` result instead of a JSON-RPC `-32602` error. See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ## Configuration
 

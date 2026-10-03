@@ -279,18 +279,13 @@ namespace Test.Mcp
         {
             await RunTestAsync("Initialize MCP Connection", async () =>
             {
-                JsonElement result = await _Client!.CallAsync<JsonElement>("initialize", new
-                {
-                    protocolVersion = "2025-03-26"
-                }).ConfigureAwait(false);
+                // Voltaic 2.1+ clients perform the initialize handshake on connect.
+                Assert(!String.IsNullOrEmpty(_Client!.SessionId), "Connect should have opened a session");
+                AssertEquals(McpProtocol.LatestProtocolVersion, _Client.ProtocolVersion, "Negotiated protocol version");
+                Console.WriteLine($"    Negotiated: {_Client.ProtocolVersion}");
 
-                Assert(result.TryGetProperty("protocolVersion", out _), "Should have protocolVersion");
-                Assert(result.TryGetProperty("serverInfo", out _), "Should have serverInfo");
-                Assert(result.TryGetProperty("capabilities", out _), "Should have capabilities");
-                AssertEquals("Verbex MCP Server", result.GetProperty("serverInfo").GetProperty("name").GetString(), "Server name");
-
-                Console.WriteLine($"    Server: {result.GetProperty("serverInfo").GetProperty("name").GetString()}");
-                Console.WriteLine($"    Version: {result.GetProperty("serverInfo").GetProperty("version").GetString()}");
+                // A second initialize on the same session is rejected.
+                await AssertSecondInitializeRejectedAsync((m, p) => _Client.CallAsync<JsonElement>(m, p)).ConfigureAwait(false);
             }).ConfigureAwait(false);
         }
 
@@ -1026,7 +1021,7 @@ namespace Test.Mcp
 
         private static async Task TestTagSchemaValidationAsync()
         {
-            await RunTestAsync("Tag values must be strings (additionalProperties schema is enforced)", async () =>
+            await RunTestAsync("Tag values must be strings (additionalProperties schema is enforced as an isError result)", async () =>
             {
                 // Positive: string tag values pass validation and are stored.
                 JsonElement ok = await CallToolDataAsync("verbex_add_document", new
@@ -1038,8 +1033,9 @@ namespace Test.Mcp
                 }).ConfigureAwait(false);
                 Assert(ok.GetProperty("success").GetBoolean(), "String tag values should be accepted");
 
-                // Negative: non-string tag values are rejected with -32602 before the handler runs, for each tool
-                // whose schema declares tags as additionalProperties { type: string }.
+                // Negative: non-string tag values fail input validation before the handler runs, for each tool
+                // whose schema declares tags as additionalProperties { type: string }. Since Voltaic 2.1 this is an
+                // isError tool result (as the 2025-11-25 specification requires), not a JSON-RPC -32602 error.
                 object[] badCalls = new object[]
                 {
                     ToolCall("verbex_add_document", new { index = _TestIndexName, name = "schema-bad-tags", content = "Should not be indexed.", tags = new { priority = 5 } }),
@@ -1049,18 +1045,11 @@ namespace Test.Mcp
 
                 foreach (object call in badCalls)
                 {
-                    bool threw = false;
-                    try
-                    {
-                        await _Client!.CallAsync<JsonElement>("tools/call", call).ConfigureAwait(false);
-                    }
-                    catch (Exception e) when (e is not TestAssertException)
-                    {
-                        threw = true;
-                        Assert(e.Message.Contains("-32602"), "Invalid tag value should fail with -32602: " + e.Message);
-                    }
-
-                    Assert(threw, "Non-string tag value should be rejected: " + JsonSerializer.Serialize(call));
+                    JsonElement result = await _Client!.CallAsync<JsonElement>("tools/call", call).ConfigureAwait(false);
+                    Assert(result.TryGetProperty("isError", out JsonElement isError) && isError.ValueKind == JsonValueKind.True,
+                        "Non-string tag value should be rejected with isError: " + JsonSerializer.Serialize(call) + " -> " + result.GetRawText());
+                    string text = result.GetProperty("content")[0].GetProperty("text").GetString() ?? "";
+                    Assert(text.Contains("tags", StringComparison.OrdinalIgnoreCase), "Validation error should name the tags argument: " + text);
                 }
 
                 JsonElement list = await CallToolDataAsync("verbex_list_documents", new { index = _TestIndexName, limit = 1000 }).ConfigureAwait(false);
@@ -1082,14 +1071,11 @@ namespace Test.Mcp
 
             await RunTestAsync("Streamable HTTP: connect + initialize (2025-11-25)", async () =>
             {
+                client.ProtocolVersion = "2025-11-25";
                 Assert(await client.ConnectStreamableAsync(baseUrl).ConfigureAwait(false), "ConnectStreamableAsync should succeed");
-                JsonElement init = await client.CallAsync<JsonElement>("initialize", new
-                {
-                    protocolVersion = "2025-11-25",
-                    capabilities = new { },
-                    clientInfo = new { name = "verbex-test", version = "1.0.0" }
-                }).ConfigureAwait(false);
-                AssertEquals("2025-11-25", init.GetProperty("protocolVersion").GetString(), "Negotiated protocol version");
+                Assert(!String.IsNullOrEmpty(client.SessionId), "Connect should have opened a session");
+                AssertEquals("2025-11-25", client.ProtocolVersion, "Negotiated protocol version");
+                await AssertSecondInitializeRejectedAsync((m, p) => client.CallAsync<JsonElement>(m, p)).ConfigureAwait(false);
             }).ConfigureAwait(false);
 
             await RunTransportSmokeAsync("Streamable HTTP", (m, p) => client.CallAsync<JsonElement>(m, p)).ConfigureAwait(false);
@@ -1142,13 +1128,8 @@ namespace Test.Mcp
             await RunTestAsync("stdio: launch + initialize", async () =>
             {
                 Assert(await client.LaunchServerAsync("dotnet", new[] { serverDll, "--transport", "stdio" }).ConfigureAwait(false), "Server should launch");
-                JsonElement init = await client.CallAsync<JsonElement>("initialize", new
-                {
-                    protocolVersion = "2025-11-25",
-                    capabilities = new { },
-                    clientInfo = new { name = "verbex-test", version = "1.0.0" }
-                }, 60000).ConfigureAwait(false);
-                AssertEquals("Verbex MCP Server", init.GetProperty("serverInfo").GetProperty("name").GetString(), "Server name");
+                AssertInitializeResult(client.InitializeResult);
+                await AssertSecondInitializeRejectedAsync((m, p) => client.CallAsync<JsonElement>(m, p)).ConfigureAwait(false);
             }).ConfigureAwait(false);
 
             await RunTransportSmokeAsync("stdio", (m, p) => client.CallAsync<JsonElement>(m, p)).ConfigureAwait(false);
@@ -1169,17 +1150,41 @@ namespace Test.Mcp
                     if (!connected) await Task.Delay(500).ConfigureAwait(false);
                 }
                 Assert(connected, "WebSocket client should connect to " + url);
-
-                JsonElement init = await client.CallAsync<JsonElement>("initialize", new
-                {
-                    protocolVersion = "2025-11-25",
-                    capabilities = new { },
-                    clientInfo = new { name = "verbex-test", version = "1.0.0" }
-                }).ConfigureAwait(false);
-                AssertEquals("Verbex MCP Server", init.GetProperty("serverInfo").GetProperty("name").GetString(), "Server name");
+                AssertInitializeResult(client.InitializeResult);
+                await AssertSecondInitializeRejectedAsync((m, p) => client.CallAsync<JsonElement>(m, p)).ConfigureAwait(false);
             }).ConfigureAwait(false);
 
             await RunTransportSmokeAsync("WebSocket", (m, p) => client.CallAsync<JsonElement>(m, p)).ConfigureAwait(false);
+        }
+
+        private static void AssertInitializeResult(JsonElement? initializeResult)
+        {
+            Assert(initializeResult.HasValue, "Client should hold the initialize result after connecting");
+            JsonElement init = initializeResult!.Value;
+            Assert(init.TryGetProperty("protocolVersion", out _), "Should have protocolVersion");
+            Assert(init.TryGetProperty("capabilities", out _), "Should have capabilities");
+            AssertEquals("Verbex MCP Server", init.GetProperty("serverInfo").GetProperty("name").GetString(), "Server name");
+        }
+
+        private static async Task AssertSecondInitializeRejectedAsync(Func<string, object?, Task<JsonElement>> rpc)
+        {
+            bool threw = false;
+            try
+            {
+                await rpc("initialize", new
+                {
+                    protocolVersion = McpProtocol.LatestProtocolVersion,
+                    capabilities = new { },
+                    clientInfo = new { name = "verbex-test", version = "1.0.0" }
+                }).ConfigureAwait(false);
+            }
+            catch (Exception e) when (e is not TestAssertException)
+            {
+                threw = true;
+                Assert(e.Message.Contains("-32600") || e.Message.Contains("already initialized"), "Second initialize should fail with -32600: " + e.Message);
+            }
+
+            Assert(threw, "A second initialize on an initialized session should be rejected");
         }
 
         /// <summary>
@@ -1197,7 +1202,25 @@ namespace Test.Mcp
 
             await RunTestAsync($"{label}: ping returns an empty result", async () =>
             {
-                // {} under handshake revisions; only resultType under the stateless 2026-07-28 revision.
+                if (label == "Stateless")
+                {
+                    // The stateless 2026-07-28 revision removed ping; servers answer -32601.
+                    bool threw = false;
+                    try
+                    {
+                        await rpc("ping", null).ConfigureAwait(false);
+                    }
+                    catch (Exception e) when (e is not TestAssertException)
+                    {
+                        threw = true;
+                        Assert(e.Message.Contains("-32601") || e.Message.Contains("does not exist"), "Stateless ping should be method-not-found: " + e.Message);
+                    }
+
+                    Assert(threw, "Stateless ping should be rejected");
+                    return;
+                }
+
+                // {} under handshake revisions.
                 JsonElement pong = await rpc("ping", null).ConfigureAwait(false);
                 AssertEquals(JsonValueKind.Object, pong.ValueKind, "ping result kind");
                 List<string> props = pong.EnumerateObject().Select(p => p.Name).Where(n => n != "resultType").ToList();
