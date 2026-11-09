@@ -3,13 +3,16 @@ namespace Verbex.Mcp
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Text;
     using System.Text.Json;
     using System.Text.Json.Nodes;
+    using System.Text.RegularExpressions;
 
     /// <summary>
     /// Registers (or removes) the Verbex MCP server in the configuration files of supported AI clients:
     /// Claude Code, Cursor, Codex, the Gemini CLI, and Mux. Each client's config is edited in place with a
-    /// DOM-preserving JSON merge, so every other MCP server entry and unrelated setting is retained.
+    /// DOM-preserving JSON merge (or, for Codex, a line-preserving edit of its TOML file), so every other MCP
+    /// server entry and unrelated setting is retained.
     /// <para>
     /// The Verbex MCP server exposes no authentication, so no credential headers are written. Entries point
     /// at the Streamable HTTP endpoint, which requires the server to be running with
@@ -36,6 +39,10 @@ namespace Verbex.Mcp
 
         private const string _ServerKey = "verbex";
         private const string _McpPath = "/mcp";
+
+        private static readonly Regex _TomlTableHeader = new Regex(
+            @"^\s*\[\[?\s*([^\]]+?)\s*\]\]?\s*(#.*)?$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         private static readonly JsonSerializerOptions _WriteOptions = new JsonSerializerOptions
         {
@@ -113,9 +120,9 @@ namespace Verbex.Mcp
                 {
                     Path.Combine(home, ".cursor", "mcp.json")
                 }),
-                new McpClientTarget("Codex", McpConfigFormat.McpServersTypeUrl, new string[]
+                new McpClientTarget("Codex", McpConfigFormat.CodexToml, new string[]
                 {
-                    Path.Combine(home, ".codex", "config.json")
+                    Path.Combine(home, ".codex", "config.toml")
                 }),
                 new McpClientTarget("Gemini", McpConfigFormat.McpServersHttpUrl, new string[]
                 {
@@ -136,6 +143,14 @@ namespace Verbex.Mcp
             if (!string.IsNullOrEmpty(directory))
                 Directory.CreateDirectory(directory);
 
+            if (client.Format == McpConfigFormat.CodexToml)
+            {
+                ApplyCodexTomlEntry(targetPath, fullUrl);
+                RemoveLegacyCodexJsonEntry(targetPath);
+                Console.WriteLine("  Installed Verbex MCP for " + client.Name + " at " + targetPath);
+                return;
+            }
+
             JsonObject root = LoadRoot(targetPath);
 
             if (client.Format == McpConfigFormat.MuxServersArray)
@@ -149,6 +164,12 @@ namespace Verbex.Mcp
 
         private static void UninstallClient(McpClientTarget client)
         {
+            if (client.Format == McpConfigFormat.CodexToml)
+            {
+                UninstallCodex(client);
+                return;
+            }
+
             string? targetPath = ResolveExistingPath(client);
             if (targetPath == null)
             {
@@ -172,6 +193,97 @@ namespace Verbex.Mcp
 
             File.WriteAllText(targetPath, root.ToJsonString(_WriteOptions));
             Console.WriteLine("  Removed Verbex MCP for " + client.Name + " at " + targetPath);
+        }
+
+        private static void UninstallCodex(McpClientTarget client)
+        {
+            string targetPath = client.ConfigPaths[0];
+            bool removedLegacy = RemoveLegacyCodexJsonEntry(targetPath);
+            bool removed = File.Exists(targetPath) && RemoveCodexTomlEntry(targetPath);
+
+            if (removed)
+                Console.WriteLine("  Removed Verbex MCP for " + client.Name + " at " + targetPath);
+            else if (!removedLegacy)
+                Console.WriteLine("  Skipped " + client.Name + ": no Verbex entry in " + targetPath);
+        }
+
+        private static void ApplyCodexTomlEntry(string path, string fullUrl)
+        {
+            List<string> lines = ReadTomlWithoutVerbexTable(path, out bool _);
+
+            while (lines.Count > 0 && string.IsNullOrWhiteSpace(lines[lines.Count - 1]))
+                lines.RemoveAt(lines.Count - 1);
+            if (lines.Count > 0)
+                lines.Add(string.Empty);
+
+            lines.Add("[mcp_servers." + _ServerKey + "]");
+            lines.Add("url = " + JsonSerializer.Serialize(fullUrl));
+            WriteTomlLines(path, lines);
+        }
+
+        private static bool RemoveCodexTomlEntry(string path)
+        {
+            List<string> lines = ReadTomlWithoutVerbexTable(path, out bool found);
+            if (!found)
+                return false;
+
+            while (lines.Count > 0 && string.IsNullOrWhiteSpace(lines[lines.Count - 1]))
+                lines.RemoveAt(lines.Count - 1);
+            WriteTomlLines(path, lines);
+            return true;
+        }
+
+        private static List<string> ReadTomlWithoutVerbexTable(string path, out bool found)
+        {
+            found = false;
+            List<string> kept = new List<string>();
+            if (!File.Exists(path))
+                return kept;
+
+            string tableName = "mcp_servers." + _ServerKey;
+            bool skipping = false;
+
+            foreach (string line in File.ReadAllText(path).Replace("\r\n", "\n").Split('\n'))
+            {
+                Match header = _TomlTableHeader.Match(line);
+                if (header.Success)
+                {
+                    string name = header.Groups[1].Value.Replace("\"", string.Empty);
+                    skipping = string.Equals(name, tableName, StringComparison.Ordinal)
+                        || name.StartsWith(tableName + ".", StringComparison.Ordinal);
+                    found = found || skipping;
+                }
+
+                if (!skipping)
+                    kept.Add(line);
+            }
+
+            return kept;
+        }
+
+        private static void WriteTomlLines(string path, List<string> lines)
+        {
+            File.WriteAllText(path, string.Join("\n", lines) + "\n", new UTF8Encoding(false));
+        }
+
+        private static bool RemoveLegacyCodexJsonEntry(string tomlPath)
+        {
+            // Earlier releases wrote the entry to config.json, which Codex never reads; clean it up.
+            string? directory = Path.GetDirectoryName(tomlPath);
+            if (string.IsNullOrEmpty(directory))
+                return false;
+
+            string legacyPath = Path.Combine(directory, "config.json");
+            if (!File.Exists(legacyPath))
+                return false;
+
+            JsonObject root = LoadRoot(legacyPath);
+            if (!RemoveMcpServersEntry(root))
+                return false;
+
+            File.WriteAllText(legacyPath, root.ToJsonString(_WriteOptions));
+            Console.WriteLine("  Removed stale Verbex entry from " + legacyPath + " (Codex reads config.toml)");
+            return true;
         }
 
         private static string? ResolveExistingPath(McpClientTarget client)

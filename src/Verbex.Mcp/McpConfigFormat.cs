@@ -8,7 +8,7 @@ namespace Verbex.Mcp
     {
         /// <summary>
         /// A top-level <c>mcpServers</c> object whose entry carries <c>type</c> and <c>url</c>.
-        /// Used by Claude Code and Codex.
+        /// Used by Claude Code.
         /// </summary>
         McpServersTypeUrl,
 
@@ -28,6 +28,12 @@ namespace Verbex.Mcp
         /// A top-level <c>servers</c> array whose entry carries <c>name</c>, <c>transport</c>,
         /// a base <c>url</c>, and an <c>mcpPath</c>. Used by Mux.
         /// </summary>
-        MuxServersArray
+        MuxServersArray,
+
+        /// <summary>
+        /// A TOML <c>[mcp_servers.&lt;name&gt;]</c> table carrying <c>url</c>, in <c>~/.codex/config.toml</c>.
+        /// Used by Codex.
+        /// </summary>
+        CodexToml
     }
 }

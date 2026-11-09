@@ -1,5 +1,6 @@
 @echo off
-REM Disconnect Claude Code from the Verbex MCP server (via the claude CLI).
+REM Disconnect Claude Code from the Verbex MCP server (via the claude CLI). Removes the user-scope entry, plus a
+REM local-scope entry for the current directory left by older versions of install-claude.bat.
 setlocal
 where claude >nul 2>nul
 if errorlevel 1 (
@@ -8,6 +9,12 @@ if errorlevel 1 (
 )
 
 REM claude is itself a batch file (claude.cmd), so it must be run with "call" or this script would end when it does.
-call claude mcp remove verbex
-echo Removed 'verbex' MCP server from Claude Code.
+set REMOVED=0
+call claude mcp remove --scope user verbex >nul 2>nul && set REMOVED=1
+call claude mcp remove --scope local verbex >nul 2>nul && set REMOVED=1
+if "%REMOVED%"=="1" (
+  echo Removed 'verbex' MCP server from Claude Code.
+) else (
+  echo No 'verbex' MCP server was registered with Claude Code; nothing to remove.
+)
 endlocal
