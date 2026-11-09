@@ -3,3 +3,6 @@
 
 # Windows batch scripts use CRLF.
 *.bat text eol=crlf
+
+# Windows command scripts use CRLF.
+*.cmd text eol=crlf

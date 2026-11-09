@@ -7,6 +7,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-claude mcp remove verbex
+REM claude is itself a batch file (claude.cmd), so it must be run with "call" or this script would end when it does.
+call claude mcp remove verbex
 echo Removed 'verbex' MCP server from Claude Code.
 endlocal

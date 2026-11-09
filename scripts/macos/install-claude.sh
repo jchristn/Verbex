@@ -12,5 +12,7 @@ command -v claude >/dev/null 2>&1 || {
   exit 1
 }
 
+# Re-running replaces the existing entry instead of failing on a duplicate.
+claude mcp remove verbex >/dev/null 2>&1 || true
 claude mcp add --transport http verbex "$URL"
 echo "Added 'verbex' MCP server to Claude Code. Restart Claude Code to pick it up."

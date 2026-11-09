@@ -12,6 +12,10 @@ if errorlevel 1 (
   exit /b 1
 )
 
-claude mcp add --transport http verbex "%VERBEX_MCP_URL%"
+REM Re-running replaces the existing entry instead of failing on a duplicate. claude is itself a batch file
+REM (claude.cmd), so it must be run with "call" or this script would end when it does.
+call claude mcp remove verbex >nul 2>nul
+call claude mcp add --transport http verbex "%VERBEX_MCP_URL%"
+if errorlevel 1 exit /b 1
 echo Added 'verbex' MCP server to Claude Code. Restart Claude Code to pick it up.
 endlocal

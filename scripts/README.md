@@ -8,6 +8,8 @@ scripts/
   windows/   install-<agent>.bat   remove-<agent>.bat
   macos/     install-<agent>.sh    remove-<agent>.sh
   linux/     install-<agent>.sh    remove-<agent>.sh
+  wsl/       install-<agent>.sh    remove-<agent>.sh   (WSL 1)
+  wsl2/      install-<agent>.sh    remove-<agent>.sh   (WSL 2)
 ```
 
 Supported agents: **claude**, **cursor**, **codex**, **gemini**, **mux**.
@@ -36,6 +38,22 @@ sh scripts/macos/install-cursor.sh      # or scripts/linux/... ; the two are ide
 sh scripts/linux/remove-cursor.sh
 ```
 
+WSL (run inside the distro; use `wsl2/` on WSL 2 and `wsl/` on WSL 1):
+
+```sh
+sh scripts/wsl2/install-claude.sh
+sh scripts/wsl2/remove-claude.sh
+```
+
+The WSL scripts register the agent that runs *inside* WSL and write the WSL-side config (`~` in the distro). They
+reuse the Linux scripts after fixing the WSL environment: Windows entries on `PATH` are ignored, so a Windows
+`claude`/`codex`/`gemini` shim is never used (install the agent inside WSL, or run `scripts\windows\...` from Windows
+for a Windows agent). On WSL 2 with NAT networking, `127.0.0.1` inside the distro is not Windows; when the default
+endpoint does not answer inside WSL but the Windows host does, the scripts use the Windows host address instead
+(set `VERBEX_MCP_URL`/`VERBEX_MCP_BASE_URL` to choose the address yourself, `WSL_NO_HOST_REWRITE=1` to keep `127.0.0.1`,
+or enable `networkingMode=mirrored` in `.wslconfig`). That host address can change after a Windows restart, so
+re-run the install script if the agent stops connecting.
+
 Each `install` script is idempotent — it updates the existing `verbex` entry in place and preserves every
 other MCP server in the config. Restart the agent afterward to pick up the change.
 
@@ -45,12 +63,12 @@ other MCP server in the config. Restart the agent afterward to pick up the chang
 | --- | --- | --- |
 | **claude** | runs the `claude` CLI (`claude mcp add` / `claude mcp remove`) | Claude Code's own store |
 | **cursor** | writes an `mcpServers.verbex` entry (`url`) | `~/.cursor/mcp.json` |
-| **codex** | writes an `mcpServers.verbex` entry (`type: http`, `url`) | `~/.codex/config.json` |
+| **codex** | writes an `[mcp_servers.verbex]` table (`url`) | `~/.codex/config.toml` |
 | **gemini** | writes an `mcpServers.verbex` entry (`httpUrl`) | `~/.gemini/settings.json` |
 | **mux** | appends a `verbex` object to the `servers` array (`transport: http`, base `url`, `mcpPath`) | `~/.mux/mcp-servers.json` |
 
 The scripts connect to `http://127.0.0.1:8200/mcp`. The Verbex MCP server exposes **no authentication**, so
-no credential headers are written. On Windows the JSON is edited with PowerShell; on macOS/Linux with
+no credential headers are written. On Windows the config is edited with PowerShell; on macOS/Linux with
 `python3` (required). The `claude` scripts require the `claude` CLI on `PATH`.
 
 ## Overriding the defaults
