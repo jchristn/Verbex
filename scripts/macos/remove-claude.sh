@@ -1,15 +1,46 @@
-#!/usr/bin/env sh
-# Disconnect Claude Code from the Verbex MCP server (via the claude CLI). Removes the user-scope entry, plus a
-# local-scope entry for the current directory left by older versions of install-claude.sh.
-set -e
+#!/usr/bin/env bash
+# Disconnect Claude Code from the Verbex MCP server (user scope), via the claude CLI.
+# Succeeds with "nothing to remove" when there is no 'verbex' entry; every other server is kept.
+# Usage: scripts/macos/remove-claude.sh
+# Requires the claude CLI.
+if [ -z "${BASH_VERSION:-}" ]; then exec bash "$0" "$@"; fi
+set -euo pipefail
 
-command -v claude >/dev/null 2>&1 || { echo "Claude CLI not found on PATH." >&2; exit 1; }
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC2034 # not every script needs REPO_ROOT
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+die() { echo "Error: $*" >&2; exit 1; }
 
-removed=0
-claude mcp remove --scope user verbex >/dev/null 2>&1 && removed=1
-claude mcp remove --scope local verbex >/dev/null 2>&1 && removed=1
-if [ "$removed" -eq 1 ]; then
-  echo "Removed 'verbex' MCP server from Claude Code."
-else
-  echo "No 'verbex' MCP server was registered with Claude Code; nothing to remove."
+if [ "$(uname -s)" != Darwin ]; then
+    die "This script is for macOS. Use scripts/linux on Linux, scripts/wsl2 or scripts/wsl under WSL, or scripts\\windows on Windows."
 fi
+
+usage() { awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"; }
+case "${1:-}" in
+    -h|--help) usage; exit 0 ;;
+    -?*) die "Unknown option: $1 (see --help)" ;;
+esac
+[ "$#" -eq 0 ] || die "Unexpected argument: $1 (this script takes no arguments; see --help)"
+command -v claude >/dev/null 2>&1 || die "'claude' was not found. Install Claude Code: curl -fsSL https://claude.ai/install.sh | bash (see https://code.claude.com/docs/en/setup)."
+
+# Prints "removed" or "absent"; fails on any other error from the claude CLI.
+claude_remove() {
+    local out
+    if out="$(claude mcp remove --scope user verbex 2>&1)"; then echo removed; return 0; fi
+    case "$out" in
+        *"No MCP server named"*) echo absent ;;
+        *) die "claude mcp remove failed: $out" ;;
+    esac
+}
+claude_add() {
+    claude mcp add --scope user --transport http verbex "$URL" >/dev/null || die "claude mcp add failed."
+}
+
+# Assigned first: a failure inside $(...) in an if test would not stop the script.
+STATUS="$(claude_remove)"
+if [ "$STATUS" = removed ]; then
+    echo "Removed 'verbex' from Claude Code at user scope."
+else
+    echo "No 'verbex' entry in Claude Code at user scope; nothing to remove."
+fi
+echo "Restart Claude Code to pick up the change."
